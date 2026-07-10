@@ -2,3 +2,7 @@ node_modules
 .env
 .env.local
 dist
+
+# Arquivos sensíveis / não versionar
+contas.txt
+*.zip

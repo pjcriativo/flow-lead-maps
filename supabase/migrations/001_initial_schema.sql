@@ -1,4 +1,4 @@
--- LeadSift Database Schema
+-- LeadSift Database Schema — MESTRE DO MVP
 -- Run this in Supabase SQL Editor
 
 -- User profiles (extends auth.users)
