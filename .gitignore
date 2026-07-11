@@ -17,5 +17,11 @@ dist
 contas.txt
 *.zip
 
+# Skills: os symlinks em .claude/skills/* usam caminho ABSOLUTO da máquina
+# (não portáveis). O conteúdo real fica em .agents/skills/ (versionado).
+# Exceção: flow-loop é arquivo real e deve ser versionado.
+/.claude/skills/*
+!/.claude/skills/flow-loop
+
 .vercel
 .env*
