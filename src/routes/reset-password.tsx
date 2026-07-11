@@ -9,7 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
-    meta: [{ title: "Reset password — Flow Leads" }],
+    meta: [{ title: "Redefinir senha — Flow Leads" }],
   }),
   component: ResetPasswordPage,
 });
@@ -30,10 +30,10 @@ function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      setInfo("Password updated. Redirecting...");
+      setInfo("Senha atualizada. Redirecionando...");
       setTimeout(() => navigate({ to: "/dashboard", replace: true }), 1000);
     } catch (e: any) {
-      setError(e.message ?? "Could not update password");
+      setError(e.message ?? "Não foi possível atualizar a senha");
     } finally {
       setLoading(false);
     }
@@ -46,12 +46,12 @@ function ResetPasswordPage() {
           <FlowLeadsLogo className="h-10 w-auto" />
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Set a new password</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Enter and confirm your new password below.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Defina uma nova senha</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Digite e confirme sua nova senha abaixo.</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="password">New password</Label>
+            <Label htmlFor="password">Nova senha</Label>
             <div className="relative">
               <Input
                 id="password"
@@ -66,7 +66,7 @@ function ResetPasswordPage() {
                 type="button"
                 onClick={() => setShow((v) => !v)}
                 className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                aria-label={show ? "Hide password" : "Show password"}
+                aria-label={show ? "Ocultar senha" : "Mostrar senha"}
               >
                 {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -78,13 +78,13 @@ function ResetPasswordPage() {
                 onChange={(e) => setShow(e.target.checked)}
                 className="h-3.5 w-3.5 rounded border-border"
               />
-              Show password
+              Mostrar senha
             </label>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           {info && <p className="text-sm text-emerald-600">{info}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Updating..." : "Update password"}
+            {loading ? "Atualizando..." : "Atualizar senha"}
           </Button>
         </form>
       </div>

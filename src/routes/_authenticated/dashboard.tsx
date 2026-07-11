@@ -38,10 +38,10 @@ import { posthog } from "@/lib/posthog";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Flow Leads" },
-      { name: "description", content: "Manage your leads and export them to Excel or Google Sheets from your Flow Leads dashboard." },
-      { property: "og:title", content: "Dashboard — Flow Leads" },
-      { property: "og:description", content: "Manage your leads and export them to Excel or Google Sheets from your Flow Leads dashboard." },
+      { title: "Painel — Flow Leads" },
+      { name: "description", content: "Gerencie seus leads e exporte para Excel ou Google Sheets pelo painel do Flow Leads." },
+      { property: "og:title", content: "Painel — Flow Leads" },
+      { property: "og:description", content: "Gerencie seus leads e exporte para Excel ou Google Sheets pelo painel do Flow Leads." },
       { property: "og:url", content: "https://flowleads.com.br/dashboard" },
     ],
     links: [
@@ -73,6 +73,13 @@ type Lead = {
 };
 
 type Section = "dashboard" | "leads" | "sheets" | "settings";
+
+const SECTION_LABELS: Record<Section, string> = {
+  dashboard: "Painel",
+  leads: "Meus Leads",
+  sheets: "Google Sheets",
+  settings: "Configurações",
+};
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -114,10 +121,10 @@ function Dashboard() {
         </Link>
         <nav className="flex-1 space-y-1 px-3 py-2">
           {[
-            { id: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
-            { id: "leads", label: "My Leads", Icon: Users },
+            { id: "dashboard", label: "Painel", Icon: LayoutDashboard },
+            { id: "leads", label: "Meus Leads", Icon: Users },
             { id: "sheets", label: "Google Sheets", Icon: SheetIcon },
-            { id: "settings", label: "Settings", Icon: SettingsIcon },
+            { id: "settings", label: "Configurações", Icon: SettingsIcon },
           ].map((item) => (
             <button
               key={item.id}
@@ -140,7 +147,7 @@ function Dashboard() {
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
           >
             <LogOut className="h-4 w-4" />
-            Sign out
+            Sair
           </button>
         </div>
         <div className="border-t border-sidebar-border p-4 text-xs text-sidebar-foreground/50">
@@ -155,13 +162,13 @@ function Dashboard() {
             key={id}
             onClick={() => setSection(id)}
             className={cn(
-              "shrink-0 rounded-md px-3 py-1.5 text-xs capitalize",
+              "shrink-0 rounded-md px-3 py-1.5 text-xs",
               section === id
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground/70",
             )}
           >
-            {id}
+            {SECTION_LABELS[id]}
           </button>
         ))}
       </div>
@@ -195,10 +202,10 @@ function Dashboard() {
 
 /* -------------------- Dashboard / Generate -------------------- */
 const NICHE_TAGS: string[] = [
-  "Marketing Agency", "Dental Clinic", "Real Estate Agent", "Law Firm",
-  "Restaurant", "Gym & Fitness", "Plumber", "Electrician", "Accountant",
-  "Hair Salon", "Auto Repair", "Mortgage Broker", "Insurance Agent",
-  "Web Designer", "Photographer",
+  "Agência de Marketing", "Clínica Odontológica", "Corretor de Imóveis", "Escritório de Advocacia",
+  "Restaurante", "Academia", "Encanador", "Eletricista", "Contador",
+  "Salão de Beleza", "Oficina Mecânica", "Correspondente Bancário", "Corretor de Seguros",
+  "Web Designer", "Fotógrafo",
 ];
 
 function DashboardSection({
@@ -219,7 +226,7 @@ function DashboardSection({
   const [count, setCount] = useState("50");
   const [findEmails, setFindEmails] = useState(true);
   const [running, setRunning] = useState(false);
-  const [status, setStatus] = useState("Idle");
+  const [status, setStatus] = useState("Parado");
   const [jobStatus, setJobStatus] = useState<string>("");
   const [currentSource, setCurrentSource] = useState<string>("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -246,7 +253,7 @@ function DashboardSection({
 
   const handleGenerate = async () => {
     if (!businessType || !city) {
-      pushLog("ERROR: Business type and city are required.");
+      pushLog("ERRO: Tipo de empresa e cidade são obrigatórios.");
       return;
     }
     setRunning(true);
@@ -257,7 +264,7 @@ function DashboardSection({
     setJobStatus("");
     setCurrentSource("");
     const maxResults = Number(count);
-    setStatus(`Starting search: ${businessType} in ${city}...`);
+    setStatus(`Iniciando busca: ${businessType} em ${city}...`);
     pushLog(`POST /scrape`);
     posthog.capture("scrape_started", { query: businessType, city, limit: maxResults });
     const { data: { session } } = await supabase.auth.getSession();
@@ -282,11 +289,11 @@ function DashboardSection({
       const jobId = submitJson.job_id ?? submitJson.id ?? submitJson.jobId;
       if (!jobId) {
         console.error("No job_id in scrape response", submitJson);
-        throw new Error("Unexpected response from server. Please try again.");
+        throw new Error("Resposta inesperada do servidor. Tente novamente.");
       }
       setLastJobId(String(jobId));
-      pushLog(`✔ Job created: ${jobId}`);
-      setStatus(`Job ${jobId} queued. Polling...`);
+      pushLog(`✔ Tarefa criada: ${jobId}`);
+      setStatus(`Tarefa ${jobId} na fila. Consultando...`);
 
       let seenLeadCount = 0;
       let lastStatus = "";
@@ -297,11 +304,11 @@ function DashboardSection({
         try {
           pollRes = await fetch(`${API_BASE}/job/${jobId}`);
         } catch (e: any) {
-          pushLog(`Poll error: ${e.message}. Retrying...`);
+          pushLog(`Erro na consulta: ${e.message}. Tentando de novo...`);
           continue;
         }
         if (!pollRes.ok) {
-          pushLog(`GET /job/${jobId} → ${pollRes.status}. Retrying...`);
+          pushLog(`GET /job/${jobId} → ${pollRes.status}. Tentando de novo...`);
           continue;
         }
         const job = await pollRes.json();
@@ -324,8 +331,8 @@ function DashboardSection({
             return [...prev, ...mapped];
           });
           for (const r of fresh) {
-            const name = r.name ?? r.business_name ?? r.title ?? "(no name)";
-            pushLog(`✔ Found: ${name}`);
+            const name = r.name ?? r.business_name ?? r.title ?? "(sem nome)";
+            pushLog(`✔ Encontrado: ${name}`);
           }
           seenLeadCount = results.length;
         }
@@ -336,8 +343,8 @@ function DashboardSection({
           // Replace leads with the final completed data (emails may have been added)
           const finalLeads = results.map((r, i) => normalizeLead(r, i + 1, businessType, city));
           setLeads(finalLeads);
-          pushLog(`✔ Completed. Total: ${results.length} leads.`);
-          setStatus(`Done — ${results.length} leads`);
+          pushLog(`✔ Concluído. Total: ${results.length} leads.`);
+          setStatus(`Concluído — ${results.length} leads`);
           posthog.capture("leads_generated", {
             leads_count: finalLeads.length,
             emails_found: finalLeads.filter((l) => l.email && l.email !== "-").length,
@@ -347,7 +354,7 @@ function DashboardSection({
           // Auto-sync to Google Sheets if connected
           if (googleConnected && sheetVerified && sheetUrl && results.length) {
             try {
-              pushLog(`Syncing ${results.length} leads to Google Sheets...`);
+              pushLog(`Sincronizando ${results.length} leads com o Google Sheets...`);
               const syncRes = await fetch(`${API_BASE}/sheets/sync`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -361,22 +368,22 @@ function DashboardSection({
               if (!syncRes.ok) throw new Error(`${syncRes.status} ${syncRes.statusText}`);
               const sjson = await syncRes.json().catch(() => ({}));
               const synced = sjson.synced ?? sjson.count ?? results.length;
-              pushLog(`✔ ${synced} leads synced to Google Sheets`);
+              pushLog(`✔ ${synced} leads sincronizados com o Google Sheets`);
             } catch (e: any) {
-              pushLog(`✖ Sheet sync failed: ${e.message}`);
+              pushLog(`✖ Falha ao sincronizar a planilha: ${e.message}`);
             }
           }
           break;
         }
         if (["failed", "error", "cancelled", "canceled"].includes(jobStatus.toLowerCase())) {
-          pushLog(`✖ Job ended with status: ${jobStatus}`);
-          setStatus(`Failed — ${jobStatus}`);
+          pushLog(`✖ Tarefa encerrou com status: ${jobStatus}`);
+          setStatus(`Falhou — ${jobStatus}`);
           break;
         }
       }
     } catch (err: any) {
-      pushLog(`ERROR: ${err.message}`);
-      setStatus(`Error: ${err.message}`);
+      pushLog(`ERRO: ${err.message}`);
+      setStatus(`Erro: ${err.message}`);
     } finally {
       setRunning(false);
     }
@@ -400,9 +407,9 @@ function DashboardSection({
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const json = await res.json().catch(() => ({} as any));
       const synced = json.synced ?? json.count ?? leads.length;
-      setSyncMsg({ type: "ok", text: `✔ ${synced} leads synced to Google Sheets` });
+      setSyncMsg({ type: "ok", text: `✔ ${synced} leads sincronizados com o Google Sheets` });
     } catch (e: any) {
-      setSyncMsg({ type: "err", text: `✖ Sync failed: ${e.message}` });
+      setSyncMsg({ type: "err", text: `✖ Falha na sincronização: ${e.message}` });
     } finally {
       setSyncing(false);
     }
@@ -411,7 +418,7 @@ function DashboardSection({
   const exportExcel = () => {
     if (!leads.length) return;
     posthog.capture("leads_exported", { leads_count: leads.length });
-    const headers = ["#", "Name", "Category", "City", "Phone", "Email", "Website", "Rating", "Maps"];
+    const headers = ["#", "Nome", "Categoria", "Cidade", "Telefone", "E-mail", "Site", "Avaliação", "Maps"];
     const rows = leads.map((l) => [
       l.id, l.name, l.category, l.city, l.phone, l.email, l.website, l.rating, l.mapsUrl,
     ]);
@@ -422,7 +429,7 @@ function DashboardSection({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `leadhunter-${Date.now()}.csv`;
+    a.download = `flow-leads-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -433,19 +440,19 @@ function DashboardSection({
       <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_140px_auto_auto]">
           <div>
-            <Label htmlFor="bt" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Business type</Label>
-            <Input id="bt" placeholder="e.g. dental clinic"
+            <Label htmlFor="bt" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Tipo de empresa</Label>
+            <Input id="bt" placeholder="ex.: clínica odontológica"
               value={businessType} onChange={(e) => setBusinessType(e.target.value)} />
           </div>
           <div>
-            <Label htmlFor="city" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">City</Label>
-            <Input id="city" placeholder="e.g. New York, NY"
+            <Label htmlFor="city" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Cidade</Label>
+            <Input id="city" placeholder="ex.: São Paulo, SP"
               value={city} onChange={(e) => setCity(e.target.value)} />
           </div>
           <div>
             <Label htmlFor="count" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Leads</Label>
             <Select value={count} onValueChange={setCount}>
-              <SelectTrigger id="count" aria-label="Number of Leads"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="count" aria-label="Número de leads"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {["20", "30", "50", "70", "100", "200", "300", "400", "500"].map((n) => (
                   <SelectItem key={n} value={n}>{n}</SelectItem>
@@ -454,7 +461,7 @@ function DashboardSection({
             </Select>
           </div>
           <div className="flex flex-col justify-end">
-            <Label htmlFor="emails" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Emails</Label>
+            <Label htmlFor="emails" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">E-mails</Label>
             <div className="flex h-10 items-center gap-2 rounded-md border border-border bg-secondary/40 px-3">
               <Mail className="h-4 w-4 text-primary" />
               <Switch id="emails" checked={findEmails} onCheckedChange={setFindEmails} />
@@ -466,7 +473,7 @@ function DashboardSection({
               disabled={running || !sessionReady}
               className="h-10 min-w-[170px] bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
             >
-              {running ? <><Loader2 className="animate-spin" /> Hunting...</> : !sessionReady ? <><Loader2 className="animate-spin" /> Loading...</> : <><Search /> Generate Leads</>}
+              {running ? <><Loader2 className="animate-spin" /> Buscando...</> : !sessionReady ? <><Loader2 className="animate-spin" /> Carregando...</> : <><Search /> Gerar Leads</>}
             </Button>
           </div>
         </div>
@@ -496,10 +503,10 @@ function DashboardSection({
       <div className="overflow-hidden rounded-2xl border-2 border-border bg-card shadow-[var(--shadow-card)]">
         <div className="flex items-baseline justify-between border-b border-border px-5 pt-5 pb-3">
           <div>
-            <h2 className="text-xl font-semibold tracking-tight">Live results</h2>
-            <p className="text-xs text-muted-foreground">Rows appear the moment we verify each business.</p>
+            <h2 className="text-xl font-semibold tracking-tight">Resultados ao vivo</h2>
+            <p className="text-xs text-muted-foreground">As linhas aparecem assim que verificamos cada empresa.</p>
           </div>
-          <span className="hidden text-xs uppercase tracking-wide text-muted-foreground sm:inline">Flow Leads feed</span>
+          <span className="hidden text-xs uppercase tracking-wide text-muted-foreground sm:inline">Feed do Flow Leads</span>
         </div>
         {/* Live status strip */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
@@ -516,7 +523,7 @@ function DashboardSection({
                 <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40"></span>
               )}
               <span className="text-sm font-semibold tracking-tight">
-                {running ? "Live" : leads.length ? "Complete" : "Ready"}
+                {running ? "Ao vivo" : leads.length ? "Concluído" : "Pronto"}
               </span>
             </div>
             <div className="hidden text-sm text-muted-foreground sm:block truncate max-w-[420px]">{status}</div>
@@ -530,10 +537,10 @@ function DashboardSection({
               <span className="text-3xl font-semibold tabular-nums leading-none text-[#16A34A]">
                 {leads.filter(l => l.email && l.email.trim()).length}
               </span>
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">emails</span>
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">e-mails</span>
             </div>
             <Button onClick={exportExcel} variant="outline" size="sm" disabled={!leads.length}>
-              <Download /> Export to Excel
+              <Download /> Exportar para Excel
             </Button>
           </div>
         </div>
@@ -563,15 +570,15 @@ function DashboardSection({
         <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs text-muted-foreground">
             {sheetUrl
-              ? <>Target sheet: <span className="text-foreground">{sheetUrl}</span></>
-              : <>No Google Sheet linked. Connect one in the Google Sheets tab.</>}
+              ? <>Planilha alvo: <span className="text-foreground">{sheetUrl}</span></>
+              : <>Nenhuma planilha do Google conectada. Conecte uma na aba Google Sheets.</>}
           </div>
           <div className="flex items-center gap-3">
             {syncMsg && (
               <span className={cn("text-xs", syncMsg.type === "ok" ? "text-[#16A34A]" : "text-destructive")}>{syncMsg.text}</span>
             )}
             <Button onClick={handleManualSync} disabled={syncing || !lastJobId || !sheetUrl} size="sm">
-              {syncing ? <><Loader2 className="animate-spin" /> Syncing...</> : <><SheetIcon /> Sync to Google Sheets</>}
+              {syncing ? <><Loader2 className="animate-spin" /> Sincronizando...</> : <><SheetIcon /> Sincronizar com o Google Sheets</>}
             </Button>
           </div>
         </div>
@@ -592,7 +599,7 @@ function TableEmptyState({ running }: { running: boolean }) {
       <table className="w-full text-sm">
         <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            {["#", "Business", "Category", "City", "Phone", "Email", "Website", "Rating", ""].map((h) => (
+            {["#", "Empresa", "Categoria", "Cidade", "Telefone", "E-mail", "Site", "Avaliação", ""].map((h) => (
               <th key={h} className="px-4 py-3 font-medium">{h}</th>
             ))}
           </tr>
@@ -615,11 +622,11 @@ function TableEmptyState({ running }: { running: boolean }) {
             {running ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
           </div>
           <div className="text-center">
-            <div className="text-base font-semibold">{running ? "Searching Google Maps…" : "Ready to find your first leads"}</div>
+            <div className="text-base font-semibold">{running ? "Buscando no Google Maps…" : "Pronto para encontrar seus primeiros leads"}</div>
             <div className="mt-1 text-sm text-muted-foreground">
               {running
-                ? "New businesses will appear here as we verify them."
-                : "Enter a business type and city above, then click Generate Leads to start."}
+                ? "Novas empresas aparecem aqui conforme as verificamos."
+                : "Informe um tipo de empresa e cidade acima e clique em Gerar Leads para começar."}
             </div>
           </div>
         </div>
@@ -638,7 +645,7 @@ function LogDrawer({ logs, logRef }: { logs: string[]; logRef: React.RefObject<H
       >
         <span className="flex items-center gap-2 font-medium">
           <span className="h-2 w-2 rounded-full bg-[#16A34A]"></span>
-          Activity log
+          Registro de atividade
           <span className="text-xs text-muted-foreground">({logs.length})</span>
         </span>
         {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -649,7 +656,7 @@ function LogDrawer({ logs, logRef }: { logs: string[]; logRef: React.RefObject<H
           className="h-56 overflow-auto border-t border-border bg-[oklch(0.14_0.03_260)] p-3 font-mono text-xs leading-relaxed text-[oklch(0.78_0.18_150)]"
         >
           {logs.map((l, i) => <div key={i}>{l}</div>)}
-          {!logs.length && <div className="text-[oklch(0.5_0.05_150)]">Waiting for activity…</div>}
+          {!logs.length && <div className="text-[oklch(0.5_0.05_150)]">Aguardando atividade…</div>}
         </div>
       )}
     </div>
@@ -676,15 +683,15 @@ function LeadsTable({
       <table className="w-full text-[15px]">
         <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            {["#", "Name", "Category", "City", "Phone", "Email", "Website", "Rating", "Actions"].map((h) => (
+            {["#", "Nome", "Categoria", "Cidade", "Telefone", "E-mail", "Site", "Avaliação", "Ações"].map((h) => (
               <th key={h} className="px-5 py-3.5 font-medium">
-                {h === "Email" ? (
+                {h === "E-mail" ? (
                   <span className="inline-flex items-center gap-1">
-                    Email ✉
+                    E-mail ✉
                     {emailsSearching && (
                       <span className="inline-flex items-center gap-1 normal-case tracking-normal text-primary">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        (searching...)
+                        (buscando...)
                       </span>
                     )}
                   </span>
@@ -705,7 +712,7 @@ function LeadsTable({
                 {l.email && l.email.trim() ? (
                   <a
                     href={`mailto:${l.email}`}
-                    title="Verified email found"
+                    title="E-mail verificado encontrado"
                     className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-[#16A34A] ring-1 ring-inset ring-[#16A34A]/20 hover:underline animate-scale-in"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 fill-[#16A34A] text-white" />
@@ -713,7 +720,7 @@ function LeadsTable({
                   </a>
                 ) : emailsSearching ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin text-primary" /> finding…
+                    <Loader2 className="h-3 w-3 animate-spin text-primary" /> buscando…
                   </span>
                 ) : (
                   <span className="text-muted-foreground">—</span>
@@ -722,7 +729,7 @@ function LeadsTable({
               <td className="px-5 py-4">
                 {l.website ? (
                   <a href={getWebsiteUrl(l.website)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                    <Globe className="h-3.5 w-3.5" /> Visit
+                    <Globe className="h-3.5 w-3.5" /> Visitar
                   </a>
                 ) : <span className="text-muted-foreground">—</span>}
               </td>
@@ -760,7 +767,7 @@ function LeadsSection(_: { leads: Lead[] }) {
         const userId = session?.user?.id;
         if (!userId) {
           if (!cancelled) {
-            setError("You must be signed in to view your leads.");
+            setError("Você precisa estar logado para ver seus leads.");
             setLoading(false);
           }
           return;
@@ -776,7 +783,7 @@ function LeadsSection(_: { leads: Lead[] }) {
         );
         if (!cancelled) setLeads(mapped);
       } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? "Failed to load leads");
+        if (!cancelled) setError(e?.message ?? "Não foi possível carregar os leads");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -787,17 +794,17 @@ function LeadsSection(_: { leads: Lead[] }) {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My Leads</h1>
-        <p className="text-sm text-muted-foreground">All leads saved to your account.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Meus Leads</h1>
+        <p className="text-sm text-muted-foreground">Todos os leads salvos na sua conta.</p>
       </div>
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading your leads...
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando seus leads...
         </div>
       ) : error ? (
-        <EmptyState title="We couldn't load your saved leads" desc={`${error}. Refresh the page or try again in a moment.`} />
+        <EmptyState title="Não conseguimos carregar seus leads salvos" desc={`${error} Atualize a página ou tente novamente em instantes.`} />
       ) : leads.length === 0 ? (
-        <EmptyState title="No saved leads yet" desc="Head to the Dashboard tab, run a search, and your results will be saved here automatically." />
+        <EmptyState title="Nenhum lead salvo ainda" desc="Vá até a aba Painel, faça uma busca, e seus resultados serão salvos aqui automaticamente." />
       ) : (
         <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
           <LeadsTable leads={leads} />
@@ -873,16 +880,16 @@ function SheetsSection({
       const normalized = list
         .filter((s: any) => s && (s.url || s.id))
         .map((s: any) => ({
-          name: s.name ?? s.title ?? s.sheet_name ?? "Untitled Sheet",
+          name: s.name ?? s.title ?? s.sheet_name ?? "Planilha sem título",
           url: s.url ?? `https://docs.google.com/spreadsheets/d/${s.id}/edit`,
         }));
       if (normalized.length === 0) {
-        setSheetsError("No sheets found. Please paste a URL manually.");
+        setSheetsError("Nenhuma planilha encontrada. Cole uma URL manualmente.");
       } else {
         setSheetsList(normalized);
       }
     } catch (e: any) {
-      setSheetsError("Could not load sheets. Please paste URL manually.");
+      setSheetsError("Não foi possível carregar as planilhas. Cole a URL manualmente.");
     } finally {
       setLoadingSheets(false);
     }
@@ -909,12 +916,12 @@ function SheetsSection({
       const j = await res.json().catch(() => ({}));
       if (res.ok && (j.success ?? j.ok)) {
         setSheetVerified(true);
-        setSheetTitle(j.sheet_title ?? j.title ?? j.spreadsheet_title ?? "Spreadsheet");
+        setSheetTitle(j.sheet_title ?? j.title ?? j.spreadsheet_title ?? "Planilha");
       } else {
-        setSheetError(j.error ?? j.message ?? "Could not access sheet");
+        setSheetError(j.error ?? j.message ?? "Não foi possível acessar a planilha");
       }
     } catch (e: any) {
-      setSheetError(e.message ?? "Network error");
+      setSheetError(e.message ?? "Erro de rede");
     } finally {
       setTesting(false);
     }
@@ -938,13 +945,13 @@ function SheetsSection({
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Google Sheets</h1>
-        <p className="text-sm text-muted-foreground">Sync leads directly into a spreadsheet.</p>
+        <p className="text-sm text-muted-foreground">Sincronize leads direto para uma planilha.</p>
       </div>
       <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         {!googleConnected ? (
           <>
             <p className="text-sm text-muted-foreground">
-              Connect your Google account to sync leads into your spreadsheets.
+              Conecte sua conta Google para sincronizar leads nas suas planilhas.
             </p>
             <button
               onClick={connectGoogle}
@@ -961,7 +968,7 @@ function SheetsSection({
                   <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A8.99 8.99 0 0 0 9 0 9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
                 </svg>
               )}
-              {connecting ? "Waiting for Google..." : "Connect Google Account"}
+              {connecting ? "Aguardando o Google..." : "Conectar conta Google"}
             </button>
             {authError && <p className="text-sm text-destructive">{authError}</p>}
           </>
@@ -970,10 +977,10 @@ function SheetsSection({
             <div className="flex items-center justify-between rounded-md border border-[oklch(0.7_0.18_150)]/40 bg-[oklch(0.7_0.18_150)]/10 p-3 text-sm">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-[oklch(0.55_0.18_150)]" />
-                <span className="font-medium text-[oklch(0.45_0.18_150)]">✅ Google Account Connected</span>
+                <span className="font-medium text-[oklch(0.45_0.18_150)]">✅ Conta Google conectada</span>
               </div>
               <button onClick={disconnect} className="text-xs text-muted-foreground hover:text-destructive underline underline-offset-2">
-                Disconnect
+                Desconectar
               </button>
             </div>
 
@@ -987,7 +994,7 @@ function SheetsSection({
                   className="w-full justify-start gap-2"
                 >
                   {loadingSheets ? <Loader2 className="h-4 w-4 animate-spin" /> : <SheetIcon className="h-4 w-4" />}
-                  {loadingSheets ? "Loading your sheets..." : "Load My Sheets"}
+                  {loadingSheets ? "Carregando suas planilhas..." : "Carregar minhas planilhas"}
                 </Button>
 
                 {sheetsError && (
@@ -996,13 +1003,13 @@ function SheetsSection({
 
                 {sheetsList.length > 0 && (
                   <div className="space-y-1">
-                    <Label htmlFor="sheet-select">Select a spreadsheet</Label>
+                    <Label htmlFor="sheet-select">Selecione uma planilha</Label>
                     <Select
                       value={sheetUrl}
                       onValueChange={handleSelectSheet}
                     >
-                      <SelectTrigger id="sheet-select" aria-label="Select a spreadsheet">
-                        <SelectValue placeholder="Choose a sheet..." />
+                      <SelectTrigger id="sheet-select" aria-label="Selecione uma planilha">
+                        <SelectValue placeholder="Escolha uma planilha..." />
                       </SelectTrigger>
                       <SelectContent>
                         {sheetsList.map((s) => (
@@ -1020,15 +1027,15 @@ function SheetsSection({
                   onClick={() => { setManualMode(true); setSheetsError(null); }}
                   className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2"
                 >
-                  Or paste URL manually
+                  Ou cole a URL manualmente
                 </button>
               </div>
             )}
 
             {manualMode && (
               <div className="space-y-2">
-                <Label htmlFor="url">Google Sheet URL</Label>
-                <Input id="url" placeholder="Paste your Google Sheet URL here"
+                <Label htmlFor="url">URL da planilha do Google</Label>
+                <Input id="url" placeholder="Cole aqui a URL da sua planilha do Google"
                   value={sheetUrl}
                   onChange={(e) => { setSheetUrl(e.target.value); setSheetVerified(false); setSheetTitle(""); setSheetError(""); }} />
                 <button
@@ -1036,20 +1043,20 @@ function SheetsSection({
                   onClick={() => { setManualMode(false); setSheetsError(null); }}
                   className="text-xs text-muted-foreground hover:text-primary underline underline-offset-2"
                 >
-                  Back to Load My Sheets
+                  Voltar para Carregar minhas planilhas
                 </button>
               </div>
             )}
 
             <div className="flex flex-wrap gap-3">
               <Button variant="outline" onClick={verifySheet} disabled={testing || !sheetUrl}>
-                {testing ? <><Loader2 className="animate-spin" /> Checking sheet access…</> : <>Test &amp; save sheet</>}
+                {testing ? <><Loader2 className="animate-spin" /> Verificando acesso à planilha…</> : <>Testar e salvar planilha</>}
               </Button>
             </div>
             {sheetVerified && (
               <div className="flex items-center gap-2 rounded-md border border-[oklch(0.7_0.18_150)]/40 bg-[oklch(0.7_0.18_150)]/10 p-3 text-sm text-[oklch(0.45_0.18_150)]">
                 <CheckCircle2 className="h-4 w-4 text-[oklch(0.55_0.18_150)]" />
-                <span className="font-medium">✅ Sheet Connected: {sheetTitle}</span>
+                <span className="font-medium">✅ Planilha conectada: {sheetTitle}</span>
               </div>
             )}
             {sheetError && (
@@ -1070,26 +1077,26 @@ function SettingsSection() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">App preferences and backend configuration.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+        <p className="text-sm text-muted-foreground">Preferências do app e configuração do backend.</p>
       </div>
       <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <div className="space-y-2">
-          <Label htmlFor="backend-url">Backend API URL</Label>
+          <Label htmlFor="backend-url">URL da API do backend</Label>
           <Input id="backend-url" type="password" defaultValue={API_BASE} />
-          <p className="text-xs text-muted-foreground">Hidden by default to avoid leaking infrastructure details.</p>
+          <p className="text-xs text-muted-foreground">Oculto por padrão para não expor detalhes de infraestrutura.</p>
         </div>
         <div className="flex items-center justify-between rounded-md border border-border p-3">
           <div>
-            <Label htmlFor="auto-export" className="text-sm font-medium cursor-pointer">Auto-export to Excel</Label>
-            <div className="text-xs text-muted-foreground">Download a CSV automatically when a run completes.</div>
+            <Label htmlFor="auto-export" className="text-sm font-medium cursor-pointer">Exportar para Excel automaticamente</Label>
+            <div className="text-xs text-muted-foreground">Baixar um CSV automaticamente quando uma busca terminar.</div>
           </div>
           <Switch id="auto-export" />
         </div>
         <div className="flex items-center justify-between rounded-md border border-border p-3">
           <div>
-            <Label htmlFor="email-enrich" className="text-sm font-medium cursor-pointer">Email enrichment by default</Label>
-            <div className="text-xs text-muted-foreground">Toggle "Find Emails" on for every new search.</div>
+            <Label htmlFor="email-enrich" className="text-sm font-medium cursor-pointer">Enriquecimento de e-mail por padrão</Label>
+            <div className="text-xs text-muted-foreground">Ativar "Localizar e-mails" em toda nova busca.</div>
           </div>
           <Switch id="email-enrich" defaultChecked />
         </div>

@@ -11,8 +11,8 @@ import { posthog } from "@/lib/posthog";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Flow Leads" },
-      { name: "description", content: "Sign in to your Flow Leads account." },
+      { title: "Entrar — Flow Leads" },
+      { name: "description", content: "Entre na sua conta do Flow Leads." },
     ],
   }),
   component: AuthPage,
@@ -45,7 +45,7 @@ function AuthPage() {
           redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
-        setInfo("Password reset link sent. Check your email.");
+        setInfo("Enviamos o link de redefinição de senha. Verifique seu e-mail.");
         return;
       }
       if (mode === "signup") {
@@ -62,7 +62,7 @@ function AuthPage() {
       }
       navigate({ to: "/dashboard", replace: true });
     } catch (e: any) {
-      setError(e.message ?? "Authentication failed");
+      setError(e.message ?? "Falha na autenticação");
     } finally {
       setLoading(false);
     }
@@ -76,32 +76,32 @@ function AuthPage() {
         </div>
         <div className="text-center">
           <h1 className="text-2xl font-semibold tracking-tight">
-            {mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your account" : "Reset your password"}
+            {mode === "signin" ? "Bem-vindo de volta" : mode === "signup" ? "Crie sua conta" : "Redefina sua senha"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {mode === "signin"
-              ? "Sign in to access your dashboard."
+              ? "Entre para acessar seu painel."
               : mode === "signup"
-              ? "Start finding leads in seconds."
-              : "Enter your email and we'll send you a reset link."}
+              ? "Comece a encontrar leads em segundos."
+              : "Informe seu e-mail e enviaremos um link de redefinição."}
           </p>
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">E-mail</Label>
             <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           {mode !== "forgot" && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Senha</Label>
                 {mode === "signin" && (
                   <button
                     type="button"
                     className="text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => { setError(null); setInfo(null); setMode("forgot"); }}
                   >
-                    Forgot password?
+                    Esqueceu a senha?
                   </button>
                 )}
               </div>
@@ -119,7 +119,7 @@ function AuthPage() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -131,7 +131,7 @@ function AuthPage() {
                   onChange={(e) => setShowPassword(e.target.checked)}
                   className="h-3.5 w-3.5 rounded border-border"
                 />
-                Show password
+                Mostrar senha
               </label>
             </div>
           )}
@@ -139,12 +139,12 @@ function AuthPage() {
           {info && <p className="text-sm text-emerald-600">{info}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading
-              ? "Please wait..."
+              ? "Aguarde..."
               : mode === "signin"
-              ? "Sign in"
+              ? "Entrar"
               : mode === "signup"
-              ? "Sign up"
-              : "Send reset link"}
+              ? "Cadastrar"
+              : "Enviar link de redefinição"}
           </Button>
         </form>
         <button
@@ -157,10 +157,10 @@ function AuthPage() {
           }}
         >
           {mode === "signin"
-            ? "Don't have an account? Sign up"
+            ? "Não tem conta? Cadastre-se"
             : mode === "signup"
-            ? "Already have an account? Sign in"
-            : "Back to sign in"}
+            ? "Já tem conta? Entrar"
+            : "Voltar para entrar"}
         </button>
       </div>
     </div>

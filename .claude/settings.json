@@ -1,14 +1,17 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
       "Bash(npm install)",
-      "Bash(npm run build)",
-      "Bash(npm run dev)",
+      "Bash(npm run:*)",
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(grep:*)",
@@ -19,6 +22,7 @@
     "deny": [
       "Bash(rm:*)",
       "Bash(git reset:*)",
+      "Bash(git checkout:*)",
       "Bash(supabase:*)",
       "Read(.env)",
       "Write(.env)",
