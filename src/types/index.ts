@@ -79,24 +79,38 @@ export interface Redesign {
 }
 
 /* -------------------------------------------------------------------------- */
-/* FASE 4 — Publicação                                                        */
+/* FASE 4 — Publicação (sites TEMPORÁRIOS)                                     */
 /* -------------------------------------------------------------------------- */
 
-/** Status da publicação do site gerado. */
-export type PublicacaoStatus = "nao_publicado" | "publicando" | "publicado" | "erro";
+/**
+ * Ciclo de vida do site publicado: publicado → aprovado/reprovado/expirado.
+ * Expira em 15 dias se não resolvido. Ao excluir/expirar: apaga os arquivos do
+ * Storage, mas MANTÉM o registro (arquivos_removidos = true).
+ */
+export type SitePublicadoStatus = "publicado" | "aprovado" | "reprovado" | "expirado";
 
-/** Publicação de um site gerado (Fase 4) — liga a um Redesign. */
-export interface Publicacao {
+/**
+ * Site gerado publicado num caminho temporário
+ * (flowleads.flowgenius.com.br/site/<slug>), sem o cliente conectar conta.
+ */
+export interface SitePublicado {
   id: string;
-  /** Redesign de origem (Fase 3, tela Redesign). */
-  redesign_id: string;
   lead_id: string;
-  /** Nome do negócio, denormalizado para exibir sem join. */
+  slug: string;
+  url_publica: string;
+  status: SitePublicadoStatus;
+  /** ISO datetime. */
+  publicado_em: string;
+  /** ISO datetime — publicado_em + 15 dias. */
+  expira_em: string;
+  /** true quando os arquivos foram apagados do Storage (excluído/expirado). */
+  arquivos_removidos: boolean;
+}
+
+/** Lead com redesign pronto e ainda SEM site publicado (candidato a publicar). */
+export interface LeadPublicavel {
+  lead_id: string;
   lead_nome: string;
-  /** URL pública final (ex.: lead.flowleads.com.br/nome). */
-  url_publica: string | null;
-  status: PublicacaoStatus;
-  publicado_em: string | null;
 }
 
 /** Status de pagamento de um registro financeiro. */
