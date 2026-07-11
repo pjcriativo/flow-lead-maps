@@ -16,3 +16,6 @@ dist
 # Arquivos sensíveis / não versionar
 contas.txt
 *.zip
+
+.vercel
+.env*

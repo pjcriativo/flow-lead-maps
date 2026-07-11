@@ -7,7 +7,7 @@ import viteReact from "@vitejs/plugin-react";
 
 // Config do Vite para o TanStack Start (sem dependências de terceiros).
 // Replica o essencial: Tailwind v4, resolução de paths do tsconfig, TanStack
-// Start (com entry SSR em src/server.ts), Nitro (build → Cloudflare) e React.
+// Start (com entry SSR em src/server.ts), Nitro (build → Vercel) e React.
 export default defineConfig(({ command }) => ({
   server: {
     host: true,
@@ -32,8 +32,8 @@ export default defineConfig(({ command }) => ({
     tanstackStart({
       server: { entry: "server" },
     }),
-    // Nitro só é necessário no build (gera a saída para Cloudflare).
-    ...(command === "build" ? [nitro({ defaultPreset: "cloudflare-module" })] : []),
+    // Nitro só é necessário no build (gera a saída para a Vercel em .vercel/output).
+    ...(command === "build" ? [nitro({ defaultPreset: "vercel" })] : []),
     viteReact(),
   ],
 }));
