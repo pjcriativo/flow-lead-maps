@@ -10,6 +10,7 @@ import {
   FileText,
   ScrollText,
   Wallet,
+  Wand2,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -35,6 +36,7 @@ import { LeadsManager } from "@/components/leads/LeadsManager";
 import { PropostasSection } from "@/components/propostas/PropostasSection";
 import { FinanceiroSection } from "@/components/financeiro/FinanceiroSection";
 import { ContratosSection } from "@/components/contratos/ContratosSection";
+import { RedesignSection } from "@/components/redesign/RedesignSection";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -59,7 +61,7 @@ function getUserId(): string {
   return currentUserId;
 }
 
-type Section = "buscar" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "sheets" | "settings";
+type Section = "buscar" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "redesign" | "sheets" | "settings";
 
 const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
@@ -68,6 +70,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "propostas", label: "Propostas", Icon: FileText },
   { id: "contratos", label: "Contratos", Icon: ScrollText },
   { id: "financeiro", label: "Financeiro", Icon: Wallet },
+  { id: "redesign", label: "Redesign", Icon: Wand2 },
   { id: "sheets", label: "Google Sheets", Icon: SheetIcon },
   { id: "settings", label: "Configurações", Icon: SettingsIcon },
 ];
@@ -159,6 +162,7 @@ function Dashboard() {
         {section === "propostas" && <PropostasSection />}
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
+        {section === "redesign" && <RedesignSection />}
         {section === "sheets" && (
           <SheetsSection
             sheetUrl={sheetUrl}

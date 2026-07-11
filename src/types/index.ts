@@ -54,6 +54,30 @@ export interface Contrato {
   conteudo_html: string;
 }
 
+/* -------------------------------------------------------------------------- */
+/* FASE 3 — Redesign                                                          */
+/* -------------------------------------------------------------------------- */
+
+/** Status da geração do redesign. */
+export type RedesignStatus = "pendente" | "gerando" | "pronto" | "erro";
+
+/** Redesign do site de um lead (gerado por IA na Fase 3). */
+export interface Redesign {
+  id: string;
+  lead_id: string;
+  /** Nome do negócio, denormalizado para exibir sem join. */
+  lead_nome: string;
+  /** URL do site atual do lead (o "antes"). */
+  site_original_url: string | null;
+  /** URL/《preview》do site gerado (o "depois"). */
+  preview_url: string | null;
+  status: RedesignStatus;
+  /** ISO datetime. */
+  criado_em: string;
+  gerado_em: string | null;
+  observacoes: string | null;
+}
+
 /** Status de pagamento de um registro financeiro. */
 export type PagamentoStatus = "pendente" | "pago" | "atrasado" | "cancelado";
 
