@@ -3,6 +3,13 @@ node_modules
 .env.local
 dist
 
+# Artefatos de build (TanStack Start / Nitro / Cloudflare / Vite)
+.output
+.wrangler
+.nitro
+.vite
+.tanstack
+
 # Arquivos sensíveis / não versionar
 contas.txt
 *.zip

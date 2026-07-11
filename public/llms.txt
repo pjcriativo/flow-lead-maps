@@ -1,0 +1,8 @@
+# Flow Leads
+
+> Find qualified business leads on Google Maps in seconds. Export names, phones, emails, and websites to Excel or Google Sheets.
+
+## Pages
+
+- [Home](/): Landing page with features, how it works, and pricing.
+- [Dashboard](/dashboard): Generate leads, view results, and sync to Google Sheets.
