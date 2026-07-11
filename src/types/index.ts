@@ -31,3 +31,23 @@ export interface Proposta {
   enviada_em: string | null;
   respondida_em: string | null;
 }
+
+/** Status de pagamento de um registro financeiro. */
+export type PagamentoStatus = "pendente" | "pago" | "atrasado" | "cancelado";
+
+/** Registro financeiro (parcela/cobrança) ligado a um lead/contrato. */
+export interface RegistroFinanceiro {
+  id: string;
+  lead_id: string;
+  /** Nome do negócio, denormalizado para exibir sem join. */
+  lead_nome: string;
+  /** Liga ao contrato (Fase 2, tela Contratos) quando existir. */
+  contrato_id: string | null;
+  descricao: string;
+  /** Valor em R$. */
+  valor: number;
+  status: PagamentoStatus;
+  /** ISO date do vencimento. */
+  vencimento: string;
+  pago_em: string | null;
+}
