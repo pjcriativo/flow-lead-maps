@@ -8,6 +8,7 @@ import {
   Search,
   LayoutGrid,
   FileText,
+  ScrollText,
   Wallet,
   Loader2,
   CheckCircle2,
@@ -33,6 +34,7 @@ import { PipelineSection } from "@/components/leads/PipelineSection";
 import { LeadsManager } from "@/components/leads/LeadsManager";
 import { PropostasSection } from "@/components/propostas/PropostasSection";
 import { FinanceiroSection } from "@/components/financeiro/FinanceiroSection";
+import { ContratosSection } from "@/components/contratos/ContratosSection";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -57,13 +59,14 @@ function getUserId(): string {
   return currentUserId;
 }
 
-type Section = "buscar" | "pipeline" | "leads" | "propostas" | "financeiro" | "sheets" | "settings";
+type Section = "buscar" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "sheets" | "settings";
 
 const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
   { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
   { id: "leads", label: "Meus Leads", Icon: Users },
   { id: "propostas", label: "Propostas", Icon: FileText },
+  { id: "contratos", label: "Contratos", Icon: ScrollText },
   { id: "financeiro", label: "Financeiro", Icon: Wallet },
   { id: "sheets", label: "Google Sheets", Icon: SheetIcon },
   { id: "settings", label: "Configurações", Icon: SettingsIcon },
@@ -154,6 +157,7 @@ function Dashboard() {
         {section === "pipeline" && <PipelineSection />}
         {section === "leads" && <LeadsManager />}
         {section === "propostas" && <PropostasSection />}
+        {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
         {section === "sheets" && (
           <SheetsSection

@@ -32,6 +32,28 @@ export interface Proposta {
   respondida_em: string | null;
 }
 
+/** Status de um contrato. */
+export type ContratoStatus = "rascunho" | "gerado" | "assinado" | "cancelado";
+
+/** Contrato de serviço gerado para um lead (a partir de uma proposta aceita). */
+export interface Contrato {
+  id: string;
+  lead_id: string;
+  /** Nome do negócio, denormalizado para exibir sem join. */
+  lead_nome: string;
+  /** Liga à proposta de origem (Fase 2, tela Propostas) quando existir. */
+  proposta_id: string | null;
+  titulo: string;
+  /** Valor em R$. */
+  valor: number;
+  status: ContratoStatus;
+  /** ISO datetime. */
+  criado_em: string;
+  assinado_em: string | null;
+  /** HTML do contrato para preview (gerado por template ou IA). */
+  conteudo_html: string;
+}
+
 /** Status de pagamento de um registro financeiro. */
 export type PagamentoStatus = "pendente" | "pago" | "atrasado" | "cancelado";
 
