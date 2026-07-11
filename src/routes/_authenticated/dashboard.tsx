@@ -269,7 +269,7 @@ function DashboardSection({
     posthog.capture("scrape_started", { query: businessType, city, limit: maxResults });
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
-    pushLog(`Body: { query: "${businessType}", city: "${city}", limit: ${maxResults}, find_emails: true, user_id, sheet_url }`);
+    pushLog(`Corpo: { query: "${businessType}", city: "${city}", limit: ${maxResults}, find_emails: true, user_id, sheet_url }`);
 
     try {
       const res = await fetch(`${API_BASE}/scrape`, {
@@ -284,11 +284,11 @@ function DashboardSection({
           sheet_url: sheetUrl || "",
         }),
       });
-      if (!res.ok) throw new Error(`POST /scrape failed: ${res.status} ${res.statusText}`);
+      if (!res.ok) throw new Error(`Falha no POST /scrape: ${res.status} ${res.statusText}`);
       const submitJson = await res.json();
       const jobId = submitJson.job_id ?? submitJson.id ?? submitJson.jobId;
       if (!jobId) {
-        console.error("No job_id in scrape response", submitJson);
+        console.error("Sem job_id na resposta do scrape", submitJson);
         throw new Error("Resposta inesperada do servidor. Tente novamente.");
       }
       setLastJobId(String(jobId));
@@ -312,7 +312,7 @@ function DashboardSection({
           continue;
         }
         const job = await pollRes.json();
-        const jobStatus: string = job.status ?? "unknown";
+        const jobStatus: string = job.status ?? "desconhecido";
         const results: any[] = job.results ?? job.leads ?? job.data ?? [];
         const src: string = job.current_source ?? job.currentSource ?? job.stage ?? "";
         setJobStatus(jobStatus);
@@ -506,7 +506,7 @@ function DashboardSection({
             <h2 className="text-xl font-semibold tracking-tight">Resultados ao vivo</h2>
             <p className="text-xs text-muted-foreground">As linhas aparecem assim que verificamos cada empresa.</p>
           </div>
-          <span className="hidden text-xs uppercase tracking-wide text-muted-foreground sm:inline">Feed do Flow Leads</span>
+          <span className="hidden text-xs uppercase tracking-wide text-muted-foreground sm:inline">Fluxo do Flow Leads</span>
         </div>
         {/* Live status strip */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
@@ -773,7 +773,7 @@ function LeadsSection(_: { leads: Lead[] }) {
           return;
         }
         const res = await fetch(`${API_BASE}/user/${encodeURIComponent(userId)}/leads`);
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Falha na requisição: ${res.status}`);
         const json = await res.json();
         const raw: any[] = Array.isArray(json)
           ? json
@@ -870,7 +870,7 @@ function SheetsSection({
     try {
       const userId = getUserId();
       const res = await fetch(`${API_BASE}/sheets/list?user_id=${encodeURIComponent(userId)}`);
-      if (!res.ok) throw new Error(`Failed to load sheets: ${res.status}`);
+      if (!res.ok) throw new Error(`Falha ao carregar as planilhas: ${res.status}`);
       const json = await res.json();
       const list = Array.isArray(json.sheets)
         ? json.sheets

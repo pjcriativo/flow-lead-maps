@@ -44,7 +44,7 @@ const PLANS: Plan[] = [
     name: "Básico",
     monthly: 19,
     yearly: 182,
-    yearlyMonthly: "15.16",
+    yearlyMonthly: "15,16",
     blurb: "Para quem está começando sozinho.",
     cta: "Começar",
     features: ["300 leads / mês", "Exportar para Google Sheets", "Localizador de e-mail", "Suporte padrão"],
@@ -53,7 +53,7 @@ const PLANS: Plan[] = [
     name: "Pro",
     monthly: 49,
     yearly: 470,
-    yearlyMonthly: "39.16",
+    yearlyMonthly: "39,16",
     blurb: "Para times de vendas que precisam de volume.",
     cta: "Começar",
     popular: true,
@@ -69,7 +69,7 @@ const PLANS: Plan[] = [
     name: "Agência",
     monthly: 99,
     yearly: 950,
-    yearlyMonthly: "79.16",
+    yearlyMonthly: "79,16",
     blurb: "Feito para agências rodando campanhas em escala.",
     cta: "Começar",
     features: [
@@ -142,12 +142,12 @@ function PricingPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => {
             const isFree = plan.monthly === 0;
-            const price = isFree ? "$0" : yearly ? `$${plan.yearlyMonthly}` : `$${plan.monthly}`;
+            const price = isFree ? "R$ 0" : yearly ? `R$ ${plan.yearlyMonthly}` : `R$ ${plan.monthly}`;
             const suffix = isFree ? "" : "/mês";
             const sub = isFree
               ? "7 dias grátis"
               : yearly
-              ? `Cobrado $${plan.yearly}/ano`
+              ? `Cobrado R$ ${plan.yearly}/ano`
               : "Cobrança mensal";
             return (
               <div
