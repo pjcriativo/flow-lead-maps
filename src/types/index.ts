@@ -78,6 +78,27 @@ export interface Redesign {
   observacoes: string | null;
 }
 
+/* -------------------------------------------------------------------------- */
+/* FASE 4 — Publicação                                                        */
+/* -------------------------------------------------------------------------- */
+
+/** Status da publicação do site gerado. */
+export type PublicacaoStatus = "nao_publicado" | "publicando" | "publicado" | "erro";
+
+/** Publicação de um site gerado (Fase 4) — liga a um Redesign. */
+export interface Publicacao {
+  id: string;
+  /** Redesign de origem (Fase 3, tela Redesign). */
+  redesign_id: string;
+  lead_id: string;
+  /** Nome do negócio, denormalizado para exibir sem join. */
+  lead_nome: string;
+  /** URL pública final (ex.: lead.flowleads.com.br/nome). */
+  url_publica: string | null;
+  status: PublicacaoStatus;
+  publicado_em: string | null;
+}
+
 /** Status de pagamento de um registro financeiro. */
 export type PagamentoStatus = "pendente" | "pago" | "atrasado" | "cancelado";
 

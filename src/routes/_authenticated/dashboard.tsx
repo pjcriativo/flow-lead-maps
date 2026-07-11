@@ -11,6 +11,7 @@ import {
   ScrollText,
   Wallet,
   Wand2,
+  Rocket,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -37,6 +38,7 @@ import { PropostasSection } from "@/components/propostas/PropostasSection";
 import { FinanceiroSection } from "@/components/financeiro/FinanceiroSection";
 import { ContratosSection } from "@/components/contratos/ContratosSection";
 import { RedesignSection } from "@/components/redesign/RedesignSection";
+import { PublicarSection } from "@/components/publicar/PublicarSection";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -61,7 +63,7 @@ function getUserId(): string {
   return currentUserId;
 }
 
-type Section = "buscar" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "redesign" | "sheets" | "settings";
+type Section = "buscar" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "redesign" | "publicar" | "sheets" | "settings";
 
 const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
@@ -71,6 +73,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "contratos", label: "Contratos", Icon: ScrollText },
   { id: "financeiro", label: "Financeiro", Icon: Wallet },
   { id: "redesign", label: "Redesign", Icon: Wand2 },
+  { id: "publicar", label: "Publicar", Icon: Rocket },
   { id: "sheets", label: "Google Sheets", Icon: SheetIcon },
   { id: "settings", label: "Configurações", Icon: SettingsIcon },
 ];
@@ -163,6 +166,7 @@ function Dashboard() {
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
         {section === "redesign" && <RedesignSection />}
+        {section === "publicar" && <PublicarSection />}
         {section === "sheets" && (
           <SheetsSection
             sheetUrl={sheetUrl}
