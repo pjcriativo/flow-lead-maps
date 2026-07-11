@@ -1,0 +1,11 @@
+# Supabase — config local do projeto Flow Leads.
+# project_id = ref do projeto (usado por `supabase link` / deploy).
+project_id = "lyitsavnqwtsoouhcjie"
+
+[functions.search-leads]
+# Busca de leads via Google Places. Recebe o JWT do usuário (RLS).
+verify_jwt = true
+
+[functions.enrich-lead]
+# Visita o site do lead e extrai e-mail/WhatsApp. Recebe o JWT do usuário.
+verify_jwt = true

@@ -14,7 +14,153 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      leads: {
+        Row: {
+          id: string
+          list_id: string | null
+          user_id: string
+          place_id: string | null
+          business_name: string
+          address: string | null
+          city: string | null
+          state: string | null
+          zip: string | null
+          phone: string | null
+          whatsapp: string | null
+          website: string | null
+          category: string | null
+          rating: number | null
+          review_count: number | null
+          has_website: boolean | null
+          has_photos: boolean | null
+          has_hours: boolean | null
+          has_phone: boolean | null
+          email: string | null
+          facebook_url: string | null
+          instagram_url: string | null
+          linkedin_url: string | null
+          owner_name: string | null
+          score: number
+          score_breakdown: Json | null
+          status: string
+          last_contacted_at: string | null
+          enriched_at: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          list_id?: string | null
+          user_id: string
+          place_id?: string | null
+          business_name: string
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          zip?: string | null
+          phone?: string | null
+          whatsapp?: string | null
+          website?: string | null
+          category?: string | null
+          rating?: number | null
+          review_count?: number | null
+          has_website?: boolean | null
+          has_photos?: boolean | null
+          has_hours?: boolean | null
+          has_phone?: boolean | null
+          email?: string | null
+          facebook_url?: string | null
+          instagram_url?: string | null
+          linkedin_url?: string | null
+          owner_name?: string | null
+          score?: number
+          score_breakdown?: Json | null
+          status?: string
+          last_contacted_at?: string | null
+          enriched_at?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          list_id?: string | null
+          user_id?: string
+          place_id?: string | null
+          business_name?: string
+          address?: string | null
+          city?: string | null
+          state?: string | null
+          zip?: string | null
+          phone?: string | null
+          whatsapp?: string | null
+          website?: string | null
+          category?: string | null
+          rating?: number | null
+          review_count?: number | null
+          has_website?: boolean | null
+          has_photos?: boolean | null
+          has_hours?: boolean | null
+          has_phone?: boolean | null
+          email?: string | null
+          facebook_url?: string | null
+          instagram_url?: string | null
+          linkedin_url?: string | null
+          owner_name?: string | null
+          score?: number
+          score_breakdown?: Json | null
+          status?: string
+          last_contacted_at?: string | null
+          enriched_at?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lead_lists: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          city: string
+          niche: string
+          radius: number
+          total_leads: number
+          enriched_count: number
+          contacted_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          city: string
+          niche: string
+          radius?: number
+          total_leads?: number
+          enriched_count?: number
+          contacted_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          city?: string
+          niche?: string
+          radius?: number
+          total_leads?: number
+          enriched_count?: number
+          contacted_count?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

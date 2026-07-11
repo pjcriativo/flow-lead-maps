@@ -17,6 +17,10 @@ dist
 contas.txt
 *.zip
 
+# Material de referência/andaime — NÃO versionar, NÃO faz parte do projeto.
+# Só leitura para entender a lógica de negócio ao recriar no nosso stack.
+referenciaprospector-plugin/
+
 # Skills: os symlinks em .claude/skills/* usam caminho ABSOLUTO da máquina
 # (não portáveis). O conteúdo real fica em .agents/skills/ (versionado).
 # Exceção: flow-loop é arquivo real e deve ser versionado.
