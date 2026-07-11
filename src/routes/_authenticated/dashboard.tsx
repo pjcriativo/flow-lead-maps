@@ -51,7 +51,9 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-const API_BASE = "https://leadora-saas-production.up.railway.app";
+// Backend da busca de leads. Definido em VITE_API_BASE (.env).
+// Placeholder local ate plugarmos a busca via Google Places.
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 let currentUserId = "";
 function getUserId(): string {
