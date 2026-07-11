@@ -1,7 +1,10 @@
 node_modules
-.env
-.env.local
 dist
+
+# Segredos — NUNCA versionar (.env e variantes, exceto o template)
+.env
+.env.*
+!.env.example
 
 # Artefatos de build (TanStack Start / Nitro / Cloudflare / Vite)
 .output
