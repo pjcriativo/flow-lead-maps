@@ -5,10 +5,10 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — Flow Leads" },
-      { name: "description", content: "How Flow Leads collects, uses, and protects your data, including Google OAuth and lead data storage." },
-      { property: "og:title", content: "Privacy Policy — Flow Leads" },
-      { property: "og:description", content: "How we handle your data, Google OAuth tokens, and the leads you generate." },
+      { title: "Política de Privacidade — Flow Leads" },
+      { name: "description", content: "Como o Flow Leads coleta, usa e protege seus dados, em conformidade com a LGPD (Lei 13.709/2018)." },
+      { property: "og:title", content: "Política de Privacidade — Flow Leads" },
+      { property: "og:description", content: "Como tratamos seus dados, tokens do Google OAuth e os leads que você gera, conforme a LGPD." },
       { property: "og:url", content: "https://flowleads.com.br/privacy" },
     ],
     links: [{ rel: "canonical", href: "https://flowleads.com.br/privacy" }],
@@ -25,95 +25,122 @@ function PrivacyPage() {
             <FlowLeadsLogo className="h-9 w-auto" />
           </Link>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
-            <Link to="/dashboard" className="hover:text-foreground">Dashboard</Link>
+            <Link to="/pricing" className="hover:text-foreground">Preços</Link>
+            <Link to="/dashboard" className="hover:text-foreground">Painel</Link>
           </nav>
         </div>
       </header>
 
       <article className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-4xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: May 14, 2026</p>
+        <h1 className="text-4xl font-semibold tracking-tight">Política de Privacidade</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Última atualização: 10 de julho de 2026</p>
+        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+          Esta Política descreve como o Flow Leads trata dados pessoais, em conformidade com a Lei Geral de Proteção de Dados — LGPD (Lei 13.709/2018). Ao usar o Serviço, você concorda com as práticas aqui descritas.
+        </p>
 
         <section className="mt-10 space-y-6 text-sm leading-relaxed text-muted-foreground">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">1. Information We Collect</h2>
+            <h2 className="text-lg font-semibold text-foreground">1. Dados que Coletamos</h2>
             <p className="mt-2">
-              We collect information you provide directly (account email, billing details), information generated as you use Flow Leads (search queries, scrape jobs, exported leads), and minimal technical data (IP address, browser type) needed to operate the Service.
+              Coletamos os dados que você fornece diretamente (e-mail da conta, dados de cobrança), os dados gerados durante o uso do Flow Leads (consultas de busca, tarefas de coleta, leads exportados) e dados técnicos mínimos (endereço IP, tipo de navegador) necessários para operar o Serviço.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">2. Google OAuth and Google Sheets</h2>
+            <h2 className="text-lg font-semibold text-foreground">2. Base Legal do Tratamento</h2>
             <p className="mt-2">
-              When you connect Google Sheets, we use Google OAuth 2.0 to obtain a scoped access token. We request only the permissions needed to read and write the Google Sheet you specify. We do not access any other files in your Google Drive.
-            </p>
-            <p className="mt-2">
-              OAuth refresh tokens are stored encrypted at rest and are used solely to keep your Google Sheets sync working. You can revoke access at any time from the Google Sheets page in the dashboard or from your{" "}
-              <a className="text-primary" href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">Google Account permissions</a>.
-            </p>
-            <p className="mt-2">
-              Flow Leads's use and transfer of information received from Google APIs adheres to the{" "}
-              <a className="text-primary" href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements.
+              Tratamos dados pessoais com fundamento nas hipóteses da LGPD, especialmente: <strong>execução de contrato</strong> (art. 7º, V) para prestar o Serviço; <strong>legítimo interesse</strong> (art. 7º, IX, e art. 10) para segurança, prevenção a fraudes e melhoria do produto; <strong>cumprimento de obrigação legal</strong> (art. 7º, II); e <strong>consentimento</strong> (art. 7º, I), quando aplicável. Nosso legítimo interesse é sempre ponderado frente aos seus direitos e liberdades.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">3. Lead Data Storage</h2>
+            <h2 className="text-lg font-semibold text-foreground">3. Google OAuth e Google Sheets</h2>
             <p className="mt-2">
-              Lead records you generate (business name, address, phone, website, email, ratings) are stored in our database so you can re-export them and review job history. You may delete your leads at any time. Deleted leads are removed from our active database within 30 days.
+              Ao conectar o Google Sheets, usamos o Google OAuth 2.0 para obter um token de acesso com escopo restrito. Solicitamos apenas as permissões necessárias para ler e escrever na planilha que você indicar. Não acessamos outros arquivos do seu Google Drive.
+            </p>
+            <p className="mt-2">
+              Os tokens de atualização (refresh tokens) do OAuth são armazenados de forma criptografada e usados exclusivamente para manter a sincronização com o Google Sheets. Você pode revogar o acesso a qualquer momento na página de Google Sheets do painel ou nas{" "}
+              <a className="text-primary" href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">permissões da sua Conta Google</a>.
+            </p>
+            <p className="mt-2">
+              O uso e a transferência de informações recebidas das APIs do Google pelo Flow Leads observam a{" "}
+              <a className="text-primary" href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">Política de Dados do Usuário dos Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">4. How We Use Information</h2>
+            <h2 className="text-lg font-semibold text-foreground">4. Dados de Leads e Papéis (Controlador/Operador)</h2>
             <p className="mt-2">
-              We use the information we collect to operate, maintain, and improve the Service; process payments; provide customer support; and send service-related communications. We do not sell your personal data.
+              Os registros de leads que você gera (nome do estabelecimento, endereço, telefone, site, e-mail, avaliações) são armazenados na nossa base para que você possa reexportá-los e revisar o histórico. Você pode excluir seus leads a qualquer momento; leads excluídos são removidos da base ativa em até 30 dias.
+            </p>
+            <p className="mt-2">
+              Em relação a esses dados de leads, <strong>você é o Controlador</strong> e o Flow Leads atua como <strong>Operador</strong> (arts. 5º, VI e VII, da LGPD). Cabe a você definir a finalidade do tratamento, possuir base legal adequada, atender aos titulares e disponibilizar opt-out em suas comunicações. Consulte a cláusula correspondente nos <Link to="/terms" className="text-primary">Termos de Uso</Link>.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">5. Sharing</h2>
+            <h2 className="text-lg font-semibold text-foreground">5. Como Usamos os Dados</h2>
             <p className="mt-2">
-              We share data only with: (a) infrastructure providers (hosting, database, email); (b) payment processors; and (c) authorities when required by law. Each provider is bound by confidentiality and data-protection obligations.
+              Usamos os dados para operar, manter e melhorar o Serviço; processar pagamentos; oferecer suporte; e enviar comunicações relacionadas ao Serviço. <strong>Não vendemos seus dados pessoais.</strong>
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">6. Security</h2>
+            <h2 className="text-lg font-semibold text-foreground">6. Compartilhamento</h2>
             <p className="mt-2">
-              We use industry-standard safeguards including TLS in transit, encryption at rest for sensitive credentials, and least-privilege access controls. No system is 100% secure, but we work hard to protect your data.
+              Compartilhamos dados apenas com: (a) provedores de infraestrutura (hospedagem, banco de dados, e-mail); (b) processadores de pagamento; e (c) autoridades, quando exigido por lei. Cada provedor está sujeito a obrigações de confidencialidade e proteção de dados.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">7. Your Rights</h2>
+            <h2 className="text-lg font-semibold text-foreground">7. Segurança</h2>
             <p className="mt-2">
-              Depending on your jurisdiction, you may have rights to access, correct, export, or delete your personal data. Contact us to exercise these rights.
+              Adotamos salvaguardas de mercado, incluindo TLS em trânsito, criptografia em repouso para credenciais sensíveis e controle de acesso com privilégio mínimo. Nenhum sistema é 100% seguro, mas trabalhamos para proteger seus dados e comunicar incidentes relevantes conforme a LGPD.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">8. Data Retention</h2>
+            <h2 className="text-lg font-semibold text-foreground">8. Seus Direitos como Titular (art. 18 da LGPD)</h2>
             <p className="mt-2">
-              We retain account data while your account is active. After deletion, residual backups are purged within 90 days.
+              Você pode, a qualquer momento e mediante requisição, exercer os direitos previstos no art. 18 da LGPD, entre eles:
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>confirmação da existência de tratamento;</li>
+              <li>acesso aos dados;</li>
+              <li>correção de dados incompletos, inexatos ou desatualizados;</li>
+              <li>anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade;</li>
+              <li>portabilidade a outro fornecedor;</li>
+              <li>eliminação dos dados tratados com base no consentimento;</li>
+              <li>informação sobre com quem compartilhamos seus dados;</li>
+              <li>informação sobre a possibilidade de não fornecer consentimento e suas consequências;</li>
+              <li>revogação do consentimento.</li>
+            </ul>
+            <p className="mt-2">
+              Para exercer seus direitos, fale com nosso Encarregado (DPO) em <a className="text-primary" href="mailto:privacidade@flowleads.com.br">privacidade@flowleads.com.br</a>. Você também tem o direito de peticionar à <strong>Autoridade Nacional de Proteção de Dados (ANPD)</strong>.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">9. Children</h2>
-            <p className="mt-2">Flow Leads is not directed to children under 16 and we do not knowingly collect their personal data.</p>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">10. Changes</h2>
-            <p className="mt-2">We may update this policy. Material changes will be communicated via email or in-app notice.</p>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">11. Contact</h2>
+            <h2 className="text-lg font-semibold text-foreground">9. Retenção de Dados</h2>
             <p className="mt-2">
-              Privacy questions? Email <a className="text-primary" href="mailto:privacidade@flowleads.com.br">privacidade@flowleads.com.br</a>.
+              Mantemos os dados da conta enquanto ela estiver ativa. Após a exclusão, backups residuais são eliminados em até 90 dias, ressalvadas as hipóteses de guarda obrigatória previstas em lei.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">10. Crianças e Adolescentes</h2>
+            <p className="mt-2">O Flow Leads não é direcionado a menores de 18 anos e não coletamos, de forma consciente, dados de crianças e adolescentes.</p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">11. Alterações desta Política</h2>
+            <p className="mt-2">Podemos atualizar esta Política. Alterações relevantes serão comunicadas por e-mail ou aviso no aplicativo.</p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">12. Contato e Encarregado (DPO)</h2>
+            <p className="mt-2">
+              Dúvidas sobre privacidade? Escreva para <a className="text-primary" href="mailto:privacidade@flowleads.com.br">privacidade@flowleads.com.br</a>.
             </p>
           </div>
         </section>

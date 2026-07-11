@@ -5,10 +5,10 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms of Service — Flow Leads" },
-      { name: "description", content: "Terms of Service for Flow Leads, a lead generation tool for Google Maps." },
-      { property: "og:title", content: "Terms of Service — Flow Leads" },
-      { property: "og:description", content: "The rules for using Flow Leads's lead generation service." },
+      { title: "Termos de Uso — Flow Leads" },
+      { name: "description", content: "Termos de Uso do Flow Leads, ferramenta de geração de leads a partir do Google Maps." },
+      { property: "og:title", content: "Termos de Uso — Flow Leads" },
+      { property: "og:description", content: "As regras para uso do serviço de geração de leads do Flow Leads." },
       { property: "og:url", content: "https://flowleads.com.br/terms" },
     ],
     links: [{ rel: "canonical", href: "https://flowleads.com.br/terms" }],
@@ -25,91 +25,108 @@ function TermsPage() {
             <FlowLeadsLogo className="h-9 w-auto" />
           </Link>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
-            <Link to="/dashboard" className="hover:text-foreground">Dashboard</Link>
+            <Link to="/pricing" className="hover:text-foreground">Preços</Link>
+            <Link to="/dashboard" className="hover:text-foreground">Painel</Link>
           </nav>
         </div>
       </header>
 
       <article className="mx-auto max-w-3xl px-6 py-16 prose prose-neutral dark:prose-invert">
-        <h1 className="text-4xl font-semibold tracking-tight">Terms of Service</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Last updated: May 14, 2026</p>
+        <h1 className="text-4xl font-semibold tracking-tight">Termos de Uso</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Última atualização: 10 de julho de 2026</p>
 
         <section className="mt-10 space-y-6 text-sm leading-relaxed text-muted-foreground">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">1. Acceptance of Terms</h2>
+            <h2 className="text-lg font-semibold text-foreground">1. Aceitação dos Termos</h2>
             <p className="mt-2">
-              By accessing or using Flow Leads ("the Service"), you agree to be bound by these Terms of Service. If you do not agree, do not use the Service.
+              Ao acessar ou utilizar o Flow Leads ("Serviço"), você concorda em se vincular a estes Termos de Uso. Caso não concorde, não utilize o Serviço. Estes Termos são regidos pela legislação brasileira, incluindo o Código de Defesa do Consumidor (Lei 8.078/1990) e a Lei Geral de Proteção de Dados — LGPD (Lei 13.709/2018).
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">2. Description of Service</h2>
+            <h2 className="text-lg font-semibold text-foreground">2. Descrição do Serviço</h2>
             <p className="mt-2">
-              Flow Leads is a lead generation tool that helps users discover publicly available business information from Google Maps and export it to spreadsheets and Google Sheets.
+              O Flow Leads é uma ferramenta de geração de leads que auxilia o usuário a localizar informações comerciais publicamente disponíveis no Google Maps e a exportá-las para planilhas e para o Google Sheets.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">3. Accounts</h2>
+            <h2 className="text-lg font-semibold text-foreground">3. Cadastro e Conta</h2>
             <p className="mt-2">
-              You are responsible for safeguarding your account credentials and for all activity under your account. Notify us immediately of any unauthorized use.
+              Você é responsável por manter a confidencialidade das credenciais da sua conta e por todas as atividades realizadas por meio dela. Notifique-nos imediatamente em caso de uso não autorizado.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">4. Acceptable Use</h2>
+            <h2 className="text-lg font-semibold text-foreground">4. Uso Aceitável</h2>
             <p className="mt-2">
-              You agree not to use Flow Leads to: (a) violate any applicable law or third-party rights; (b) send unsolicited bulk communications in violation of anti-spam laws (CAN-SPAM, GDPR, CASL); (c) resell raw lead data without adding value; or (d) interfere with the Service's infrastructure.
+              Você concorda em não utilizar o Flow Leads para: (a) violar qualquer lei aplicável ou direitos de terceiros; (b) enviar comunicações não solicitadas em massa (spam) em desacordo com a legislação aplicável; (c) revender dados brutos de leads sem agregar valor; ou (d) interferir na infraestrutura do Serviço.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">5. Subscriptions and Billing</h2>
+            <h2 className="text-lg font-semibold text-foreground">5. Responsabilidade sobre os Dados de Leads (LGPD)</h2>
             <p className="mt-2">
-              Paid plans renew automatically until cancelled. You can cancel from your account at any time; cancellations take effect at the end of the current billing period. Fees are non-refundable except where required by law.
+              Os dados pessoais de leads que você coleta, armazena e utiliza por meio do Serviço são de sua exclusiva responsabilidade. Para os fins da LGPD, <strong>você é o Controlador</strong> desses dados, cabendo a você definir as finalidades e os meios do tratamento. O Flow Leads atua como <strong>Operador</strong>, tratando esses dados apenas conforme suas instruções e para prestação do Serviço.
+            </p>
+            <p className="mt-2">
+              Como Controlador, você é o único responsável por: (a) possuir <strong>base legal adequada</strong> (por exemplo, legítimo interesse, nos termos dos arts. 7º e 10 da LGPD) para tratar os dados dos leads; (b) atender às requisições dos titulares e respeitar seus direitos; e (c) garantir mecanismo de <strong>consentimento e descadastramento (opt-out)</strong> em todo envio de mensagens de marketing por e-mail, WhatsApp, SMS ou outros canais, em conformidade com a LGPD e as boas práticas de mercado. O Flow Leads não se responsabiliza pelo uso que você faz dos dados coletados nem pelas mensagens que você envia.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">6. Lead Data Accuracy</h2>
+            <h2 className="text-lg font-semibold text-foreground">6. Assinaturas e Cobrança</h2>
             <p className="mt-2">
-              Lead data is sourced from third-party platforms and is provided "as is." We do not guarantee accuracy, completeness, or fitness for any particular purpose.
+              Os planos pagos são renovados automaticamente até o cancelamento. Você pode cancelar a qualquer momento pela sua conta; o cancelamento passa a valer ao fim do período de cobrança vigente. Reembolsos observam a nossa <Link to="/refund" className="text-primary">Política de Reembolso</Link> e o direito de arrependimento do art. 49 do CDC.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">7. Intellectual Property</h2>
+            <h2 className="text-lg font-semibold text-foreground">7. Precisão dos Dados de Leads</h2>
             <p className="mt-2">
-              Flow Leads and its branding are owned by us. You receive a limited, non-exclusive license to use the Service for its intended purpose during the term of your subscription.
+              Os dados de leads são obtidos de plataformas de terceiros e fornecidos "no estado em que se encontram". Não garantimos exatidão, completude ou adequação a qualquer finalidade específica.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">8. Termination</h2>
+            <h2 className="text-lg font-semibold text-foreground">8. Propriedade Intelectual</h2>
             <p className="mt-2">
-              We may suspend or terminate your access if you breach these Terms or use the Service in a way that risks harm to us or other users.
+              O Flow Leads e sua marca pertencem a nós. Você recebe uma licença limitada, não exclusiva e intransferível para usar o Serviço para sua finalidade durante a vigência da sua assinatura.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">9. Limitation of Liability</h2>
+            <h2 className="text-lg font-semibold text-foreground">9. Suspensão e Encerramento</h2>
             <p className="mt-2">
-              To the maximum extent permitted by law, Flow Leads shall not be liable for any indirect, incidental, or consequential damages arising from your use of the Service.
+              Podemos suspender ou encerrar o seu acesso caso você descumpra estes Termos ou utilize o Serviço de forma que gere risco a nós ou a outros usuários.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">10. Changes to These Terms</h2>
+            <h2 className="text-lg font-semibold text-foreground">10. Limitação de Responsabilidade</h2>
             <p className="mt-2">
-              We may update these Terms from time to time. Continued use of the Service after changes are posted constitutes acceptance of the revised Terms.
+              Na máxima extensão permitida pela lei, o Flow Leads não será responsável por danos indiretos, incidentais ou consequenciais decorrentes do uso do Serviço. Nada nestes Termos limita direitos que a lei assegura ao consumidor.
             </p>
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold text-foreground">11. Contact</h2>
+            <h2 className="text-lg font-semibold text-foreground">11. Alterações destes Termos</h2>
             <p className="mt-2">
-              Questions? Email <a className="text-primary" href="mailto:contato@flowleads.com.br">contato@flowleads.com.br</a>.
+              Podemos atualizar estes Termos periodicamente. O uso continuado do Serviço após a publicação das alterações representa a aceitação da versão revisada.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">12. Lei Aplicável e Foro</h2>
+            <p className="mt-2">
+              Estes Termos são regidos pelas leis da República Federativa do Brasil. Fica eleito o foro do domicílio do consumidor para dirimir quaisquer controvérsias, nos termos do CDC.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">13. Contato</h2>
+            <p className="mt-2">
+              Dúvidas? Escreva para <a className="text-primary" href="mailto:contato@flowleads.com.br">contato@flowleads.com.br</a>.
             </p>
           </div>
         </section>

@@ -33,9 +33,9 @@ function Index() {
             <FlowLeadsLogo className="h-9 w-auto" />
           </Link>
           <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-            <a href="#features" className="hover:text-foreground">Features</a>
-            <a href="#how" className="hover:text-foreground">How it works</a>
-            <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
+            <a href="#features" className="hover:text-foreground">Recursos</a>
+            <a href="#how" className="hover:text-foreground">Como funciona</a>
+            <Link to="/pricing" className="hover:text-foreground">Preços</Link>
           </nav>
           <Link to="/dashboard" preload="render">
             <Button>Get Started <ArrowRight /></Button>

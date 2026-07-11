@@ -106,7 +106,7 @@ function PricingPage() {
           </Link>
           <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
             <Link to="/" className="hover:text-foreground">Home</Link>
-            <Link to="/pricing" className="text-foreground">Pricing</Link>
+            <Link to="/pricing" className="text-foreground">Preços</Link>
           </nav>
           <Link to="/dashboard" preload="render">
             <Button>Open App <ArrowRight /></Button>
