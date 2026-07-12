@@ -96,12 +96,16 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
     motivo = "Tem site, mas não foi avaliado — ative a busca de e-mails para qualificar.";
   }
 
-  // BÔNUS de reputação (fontes com nota, ex. Places) — nunca base.
+  // BÔNUS de reputação — régua completa quando a fonte traz NOTA (Apify/Places).
+  // Nunca é base: soma à régua de presença digital (negócio que fatura bem +
+  // site fraco = cliente-ouro).
   let ratingBonus = 0;
   if (input.rating != null) {
-    if (input.rating >= 4.7 && (input.reviewCount ?? 0) >= 40) ratingBonus = 8;
-    else if (input.rating >= 4.5) ratingBonus = 4;
-    if (ratingBonus) notes.push(`Bônus de reputação (nota ${input.rating})`);
+    const rc = input.reviewCount ?? 0;
+    if (input.rating >= 4.7 && rc >= 40) ratingBonus = 12; // reputação "ouro"
+    else if (input.rating >= 4.5 && rc >= 20) ratingBonus = 6;
+    else if (input.rating >= 4.0) ratingBonus = 2;
+    if (ratingBonus) notes.push(`Bônus de reputação: nota ${input.rating}${rc ? ` (${rc} avaliações)` : ""}`);
   }
 
   const score = clamp(base + ratingBonus, 0, 100);

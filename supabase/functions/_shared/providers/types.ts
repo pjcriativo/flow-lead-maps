@@ -2,7 +2,7 @@
 // Adicionar uma fonte nova (ex.: Apify) = criar um arquivo que implemente
 // `ProviderSearch` e registrá-la no dispatch da search-leads. Nada mais muda.
 
-export type Fonte = "osm" | "geoapify" | "places";
+export type Fonte = "osm" | "geoapify" | "apify" | "places";
 
 /** Lugar normalizado que TODO provedor devolve (o que não vier, fica null — nunca inventar). */
 export type RawPlace = {
@@ -34,6 +34,8 @@ export type ProviderParams = {
   raioKm: number | null;
   /** Quantos candidatos coletar (a search-leads pede ~1.6x o limite). */
   alvo: number;
+  /** Limite exato pedido pelo usuário (fontes PAGAS usam isto p/ não gastar à toa). */
+  limite: number;
   /** Ids já vistos (dedupe entre buscas do usuário). */
   seen: Set<string>;
   /** Log de progresso (vai pro stream NDJSON da UI). */

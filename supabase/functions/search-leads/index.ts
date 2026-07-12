@@ -9,6 +9,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import type { Fonte, ProviderSearch } from "../_shared/providers/types.ts";
 import { searchOsm } from "../_shared/providers/osm.ts";
 import { searchGeoapify } from "../_shared/providers/geoapify.ts";
+import { searchApify } from "../_shared/providers/apify.ts";
 import { searchPlaces } from "../_shared/providers/places.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
@@ -19,6 +20,7 @@ import { geocodeCidade } from "../_shared/geocode.ts";
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
   osm: searchOsm,
   geoapify: searchGeoapify,
+  apify: searchApify,
   places: searchPlaces,
 };
 
@@ -113,6 +115,7 @@ Deno.serve(async (req) => {
           lng,
           raioKm,
           alvo: Math.ceil(limite * 1.6),
+          limite,
           seen,
           log: (message) => send({ type: "log", message }),
         });

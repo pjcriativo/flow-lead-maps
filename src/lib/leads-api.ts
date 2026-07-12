@@ -25,12 +25,13 @@ export type ScoreBreakdown = {
 };
 
 /** Fontes de busca plugáveis (o seletor da UI escolhe; o backend despacha). */
-export type FonteBusca = "osm" | "geoapify" | "places";
+export type FonteBusca = "osm" | "geoapify" | "apify" | "places";
 
 export const FONTE_LABELS: Record<FonteBusca, string> = {
   osm: "OpenStreetMap (grátis)",
   geoapify: "Geoapify (grátis)",
-  places: "Google Maps (requer billing)",
+  apify: "Google Maps via Apify (rico — pago)",
+  places: "Google Places (requer billing)",
 };
 
 /** Fontes desativadas no seletor (presentes, mas não selecionáveis). */
