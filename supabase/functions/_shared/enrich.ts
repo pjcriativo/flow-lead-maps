@@ -12,6 +12,7 @@ export type Enrichment = {
   site: SiteEval;
   email: string | null;
   whatsapp: string | null;
+  instagram: string | null;
 };
 
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
@@ -80,6 +81,18 @@ export function extractWhatsapp(html: string): string | null {
   for (const m of html.matchAll(/tel:(\+?[\d\s().-]{8,})/gi)) {
     const w = toBrWhatsapp(m[1]);
     if (w) return w;
+  }
+  return null;
+}
+
+// Palavras que não são perfil (paths do próprio Instagram).
+const IG_NAO_PERFIL = new Set(["p", "reel", "reels", "explore", "accounts", "sharer", "stories", "tv", "about", "developer", "legal"]);
+
+export function extractInstagram(html: string): string | null {
+  for (const m of html.matchAll(/https?:\/\/(?:www\.)?instagram\.com\/([A-Za-z0-9_.]+)/gi)) {
+    const handle = m[1]?.replace(/\/$/, "");
+    if (!handle || IG_NAO_PERFIL.has(handle.toLowerCase())) continue;
+    return `https://instagram.com/${handle}`;
   }
   return null;
 }
@@ -159,6 +172,7 @@ export async function enrichFromWebsite(
         site: { reachable: false, bad: false, reasons: ["site fora do ar (HTTP " + res.status + ")"] },
         email: null,
         whatsapp: toBrWhatsapp(fallbackPhone),
+        instagram: null,
       };
     }
     const html = (await res.text()).slice(0, 400_000);
@@ -166,12 +180,14 @@ export async function enrichFromWebsite(
       site: evaluateSite(html, finalUrl),
       email: extractEmail(html),
       whatsapp: extractWhatsapp(html) ?? toBrWhatsapp(fallbackPhone),
+      instagram: extractInstagram(html),
     };
   } catch (_e) {
     return {
       site: { reachable: false, bad: false, reasons: ["site inacessível (timeout/erro de rede)"] },
       email: null,
       whatsapp: toBrWhatsapp(fallbackPhone),
+      instagram: null,
     };
   } finally {
     clearTimeout(timeout);

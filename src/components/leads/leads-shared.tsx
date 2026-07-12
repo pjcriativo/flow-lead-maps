@@ -1,5 +1,6 @@
 // Peças de UI compartilhadas da Fase 1 (busca, pipeline, gestão de leads).
-import { Crown, Star, Globe, MessageCircle, Mail, ExternalLink } from "lucide-react";
+import { Star, Globe, MessageCircle, Mail, ExternalLink, Info, CheckCircle2, XCircle } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import type { Lead, ScoreBreakdown } from "@/lib/leads-api";
 import { STATUS_LABELS } from "@/lib/leads-api";
@@ -25,36 +26,102 @@ export function getBreakdown(lead: Lead): ScoreBreakdown | null {
   return null;
 }
 
+// Faixas de OPORTUNIDADE: alta=verde, média=amber, baixa=cinza.
 export function scoreColor(score: number): string {
-  if (score >= 85) return "bg-amber-100 text-amber-800 ring-amber-300";
-  if (score >= 65) return "bg-green-100 text-green-800 ring-green-300";
-  if (score >= 40) return "bg-blue-50 text-blue-700 ring-blue-200";
+  if (score >= 80) return "bg-green-100 text-green-800 ring-green-300";
+  if (score >= 50) return "bg-amber-100 text-amber-800 ring-amber-300";
   return "bg-secondary text-muted-foreground ring-border";
+}
+
+export function faixaLabel(score: number): string {
+  if (score >= 80) return "Alta oportunidade";
+  if (score >= 50) return "Média oportunidade";
+  return "Baixa oportunidade";
+}
+
+function Sinal({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {ok
+        ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#16A34A]" />
+        : <XCircle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />}
+      <span className={ok ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+    </div>
+  );
+}
+
+function ScoreBreakdownCard({ lead, bd }: { lead: Lead; bd: ScoreBreakdown | null }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="text-lg font-bold tabular-nums">
+          {lead.score}<span className="text-xs font-normal text-muted-foreground">/100</span>
+        </span>
+        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset", scoreColor(lead.score))}>
+          {faixaLabel(lead.score)}
+        </span>
+      </div>
+      {bd?.motivo && <p className="text-xs text-muted-foreground">{bd.motivo}</p>}
+      {bd && (
+        <div className="space-y-1 border-t border-border pt-2 text-xs">
+          <Sinal ok={!bd.has_website} label="Sem site próprio" />
+          {bd.has_website && <Sinal ok={bd.bad_site} label="Site fraco/datado" />}
+          <Sinal ok={bd.has_whatsapp} label="WhatsApp p/ abordagem" />
+          <Sinal ok={bd.has_instagram} label="Tem Instagram" />
+          <Sinal ok={bd.has_email} label="E-mail público" />
+        </div>
+      )}
+      <p className="border-t border-border pt-2 text-[11px] leading-snug text-muted-foreground">
+        Quanto <b className="text-foreground">maior</b>, mais fácil de vender — presença digital fraca.
+      </p>
+    </div>
+  );
 }
 
 export function ScoreBadge({ lead }: { lead: Lead }) {
   const bd = getBreakdown(lead);
-  const gold = bd?.is_gold;
-  const reasons = bd?.bad_site_reasons ?? [];
-  const title = [
-    `Score ${lead.score}/100`,
-    gold ? "★ Cliente-ouro" : "",
-    reasons.length ? "Site ruim: " + reasons.join("; ") : "",
-    ...(bd?.notes ?? []),
-  ]
-    .filter(Boolean)
-    .join("\n");
   return (
-    <span
-      title={title}
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ring-1 ring-inset",
-        scoreColor(lead.score),
-      )}
-    >
-      {gold && <Crown className="h-3.5 w-3.5 fill-amber-500 text-amber-600" />}
-      {lead.score}
-    </span>
+    <HoverCard openDelay={120} closeDelay={60}>
+      <HoverCardTrigger asChild>
+        <span
+          className={cn(
+            "inline-flex cursor-help items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ring-1 ring-inset",
+            scoreColor(lead.score),
+          )}
+        >
+          {lead.score}
+        </span>
+      </HoverCardTrigger>
+      <HoverCardContent align="start" className="w-72">
+        <ScoreBreakdownCard lead={lead} bd={bd} />
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
+// Legenda fixa (ícone de info) explicando a régua do score.
+export function ScoreLegend() {
+  return (
+    <HoverCard openDelay={100} closeDelay={60}>
+      <HoverCardTrigger asChild>
+        <button type="button" className="ml-1 inline-flex items-center align-middle text-muted-foreground hover:text-foreground">
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent align="start" className="w-80">
+        <p className="text-sm font-semibold">Score de Oportunidade</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Quanto <b className="text-foreground">MAIOR</b>, mais fácil de vender — o negócio tem presença
+          digital fraca (sem site ou site ruim). Score <b className="text-foreground">BAIXO</b> = já tem
+          site bom, menos oportunidade.
+        </p>
+        <div className="mt-2 space-y-1 text-xs">
+          <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" /> 80–100 · Alta oportunidade</div>
+          <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 50–79 · Média</div>
+          <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-gray-400" /> 0–49 · Baixa (já tem presença)</div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
   );
 }
 

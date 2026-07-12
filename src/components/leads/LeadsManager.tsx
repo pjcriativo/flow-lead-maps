@@ -20,7 +20,7 @@ import {
   LEAD_STATUSES, STATUS_LABELS, type Lead,
 } from "@/lib/leads-api";
 import {
-  ScoreBadge, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
+  ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
 } from "./leads-shared";
 
 export function LeadsManager() {
@@ -149,7 +149,9 @@ export function LeadsManager() {
               <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   {["Score", "Empresa", "Nota", "WhatsApp", "E-mail", "Site", "Status", "Ações"].map((h) => (
-                    <th key={h} className="px-4 py-3 font-medium">{h}</th>
+                    <th key={h} className="px-4 py-3 font-medium">
+                      {h === "Score" ? <span className="inline-flex items-center">Score<ScoreLegend /></span> : h}
+                    </th>
                   ))}
                 </tr>
               </thead>

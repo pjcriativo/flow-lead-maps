@@ -109,23 +109,34 @@ Deno.serve(async (req) => {
         for (const p of candidates) {
           if (inserted >= limite) break;
 
-          const hasWebsite = !!p.website;
+          // Às vezes o "site" cadastrado é, na verdade, um perfil de Instagram/Facebook.
+          let website = p.website;
+          let instagram: string | null = p.instagram;
+          let facebook: string | null = p.facebook;
+          if (website) {
+            const igm = website.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
+            const fbm = website.match(/facebook\.com\/([A-Za-z0-9_.]+)/i);
+            if (igm && !instagram) { instagram = `https://instagram.com/${igm[1].replace(/\/$/, "")}`; website = null; }
+            else if (fbm && !facebook) { facebook = website; website = null; }
+          }
+          const hasWebsite = !!website;
           let email: string | null = null;
           let whatsapp: string | null = toBrWhatsapp(p.phone);
           let site = null;
 
           if (buscarEmails && hasWebsite) {
-            const enr = await enrichFromWebsite(p.website!, p.phone);
+            const enr = await enrichFromWebsite(website!, p.phone);
             email = enr.email;
             whatsapp = enr.whatsapp ?? whatsapp;
+            instagram = instagram ?? enr.instagram; // fonte tem prioridade; senão, o que o site trouxe
             site = enr.site;
           }
 
           const breakdown = computeScore({
             hasWebsite,
             site,
-            hasInstagram: !!p.instagram,
-            hasFacebook: !!p.facebook,
+            hasInstagram: !!instagram,
+            hasFacebook: !!facebook,
             hasWhatsapp: !!whatsapp,
             hasPhone: !!p.phone,
             hasEmail: !!email,
@@ -142,15 +153,15 @@ Deno.serve(async (req) => {
             state: uf || null,
             phone: p.phone,
             whatsapp,
-            website: p.website,
+            website,
             category: p.category ?? nicho,
             rating: p.rating,
             review_count: p.review_count ?? 0,
             has_website: hasWebsite,
             has_phone: !!p.phone,
             email,
-            instagram_url: p.instagram,
-            facebook_url: p.facebook,
+            instagram_url: instagram,
+            facebook_url: facebook,
             latitude: p.lat,
             longitude: p.lng,
             score: breakdown.score,

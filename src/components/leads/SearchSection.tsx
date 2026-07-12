@@ -23,7 +23,7 @@ import {
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
 import {
-  ScoreBadge, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
+  ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
   UF_LIST,
 } from "./leads-shared";
 
@@ -311,7 +311,9 @@ function LiveTable({ leads }: { leads: Lead[] }) {
         <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             {["Score", "Empresa", "Nota", "Telefone", "WhatsApp", "E-mail", "Site", "Status", ""].map((h) => (
-              <th key={h} className="px-4 py-3 font-medium">{h}</th>
+              <th key={h} className="px-4 py-3 font-medium">
+                {h === "Score" ? <span className="inline-flex items-center">Score<ScoreLegend /></span> : h}
+              </th>
             ))}
           </tr>
         </thead>
