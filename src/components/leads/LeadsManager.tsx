@@ -21,6 +21,7 @@ import {
 } from "@/lib/leads-api";
 import {
   ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
+  Paginacao, paginar, PAGE_SIZE,
 } from "./leads-shared";
 
 export function LeadsManager() {
@@ -31,6 +32,7 @@ export function LeadsManager() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Lead | null>(null);
+  const [pagina, setPagina] = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -58,6 +60,11 @@ export function LeadsManager() {
       );
     });
   }, [leads, q, statusFilter]);
+
+  const ordenados = useMemo(() => [...filtered].sort((a, b) => b.score - a.score), [filtered]);
+  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
+  const paginaEfetiva = Math.min(pagina, totalPaginas);
+  const paginados = paginar(ordenados, paginaEfetiva);
 
   const handleEnrich = async (lead: Lead) => {
     setEnrichingId(lead.id);
@@ -156,7 +163,7 @@ export function LeadsManager() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((l) => (
+                {paginados.map((l) => (
                   <tr key={l.id} className="border-t border-border hover:bg-secondary/30">
                     <td className="px-4 py-3"><ScoreBadge lead={l} /></td>
                     <td className="px-4 py-3">
@@ -186,6 +193,9 @@ export function LeadsManager() {
               </tbody>
             </table>
           </div>
+          {ordenados.length > PAGE_SIZE && (
+            <Paginacao total={ordenados.length} page={paginaEfetiva} onPage={setPagina} />
+          )}
         </div>
       )}
 

@@ -13,6 +13,9 @@ export type Enrichment = {
   email: string | null;
   whatsapp: string | null;
   instagram: string | null;
+  facebook: string | null;
+  /** Diagnóstico: como foi a visita (para log). */
+  debug: string;
 };
 
 const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
@@ -97,6 +100,17 @@ export function extractInstagram(html: string): string | null {
   return null;
 }
 
+const FB_NAO_PERFIL = new Set(["sharer", "sharer.php", "plugins", "tr", "dialog", "events", "groups", "profile.php"]);
+
+export function extractFacebook(html: string): string | null {
+  for (const m of html.matchAll(/https?:\/\/(?:www\.|m\.|pt-br\.|business\.)?facebook\.com\/([A-Za-z0-9_.-]+)/gi)) {
+    const handle = m[1]?.replace(/\/$/, "");
+    if (!handle || FB_NAO_PERFIL.has(handle.toLowerCase())) continue;
+    return `https://facebook.com/${handle}`;
+  }
+  return null;
+}
+
 /**
  * Avalia se o site é "ruim" pelos critérios do plugin (2+ problemas = ruim).
  * Guarda o motivo específico (usado depois na proposta).
@@ -146,50 +160,96 @@ export function evaluateSite(html: string, finalUrl: string): SiteEval {
   return { reachable: true, bad: reasons.length >= 2, reasons };
 }
 
-/** Baixa o site (best-effort, com timeout) e enriquece. */
-export async function enrichFromWebsite(
-  website: string,
-  fallbackPhone?: string | null,
-): Promise<Enrichment> {
-  let url = website.trim();
-  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+// UA de navegador real (o "FlowLeadsBot" era bloqueado por muitos sites).
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36";
+const FETCH_TIMEOUT_MS = 8000;
+// Muito e-mail brasileiro fica na página de contato, não na home.
+const PAGINAS_CONTATO = ["/contato", "/fale-conosco", "/contact"];
 
+type Fetched = { ok: boolean; status: number; finalUrl: string; html: string };
+
+async function fetchHtml(url: string): Promise<Fetched> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       signal: controller.signal,
       redirect: "follow",
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; FlowLeadsBot/1.0; +https://flowleads.com.br)",
-        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent": BROWSER_UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
       },
     });
     const finalUrl = res.url || url;
-    if (!res.ok) {
-      return {
-        site: { reachable: false, bad: false, reasons: ["site fora do ar (HTTP " + res.status + ")"] },
-        email: null,
-        whatsapp: toBrWhatsapp(fallbackPhone),
-        instagram: null,
-      };
-    }
-    const html = (await res.text()).slice(0, 400_000);
-    return {
-      site: evaluateSite(html, finalUrl),
-      email: extractEmail(html),
-      whatsapp: extractWhatsapp(html) ?? toBrWhatsapp(fallbackPhone),
-      instagram: extractInstagram(html),
-    };
+    if (!res.ok) return { ok: false, status: res.status, finalUrl, html: "" };
+    const raw = await res.text();
+    // BUG corrigido: truncar só o início cortava o RODAPÉ (onde ficam e-mail/IG).
+    // Em páginas grandes, mantém cabeçalho + rodapé.
+    const html = raw.length > 1_500_000
+      ? raw.slice(0, 900_000) + "\n<!--…-->\n" + raw.slice(-600_000)
+      : raw;
+    return { ok: true, status: res.status, finalUrl, html };
   } catch (_e) {
-    return {
-      site: { reachable: false, bad: false, reasons: ["site inacessível (timeout/erro de rede)"] },
-      email: null,
-      whatsapp: toBrWhatsapp(fallbackPhone),
-      instagram: null,
-    };
+    return { ok: false, status: 0, finalUrl: url, html: "" };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * Visita o site (home + páginas de contato) e extrai e-mail, WhatsApp,
+ * Instagram e Facebook. Só fetch, best-effort, com timeout curto por página.
+ */
+export async function enrichFromWebsite(
+  website: string,
+  fallbackPhone?: string | null,
+): Promise<Enrichment> {
+  let base = website.trim();
+  if (!/^https?:\/\//i.test(base)) base = "https://" + base;
+  let origin = base;
+  try { origin = new URL(base).origin; } catch { /* mantém base */ }
+
+  const home = await fetchHtml(base);
+  if (!home.ok) {
+    return {
+      site: { reachable: false, bad: false, reasons: [`site inacessível (HTTP ${home.status || "timeout/erro"})`] },
+      email: null,
+      whatsapp: toBrWhatsapp(fallbackPhone),
+      instagram: null,
+      facebook: null,
+      debug: `home HTTP ${home.status || "erro"}`,
+    };
+  }
+
+  const site = evaluateSite(home.html, home.finalUrl);
+  let email = extractEmail(home.html);
+  let whatsapp = extractWhatsapp(home.html);
+  let instagram = extractInstagram(home.html);
+  let facebook = extractFacebook(home.html);
+  const paginas: string[] = ["home"];
+
+  // Se faltou e-mail (ou IG), tenta páginas de contato.
+  if (!email || !instagram) {
+    for (const path of PAGINAS_CONTATO) {
+      if (email && instagram) break;
+      const page = await fetchHtml(origin + path);
+      if (!page.ok) continue;
+      paginas.push(path);
+      if (!email) email = extractEmail(page.html);
+      if (!instagram) instagram = extractInstagram(page.html);
+      if (!whatsapp) whatsapp = extractWhatsapp(page.html);
+      if (!facebook) facebook = extractFacebook(page.html);
+    }
+  }
+
+  return {
+    site,
+    email,
+    whatsapp: whatsapp ?? toBrWhatsapp(fallbackPhone),
+    instagram,
+    facebook,
+    debug: `visitou ${paginas.join("+")} · email=${email ? "sim" : "não"} ig=${instagram ? "sim" : "não"}`,
+  };
 }

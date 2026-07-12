@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
   const email = enr.email ?? lead.email ?? null;
   const whatsapp = enr.whatsapp ?? lead.whatsapp ?? toBrWhatsapp(lead.phone);
   const instagram = lead.instagram_url ?? enr.instagram; // fonte tem prioridade; senão o que o site trouxe
+  const facebook = lead.facebook_url ?? enr.facebook;
 
   const breakdown = computeScore({
     hasWebsite: true,
@@ -65,6 +66,7 @@ Deno.serve(async (req) => {
       email,
       whatsapp,
       instagram_url: instagram,
+      facebook_url: facebook,
       score: breakdown.score,
       score_breakdown: breakdown,
       status: "enriched",

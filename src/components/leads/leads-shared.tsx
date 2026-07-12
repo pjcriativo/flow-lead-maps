@@ -1,7 +1,44 @@
 // Peças de UI compartilhadas da Fase 1 (busca, pipeline, gestão de leads).
-import { Star, Globe, MessageCircle, Mail, ExternalLink, Info, CheckCircle2, XCircle } from "lucide-react";
+import { Star, Globe, MessageCircle, Mail, ExternalLink, Info, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/** Paginação clássica (Anterior/Próxima + "N leads · pág X de Y"). */
+export const PAGE_SIZE = 20;
+
+export function Paginacao({
+  total, page, onPage, pageSize = PAGE_SIZE, unidade = "leads",
+}: {
+  total: number;
+  page: number;
+  onPage: (p: number) => void;
+  pageSize?: number;
+  unidade?: string;
+}) {
+  const paginas = Math.max(1, Math.ceil(total / pageSize));
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+      <span className="text-muted-foreground">
+        {total} {unidade} · pág {Math.min(page, paginas)} de {paginas}
+      </span>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          <ChevronLeft className="h-4 w-4" /> Anterior
+        </Button>
+        <Button size="sm" variant="outline" disabled={page >= paginas} onClick={() => onPage(page + 1)}>
+          Próxima <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Fatia um array já ordenado para a página atual. */
+export function paginar<T>(itens: T[], page: number, pageSize = PAGE_SIZE): T[] {
+  const start = (page - 1) * pageSize;
+  return itens.slice(start, start + pageSize);
+}
 import type { Lead, ScoreBreakdown } from "@/lib/leads-api";
 import { STATUS_LABELS } from "@/lib/leads-api";
 

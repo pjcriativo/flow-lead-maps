@@ -24,7 +24,7 @@ import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
 import {
   ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
-  UF_LIST,
+  UF_LIST, Paginacao, paginar, PAGE_SIZE,
 } from "./leads-shared";
 
 export function SearchSection({ onFinished }: { onFinished?: () => void }) {
@@ -68,6 +68,11 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const emailCount = sorted.filter((l) => l.email).length;
   const porMapa = !!pin;
 
+  const [pagina, setPagina] = useState(1);
+  const totalPaginas = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const paginaEfetiva = Math.min(pagina, totalPaginas);
+  const paginados = paginar(sorted, paginaEfetiva);
+
   const handleBuscar = async () => {
     if (!nicho.trim() || (!cidade.trim() && !porMapa)) {
       pushLog("ERRO: informe nicho e cidade (ou marque um ponto no mapa).");
@@ -76,6 +81,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     setRunning(true);
     setLeads([]);
     setLogs([]);
+    setPagina(1);
     setProgress({ found: 0, target: limite });
     setStatus(porMapa ? `Buscando: ${nicho} num raio de ${raioKm}km...` : `Buscando: ${nicho} em ${cidade}${uf ? "/" + uf : ""}...`);
     posthog.capture("search_leads_started", { nicho, cidade, uf, limite, fonte, porMapa });
@@ -275,7 +281,12 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         )}
 
         {sorted.length > 0 ? (
-          <LiveTable leads={sorted} />
+          <>
+            <LiveTable leads={paginados} />
+            {sorted.length > PAGE_SIZE && (
+              <Paginacao total={sorted.length} page={paginaEfetiva} onPage={setPagina} />
+            )}
+          </>
         ) : (
           <EmptyState running={running} />
         )}

@@ -129,7 +129,9 @@ Deno.serve(async (req) => {
             email = enr.email;
             whatsapp = enr.whatsapp ?? whatsapp;
             instagram = instagram ?? enr.instagram; // fonte tem prioridade; senão, o que o site trouxe
+            facebook = facebook ?? enr.facebook;
             site = enr.site;
+            send({ type: "log", message: `↳ ${p.name}: ${enr.debug}` });
           }
 
           const breakdown = computeScore({
