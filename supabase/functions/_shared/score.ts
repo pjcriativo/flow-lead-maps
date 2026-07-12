@@ -1,87 +1,119 @@
-// Score "cliente-ouro" (0–100), adaptado da heurística do plugin.
-// Cliente-ouro = fatura bem (nota alta + muitas avaliações) MAS tem site fraco,
-// tem site ativo (pré-req do redesign) e e-mail público (pré-req da proposta).
+// Score "régua Kaptar" (0–100) — SEM depender de nota (OSM/Geoapify não têm).
+// Filosofia: quanto PIOR a presença digital, mais QUENTE o lead (mais há para
+// vender: site novo/redesign). Nota (quando a fonte tiver, ex. Places) é BÔNUS,
+// nunca base. Guarda o motivo em score_breakdown para citar na proposta.
 import type { SiteEval } from "./enrich.ts";
 
 export type ScoreInput = {
-  rating: number | null;
-  reviewCount: number | null;
   hasWebsite: boolean;
-  site: SiteEval | null; // resultado do enrich; null = não avaliado
+  site: SiteEval | null; // avaliação do site (enrich); null = não avaliado
+  hasInstagram: boolean;
+  hasFacebook: boolean;
+  hasWhatsapp: boolean;
+  hasPhone: boolean;
   hasEmail: boolean;
-  /** Rede social encontrada (instagram/facebook) — sinal de negócio ativo. */
-  hasSocial?: boolean;
+  rating: number | null; // BÔNUS quando existir
+  reviewCount: number | null;
 };
+
+export type Tier = "quente" | "morno" | "frio";
 
 export type ScoreBreakdown = {
   score: number;
+  tier: Tier;
   is_gold: boolean;
-  rating_points: number;
-  reviews_points: number;
-  website_points: number;
-  bad_site_points: number;
-  email_points: number;
-  social_points: number;
+  motivo: string;
+  has_website: boolean;
   bad_site: boolean;
   bad_site_reasons: string[];
-  notes: string[];
+  has_instagram: boolean;
+  has_facebook: boolean;
+  has_whatsapp: boolean;
+  has_email: boolean;
+  rating_bonus: number;
+  notes: string[]; // compat com a UI (lista de observações)
 };
 
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
 export function computeScore(input: ScoreInput): ScoreBreakdown {
-  const rating = input.rating ?? 0;
-  const reviews = input.reviewCount ?? 0;
+  const hasSocial = input.hasInstagram || input.hasFacebook;
+  const badSite = !!input.site?.bad;
+  const badReasons = input.site?.reasons ?? [];
   const notes: string[] = [];
 
-  // Potencial financeiro
-  let ratingPoints = 0;
-  if (rating >= 4.7) ratingPoints = 25;
-  else if (rating >= 4.5) ratingPoints = 12;
-  else if (rating >= 4.0) ratingPoints = 5;
+  let base: number;
+  let motivo: string;
 
-  let reviewsPoints = 0;
-  if (reviews >= 40) reviewsPoints = 20;
-  else if (reviews >= 20) reviewsPoints = 8;
-  else if (reviews >= 10) reviewsPoints = 3;
+  if (!input.hasWebsite) {
+    if (!hasSocial) {
+      base = 84;
+      motivo = "Sem site e sem redes sociais — presença digital zero; máxima oportunidade de vender um site.";
+    } else {
+      base = 75;
+      motivo = "Tem redes sociais mas não tem site — oportunidade de vender um site próprio.";
+    }
+    // Contactabilidade: lead que dá pra abordar vale mais.
+    if (input.hasWhatsapp) {
+      base += 9;
+      notes.push("WhatsApp disponível — canal direto de abordagem");
+    } else if (input.hasPhone) {
+      base += 4;
+      notes.push("Telefone disponível para abordagem");
+    } else {
+      notes.push("Sem contato direto — buscar e-mail/Instagram");
+    }
+  } else if (input.site && input.site.reachable === false) {
+    base = 70;
+    motivo = "Site cadastrado mas fora do ar / inacessível — presença quebrada.";
+  } else if (badSite) {
+    base = 80;
+    motivo = "Site fraco/datado: " + badReasons.join("; ");
+    if (input.hasWhatsapp) {
+      base += 8;
+      notes.push("WhatsApp disponível — canal direto de abordagem");
+    }
+    if (!input.hasEmail && input.hasWhatsapp) {
+      base += 5;
+      notes.push("WhatsApp como principal canal (sem e-mail)");
+    }
+  } else if (input.site && input.site.bad === false) {
+    base = 25;
+    motivo = "Site moderno e bem estruturado — lead frio (pouco a melhorar).";
+    if (!input.hasWhatsapp && !input.hasEmail) base = 15;
+    base = clamp(base, 10, 40);
+  } else {
+    // tem site mas não foi avaliado (busca de e-mails desligada)
+    base = 50;
+    motivo = "Tem site, mas não foi avaliado — ative a busca de e-mails para qualificar.";
+  }
 
-  // Pré-requisito do redesign: ter site ativo
-  const websitePoints = input.hasWebsite ? 10 : 0;
-  if (!input.hasWebsite) notes.push("sem site — fora do alvo de redesign");
+  // BÔNUS de reputação (fontes com nota, ex. Places) — nunca base.
+  let ratingBonus = 0;
+  if (input.rating != null) {
+    if (input.rating >= 4.7 && (input.reviewCount ?? 0) >= 40) ratingBonus = 8;
+    else if (input.rating >= 4.5) ratingBonus = 4;
+    if (ratingBonus) notes.push(`Bônus de reputação (nota ${input.rating})`);
+  }
 
-  // Site ruim (a joia): 2+ problemas
-  const badSite = !!input.site?.bad;
-  const badSitePoints = badSite ? 25 : 0;
-  const badSiteReasons = input.site?.reasons ?? [];
-
-  // Pré-requisito da proposta: e-mail público
-  const emailPoints = input.hasEmail ? 20 : 0;
-  if (!input.hasEmail) notes.push("sem e-mail público — não fecha o ciclo da proposta");
-
-  // Rede social (fontes sem nota, ex. OSM/Foursquare): negócio ativo online
-  const socialPoints = input.hasSocial ? 5 : 0;
-
-  const score = Math.min(
-    100,
-    ratingPoints + reviewsPoints + websitePoints + badSitePoints + emailPoints + socialPoints,
-  );
-
-  const isGold =
-    rating >= 4.7 &&
-    reviews >= 40 &&
-    input.hasWebsite &&
-    badSite &&
-    input.hasEmail;
+  const score = clamp(base + ratingBonus, 0, 100);
+  const tier: Tier = score >= 75 ? "quente" : score >= 45 ? "morno" : "frio";
 
   return {
     score,
-    is_gold: isGold,
-    rating_points: ratingPoints,
-    reviews_points: reviewsPoints,
-    website_points: websitePoints,
-    bad_site_points: badSitePoints,
-    email_points: emailPoints,
-    social_points: socialPoints,
+    tier,
+    is_gold: score >= 80,
+    motivo,
+    has_website: input.hasWebsite,
     bad_site: badSite,
-    bad_site_reasons: badSiteReasons,
-    notes,
+    bad_site_reasons: badReasons,
+    has_instagram: input.hasInstagram,
+    has_facebook: input.hasFacebook,
+    has_whatsapp: input.hasWhatsapp,
+    has_email: input.hasEmail,
+    rating_bonus: ratingBonus,
+    notes: [motivo, ...notes],
   };
 }

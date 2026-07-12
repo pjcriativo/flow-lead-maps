@@ -5,16 +5,21 @@ import type { Database } from "@/integrations/supabase/types";
 
 export type Lead = Database["public"]["Tables"]["leads"]["Row"];
 
+export type ScoreTier = "quente" | "morno" | "frio";
+
 export type ScoreBreakdown = {
   score: number;
+  tier: ScoreTier;
   is_gold: boolean;
-  rating_points: number;
-  reviews_points: number;
-  website_points: number;
-  bad_site_points: number;
-  email_points: number;
+  motivo: string;
+  has_website: boolean;
   bad_site: boolean;
   bad_site_reasons: string[];
+  has_instagram: boolean;
+  has_facebook: boolean;
+  has_whatsapp: boolean;
+  has_email: boolean;
+  rating_bonus: number;
   notes: string[];
 };
 

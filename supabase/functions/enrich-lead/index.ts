@@ -47,11 +47,15 @@ Deno.serve(async (req) => {
   const whatsapp = enr.whatsapp ?? lead.whatsapp ?? toBrWhatsapp(lead.phone);
 
   const breakdown = computeScore({
-    rating: lead.rating,
-    reviewCount: lead.review_count,
     hasWebsite: true,
     site: enr.site,
+    hasInstagram: !!lead.instagram_url,
+    hasFacebook: !!lead.facebook_url,
+    hasWhatsapp: !!whatsapp,
+    hasPhone: !!lead.phone,
     hasEmail: !!email,
+    rating: lead.rating,
+    reviewCount: lead.review_count,
   });
 
   const { data: updated, error: updErr } = await supabase

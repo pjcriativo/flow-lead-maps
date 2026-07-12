@@ -45,6 +45,8 @@ export type Database = {
           status: string
           last_contacted_at: string | null
           enriched_at: string | null
+          latitude: number | null
+          longitude: number | null
           notes: string | null
           created_at: string
           updated_at: string
@@ -79,6 +81,8 @@ export type Database = {
           status?: string
           last_contacted_at?: string | null
           enriched_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -113,6 +117,8 @@ export type Database = {
           status?: string
           last_contacted_at?: string | null
           enriched_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
           notes?: string | null
           created_at?: string
           updated_at?: string

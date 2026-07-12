@@ -111,12 +111,15 @@ Deno.serve(async (req) => {
           }
 
           const breakdown = computeScore({
-            rating: p.rating,
-            reviewCount: p.review_count,
             hasWebsite,
             site,
+            hasInstagram: !!p.instagram,
+            hasFacebook: !!p.facebook,
+            hasWhatsapp: !!whatsapp,
+            hasPhone: !!p.phone,
             hasEmail: !!email,
-            hasSocial: !!(p.instagram || p.facebook),
+            rating: p.rating,
+            reviewCount: p.review_count,
           });
 
           const row = {
@@ -137,6 +140,8 @@ Deno.serve(async (req) => {
             email,
             instagram_url: p.instagram,
             facebook_url: p.facebook,
+            latitude: p.lat,
+            longitude: p.lng,
             score: breakdown.score,
             score_breakdown: breakdown,
             status: email ? "enriched" : "new",
