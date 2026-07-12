@@ -81,6 +81,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
 function Dashboard() {
   const navigate = useNavigate();
   const [section, setSection] = useState<Section>("buscar");
+  const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetVerified, setSheetVerified] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
@@ -161,11 +162,17 @@ function Dashboard() {
       <main className="flex-1 bg-white px-4 pb-10 pt-16 md:px-8 md:pt-8">
         {section === "buscar" && <SearchSection />}
         {section === "pipeline" && <PipelineSection />}
-        {section === "leads" && <LeadsManager />}
+        {section === "leads" && (
+          <LeadsManager
+            onOpenRedesign={(leadId) => { setFocusRedesignLead(leadId); setSection("redesign"); }}
+          />
+        )}
         {section === "propostas" && <PropostasSection />}
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
-        {section === "redesign" && <RedesignSection />}
+        {section === "redesign" && (
+          <RedesignSection focusLeadId={focusRedesignLead} onFocusConsumed={() => setFocusRedesignLead(null)} />
+        )}
         {section === "publicar" && <PublicarSection />}
         {section === "sheets" && (
           <SheetsSection

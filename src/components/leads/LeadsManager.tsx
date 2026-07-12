@@ -2,7 +2,7 @@
 // filtros (texto + status), enriquecer, editar (status/notas) e excluir.
 import { useEffect, useMemo, useState } from "react";
 import {
-  Loader2, RefreshCw, Search, Trash2, Pencil, Sparkles, Download, Users,
+  Loader2, RefreshCw, Search, Trash2, Pencil, Sparkles, Download, Users, Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,15 @@ import {
   fetchLeads, updateLead, deleteLead, enrichLead,
   LEAD_STATUSES, STATUS_LABELS, type Lead,
 } from "@/lib/leads-api";
+import { listarLeadIdsComRedesign } from "@/services/redesign";
 import {
   ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
   Paginacao, paginar, PAGE_SIZE,
 } from "./leads-shared";
 
-export function LeadsManager() {
+export function LeadsManager({ onOpenRedesign }: { onOpenRedesign?: (leadId: string) => void } = {}) {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [redesignLeadIds, setRedesignLeadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -38,7 +40,9 @@ export function LeadsManager() {
     setLoading(true);
     setError(null);
     try {
-      setLeads(await fetchLeads());
+      const [ls, rs] = await Promise.all([fetchLeads(), listarLeadIdsComRedesign()]);
+      setLeads(ls);
+      setRedesignLeadIds(rs);
     } catch (e: any) {
       setError(e?.message ?? "Falha ao carregar leads");
     } finally {
@@ -177,6 +181,14 @@ export function LeadsManager() {
                     <td className="px-4 py-3"><StatusBadge status={l.status} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
+                        {redesignLeadIds.has(l.id) && (
+                          <Button size="sm" variant="ghost"
+                            title="Ver redesign deste lead"
+                            className="text-primary"
+                            onClick={() => onOpenRedesign?.(l.id)}>
+                            <Wand2 className="h-4 w-4" />
+                          </Button>
+                        )}
                         {l.website && (
                           <Button size="sm" variant="ghost" title="Enriquecer (visitar site)"
                             onClick={() => handleEnrich(l)} disabled={enrichingId === l.id}>

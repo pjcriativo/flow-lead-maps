@@ -23,6 +23,14 @@ export async function listarRedesigns(): Promise<Redesign[]> {
   return (data ?? []).map((r: any) => ({ ...r, lead_nome: r.leads?.business_name ?? undefined }));
 }
 
+/** Conjunto de lead_ids que já têm um redesign (para marcar o card em Meus Leads). */
+export async function listarLeadIdsComRedesign(): Promise<Set<string>> {
+  const { data, error } = await supabase.from("redesigns").select("lead_id");
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return new Set((data ?? []).map((r: any) => r.lead_id as string));
+}
+
 /** Gera o site novo do lead via IA (10-40s). */
 export async function gerarRedesign(
   leadId: string,

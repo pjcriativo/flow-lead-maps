@@ -182,6 +182,7 @@ export type Database = {
           criado_em: string
           gerado_em: string | null
           updated_at: string
+          expira_em: string | null
         }
         Insert: {
           id?: string
@@ -197,6 +198,7 @@ export type Database = {
           criado_em?: string
           gerado_em?: string | null
           updated_at?: string
+          expira_em?: string | null
         }
         Update: {
           id?: string
@@ -212,6 +214,7 @@ export type Database = {
           criado_em?: string
           gerado_em?: string | null
           updated_at?: string
+          expira_em?: string | null
         }
         Relationships: []
       }

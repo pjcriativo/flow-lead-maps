@@ -34,7 +34,20 @@ function injetarEditor(html: string): string {
   return html + EDITOR_SNIPPET;
 }
 
-export function RedesignSection() {
+/** "expira em 15 dias" / "expira hoje" / "expirado há 3 dias" a partir de expira_em (ISO). */
+function expiraLabel(expira_em: string | null): { texto: string; vencido: boolean } | null {
+  if (!expira_em) return null;
+  const ms = new Date(expira_em).getTime() - Date.now();
+  const dias = Math.ceil(ms / 86_400_000);
+  if (dias > 1) return { texto: `expira em ${dias} dias`, vencido: false };
+  if (dias === 1) return { texto: "expira amanhã", vencido: false };
+  if (dias === 0) return { texto: "expira hoje", vencido: false };
+  return { texto: `expirado há ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? "s" : ""}`, vencido: true };
+}
+
+export function RedesignSection(
+  { focusLeadId, onFocusConsumed }: { focusLeadId?: string | null; onFocusConsumed?: () => void } = {},
+) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [redesigns, setRedesigns] = useState<Redesign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +71,15 @@ export function RedesignSection() {
     }
   };
   useEffect(() => { carregar(); }, []);
+
+  // Vindo de "Meus Leads" (link do card): abre o redesign daquele lead assim que a lista carrega.
+  useEffect(() => {
+    if (!focusLeadId || loading) return;
+    const alvo = redesigns.find((r) => r.lead_id === focusLeadId && r.html_gerado);
+    if (alvo) setAberto(alvo);
+    else setLeadSel(focusLeadId);
+    onFocusConsumed?.();
+  }, [focusLeadId, loading, redesigns]);
 
   const nomeLead = (id: string) => leads.find((l) => l.id === id)?.business_name ?? "lead";
 
@@ -165,6 +187,14 @@ export function RedesignSection() {
                   {r.modelo ? `${r.modelo}` : ""}{r.custo_usd != null ? ` · ~US$ ${Number(r.custo_usd).toFixed(4)}` : ""}
                   {r.gerado_em ? ` · ${formatDataHora(r.gerado_em)}` : ""}
                 </div>
+                {(() => {
+                  const exp = expiraLabel(r.expira_em);
+                  return exp ? (
+                    <div className={cn("text-xs font-medium", exp.vencido ? "text-destructive" : "text-muted-foreground")}>
+                      {exp.texto}
+                    </div>
+                  ) : null;
+                })()}
                 <div className="mt-auto flex items-center gap-2 pt-1">
                   <Button size="sm" className="flex-1" onClick={() => setAberto(r)} disabled={!r.html_gerado}>
                     <Pencil className="h-4 w-4" /> Abrir editor

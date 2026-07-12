@@ -79,6 +79,8 @@ export interface Redesign {
   criado_em: string;
   gerado_em: string | null;
   updated_at: string;
+  /** ISO datetime — criado_em + 15 dias. Registro fica p/ histórico após expirar. */
+  expira_em: string | null;
   /** Nome do negócio (join com leads) — para exibir. */
   lead_nome?: string;
 }
