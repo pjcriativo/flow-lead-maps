@@ -103,6 +103,8 @@ export type SitePublicadoStatus = "publicado" | "aprovado" | "reprovado" | "expi
 export interface SitePublicado {
   id: string;
   lead_id: string;
+  /** Redesign de origem (o HTML publicado veio dele). */
+  redesign_id: string;
   slug: string;
   url_publica: string;
   status: SitePublicadoStatus;
@@ -112,12 +114,16 @@ export interface SitePublicado {
   expira_em: string;
   /** true quando os arquivos foram apagados do Storage (excluído/expirado). */
   arquivos_removidos: boolean;
+  /** Nome do negócio (join com leads) — para exibir sem depender do slug. */
+  lead_nome?: string;
 }
 
 /** Lead com redesign pronto e ainda SEM site publicado (candidato a publicar). */
 export interface LeadPublicavel {
   lead_id: string;
   lead_nome: string;
+  /** Redesign pronto que será publicado (entrada da publish). */
+  redesign_id: string;
 }
 
 /** Status de pagamento de um registro financeiro. */

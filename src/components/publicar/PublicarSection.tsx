@@ -4,15 +4,28 @@
 // Consome SOMENTE os tipos centrais (@/types) via @/services/publicacao.
 import { useEffect, useState } from "react";
 import {
-  Loader2, RefreshCw, Globe, Rocket, Copy, ExternalLink, Check, Trash2,
-  ThumbsUp, ThumbsDown, Clock,
+  Loader2,
+  RefreshCw,
+  Globe,
+  Rocket,
+  Copy,
+  ExternalLink,
+  Check,
+  Trash2,
+  ThumbsUp,
+  ThumbsDown,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { SitePublicado, SitePublicadoStatus, LeadPublicavel } from "@/types";
 import {
-  listarSites, listarLeadsPublicaveis, publicarSite, despublicarSite, marcarStatus,
+  listarSites,
+  listarLeadsPublicaveis,
+  publicarSite,
+  despublicarSite,
+  marcarStatus,
 } from "@/services/publicacao";
 
 const STATUS_LABEL: Record<SitePublicadoStatus, string> = {
@@ -31,15 +44,27 @@ const STATUS_STYLE: Record<SitePublicadoStatus, string> = {
 
 function StatusPill({ status }: { status: SitePublicadoStatus }) {
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", STATUS_STYLE[status])}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        STATUS_STYLE[status],
+      )}
+    >
       {STATUS_LABEL[status]}
     </span>
   );
 }
 
-// Nome legível a partir do slug (a interface SitePublicado não guarda o nome).
+// Nome legível a partir do slug (fallback quando não veio o lead_nome do join).
 function nomeDoSlug(slug: string): string {
-  return slug.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+  return slug
+    .split("-")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ");
+}
+
+function nomeSite(s: SitePublicado): string {
+  return s.lead_nome ?? nomeDoSlug(s.slug);
 }
 
 function diasParaExpirar(expira_em: string): number {
@@ -53,7 +78,12 @@ function ExpiraCell({ site }: { site: SitePublicado }) {
   const dias = diasParaExpirar(site.expira_em);
   if (dias <= 0) return <span className="text-red-600">Expira hoje</span>;
   return (
-    <span className={cn("inline-flex items-center gap-1", dias <= 3 ? "text-red-600" : "text-muted-foreground")}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1",
+        dias <= 3 ? "text-red-600" : "text-muted-foreground",
+      )}
+    >
       <Clock className="h-3.5 w-3.5" /> {dias} {dias === 1 ? "dia" : "dias"}
     </span>
   );
@@ -81,14 +111,16 @@ export function PublicarSection() {
       setLoading(false);
     }
   };
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+  }, []);
 
   const handlePublicar = async (lead: LeadPublicavel) => {
-    setPublicandoId(lead.lead_id);
+    setPublicandoId(lead.redesign_id);
     try {
-      const novo = await publicarSite(lead.lead_id);
+      const novo = await publicarSite(lead.redesign_id);
       setSites((prev) => [novo, ...prev]);
-      setPublicaveis((prev) => prev.filter((l) => l.lead_id !== lead.lead_id));
+      setPublicaveis((prev) => prev.filter((l) => l.redesign_id !== lead.redesign_id));
       toast.success(`"${lead.lead_nome}" publicado`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao publicar");
@@ -111,7 +143,10 @@ export function PublicarSection() {
   };
 
   const handleExcluir = async (site: SitePublicado) => {
-    if (!confirm(`Despublicar "${nomeDoSlug(site.slug)}"? Os arquivos são apagados (o registro é mantido).`)) return;
+    if (
+      !confirm(`Despublicar "${nomeSite(site)}"? Os arquivos são apagados (o registro é mantido).`)
+    )
+      return;
     setAcaoId(site.id);
     const prev = sites;
     setSites((p) => p.filter((s) => s.id !== site.id)); // some da lista ativa
@@ -143,10 +178,13 @@ export function PublicarSection() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Publicar</h1>
           <p className="text-sm text-muted-foreground">
-            Sites temporários em <span className="font-medium text-foreground">flowleads.flowgenius.com.br/site/…</span> — expiram em 15 dias se não resolvidos.
+            Sites temporários em <span className="font-medium text-foreground">/site/…</span> —
+            abrem para qualquer pessoa e expiram em 15 dias se não resolvidos.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={carregar}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
+        <Button variant="outline" size="sm" onClick={carregar}>
+          <RefreshCw className="h-4 w-4" /> Atualizar
+        </Button>
       </div>
 
       {/* Prontos para publicar */}
@@ -155,10 +193,26 @@ export function PublicarSection() {
           <h2 className="mb-3 text-sm font-semibold text-foreground">Prontos para publicar</h2>
           <div className="flex flex-wrap gap-2">
             {publicaveis.map((lead) => (
-              <div key={lead.lead_id} className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2">
+              <div
+                key={lead.redesign_id}
+                className="flex items-center gap-2 rounded-lg border border-border bg-secondary/30 px-3 py-2"
+              >
                 <span className="text-sm font-medium">{lead.lead_nome}</span>
-                <Button size="sm" onClick={() => handlePublicar(lead)} disabled={publicandoId === lead.lead_id} className="bg-primary font-semibold hover:bg-primary/90">
-                  {publicandoId === lead.lead_id ? <><Loader2 className="h-4 w-4 animate-spin" /> Publicando...</> : <><Rocket className="h-4 w-4" /> Publicar</>}
+                <Button
+                  size="sm"
+                  onClick={() => handlePublicar(lead)}
+                  disabled={publicandoId === lead.redesign_id}
+                  className="bg-primary font-semibold hover:bg-primary/90"
+                >
+                  {publicandoId === lead.redesign_id ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Publicando...
+                    </>
+                  ) : (
+                    <>
+                      <Rocket className="h-4 w-4" /> Publicar
+                    </>
+                  )}
                 </Button>
               </div>
             ))}
@@ -167,14 +221,20 @@ export function PublicarSection() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando...</div>
+        <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
+        </div>
       ) : error ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
       ) : sites.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-16 text-center">
           <Rocket className="mx-auto h-8 w-8 text-muted-foreground" />
           <h3 className="mt-4 font-semibold">Nenhum site publicado</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Publique um site pronto acima; ele aparece aqui com a URL temporária.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Publique um site pronto acima; ele aparece aqui com a URL temporária.
+          </p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
@@ -183,7 +243,9 @@ export function PublicarSection() {
               <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   {["Lead", "URL pública", "Status", "Expira em", "Ações"].map((h) => (
-                    <th key={h} className="px-4 py-3 font-medium">{h}</th>
+                    <th key={h} className="px-4 py-3 font-medium">
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -192,48 +254,92 @@ export function PublicarSection() {
                   const removido = s.arquivos_removidos;
                   return (
                     <tr key={s.id} className="border-t border-border hover:bg-secondary/30">
-                      <td className="px-4 py-3 font-semibold text-foreground">{nomeDoSlug(s.slug)}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">{nomeSite(s)}</td>
                       <td className="px-4 py-3">
                         {removido ? (
                           <span className="text-xs text-muted-foreground">arquivos removidos</span>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <a href={s.url_publica} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                              <Globe className="h-3.5 w-3.5" /> {s.url_publica.replace(/^https?:\/\//, "")}
+                            <a
+                              href={s.url_publica}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                            >
+                              <Globe className="h-3.5 w-3.5" />{" "}
+                              {s.url_publica.replace(/^https?:\/\//, "")}
                             </a>
-                            <button onClick={() => copiar(s)} title="Copiar URL" className="text-muted-foreground hover:text-foreground">
-                              {copiadoId === s.id ? <Check className="h-3.5 w-3.5 text-[#16A34A]" /> : <Copy className="h-3.5 w-3.5" />}
+                            <button
+                              onClick={() => copiar(s)}
+                              title="Copiar URL"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              {copiadoId === s.id ? (
+                                <Check className="h-3.5 w-3.5 text-[#16A34A]" />
+                              ) : (
+                                <Copy className="h-3.5 w-3.5" />
+                              )}
                             </button>
                           </div>
                         )}
                       </td>
-                      <td className="px-4 py-3"><StatusPill status={s.status} /></td>
-                      <td className="px-4 py-3"><ExpiraCell site={s} /></td>
+                      <td className="px-4 py-3">
+                        <StatusPill status={s.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <ExpiraCell site={s} />
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           {s.status !== "expirado" && (
                             <>
                               {s.status !== "aprovado" && (
-                                <Button size="sm" variant="ghost" title="Marcar aprovado" onClick={() => handleStatus(s, "aprovado")} disabled={acaoId === s.id}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Marcar aprovado"
+                                  onClick={() => handleStatus(s, "aprovado")}
+                                  disabled={acaoId === s.id}
+                                >
                                   <ThumbsUp className="h-4 w-4 text-[#16A34A]" />
                                 </Button>
                               )}
                               {s.status !== "reprovado" && (
-                                <Button size="sm" variant="ghost" title="Marcar reprovado" onClick={() => handleStatus(s, "reprovado")} disabled={acaoId === s.id}>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Marcar reprovado"
+                                  onClick={() => handleStatus(s, "reprovado")}
+                                  disabled={acaoId === s.id}
+                                >
                                   <ThumbsDown className="h-4 w-4 text-red-600" />
                                 </Button>
                               )}
                               {!removido && (
                                 <a href={s.url_publica} target="_blank" rel="noopener noreferrer">
-                                  <Button size="sm" variant="ghost" title="Abrir site"><ExternalLink className="h-4 w-4" /></Button>
+                                  <Button size="sm" variant="ghost" title="Abrir site">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
                                 </a>
                               )}
-                              <Button size="sm" variant="ghost" title="Despublicar/Excluir" onClick={() => handleExcluir(s)} disabled={acaoId === s.id}>
-                                {acaoId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Despublicar/Excluir"
+                                onClick={() => handleExcluir(s)}
+                                disabled={acaoId === s.id}
+                              >
+                                {acaoId === s.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                )}
                               </Button>
                             </>
                           )}
-                          {s.status === "expirado" && <span className="text-xs text-muted-foreground">—</span>}
+                          {s.status === "expirado" && (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -1,145 +1,125 @@
-// Camada de serviço — Publicação de sites TEMPORÁRIOS (Fase 4).
-// HOJE: dados mock em memória. DEPOIS: trocar SÓ o corpo destas funções pela
-// Edge Function publish-site (grava no Supabase Storage e serve em
-// flowleads.flowgenius.com.br/site/<slug>). As telas consomem ESTAS assinaturas
-// e não mudam quando a API real entrar.
+// Camada de serviço — Publicação de sites TEMPORÁRIOS (Fase 4) LIGADA ao real.
+// - Leituras (listar/marcar status): client do browser com RLS (dono).
+// - Publicar/Despublicar (mexem no Storage): server functions do TanStack, que
+//   rodam no servidor com service role e reaproveitam publicacao.core.
+// As telas consomem ESTAS assinaturas e não mudam.
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabase } from "@/integrations/supabase/client";
 import type { SitePublicado, SitePublicadoStatus, LeadPublicavel } from "@/types";
+import type { SitePublicadoRow } from "@/services/publicacao.core";
 
-const delay = (ms = 350) => new Promise((r) => setTimeout(r, ms));
+// O join `leads(business_name)` do PostgREST pode vir como objeto ou null.
+type ComLead<T> = T & { leads: { business_name: string } | null };
 
-const BASE_URL = "https://flowleads.flowgenius.com.br/site";
-const DIAS_VALIDADE = 15;
-
-function slugify(nome: string): string {
-  return nome
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
-function maisDias(base: Date, dias: number): string {
-  const d = new Date(base);
-  d.setDate(d.getDate() + dias);
-  return d.toISOString();
-}
-
-// Sites já publicados (mock coerente: publicado, aprovado, reprovado, expirado).
-let sites: SitePublicado[] = [
-  {
-    id: "site-1",
-    lead_id: "lead-201",
-    slug: "estetica-bella-pele",
-    url_publica: `${BASE_URL}/estetica-bella-pele`,
-    status: "publicado",
-    publicado_em: "2026-07-08T11:00:00.000Z",
-    expira_em: "2026-07-23T11:00:00.000Z",
-    arquivos_removidos: false,
-  },
-  {
-    id: "site-2",
-    lead_id: "lead-202",
-    slug: "pet-shop-amigo-fiel",
-    url_publica: `${BASE_URL}/pet-shop-amigo-fiel`,
-    status: "aprovado",
-    publicado_em: "2026-07-10T09:00:00.000Z",
-    expira_em: "2026-07-25T09:00:00.000Z",
-    arquivos_removidos: false,
-  },
-  {
-    id: "site-3",
-    lead_id: "lead-206",
-    slug: "barbearia-navalha-de-ouro",
-    url_publica: `${BASE_URL}/barbearia-navalha-de-ouro`,
-    status: "reprovado",
-    publicado_em: "2026-07-05T14:00:00.000Z",
-    expira_em: "2026-07-20T14:00:00.000Z",
-    arquivos_removidos: false,
-  },
-  {
-    id: "site-4",
-    lead_id: "lead-203",
-    slug: "oficina-turbo-mecanica",
-    url_publica: `${BASE_URL}/oficina-turbo-mecanica`,
-    status: "expirado",
-    publicado_em: "2026-06-16T10:00:00.000Z",
-    expira_em: "2026-07-01T10:00:00.000Z",
-    arquivos_removidos: true,
-  },
-];
-
-// Leads com redesign pronto e ainda sem site (candidatos a publicar).
-let publicaveis: LeadPublicavel[] = [
-  { lead_id: "lead-204", lead_nome: "Contabilidade Prisma" },
-  { lead_id: "lead-205", lead_nome: "Studio Fotografia Luz" },
-];
-
-let seq = sites.length;
-
-/**
- * Lista os sites ativos e os expirados (registro mantido). Sites explicitamente
- * despublicados/excluídos somem da lista, mas o registro permanece no banco.
- */
-export async function listarSites(): Promise<SitePublicado[]> {
-  // TODO: LIGAR API — GET sites do usuário/org no Supabase (RLS).
-  await delay();
-  return sites
-    .filter((s) => !s.arquivos_removidos || s.status === "expirado")
-    .map((s) => ({ ...s }));
-}
-
-/** Lista os leads com redesign pronto ainda sem site publicado. */
-export async function listarLeadsPublicaveis(): Promise<LeadPublicavel[]> {
-  // TODO: LIGAR API — leads com redesign 'pronto' e sem site publicado.
-  await delay();
-  return publicaveis.map((l) => ({ ...l }));
-}
-
-/** Publica o site de um lead (sobe no Storage, gera URL temporária de 15 dias). */
-export async function publicarSite(leadId: string): Promise<SitePublicado> {
-  // TODO: LIGAR API — Edge Function publish-site: grava arquivos no Storage e
-  // devolve a URL pública (flowleads.flowgenius.com.br/site/<slug>).
-  await delay(1200);
-  const lead = publicaveis.find((l) => l.lead_id === leadId);
-  const nome = lead?.lead_nome ?? leadId;
-  const slug = slugify(nome);
-  const agora = new Date();
-  seq += 1;
-  const novo: SitePublicado = {
-    id: `site-${seq}`,
-    lead_id: leadId,
-    slug,
-    url_publica: `${BASE_URL}/${slug}`,
-    status: "publicado",
-    publicado_em: agora.toISOString(),
-    expira_em: maisDias(agora, DIAS_VALIDADE),
-    arquivos_removidos: false,
+function toSite(row: SitePublicadoRow, leadNome?: string | null): SitePublicado {
+  return {
+    id: row.id,
+    lead_id: row.lead_id,
+    redesign_id: row.redesign_id,
+    slug: row.slug,
+    url_publica: row.url_publica,
+    status: row.status as SitePublicadoStatus,
+    publicado_em: row.publicado_em,
+    expira_em: row.expira_em,
+    arquivos_removidos: row.arquivos_removidos,
+    lead_nome: leadNome ?? undefined,
   };
-  sites = [novo, ...sites];
-  publicaveis = publicaveis.filter((l) => l.lead_id !== leadId);
-  return { ...novo };
+}
+
+/* --------------------------- server functions --------------------------- */
+
+const publicarSiteFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { redesignId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { publishCore } = await import("@/services/publicacao.core");
+    const row = await publishCore({
+      db: context.supabase,
+      storage: supabaseAdmin,
+      userId: context.userId,
+      redesignId: data.redesignId,
+    });
+    const { data: lead } = await context.supabase
+      .from("leads")
+      .select("business_name")
+      .eq("id", row.lead_id)
+      .single();
+    return toSite(row, lead?.business_name);
+  });
+
+const despublicarSiteFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { unpublishCore } = await import("@/services/publicacao.core");
+    await unpublishCore({ db: context.supabase, storage: supabaseAdmin, id: data.id });
+  });
+
+/* ------------------------------- leituras ------------------------------- */
+
+/** Lista os sites do usuário (ativos + expirados; despublicados somem da lista). */
+export async function listarSites(): Promise<SitePublicado[]> {
+  const { data, error } = await supabase
+    .from("sites_publicados")
+    .select("*, leads(business_name)")
+    .order("publicado_em", { ascending: false });
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as ComLead<SitePublicadoRow>[];
+  return rows
+    .map((r) => toSite(r, r.leads?.business_name))
+    .filter((s) => !s.arquivos_removidos || s.status === "expirado");
+}
+
+/** Redesigns prontos que ainda NÃO têm site publicado (candidatos a publicar). */
+export async function listarLeadsPublicaveis(): Promise<LeadPublicavel[]> {
+  const [{ data: redesigns, error: rErr }, { data: sites, error: sErr }] = await Promise.all([
+    supabase
+      .from("redesigns")
+      .select("id, lead_id, leads(business_name)")
+      .eq("status", "pronto")
+      .order("criado_em", { ascending: false }),
+    supabase.from("sites_publicados").select("redesign_id").eq("arquivos_removidos", false),
+  ]);
+  if (rErr) throw rErr;
+  if (sErr) throw sErr;
+  const jaPublicados = new Set((sites ?? []).map((s) => s.redesign_id));
+  const rows = (redesigns ?? []) as unknown as ComLead<{ id: string; lead_id: string }>[];
+  return rows
+    .filter((r) => !jaPublicados.has(r.id))
+    .map((r) => ({
+      lead_id: r.lead_id,
+      lead_nome: r.leads?.business_name ?? "Lead",
+      redesign_id: r.id,
+    }));
+}
+
+/* ------------------------------- mutações ------------------------------- */
+
+/** Publica o site de um redesign pronto → sobe no Storage e devolve a URL. */
+export async function publicarSite(redesignId: string): Promise<SitePublicado> {
+  return publicarSiteFn({ data: { redesignId } });
 }
 
 /** Despublica/exclui: apaga os arquivos do Storage, MANTÉM o registro. */
 export async function despublicarSite(id: string): Promise<void> {
-  // TODO: LIGAR API — apaga os arquivos no Storage; mantém a linha no banco.
-  await delay(600);
-  sites = sites.map((s) => (s.id === id ? { ...s, arquivos_removidos: true } : s));
+  await despublicarSiteFn({ data: { id } });
 }
 
-/** Marca o site como aprovado/reprovado/expirado/publicado. */
-export async function marcarStatus(id: string, status: SitePublicadoStatus): Promise<SitePublicado> {
-  // TODO: LIGAR API — UPDATE status no Supabase (aprovação do cliente).
-  await delay(400);
-  let atualizado: SitePublicado | undefined;
-  sites = sites.map((s) => {
-    if (s.id !== id) return s;
-    // ao expirar, os arquivos são apagados
-    const arquivos_removidos = status === "expirado" ? true : s.arquivos_removidos;
-    atualizado = { ...s, status, arquivos_removidos };
-    return atualizado;
-  });
-  if (!atualizado) throw new Error("Site não encontrado");
-  return { ...atualizado };
+/** Marca o site como aprovado/reprovado/expirado/publicado (aprovação do cliente). */
+export async function marcarStatus(
+  id: string,
+  status: SitePublicadoStatus,
+): Promise<SitePublicado> {
+  const { data, error } = await supabase
+    .from("sites_publicados")
+    .update({ status })
+    .eq("id", id)
+    .select("*, leads(business_name)")
+    .single();
+  if (error) throw error;
+  const r = data as unknown as ComLead<SitePublicadoRow>;
+  return toSite(r, r.leads?.business_name);
 }

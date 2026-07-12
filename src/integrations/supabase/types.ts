@@ -224,6 +224,45 @@ export type Database = {
         }
         Relationships: []
       }
+      sites_publicados: {
+        Row: {
+          id: string
+          user_id: string
+          lead_id: string
+          redesign_id: string
+          slug: string
+          url_publica: string
+          status: string
+          publicado_em: string
+          expira_em: string
+          arquivos_removidos: boolean
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          lead_id: string
+          redesign_id: string
+          slug: string
+          url_publica: string
+          status?: string
+          publicado_em?: string
+          expira_em?: string
+          arquivos_removidos?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          lead_id?: string
+          redesign_id?: string
+          slug?: string
+          url_publica?: string
+          status?: string
+          publicado_em?: string
+          expira_em?: string
+          arquivos_removidos?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
