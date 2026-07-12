@@ -11,8 +11,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Nicho (pt-BR) → categorias do Geoapify. */
 const NICHO_CATS: Array<{ re: RegExp; cats: string[] }> = [
   { re: /odontol|dentist/i, cats: ["healthcare.dentist"] },
-  { re: /cl[ií]nica|m[eé]dic|consult[oó]rio|sa[uú]de/i, cats: ["healthcare.clinic_or_praxis", "healthcare.hospital"] },
+  // "estética" antes de "clínica" — "clínica de estética" deve virar beleza.
   { re: /est[eé]tica|beleza/i, cats: ["service.beauty", "commercial.health_and_beauty"] },
+  { re: /cl[ií]nica|m[eé]dic|consult[oó]rio|sa[uú]de/i, cats: ["healthcare.clinic_or_praxis", "healthcare.hospital"] },
   { re: /restaurante/i, cats: ["catering.restaurant"] },
   { re: /lanchonete|hamburgue|fast/i, cats: ["catering.fast_food"] },
   { re: /academia|fitness|crossfit/i, cats: ["sport.fitness.fitness_centre", "leisure.fitness"] },
@@ -27,8 +28,11 @@ const NICHO_CATS: Array<{ re: RegExp; cats: string[] }> = [
   { re: /hotel|pousada/i, cats: ["accommodation.hotel", "accommodation.guest_house"] },
 ];
 
+// Normaliza (minúsculas, SEM acento) — o nicho pode chegar decomposto (NFD).
+const semAcento = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
 function catsFor(nicho: string): string[] {
-  const hit = NICHO_CATS.find((n) => n.re.test(nicho));
+  const hit = NICHO_CATS.find((t) => t.re.test(semAcento(nicho)));
   return hit ? hit.cats : ["commercial"]; // fallback amplo
 }
 

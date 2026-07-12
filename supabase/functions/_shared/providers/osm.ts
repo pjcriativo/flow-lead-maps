@@ -17,8 +17,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Seletores Overpass por nicho (pt-BR). Cada item vira uma sub-query. */
 const NICHO_TAGS: Array<{ re: RegExp; selectors: string[] }> = [
   { re: /odontol|dentist/i, selectors: ['["amenity"="dentist"]', '["healthcare"="dentist"]'] },
-  { re: /cl[ií]nica|m[eé]dic|sa[uú]de/i, selectors: ['["amenity"="clinic"]', '["healthcare"="clinic"]', '["amenity"="doctors"]'] },
+  // "estética" antes de "clínica" — "clínica de estética" deve virar beleza, não UBS.
   { re: /est[eé]tica/i, selectors: ['["shop"="beauty"]', '["beauty"]'] },
+  { re: /cl[ií]nica|m[eé]dic|sa[uú]de/i, selectors: ['["amenity"="clinic"]', '["healthcare"="clinic"]', '["amenity"="doctors"]'] },
   { re: /restaurante/i, selectors: ['["amenity"="restaurant"]'] },
   { re: /lanchonete|hamburgue/i, selectors: ['["amenity"="fast_food"]'] },
   { re: /academia|fitness|crossfit/i, selectors: ['["leisure"="fitness_centre"]'] },
@@ -38,12 +39,17 @@ const NICHO_TAGS: Array<{ re: RegExp; selectors: string[] }> = [
   { re: /seguro/i, selectors: ['["office"="insurance"]'] },
 ];
 
+// Normaliza (minúsculas, SEM acento) — o nicho pode chegar decomposto (NFD),
+// o que impediria os regex de categoria de casarem.
+const semAcento = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
 /** Resolve os seletores do nicho; fallback = busca por nome (regex no name). */
 function selectorsFor(nicho: string): string[] {
-  const hit = NICHO_TAGS.find((n) => n.re.test(nicho));
+  const n = semAcento(nicho);
+  const hit = NICHO_TAGS.find((t) => t.re.test(n));
   if (hit) return hit.selectors;
   // fallback: POIs com nome contendo o termo principal do nicho
-  const termo = nicho.trim().split(/\s+/)[0].replace(/[^\p{L}\p{N}]/gu, "");
+  const termo = n.trim().split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
   return [`["name"~"${termo}",i]`];
 }
 

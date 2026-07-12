@@ -22,6 +22,7 @@ import {
 } from "@/lib/leads-api";
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
+import { geocodeCidade } from "@/lib/geo";
 import {
   ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
   UF_LIST, Paginacao, paginar, PAGE_SIZE,
@@ -34,10 +35,42 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [limite, setLimite] = useState(50);
   const [buscarEmails, setBuscarEmails] = useState(true);
   const [fonte, setFonte] = useState<FonteBusca>("osm");
-  const [mapaAberto, setMapaAberto] = useState(false);
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [pinManual, setPinManual] = useState(false);
   const [raioKm, setRaioKm] = useState(10);
+  const [geoLoading, setGeoLoading] = useState(false);
   const [filtros, setFiltros] = useState<string[]>([]);
+  const geoAbort = useRef<AbortController | null>(null);
+
+  // Geocodifica a cidade e centraliza o mapa/pino nela (pino automático).
+  const geocodar = async (c: string, u: string) => {
+    if (!c.trim()) return null;
+    geoAbort.current?.abort();
+    const ctrl = new AbortController();
+    geoAbort.current = ctrl;
+    setGeoLoading(true);
+    try {
+      const g = await geocodeCidade(c.trim(), u, ctrl.signal);
+      if (g) {
+        setPin({ lat: g.lat, lng: g.lng });
+        setPinManual(false);
+        setRaioKm(g.raioKmSugerido);
+      }
+      return g;
+    } catch {
+      return null;
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+
+  // Ao digitar/alterar cidade + UF, move o mapa para a cidade (debounce).
+  useEffect(() => {
+    if (!cidade.trim()) return;
+    const id = setTimeout(() => { void geocodar(cidade, uf); }, 700);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cidade, uf]);
 
   const [running, setRunning] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -66,7 +99,6 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const sorted = [...leads].filter(capturaOk).sort((a, b) => b.score - a.score);
   const goldCount = sorted.filter((l) => (l.score_breakdown as any)?.is_gold).length;
   const emailCount = sorted.filter((l) => l.email).length;
-  const porMapa = !!pin;
 
   const [pagina, setPagina] = useState(1);
   const totalPaginas = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
@@ -74,8 +106,8 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const paginados = paginar(sorted, paginaEfetiva);
 
   const handleBuscar = async () => {
-    if (!nicho.trim() || (!cidade.trim() && !porMapa)) {
-      pushLog("ERRO: informe nicho e cidade (ou marque um ponto no mapa).");
+    if (!nicho.trim() || (!cidade.trim() && !pinManual)) {
+      pushLog("ERRO: informe o nicho e a cidade (ou marque um ponto no mapa).");
       return;
     }
     setRunning(true);
@@ -83,17 +115,36 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     setLogs([]);
     setPagina(1);
     setProgress({ found: 0, target: limite });
-    setStatus(porMapa ? `Buscando: ${nicho} num raio de ${raioKm}km...` : `Buscando: ${nicho} em ${cidade}${uf ? "/" + uf : ""}...`);
-    posthog.capture("search_leads_started", { nicho, cidade, uf, limite, fonte, porMapa });
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
+      // FONTE ÚNICA da área: pino manual manda; senão geocodifica a cidade AGORA
+      // (garante que a busca use a cidade atual, não um pino de cidade anterior).
+      let centro = pin;
+      let raio = raioKm;
+      if (!pinManual) {
+        const g = cidade.trim()
+          ? await geocodeCidade(cidade.trim(), uf, controller.signal).catch(() => null)
+          : null;
+        if (g) {
+          centro = { lat: g.lat, lng: g.lng };
+          raio = g.raioKmSugerido;
+          setPin(centro);
+          setRaioKm(raio);
+        } else {
+          centro = null; // sem geocode → o backend busca por cidade/UF
+        }
+      }
+      const usarMapa = !!centro;
+      setStatus(`Buscando: ${nicho} em ${cidade}${uf ? "/" + uf : ""}${usarMapa ? ` · raio ${raio}km` : ""}...`);
+      posthog.capture("search_leads_started", { nicho, cidade, uf, limite, fonte, usarMapa });
+
       await streamSearchLeads(
         {
           nicho, cidade, uf, limite, buscarEmails, fonte,
-          ...(porMapa ? { lat: pin!.lat, lng: pin!.lng, raioKm } : {}),
+          ...(usarMapa ? { lat: centro!.lat, lng: centro!.lng, raioKm: raio } : {}),
         },
         (ev: SearchEvent) => {
           switch (ev.type) {
@@ -219,34 +270,39 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               <ToggleGroupItem value="instagram" aria-label="Só com Instagram" className="gap-1 px-3"><Instagram className="h-3.5 w-3.5" /> Instagram</ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <div>
-            <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Área</Label>
-            <Button type="button" variant={mapaAberto || pin ? "default" : "outline"} onClick={() => setMapaAberto((o) => !o)} className="gap-1">
-              <MapPin className="h-4 w-4" /> {pin ? `Ponto no mapa (${raioKm}km)` : "Buscar por área no mapa"}
-            </Button>
-          </div>
         </div>
 
-        {mapaAberto && (
-          <div className="mt-4 space-y-3 rounded-lg border border-border bg-secondary/20 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-sm text-muted-foreground">
-                {pin ? <>Buscando ao redor do pin — raio <b className="text-foreground">{raioKm} km</b> (cidade/UF ignoradas enquanto houver pin)</> : "Clique no mapa para marcar o centro da busca."}
-              </span>
-              {pin && (
-                <Button size="sm" variant="ghost" onClick={() => setPin(null)}><X className="h-4 w-4" /> Limpar pin</Button>
-              )}
-            </div>
-            <MapaBusca pin={pin} raioKm={raioKm} onPick={(p) => setPin(p)} />
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Raio da busca</Label>
-                <span className="text-sm font-semibold tabular-nums">{raioKm} km</span>
-              </div>
-              <Slider value={[raioKm]} min={1} max={200} step={1} onValueChange={(v) => setRaioKm(v[0])} />
-            </div>
+        {/* Mapa: reflete a cidade digitada (pino automático) ou um clique manual. */}
+        <div className="mt-4 space-y-3 rounded-lg border border-border bg-secondary/20 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="inline-flex flex-wrap items-center gap-1.5 text-sm">
+              <MapPin className="h-4 w-4 text-primary" />
+              <span className="text-muted-foreground">Buscando em:</span>
+              <b className="text-foreground">
+                {pinManual
+                  ? "ponto marcado no mapa"
+                  : cidade.trim()
+                    ? `${cidade.trim()}${uf ? ", " + uf : ""}`
+                    : "informe a cidade ou clique no mapa"}
+              </b>
+              <span className="text-muted-foreground">· raio {raioKm} km</span>
+              {geoLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            </span>
+            {pinManual && (
+              <Button size="sm" variant="ghost" onClick={() => { void geocodar(cidade, uf); }}>
+                <X className="h-4 w-4" /> Voltar para a cidade
+              </Button>
+            )}
           </div>
-        )}
+          <MapaBusca pin={pin} raioKm={raioKm} onPick={(p) => { setPin(p); setPinManual(true); }} />
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Raio da busca</Label>
+              <span className="text-sm font-semibold tabular-nums">{raioKm} km</span>
+            </div>
+            <Slider value={[raioKm]} min={1} max={200} step={1} onValueChange={(v) => setRaioKm(v[0])} />
+          </div>
+        </div>
       </div>
 
       {/* Resultados ao vivo */}

@@ -21,6 +21,7 @@ export function MapaBusca({
   const divRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const refs = useRef<{ L: any; map: any; marker: any; circle: any }>({ L: null, map: null, marker: null, circle: null });
+  const prevPinKey = useRef<string>("");
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
 
@@ -64,7 +65,14 @@ export function MapaBusca({
       refs.current.circle = L.circle([pin.lat, pin.lng], {
         radius: raioKm * 1000, color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.1, weight: 1,
       }).addTo(map);
-      map.panTo([pin.lat, pin.lng]);
+      // Enquadra a área só quando o PINO muda (cidade nova ou clique), não a cada ajuste de raio.
+      const key = `${pin.lat.toFixed(5)},${pin.lng.toFixed(5)}`;
+      if (key !== prevPinKey.current) {
+        map.fitBounds(refs.current.circle.getBounds(), { padding: [24, 24], maxZoom: 15 });
+        prevPinKey.current = key;
+      }
+    } else {
+      prevPinKey.current = "";
     }
   }, [pin, raioKm]);
 
