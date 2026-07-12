@@ -18,19 +18,32 @@ export type ScoreBreakdown = {
   notes: string[];
 };
 
+/** Fontes de busca plugáveis (o seletor da UI escolhe; o backend despacha). */
+export type FonteBusca = "osm" | "geoapify" | "places";
+
+export const FONTE_LABELS: Record<FonteBusca, string> = {
+  osm: "OpenStreetMap (grátis)",
+  geoapify: "Geoapify (grátis)",
+  places: "Google Maps (requer billing)",
+};
+
+/** Fontes desativadas no seletor (presentes, mas não selecionáveis). */
+export const FONTES_DESATIVADAS: FonteBusca[] = ["places"];
+
 export type SearchParams = {
   nicho: string;
   cidade: string;
   uf: string;
   limite: number;
   buscarEmails: boolean;
+  fonte: FonteBusca;
 };
 
 export type SearchEvent =
   | { type: "log"; message: string }
   | { type: "lead"; lead: Lead }
   | { type: "progress"; found: number; target: number }
-  | { type: "done"; inserted: number; total: number }
+  | { type: "done"; inserted: number; total: number; fonte?: FonteBusca }
   | { type: "error"; message: string };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;

@@ -1,33 +1,40 @@
-// Cliente da Google Places API (Text Search + Place Details).
+// Cliente da Google Places API (New) — Text Search (v1).
 // A chave vive em SECRET da Edge Function (Deno.env), NUNCA no front.
+// Uma chamada de searchText já traz nome/telefone/site/nota/avaliações via
+// FieldMask — não precisa de um Place Details separado.
 
-const PLACES_BASE = "https://maps.googleapis.com/maps/api/place";
+const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 
-export type PlaceLite = {
+const FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.rating",
+  "places.userRatingCount",
+  "places.formattedAddress",
+  "places.nationalPhoneNumber",
+  "places.internationalPhoneNumber",
+  "places.websiteUri",
+  "places.googleMapsUri",
+  "places.types",
+  "nextPageToken",
+].join(",");
+
+export type Place = {
   place_id: string;
   name: string;
   rating: number | null;
   user_ratings_total: number | null;
   formatted_address: string | null;
-};
-
-export type PlaceDetails = {
-  place_id: string;
-  name: string;
-  rating: number | null;
-  user_ratings_total: number | null;
-  formatted_address: string | null;
-  formatted_phone_number: string | null;
-  international_phone_number: string | null;
+  phone: string | null;
   website: string | null;
-  url: string | null; // link do Google Maps
+  maps_uri: string | null;
   types: string[];
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Gera variações de subnicho e sub-região para superar o limite de ~60/busca.
+ * Gera variações de subnicho e sub-região para superar o limite por busca.
  * Ex.: "marketing" em Curitiba/PR →
  *   "marketing em Curitiba, PR", "marketing Curitiba centro", "... zona sul"...
  */
@@ -44,82 +51,72 @@ export function buildQueries(nicho: string, cidade: string, uf: string): string[
     `${n} particular em ${c}`,
     ...zonas.map((z) => `${n} em ${c} ${z}`),
   ];
-  // dedupe preservando ordem
   return [...new Set(queries)];
 }
 
-async function textSearchPage(
+function mapPlace(p: any): Place {
+  return {
+    place_id: p.id,
+    name: p.displayName?.text ?? "",
+    rating: p.rating ?? null,
+    user_ratings_total: p.userRatingCount ?? null,
+    formatted_address: p.formattedAddress ?? null,
+    phone: p.nationalPhoneNumber ?? p.internationalPhoneNumber ?? null,
+    website: p.websiteUri ?? null,
+    maps_uri: p.googleMapsUri ?? null,
+    types: p.types ?? [],
+  };
+}
+
+async function searchTextPage(
   query: string,
   key: string,
-  pagetoken?: string,
-): Promise<{ results: PlaceLite[]; next?: string }> {
-  const params = new URLSearchParams({ language: "pt-BR", region: "br", key });
-  if (pagetoken) params.set("pagetoken", pagetoken);
-  else params.set("query", query);
+  pageToken?: string,
+): Promise<{ places: Place[]; next?: string }> {
+  const body: Record<string, unknown> = {
+    textQuery: query,
+    languageCode: "pt-BR",
+    regionCode: "BR",
+    pageSize: 20,
+  };
+  if (pageToken) body.pageToken = pageToken;
 
-  const res = await fetch(`${PLACES_BASE}/textsearch/json?${params.toString()}`);
+  const res = await fetch(SEARCH_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": FIELD_MASK,
+    },
+    body: JSON.stringify(body),
+  });
   const data = await res.json();
-  if (data.status && !["OK", "ZERO_RESULTS"].includes(data.status)) {
-    throw new Error(
-      `Places TextSearch: ${data.status}${data.error_message ? " — " + data.error_message : ""}`,
-    );
+  if (!res.ok) {
+    const msg = data?.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`Places searchText: ${msg}`);
   }
-  const results: PlaceLite[] = (data.results ?? []).map((r: any) => ({
-    place_id: r.place_id,
-    name: r.name,
-    rating: r.rating ?? null,
-    user_ratings_total: r.user_ratings_total ?? null,
-    formatted_address: r.formatted_address ?? null,
-  }));
-  return { results, next: data.next_page_token };
+  const places: Place[] = (data.places ?? []).map(mapPlace);
+  return { places, next: data.nextPageToken };
 }
 
 /**
  * Executa uma query paginando (até 3 páginas / ~60 resultados).
- * `onFound` recebe cada place novo (dedupe é do chamador).
+ * `onFound` recebe cada place; retorne false para parar.
  */
 export async function textSearchAll(
   query: string,
   key: string,
-  onFound: (p: PlaceLite) => boolean, // retorna false para parar
+  onFound: (p: Place) => boolean,
 ): Promise<void> {
-  let pagetoken: string | undefined;
+  let pageToken: string | undefined;
   for (let page = 0; page < 3; page++) {
-    if (page > 0) await sleep(2100); // next_page_token demora a valer
-    const { results, next } = await textSearchPage(query, key, pagetoken);
-    for (const p of results) {
+    if (page > 0) await sleep(1500); // pageToken leva um instante para valer
+    const { places, next } = await searchTextPage(query, key, pageToken);
+    for (const p of places) {
       if (!p.place_id) continue;
-      const keepGoing = onFound(p);
-      if (!keepGoing) return;
+      if (!onFound(p)) return;
     }
     if (!next) break;
-    pagetoken = next;
+    pageToken = next;
   }
-}
-
-export async function placeDetails(
-  placeId: string,
-  key: string,
-): Promise<PlaceDetails | null> {
-  const fields = [
-    "place_id", "name", "rating", "user_ratings_total", "formatted_address",
-    "formatted_phone_number", "international_phone_number", "website", "url", "types",
-  ].join(",");
-  const params = new URLSearchParams({ place_id: placeId, fields, language: "pt-BR", key });
-  const res = await fetch(`${PLACES_BASE}/details/json?${params.toString()}`);
-  const data = await res.json();
-  if (data.status !== "OK" || !data.result) return null;
-  const r = data.result;
-  return {
-    place_id: r.place_id ?? placeId,
-    name: r.name ?? "",
-    rating: r.rating ?? null,
-    user_ratings_total: r.user_ratings_total ?? null,
-    formatted_address: r.formatted_address ?? null,
-    formatted_phone_number: r.formatted_phone_number ?? null,
-    international_phone_number: r.international_phone_number ?? null,
-    website: r.website ?? null,
-    url: r.url ?? null,
-    types: r.types ?? [],
-  };
 }

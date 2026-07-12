@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { posthog } from "@/lib/posthog";
-import { streamSearchLeads, type Lead, type SearchEvent } from "@/lib/leads-api";
+import {
+  streamSearchLeads, FONTE_LABELS, FONTES_DESATIVADAS,
+  type Lead, type SearchEvent, type FonteBusca,
+} from "@/lib/leads-api";
 import {
   ScoreBadge, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
   UF_LIST, QTD_OPTIONS, NICHE_TAGS,
@@ -25,6 +28,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [uf, setUf] = useState("");
   const [limite, setLimite] = useState("50");
   const [buscarEmails, setBuscarEmails] = useState(true);
+  const [fonte, setFonte] = useState<FonteBusca>("osm");
 
   const [running, setRunning] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -64,7 +68,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
 
     try {
       await streamSearchLeads(
-        { nicho, cidade, uf, limite: Number(limite), buscarEmails },
+        { nicho, cidade, uf, limite: Number(limite), buscarEmails, fonte },
         (ev: SearchEvent) => {
           switch (ev.type) {
             case "log":
@@ -156,6 +160,19 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="fonte" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fonte</Label>
+            <Select value={fonte} onValueChange={(v) => setFonte(v as FonteBusca)} disabled={running}>
+              <SelectTrigger id="fonte" aria-label="Fonte da busca" className="h-9 w-[240px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(FONTE_LABELS) as FonteBusca[]).map((f) => (
+                  <SelectItem key={f} value={f} disabled={FONTES_DESATIVADAS.includes(f)}>
+                    {FONTE_LABELS[f]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-1.5">
             <Mail className="h-4 w-4 text-primary" />
             <Label htmlFor="emails" className="cursor-pointer text-xs font-medium text-muted-foreground">Buscar e-mails (visita o site)</Label>
@@ -218,6 +235,15 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
       </div>
 
       {(running || logs.length > 0) && <LogDrawer logs={logs} logRef={logRef} />}
+
+      {/* Atribuição exigida pela licença ODbL do OpenStreetMap */}
+      <p className="px-1 text-center text-xs text-muted-foreground">
+        Dados de lugares ©{" "}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+          OpenStreetMap contributors
+        </a>{" "}
+        · Geoapify
+      </p>
     </div>
   );
 }

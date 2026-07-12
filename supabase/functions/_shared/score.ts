@@ -9,6 +9,8 @@ export type ScoreInput = {
   hasWebsite: boolean;
   site: SiteEval | null; // resultado do enrich; null = não avaliado
   hasEmail: boolean;
+  /** Rede social encontrada (instagram/facebook) — sinal de negócio ativo. */
+  hasSocial?: boolean;
 };
 
 export type ScoreBreakdown = {
@@ -19,6 +21,7 @@ export type ScoreBreakdown = {
   website_points: number;
   bad_site_points: number;
   email_points: number;
+  social_points: number;
   bad_site: boolean;
   bad_site_reasons: string[];
   notes: string[];
@@ -53,9 +56,12 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
   const emailPoints = input.hasEmail ? 20 : 0;
   if (!input.hasEmail) notes.push("sem e-mail público — não fecha o ciclo da proposta");
 
+  // Rede social (fontes sem nota, ex. OSM/Foursquare): negócio ativo online
+  const socialPoints = input.hasSocial ? 5 : 0;
+
   const score = Math.min(
     100,
-    ratingPoints + reviewsPoints + websitePoints + badSitePoints + emailPoints,
+    ratingPoints + reviewsPoints + websitePoints + badSitePoints + emailPoints + socialPoints,
   );
 
   const isGold =
@@ -73,6 +79,7 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
     website_points: websitePoints,
     bad_site_points: badSitePoints,
     email_points: emailPoints,
+    social_points: socialPoints,
     bad_site: badSite,
     bad_site_reasons: badSiteReasons,
     notes,
