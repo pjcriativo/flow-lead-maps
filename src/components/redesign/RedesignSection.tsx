@@ -1,25 +1,20 @@
-// Fase 3 — Tela "Redesign": a partir de um lead, gerar o novo site e comparar
-// antes/depois (só layout + mock por ora). Consome SOMENTE os tipos centrais
-// (@/types) via a camada de serviço (@/services/redesign) — nunca o mock direto.
-import { useEffect, useState } from "react";
+// Fase 3 — Tela "Redesign" LIGADA: gera o site novo do lead via IA (redesign-site),
+// mostra preview, editor inline (texto/imagem) e comparador antes/depois.
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Loader2, RefreshCw, Plus, Wand2, Columns2, Globe, ExternalLink, MessageCircle, Star,
+  Loader2, RefreshCw, Wand2, Pencil, Eye, Columns2, ExternalLink, Save, Trash2,
+  X, Download, Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { formatDataHora } from "@/lib/format";
+import { fetchLeads, type Lead } from "@/lib/leads-api";
 import type { Redesign, RedesignStatus } from "@/types";
-import { listarRedesigns, gerarRedesign } from "@/services/redesign";
-
-const STATUS_LABEL: Record<RedesignStatus, string> = {
-  pendente: "Pendente",
-  gerando: "Gerando…",
-  pronto: "Pronto",
-  erro: "Erro",
-};
+import { listarRedesigns, gerarRedesign, salvarEdicao, excluirRedesign } from "@/services/redesign";
 
 const STATUS_STYLE: Record<RedesignStatus, string> = {
   pendente: "bg-secondary text-muted-foreground",
@@ -28,80 +23,113 @@ const STATUS_STYLE: Record<RedesignStatus, string> = {
   erro: "bg-red-50 text-red-700",
 };
 
-function StatusPill({ status }: { status: RedesignStatus }) {
-  return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", STATUS_STYLE[status])}>
-      {status === "gerando" && <Loader2 className="h-3 w-3 animate-spin" />}
-      {STATUS_LABEL[status]}
-    </span>
-  );
+// Script injetado no iframe para edição inline (texto contentEditable + trocar imagem).
+const EDITOR_SNIPPET = `
+<style id="__editorstyle">[contenteditable="true"]{outline:1px dashed #3b82f6;outline-offset:2px}[contenteditable="true"]:focus{outline:2px solid #3b82f6}.__img-edit{cursor:pointer !important;outline:2px dashed #16a34a !important}</style>
+<script id="__editor">(function(){var sel="h1,h2,h3,h4,h5,h6,p,span,a,li,button,strong,em,blockquote,figcaption,label";document.querySelectorAll(sel).forEach(function(el){if(!el.querySelector("img")){el.setAttribute("contenteditable","true")}});document.querySelectorAll("img").forEach(function(img){img.classList.add("__img-edit");img.addEventListener("click",function(e){e.preventDefault();var u=prompt("URL da nova imagem:",img.getAttribute("src")||"");if(u){img.setAttribute("src",u)}})});})();</script>
+`;
+
+function injetarEditor(html: string): string {
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, EDITOR_SNIPPET + "</body>");
+  return html + EDITOR_SNIPPET;
 }
 
 export function RedesignSection() {
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [redesigns, setRedesigns] = useState<Redesign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [gerandoId, setGerandoId] = useState<string | null>(null);
-  const [novoGerando, setNovoGerando] = useState(false);
-  const [comparando, setComparando] = useState<Redesign | null>(null);
+  const [leadSel, setLeadSel] = useState<string>("");
+  const [gerando, setGerando] = useState(false);
+  const [aberto, setAberto] = useState<Redesign | null>(null);
 
   const carregar = async () => {
     setLoading(true);
     setError(null);
     try {
-      setRedesigns(await listarRedesigns());
+      const [ls, rs] = await Promise.all([fetchLeads(), listarRedesigns()]);
+      setLeads(ls);
+      setRedesigns(rs);
+      if (!leadSel && ls.length) setLeadSel(ls.find((l) => l.website)?.id ?? ls[0].id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao carregar redesigns");
+      setError(e instanceof Error ? e.message : "Falha ao carregar");
     } finally {
       setLoading(false);
     }
   };
   useEffect(() => { carregar(); }, []);
 
-  const handleNovo = async () => {
-    setNovoGerando(true);
+  const nomeLead = (id: string) => leads.find((l) => l.id === id)?.business_name ?? "lead";
+
+  const handleGerar = async (leadId: string) => {
+    if (!leadId) return;
+    setGerando(true);
+    toast.info(`Gerando site de "${nomeLead(leadId)}"… pode levar 10–40s.`);
     try {
-      // TODO: LIGAR API — abrir seleção de lead real; hoje usa alvo mock.
-      const novo = await gerarRedesign();
-      setRedesigns((prev) => [novo, ...prev]);
-      toast.success(`Redesign gerado para "${novo.lead_nome}"`);
-      setComparando(novo);
+      const res = await gerarRedesign(leadId);
+      const u = res.usage;
+      toast.success(
+        `Site gerado! ${u.modelo} · ${u.outputTokens} tokens · ~US$ ${u.custoUsd.toFixed(4)} · ${u.imagensUsadas} imagens${u.temLogo ? " + logo" : ""}`,
+        { duration: 8000 },
+      );
+      await carregar();
+      setAberto(res.redesign);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível gerar o redesign");
+      toast.error(`Falha ao gerar: ${e instanceof Error ? e.message : "erro"}`);
     } finally {
-      setNovoGerando(false);
+      setGerando(false);
     }
   };
 
-  const handleRedesenhar = async (r: Redesign) => {
-    setGerandoId(r.id);
-    // otimista: mostra "gerando" no card
-    setRedesigns((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: "gerando" } : x)));
+  const handleExcluir = async (r: Redesign) => {
+    if (!confirm(`Excluir o redesign de "${r.lead_nome ?? nomeLead(r.lead_id)}"?`)) return;
+    const prev = redesigns;
+    setRedesigns((p) => p.filter((x) => x.id !== r.id));
     try {
-      const atualizado = await gerarRedesign(r);
-      setRedesigns((prev) => prev.map((x) => (x.id === atualizado.id ? atualizado : x)));
-      toast.success(`Redesign atualizado para "${r.lead_nome}"`);
+      await excluirRedesign(r.id);
+      toast.success("Redesign excluído.");
     } catch (e) {
-      setRedesigns((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: "erro" } : x)));
-      toast.error(e instanceof Error ? e.message : "Falha ao redesenhar");
-    } finally {
-      setGerandoId(null);
+      setRedesigns(prev);
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir");
     }
   };
+
+  const leadsComSite = useMemo(() => leads.filter((l) => l.website), [leads]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Redesign</h1>
-          <p className="text-sm text-muted-foreground">Gere o novo site do lead e compare antes/depois.</p>
+          <p className="text-sm text-muted-foreground">Gere o site novo do lead com IA e ajuste no editor.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={carregar}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
-          <Button size="sm" onClick={handleNovo} disabled={novoGerando} className="bg-primary font-semibold hover:bg-primary/90">
-            {novoGerando ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</> : <><Plus className="h-4 w-4" /> Novo redesign</>}
+        <Button variant="outline" size="sm" onClick={carregar}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
+      </div>
+
+      {/* Gerar novo redesign */}
+      <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <h2 className="mb-2 text-sm font-semibold">Gerar novo redesign</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[280px] flex-1">
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead</label>
+            <Select value={leadSel} onValueChange={setLeadSel} disabled={gerando || !leads.length}>
+              <SelectTrigger aria-label="Escolher lead"><SelectValue placeholder="Escolha um lead" /></SelectTrigger>
+              <SelectContent className="max-h-80">
+                {leads.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.business_name}{l.website ? " · tem site" : " · sem site"}{l.rating ? ` · ★${l.rating}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => handleGerar(leadSel)} disabled={gerando || !leadSel} className="bg-primary font-semibold hover:bg-primary/90">
+            {gerando ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</> : <><Wand2 className="h-4 w-4" /> Redesenhar</>}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {leadsComSite.length} leads com site (matéria-prima melhor). Custo por geração ~US$ 0,01–0,05 (OpenAI).
+        </p>
       </div>
 
       {loading ? (
@@ -112,41 +140,40 @@ export function RedesignSection() {
         <div className="rounded-xl border border-dashed border-border bg-card p-16 text-center">
           <Wand2 className="mx-auto h-8 w-8 text-muted-foreground" />
           <h3 className="mt-4 font-semibold">Nenhum redesign ainda</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Clique em "Novo redesign" para gerar o primeiro.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Escolha um lead acima e clique em Redesenhar.</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {redesigns.map((r) => (
             <div key={r.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {/* mini-preview do "depois" */}
-              <div className="relative h-36 overflow-hidden border-b border-border bg-slate-900">
-                {r.status === "pronto" ? (
-                  <SiteDepois nome={r.lead_nome} compact />
+              <div className="h-40 overflow-hidden border-b border-border bg-white">
+                {r.html_gerado ? (
+                  <iframe title={`preview-${r.id}`} srcDoc={r.html_editado ?? r.html_gerado}
+                    className="pointer-events-none h-[500px] w-[1250px] origin-top-left scale-[0.32] border-0" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                    {r.status === "gerando" ? "gerando preview…" : "preview ainda não gerado"}
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    {r.status === "gerando" ? "gerando…" : r.status === "erro" ? "erro na geração" : "sem preview"}
                   </div>
                 )}
               </div>
-              <div className="flex flex-1 flex-col gap-3 p-4">
+              <div className="flex flex-1 flex-col gap-2 p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold leading-tight text-foreground">{r.lead_nome}</span>
-                  <StatusPill status={r.status} />
+                  <span className="font-semibold leading-tight text-foreground">{r.lead_nome ?? nomeLead(r.lead_id)}</span>
+                  <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_STYLE[r.status])}>{r.status}</span>
                 </div>
-                {r.site_original_url && (
-                  <a href={r.site_original_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary">
-                    <Globe className="h-3.5 w-3.5" /> Site atual <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-                {r.observacoes && <p className="text-xs text-muted-foreground">{r.observacoes}</p>}
+                <div className="text-xs text-muted-foreground">
+                  {r.modelo ? `${r.modelo}` : ""}{r.custo_usd != null ? ` · ~US$ ${Number(r.custo_usd).toFixed(4)}` : ""}
+                  {r.gerado_em ? ` · ${formatDataHora(r.gerado_em)}` : ""}
+                </div>
                 <div className="mt-auto flex items-center gap-2 pt-1">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => handleRedesenhar(r)} disabled={gerandoId === r.id || r.status === "gerando"}>
-                    {gerandoId === r.id || r.status === "gerando" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                    Redesenhar
+                  <Button size="sm" className="flex-1" onClick={() => setAberto(r)} disabled={!r.html_gerado}>
+                    <Pencil className="h-4 w-4" /> Abrir editor
                   </Button>
-                  <Button size="sm" className="flex-1" onClick={() => setComparando(r)} disabled={r.status !== "pronto"}>
-                    <Columns2 className="h-4 w-4" /> Comparar
+                  <Button size="sm" variant="ghost" title="Redesenhar de novo" onClick={() => handleGerar(r.lead_id)} disabled={gerando}>
+                    <Wand2 className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" title="Excluir" onClick={() => handleExcluir(r)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               </div>
@@ -155,99 +182,122 @@ export function RedesignSection() {
         </div>
       )}
 
-      {comparando && (
-        <ComparadorDialog redesign={comparando} onClose={() => setComparando(null)} />
+      {aberto && aberto.html_gerado && (
+        <EditorRedesign
+          redesign={aberto}
+          onClose={() => setAberto(null)}
+          onSaved={(html) => {
+            setRedesigns((prev) => prev.map((r) => (r.id === aberto.id ? { ...r, html_editado: html } : r)));
+          }}
+        />
       )}
     </div>
   );
 }
 
-/* -------------------- Comparador antes/depois (wipe) -------------------- */
-function ComparadorDialog({ redesign, onClose }: { redesign: Redesign; onClose: () => void }) {
-  const [pos, setPos] = useState(50);
+/* -------------------- Editor + comparador (modal cheio) -------------------- */
+type Modo = "preview" | "editar" | "comparar";
+
+function EditorRedesign({ redesign, onClose, onSaved }: { redesign: Redesign; onClose: () => void; onSaved: (html: string) => void }) {
+  const [html, setHtml] = useState(redesign.html_editado ?? redesign.html_gerado ?? "");
+  const [modo, setModo] = useState<Modo>("preview");
+  const [salvando, setSalvando] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const salvar = async () => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) { toast.error("Não consegui ler o editor."); return; }
+    setSalvando(true);
+    try {
+      const clone = doc.documentElement.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
+      clone.querySelectorAll(".__img-edit").forEach((el) => el.classList.remove("__img-edit"));
+      clone.querySelector("#__editor")?.remove();
+      clone.querySelector("#__editorstyle")?.remove();
+      const out = "<!doctype html>\n" + clone.outerHTML;
+      await salvarEdicao(redesign.id, out);
+      setHtml(out);
+      onSaved(out);
+      setModo("preview");
+      toast.success("Edições salvas.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const abrirNovaAba = () => {
+    const blob = new Blob([html], { type: "text/html" });
+    window.open(URL.createObjectURL(blob), "_blank");
+  };
+  const baixar = () => {
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `site-${(redesign.lead_nome ?? "lead").toLowerCase().replace(/\s+/g, "-")}.html`;
+    a.click();
+  };
+
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Columns2 className="h-4 w-4 text-primary" /> Antes / Depois — {redesign.lead_nome}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="relative aspect-[16/10] w-full select-none overflow-hidden rounded-lg border border-border">
-          {/* Depois (fundo) */}
-          <div className="absolute inset-0"><SiteDepois nome={redesign.lead_nome} /></div>
-          {/* Antes (recortado pela posição do slider) */}
-          <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
-            <SiteAntes nome={redesign.lead_nome} />
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/50">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{redesign.lead_nome ?? "Redesign"}</span>
+          <div className="ml-2 flex rounded-md border border-border p-0.5">
+            {(["preview", "editar", "comparar"] as Modo[]).map((m) => (
+              <button key={m} onClick={() => setModo(m)}
+                className={cn("rounded px-3 py-1 text-xs font-medium capitalize", modo === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                {m === "preview" ? <><Eye className="mr-1 inline h-3.5 w-3.5" />Preview</> : m === "editar" ? <><Pencil className="mr-1 inline h-3.5 w-3.5" />Editar</> : <><Columns2 className="mr-1 inline h-3.5 w-3.5" />Antes/Depois</>}
+              </button>
+            ))}
           </div>
-          {/* divisória */}
-          <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-white shadow" style={{ left: `${pos}%` }} />
-          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-xs font-medium text-white">Antes</span>
-          <span className="absolute right-2 top-2 rounded bg-primary/90 px-2 py-0.5 text-xs font-medium text-primary-foreground">Depois</span>
         </div>
+        <div className="flex items-center gap-2">
+          {modo === "editar" && (
+            <Button size="sm" onClick={salvar} disabled={salvando}>
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={abrirNovaAba}><ExternalLink className="h-4 w-4" /> Abrir</Button>
+          <Button size="sm" variant="outline" onClick={baixar}><Download className="h-4 w-4" /> HTML</Button>
+          <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+        </div>
+      </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">Antes</span>
-          <input
-            type="range" min={0} max={100} value={pos}
-            onChange={(e) => setPos(Number(e.target.value))}
-            aria-label="Comparar antes e depois"
-            className="h-2 flex-1 cursor-ew-resize appearance-none rounded-full bg-secondary accent-primary"
+      <div className="flex-1 overflow-hidden bg-secondary/30">
+        {modo === "comparar" ? (
+          <div className="grid h-full grid-cols-2 gap-px bg-border">
+            <div className="flex flex-col bg-white">
+              <div className="bg-black/70 px-2 py-1 text-xs text-white">Antes {redesign.site_original_url ? "" : "(sem site atual)"}</div>
+              {redesign.site_original_url ? (
+                <iframe title="antes" src={redesign.site_original_url} className="h-full w-full border-0" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Este lead não tinha site.</div>
+              )}
+            </div>
+            <div className="flex flex-col bg-white">
+              <div className="bg-primary px-2 py-1 text-xs text-primary-foreground">Depois (novo site)</div>
+              <iframe title="depois" srcDoc={html} sandbox="allow-scripts allow-same-origin allow-popups" className="h-full w-full border-0" />
+            </div>
+          </div>
+        ) : (
+          <iframe
+            ref={iframeRef}
+            title="editor"
+            key={modo}
+            srcDoc={modo === "editar" ? injetarEditor(html) : html}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
+            className="h-full w-full border-0 bg-white"
           />
-          <span className="text-xs text-muted-foreground">Depois</span>
-        </div>
-        <p className="text-center text-xs text-muted-foreground">
-          {/* TODO: LIGAR API — aqui entra o preview real do site gerado (redesign-site). */}
-          Prévia ilustrativa. O site real gerado aparece aqui quando a API for ligada.
-        </p>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/* -------------------- Previews mock (layout ilustrativo) -------------------- */
-function SiteAntes({ nome }: { nome: string }) {
-  return (
-    <div className="flex h-full w-full flex-col bg-[#e9e9e9] font-serif text-[#222]">
-      <div className="bg-[#3a4a5a] px-3 py-2 text-center text-sm font-bold text-white">{nome}</div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
-        <div className="text-base font-bold underline">Bem-vindo ao nosso site</div>
-        <div className="max-w-[80%] text-[11px] leading-tight">
-          Somos uma empresa comprometida com a qualidade. Ligue para nós e agende um horário pelo telefone.
-        </div>
-        <div className="mt-1 h-16 w-24 border border-[#999] bg-[#cfcfcf] text-center text-[9px] leading-[64px] text-[#777]">imagem</div>
-        <div className="text-[10px] text-[#555]">Tel: (00) 0000-0000 · seg a sex</div>
-      </div>
-      <div className="bg-[#d5d5d5] px-3 py-1 text-center text-[9px] text-[#666]">© 2013 — todos os direitos reservados</div>
-    </div>
-  );
-}
-
-function SiteDepois({ nome, compact }: { nome: string; compact?: boolean }) {
-  return (
-    <div className="flex h-full w-full flex-col bg-white text-slate-900">
-      <div className="flex items-center justify-between bg-gradient-to-r from-primary to-indigo-600 px-3 py-2 text-white">
-        <span className={cn("font-bold", compact ? "text-xs" : "text-sm")}>{nome}</span>
-        <span className={cn("rounded-full bg-white/20 px-2 py-0.5 font-medium", compact ? "text-[9px]" : "text-[10px]")}>Menu</span>
-      </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-gradient-to-b from-blue-50 to-white px-4 text-center">
-        <div className={cn("font-bold tracking-tight", compact ? "text-sm" : "text-lg")}>Sua melhor escolha, agora online</div>
-        {!compact && <div className="max-w-[70%] text-[11px] text-slate-500">Atendimento rápido, agendamento pelo WhatsApp e visual moderno que passa confiança.</div>}
-        <div className="inline-flex items-center gap-1 rounded-full bg-[#16A34A] px-3 py-1 text-[11px] font-semibold text-white">
-          <MessageCircle className="h-3 w-3" /> Falar no WhatsApp
-        </div>
-        {!compact && (
-          <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-500">
-            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            <span className="ml-1 text-slate-500">avaliação dos clientes</span>
-          </div>
         )}
       </div>
+      {modo === "comparar" && redesign.site_original_url && (
+        <div className="bg-card px-4 py-1 text-center text-xs text-muted-foreground">
+          Se o "Antes" ficar em branco, o site atual bloqueia incorporação —{" "}
+          <a href={redesign.site_original_url} target="_blank" rel="noreferrer" className="text-primary underline"><Globe className="inline h-3 w-3" /> abrir em nova aba</a>.
+        </div>
+      )}
     </div>
   );
 }

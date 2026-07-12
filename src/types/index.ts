@@ -61,21 +61,26 @@ export interface Contrato {
 /** Status da geração do redesign. */
 export type RedesignStatus = "pendente" | "gerando" | "pronto" | "erro";
 
-/** Redesign do site de um lead (gerado por IA na Fase 3). */
+/** Redesign do site de um lead (gerado por IA na Fase 3). Origem: tabela `redesigns`. */
 export interface Redesign {
   id: string;
   lead_id: string;
-  /** Nome do negócio, denormalizado para exibir sem join. */
-  lead_nome: string;
   /** URL do site atual do lead (o "antes"). */
   site_original_url: string | null;
-  /** URL/《preview》do site gerado (o "depois"). */
-  preview_url: string | null;
+  /** HTML gerado pela IA. */
+  html_gerado: string | null;
+  /** HTML após edição do usuário (o que vai para publicação). */
+  html_editado: string | null;
   status: RedesignStatus;
+  modelo: string | null;
+  custo_usd: number | null;
+  observacoes: string | null;
   /** ISO datetime. */
   criado_em: string;
   gerado_em: string | null;
-  observacoes: string | null;
+  updated_at: string;
+  /** Nome do negócio (join com leads) — para exibir. */
+  lead_nome?: string;
 }
 
 /* -------------------------------------------------------------------------- */

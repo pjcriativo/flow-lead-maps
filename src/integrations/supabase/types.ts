@@ -167,6 +167,54 @@ export type Database = {
         }
         Relationships: []
       }
+      redesigns: {
+        Row: {
+          id: string
+          user_id: string
+          lead_id: string
+          site_original_url: string | null
+          html_gerado: string | null
+          html_editado: string | null
+          status: string
+          modelo: string | null
+          custo_usd: number | null
+          observacoes: string | null
+          criado_em: string
+          gerado_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          lead_id: string
+          site_original_url?: string | null
+          html_gerado?: string | null
+          html_editado?: string | null
+          status?: string
+          modelo?: string | null
+          custo_usd?: number | null
+          observacoes?: string | null
+          criado_em?: string
+          gerado_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          lead_id?: string
+          site_original_url?: string | null
+          html_gerado?: string | null
+          html_editado?: string | null
+          status?: string
+          modelo?: string | null
+          custo_usd?: number | null
+          observacoes?: string | null
+          criado_em?: string
+          gerado_em?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

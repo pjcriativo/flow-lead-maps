@@ -9,3 +9,7 @@ verify_jwt = true
 [functions.enrich-lead]
 # Visita o site do lead e extrai e-mail/WhatsApp. Recebe o JWT do usuário.
 verify_jwt = true
+
+[functions.redesign-site]
+# Gera o site novo do lead via IA (OpenAI). Recebe o JWT do usuário.
+verify_jwt = true
