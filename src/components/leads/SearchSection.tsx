@@ -21,9 +21,10 @@ import {
   type Lead, type SearchEvent, type FonteBusca,
 } from "@/lib/leads-api";
 import { MapaBusca } from "./MapaBusca";
+import { NichoSelector } from "./NichoSelector";
 import {
   ScoreBadge, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
-  UF_LIST, NICHE_TAGS,
+  UF_LIST,
 } from "./leads-shared";
 
 export function SearchSection({ onFinished }: { onFinished?: () => void }) {
@@ -188,21 +189,11 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
             <Label htmlFor="emails" className="cursor-pointer text-xs font-medium text-muted-foreground">Buscar e-mails (visita o site)</Label>
             <Switch id="emails" checked={buscarEmails} onCheckedChange={setBuscarEmails} disabled={running} />
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {NICHE_TAGS.map((tag) => (
-              <button key={tag} type="button" disabled={running}
-                onClick={() => setNicho(tag)}
-                className={cn(
-                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                  nicho.trim().toLowerCase() === tag.toLowerCase()
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-blue-50 text-blue-700 hover:bg-blue-100",
-                )}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
+        </div>
+
+        {/* Seletor de nichos por categoria (busca por texto + chips) */}
+        <div className="mt-3">
+          <NichoSelector value={nicho} onSelect={setNicho} disabled={running} />
         </div>
 
         {/* Quantidade (slider) + filtro de captura + mapa */}
