@@ -87,21 +87,28 @@ async function overpass(query: string): Promise<any> {
   throw new Error(`Overpass indisponível (${lastErr})`);
 }
 
-export const searchOsm: ProviderSearch = async ({ nicho, cidade, uf, alvo, seen, log }) => {
+export const searchOsm: ProviderSearch = async ({ nicho, cidade, uf, lat, lng, raioKm, alvo, seen, log }) => {
   const selectors = selectorsFor(nicho);
   const found: RawPlace[] = [];
   const nomesEnderecos = new Set<string>(); // dedupe extra por nome+endereço
 
-  // área administrativa da cidade (admin_level 8 = município no Brasil)
-  const areaFiltro = `area["name"="${cidade}"]["boundary"="administrative"]["admin_level"~"7|8"]->.cidade;`;
+  // Modo mapa (around: raio + centro) tem prioridade sobre a área da cidade.
+  const porMapa = lat != null && lng != null;
+  const areaPrefixo = porMapa
+    ? ""
+    : `area["name"="${cidade}"]["boundary"="administrative"]["admin_level"~"7|8"]->.cidade;`;
+  const espacial = porMapa
+    ? `(around:${Math.round((raioKm ?? 10) * 1000)},${lat},${lng})`
+    : `(area.cidade)`;
+  const onde = porMapa ? `raio ${raioKm ?? 10}km` : `${cidade}${uf ? "/" + uf : ""}`;
 
   for (const sel of selectors) {
     if (found.length >= alvo) break;
-    log(`OSM/Overpass: buscando ${sel} em ${cidade}${uf ? "/" + uf : ""}`);
+    log(`OSM/Overpass: buscando ${sel} em ${onde}`);
     const q = `
 [out:json][timeout:30];
-${areaFiltro}
-nwr${sel}(area.cidade);
+${areaPrefixo}
+nwr${sel}${espacial};
 out center tags ${Math.min(alvo * 3, 200)};`;
     try {
       const data = await overpass(q);

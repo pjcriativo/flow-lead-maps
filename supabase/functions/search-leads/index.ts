@@ -28,6 +28,10 @@ type Body = {
   limite?: number;
   buscarEmails?: boolean;
   fonte?: Fonte;
+  /** Busca por área no mapa (alternativa a cidade/uf). */
+  lat?: number;
+  lng?: number;
+  raio_km?: number;
 };
 
 Deno.serve(async (req) => {
@@ -59,9 +63,13 @@ Deno.serve(async (req) => {
   const buscarEmails = body.buscarEmails !== false;
   const fonte: Fonte = body.fonte && body.fonte in PROVIDERS ? body.fonte : "osm";
   const provider = PROVIDERS[fonte];
+  const lat = typeof body.lat === "number" ? body.lat : null;
+  const lng = typeof body.lng === "number" ? body.lng : null;
+  const raioKm = typeof body.raio_km === "number" ? body.raio_km : null;
+  const porMapa = lat != null && lng != null;
 
-  if (!nicho || !cidade) {
-    return json({ error: "Informe nicho e cidade." }, 400);
+  if (!nicho || (!cidade && !porMapa)) {
+    return json({ error: "Informe o nicho e a cidade (ou marque um ponto no mapa)." }, 400);
   }
 
   const encoder = new TextEncoder();
@@ -86,6 +94,9 @@ Deno.serve(async (req) => {
           nicho,
           cidade,
           uf,
+          lat,
+          lng,
+          raioKm,
           alvo: Math.ceil(limite * 1.6),
           seen,
           log: (message) => send({ type: "log", message }),

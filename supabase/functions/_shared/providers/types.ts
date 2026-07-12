@@ -28,6 +28,10 @@ export type ProviderParams = {
   nicho: string;
   cidade: string;
   uf: string;
+  /** Busca por área no mapa: centro + raio (km). Quando presentes, têm prioridade sobre cidade/uf. */
+  lat: number | null;
+  lng: number | null;
+  raioKm: number | null;
   /** Quantos candidatos coletar (a search-leads pede ~1.6x o limite). */
   alvo: number;
   /** Ids já vistos (dedupe entre buscas do usuário). */

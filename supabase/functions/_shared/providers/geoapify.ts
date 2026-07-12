@@ -74,17 +74,25 @@ function mapFeature(f: any): RawPlace | null {
   };
 }
 
-export const searchGeoapify: ProviderSearch = async ({ nicho, cidade, uf, alvo, seen, log }) => {
+export const searchGeoapify: ProviderSearch = async ({ nicho, cidade, uf, lat, lng, raioKm, alvo, seen, log }) => {
   const key = Deno.env.get("GEOAPIFY_API_KEY");
   if (!key) throw new Error("GEOAPIFY_API_KEY não configurada no secret da Edge Function.");
 
-  log(`Geoapify: geocodificando ${cidade}${uf ? "/" + uf : ""}...`);
-  const centro = await geocodeCidade(cidade, uf, key);
+  let centro: { lat: number; lon: number } | null;
+  if (lat != null && lng != null) {
+    centro = { lat, lon: lng };
+    log(`Geoapify: ponto do mapa (raio ${raioKm ?? 20}km)`);
+  } else {
+    log(`Geoapify: geocodificando ${cidade}${uf ? "/" + uf : ""}...`);
+    centro = await geocodeCidade(cidade, uf, key);
+  }
   if (!centro) {
-    log("Geoapify: cidade não geocodificada");
+    log("Geoapify: localização não resolvida");
     return [];
   }
 
+  // Geoapify limita o raio do circle a 50km.
+  const raioM = Math.min(Math.round((raioKm ?? 20) * 1000), 50000);
   const cats = catsFor(nicho);
   const found: RawPlace[] = [];
   const nomesEnderecos = new Set<string>();
@@ -92,10 +100,10 @@ export const searchGeoapify: ProviderSearch = async ({ nicho, cidade, uf, alvo, 
 
   for (const cat of cats) {
     if (found.length >= alvo) break;
-    log(`Geoapify: categoria ${cat} num raio de 20km`);
+    log(`Geoapify: categoria ${cat} (raio ${Math.round(raioM / 1000)}km)`);
     const params = new URLSearchParams({
       categories: cat,
-      filter: `circle:${centro.lon},${centro.lat},20000`,
+      filter: `circle:${centro.lon},${centro.lat},${raioM}`,
       bias: `proximity:${centro.lon},${centro.lat}`,
       limit: String(limit),
       lang: "pt",

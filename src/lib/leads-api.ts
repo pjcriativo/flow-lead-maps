@@ -42,6 +42,10 @@ export type SearchParams = {
   limite: number;
   buscarEmails: boolean;
   fonte: FonteBusca;
+  /** Busca por área no mapa (alternativa a cidade/UF). */
+  lat?: number | null;
+  lng?: number | null;
+  raioKm?: number | null;
 };
 
 export type SearchEvent =
@@ -76,7 +80,17 @@ export async function streamSearchLeads(
       Authorization: `Bearer ${token}`,
       apikey: ANON_KEY,
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify({
+      nicho: params.nicho,
+      cidade: params.cidade,
+      uf: params.uf,
+      limite: params.limite,
+      buscarEmails: params.buscarEmails,
+      fonte: params.fonte,
+      ...(params.lat != null && params.lng != null
+        ? { lat: params.lat, lng: params.lng, raio_km: params.raioKm ?? 10 }
+        : {}),
+    }),
     signal,
   });
 
