@@ -138,6 +138,8 @@ export type Database = {
           enriched_count: number
           contacted_count: number
           created_at: string
+          uf: string | null
+          fonte: string | null
         }
         Insert: {
           id?: string
@@ -151,6 +153,8 @@ export type Database = {
           enriched_count?: number
           contacted_count?: number
           created_at?: string
+          uf?: string | null
+          fonte?: string | null
         }
         Update: {
           id?: string
@@ -164,6 +168,8 @@ export type Database = {
           enriched_count?: number
           contacted_count?: number
           created_at?: string
+          uf?: string | null
+          fonte?: string | null
         }
         Relationships: []
       }

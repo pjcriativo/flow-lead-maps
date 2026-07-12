@@ -23,6 +23,7 @@ import {
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
 import { geocodeCidade } from "@/lib/geo";
+import { criarListaComLeads, nomeAutoLista } from "@/lib/lists-api";
 import {
   ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
   UF_LIST, Paginacao, paginar, PAGE_SIZE,
@@ -79,6 +80,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [progress, setProgress] = useState({ found: 0, target: 0 });
   const abortRef = useRef<AbortController | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const insertedIdsRef = useRef<string[]>([]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -115,6 +117,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     setLogs([]);
     setPagina(1);
     setProgress({ found: 0, target: limite });
+    insertedIdsRef.current = [];
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -153,6 +156,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               break;
             case "lead":
               setLeads((prev) => [...prev, ev.lead]);
+              if (ev.lead.id) insertedIdsRef.current.push(ev.lead.id);
               break;
             case "progress":
               setProgress({ found: ev.found, target: ev.target });
@@ -172,6 +176,22 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         },
         controller.signal,
       );
+
+      // Busca concluída → cada busca vira uma LISTA salva (lead_lists) com os leads
+      // daquela busca vinculados (list_id). Grava com o user_id do usuário logado.
+      const ids = insertedIdsRef.current;
+      if (ids.length > 0) {
+        try {
+          const nome = nomeAutoLista(nicho, cidade, uf);
+          const lista = await criarListaComLeads({
+            name: nome, niche: nicho, city: cidade, uf, fonte, radius: raio, leadIds: ids,
+          });
+          pushLog(`🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`);
+          posthog.capture("lead_list_created", { list_id: lista.id, total: ids.length, nicho, cidade, uf, fonte });
+        } catch (le: any) {
+          pushLog(`⚠️ Leads salvos, mas falhou ao criar a lista: ${le?.message ?? "erro"}`);
+        }
+      }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         setStatus(`Erro: ${e.message}`);

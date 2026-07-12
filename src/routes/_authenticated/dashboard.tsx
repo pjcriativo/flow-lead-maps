@@ -7,6 +7,7 @@ import {
   Settings as SettingsIcon,
   Search,
   LayoutGrid,
+  FolderOpen,
   FileText,
   ScrollText,
   Wallet,
@@ -38,6 +39,7 @@ import { PropostasSection } from "@/components/propostas/PropostasSection";
 import { FinanceiroSection } from "@/components/financeiro/FinanceiroSection";
 import { ContratosSection } from "@/components/contratos/ContratosSection";
 import { RedesignSection } from "@/components/redesign/RedesignSection";
+import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -63,10 +65,11 @@ function getUserId(): string {
   return currentUserId;
 }
 
-type Section = "buscar" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "redesign" | "publicar" | "sheets" | "settings";
+type Section = "buscar" | "listas" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "redesign" | "publicar" | "sheets" | "settings";
 
 const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
+  { id: "listas", label: "Minhas Listas", Icon: FolderOpen },
   { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
   { id: "leads", label: "Meus Leads", Icon: Users },
   { id: "propostas", label: "Propostas", Icon: FileText },
@@ -161,6 +164,11 @@ function Dashboard() {
 
       <main className="flex-1 bg-white px-4 pb-10 pt-16 md:px-8 md:pt-8">
         {section === "buscar" && <SearchSection />}
+        {section === "listas" && (
+          <MinhasListasSection
+            onOpenRedesign={(leadId) => { setFocusRedesignLead(leadId); setSection("redesign"); }}
+          />
+        )}
         {section === "pipeline" && <PipelineSection />}
         {section === "leads" && (
           <LeadsManager

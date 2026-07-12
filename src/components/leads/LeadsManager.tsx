@@ -20,6 +20,7 @@ import {
   LEAD_STATUSES, STATUS_LABELS, type Lead,
 } from "@/lib/leads-api";
 import { listarLeadIdsComRedesign } from "@/services/redesign";
+import { listarListas, type LeadListComStats } from "@/lib/lists-api";
 import {
   ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
   Paginacao, paginar, PAGE_SIZE,
@@ -28,10 +29,12 @@ import {
 export function LeadsManager({ onOpenRedesign }: { onOpenRedesign?: (leadId: string) => void } = {}) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [redesignLeadIds, setRedesignLeadIds] = useState<Set<string>>(new Set());
+  const [listas, setListas] = useState<LeadListComStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [listFilter, setListFilter] = useState<string>("all");
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Lead | null>(null);
   const [pagina, setPagina] = useState(1);
@@ -40,9 +43,10 @@ export function LeadsManager({ onOpenRedesign }: { onOpenRedesign?: (leadId: str
     setLoading(true);
     setError(null);
     try {
-      const [ls, rs] = await Promise.all([fetchLeads(), listarLeadIdsComRedesign()]);
+      const [ls, rs, lists] = await Promise.all([fetchLeads(), listarLeadIdsComRedesign(), listarListas()]);
       setLeads(ls);
       setRedesignLeadIds(rs);
+      setListas(lists);
     } catch (e: any) {
       setError(e?.message ?? "Falha ao carregar leads");
     } finally {
@@ -55,6 +59,8 @@ export function LeadsManager({ onOpenRedesign }: { onOpenRedesign?: (leadId: str
     const term = q.trim().toLowerCase();
     return leads.filter((l) => {
       if (statusFilter !== "all" && l.status !== statusFilter) return false;
+      if (listFilter === "none" && l.list_id) return false;
+      if (listFilter !== "all" && listFilter !== "none" && l.list_id !== listFilter) return false;
       if (!term) return true;
       return (
         l.business_name.toLowerCase().includes(term) ||
@@ -66,6 +72,7 @@ export function LeadsManager({ onOpenRedesign }: { onOpenRedesign?: (leadId: str
   }, [leads, q, statusFilter]);
 
   const ordenados = useMemo(() => [...filtered].sort((a, b) => b.score - a.score), [filtered]);
+  useEffect(() => { setPagina(1); }, [q, statusFilter, listFilter]);
   const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
   const paginaEfetiva = Math.min(pagina, totalPaginas);
   const paginados = paginar(ordenados, paginaEfetiva);
@@ -139,6 +146,16 @@ export function LeadsManager({ onOpenRedesign }: { onOpenRedesign?: (leadId: str
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
             {LEAD_STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={listFilter} onValueChange={setListFilter}>
+          <SelectTrigger className="w-[220px]" aria-label="Filtrar por lista"><SelectValue /></SelectTrigger>
+          <SelectContent className="max-h-80">
+            <SelectItem value="all">Todas as listas</SelectItem>
+            <SelectItem value="none">Sem lista</SelectItem>
+            {listas.map((l) => (
+              <SelectItem key={l.id} value={l.id}>{l.name} ({l.leads_atuais})</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
