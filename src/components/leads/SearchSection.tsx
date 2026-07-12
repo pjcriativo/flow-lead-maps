@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Search, Loader2, CheckCircle2, Sparkles, ChevronDown, ChevronUp, Phone, Mail,
-  MapPin, X, Globe, Instagram,
+  MapPin, X, Globe, Instagram, Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -261,6 +261,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               <span className="text-sm font-semibold tabular-nums">{limite}</span>
             </div>
             <Slider value={[limite]} min={10} max={200} step={5} disabled={running} onValueChange={(v) => setLimite(v[0])} />
+            <p className="mt-1 text-[11px] text-muted-foreground">máx. 200 nesta fonte (OpenStreetMap/Geoapify)</p>
           </div>
           <div>
             <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Filtrar por captura</Label>
@@ -336,6 +337,20 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
           </div>
         )}
 
+        {/* BUG 5: filtro de captura é client-side → deixa CLARO que está filtrando. */}
+        {filtros.length > 0 && leads.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-50 px-5 py-2 text-xs text-amber-800">
+            <Filter className="h-3.5 w-3.5" />
+            <span>
+              Filtrando: mostrando <b>{sorted.length}</b> de <b>{leads.length}</b> — só leads com{" "}
+              <b>{filtros.map((f) => (f === "telefone" ? "Telefone" : f === "site" ? "Site" : "Instagram")).join(" ou ")}</b>
+            </span>
+            <button type="button" onClick={() => setFiltros([])} className="underline underline-offset-2 hover:text-amber-900">
+              limpar filtro
+            </button>
+          </div>
+        )}
+
         {sorted.length > 0 ? (
           <>
             <LiveTable leads={paginados} />
@@ -343,6 +358,11 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               <Paginacao total={sorted.length} page={paginaEfetiva} onPage={setPagina} />
             )}
           </>
+        ) : leads.length > 0 ? (
+          <div className="px-8 py-12 text-center text-sm text-muted-foreground">
+            Nenhum dos <b>{leads.length}</b> leads encontrados passa no filtro de captura.{" "}
+            <button type="button" onClick={() => setFiltros([])} className="text-primary underline underline-offset-2">Limpar filtro</button>
+          </div>
         ) : (
           <EmptyState running={running} />
         )}

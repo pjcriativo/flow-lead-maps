@@ -12,7 +12,8 @@ import { searchGeoapify } from "../_shared/providers/geoapify.ts";
 import { searchPlaces } from "../_shared/providers/places.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
-import { toBrWhatsapp } from "../_shared/phone.ts";
+import { firstBrWhatsapp } from "../_shared/phone.ts";
+import { geocodeCidade } from "../_shared/geocode.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
@@ -63,9 +64,9 @@ Deno.serve(async (req) => {
   const buscarEmails = body.buscarEmails !== false;
   const fonte: Fonte = body.fonte && body.fonte in PROVIDERS ? body.fonte : "osm";
   const provider = PROVIDERS[fonte];
-  const lat = typeof body.lat === "number" ? body.lat : null;
-  const lng = typeof body.lng === "number" ? body.lng : null;
-  const raioKm = typeof body.raio_km === "number" ? body.raio_km : null;
+  let lat = typeof body.lat === "number" ? body.lat : null;
+  let lng = typeof body.lng === "number" ? body.lng : null;
+  let raioKm = typeof body.raio_km === "number" ? body.raio_km : null;
   const porMapa = lat != null && lng != null;
 
   if (!nicho || (!cidade && !porMapa)) {
@@ -80,6 +81,20 @@ Deno.serve(async (req) => {
 
       try {
         send({ type: "log", message: `Fonte: ${fonte} — ${nicho} em ${cidade}${uf ? "/" + uf : ""} (meta ${limite})` });
+
+        // Caminho padrão: sem pino, geocodifica cidade+UF (respeita a UF) e busca
+        // por raio. Evita o modo-cidade do OSM, que ignora a UF.
+        if (!(lat != null && lng != null) && cidade) {
+          const g = await geocodeCidade(cidade, uf);
+          if (g) {
+            lat = g.lat;
+            lng = g.lng;
+            raioKm = raioKm ?? g.raioKm;
+            send({ type: "log", message: `Geocode ${cidade}/${uf}: ${g.lat.toFixed(3)},${g.lng.toFixed(3)} · raio ${raioKm}km` });
+          } else {
+            send({ type: "log", message: `Geocode falhou — usando busca por nome da cidade (a fonte pode ignorar a UF)` });
+          }
+        }
 
         // ids já vistos pelo usuário (dedupe entre buscas)
         const { data: existing } = await supabase
@@ -121,7 +136,7 @@ Deno.serve(async (req) => {
           }
           const hasWebsite = !!website;
           let email: string | null = null;
-          let whatsapp: string | null = toBrWhatsapp(p.phone);
+          let whatsapp: string | null = firstBrWhatsapp(p.phone);
           let site = null;
 
           if (buscarEmails && hasWebsite) {

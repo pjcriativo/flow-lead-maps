@@ -26,6 +26,19 @@ export function toBrWhatsapp(phone: string | null | undefined): string | null {
   return null;
 }
 
+/**
+ * O campo de telefone pode ter VÁRIOS números (OSM usa ";" "," "/" ou "ou").
+ * Tenta cada um e devolve o primeiro que for celular BR.
+ */
+export function firstBrWhatsapp(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  for (const parte of String(raw).split(/[;,/]|\bou\b|\be\b/i)) {
+    const w = toBrWhatsapp(parte);
+    if (w) return w;
+  }
+  return null;
+}
+
 /** Extrai um número de WhatsApp de um link wa.me / api.whatsapp.com. */
 export function whatsappFromLink(href: string): string | null {
   const m = href.match(

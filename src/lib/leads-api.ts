@@ -13,6 +13,7 @@ export type ScoreBreakdown = {
   is_gold: boolean;
   motivo: string;
   has_website: boolean;
+  site_fora_do_ar?: boolean;
   bad_site: boolean;
   bad_site_reasons: string[];
   has_instagram: boolean;

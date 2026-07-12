@@ -6,7 +6,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { json, corsHeaders } from "../_shared/cors.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
-import { toBrWhatsapp } from "../_shared/phone.ts";
+import { firstBrWhatsapp } from "../_shared/phone.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
   const enr = await enrichFromWebsite(lead.website, lead.phone);
   const email = enr.email ?? lead.email ?? null;
-  const whatsapp = enr.whatsapp ?? lead.whatsapp ?? toBrWhatsapp(lead.phone);
+  const whatsapp = enr.whatsapp ?? lead.whatsapp ?? firstBrWhatsapp(lead.phone);
   const instagram = lead.instagram_url ?? enr.instagram; // fonte tem prioridade; senão o que o site trouxe
   const facebook = lead.facebook_url ?? enr.facebook;
 

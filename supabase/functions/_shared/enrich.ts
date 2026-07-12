@@ -1,6 +1,6 @@
 // Enriquecimento SÓ com fetch (sem browser/Selenium):
 // visita o site do lead e extrai e-mail, WhatsApp e avalia se o site é "ruim".
-import { toBrWhatsapp, whatsappFromLink } from "./phone.ts";
+import { toBrWhatsapp, firstBrWhatsapp, whatsappFromLink } from "./phone.ts";
 
 export type SiteEval = {
   reachable: boolean;
@@ -22,11 +22,25 @@ const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
 // Domínios/lixo que NÃO são e-mail de contato do negócio.
 const EMAIL_JUNK = [
-  "example.com", "sentry.io", "sentry-next.wixpress.com", "wixpress.com",
-  "wix.com", "godaddy.com", "domain.com", "email.com", "yourdomain",
-  "sradmin", "no-reply", "noreply", "@2x", ".png", ".jpg", ".jpeg",
-  ".gif", ".svg", ".webp", ".css", ".js",
+  "example.com", "example.org", "exemplo.com", "sentry.io", "sentry-next.wixpress.com",
+  "wixpress.com", "wix.com", "godaddy.com", "domain.com", "dominio.com", "email.com",
+  "yourdomain", "seudominio", "sradmin", "no-reply", "noreply", "@2x", ".png", ".jpg",
+  ".jpeg", ".gif", ".svg", ".webp", ".css", ".js",
 ];
+
+// E-mails PLACEHOLDER de template (não são de negócio real).
+const EMAIL_PLACEHOLDER = /^(your|you|youremail|email|e-?mail|name|nome|seu|sua|seuemail|user|username|teste|test|abc|xyz|info@info|mail@mail|admin@admin)@|@(example|exemplo|domain|dominio|yourdomain|seudominio|test|teste|email|mail|placeholder)\./i;
+
+function emailValido(e: string): boolean {
+  if (e.length > 80) return false;
+  if (EMAIL_JUNK.some((j) => e.includes(j))) return false;
+  if (EMAIL_PLACEHOLDER.test(e)) return false;
+  return true;
+}
+
+// Marcadores de domínio estacionado / à venda / em construção (site NÃO válido).
+const PARKED_RE =
+  /domain (is )?(for sale|parked)|buy this domain|this domain (is|may be) for sale|hugedomains|sedoparking|bodis\.com|domain parking|parkingcrew|dom[ií]nio (à venda|estacionado|em constru[çc][aã]o)|site em constru[çc][aã]o|em constru[çc][aã]o|under construction|coming soon|em breve|account suspended|default web page|apache2 (ubuntu|debian) default/i;
 
 // Plataformas de site grátis / construtor (sinal de site fraco).
 const BUILDER_HOSTS = [
@@ -58,10 +72,7 @@ export function extractEmail(html: string): string | null {
     found.add(m[0].trim().toLowerCase());
   }
 
-  const clean = [...found].filter((e) => {
-    if (e.length > 80) return false;
-    return !EMAIL_JUNK.some((j) => e.includes(j));
-  });
+  const clean = [...found].filter(emailValido);
   if (clean.length === 0) return null;
   // preferir e-mails "de contato"
   clean.sort((a, b) => {
@@ -214,12 +225,25 @@ export async function enrichFromWebsite(
   const home = await fetchHtml(base);
   if (!home.ok) {
     return {
-      site: { reachable: false, bad: false, reasons: [`site inacessível (HTTP ${home.status || "timeout/erro"})`] },
+      site: { reachable: false, bad: false, reasons: [`site fora do ar (HTTP ${home.status || "timeout/DNS"})`] },
       email: null,
-      whatsapp: toBrWhatsapp(fallbackPhone),
+      whatsapp: firstBrWhatsapp(fallbackPhone),
       instagram: null,
       facebook: null,
       debug: `home HTTP ${home.status || "erro"}`,
+    };
+  }
+
+  // Domínio estacionado / à venda / em construção = site NÃO válido.
+  const semTexto = home.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length < 200;
+  if (PARKED_RE.test(home.html.slice(0, 8000)) || semTexto) {
+    return {
+      site: { reachable: false, bad: false, reasons: ["domínio estacionado/à venda ou em construção (sem site funcional)"] },
+      email: null,
+      whatsapp: firstBrWhatsapp(fallbackPhone),
+      instagram: null,
+      facebook: null,
+      debug: semTexto ? "página vazia" : "parked",
     };
   }
 
@@ -247,7 +271,7 @@ export async function enrichFromWebsite(
   return {
     site,
     email,
-    whatsapp: whatsapp ?? toBrWhatsapp(fallbackPhone),
+    whatsapp: whatsapp ?? firstBrWhatsapp(fallbackPhone),
     instagram,
     facebook,
     debug: `visitou ${paginas.join("+")} · email=${email ? "sim" : "não"} ig=${instagram ? "sim" : "não"}`,

@@ -24,6 +24,7 @@ export type ScoreBreakdown = {
   is_gold: boolean;
   motivo: string;
   has_website: boolean;
+  site_fora_do_ar: boolean;
   bad_site: boolean;
   bad_site_reasons: string[];
   has_instagram: boolean;
@@ -47,13 +48,21 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
   let base: number;
   let motivo: string;
 
-  if (!input.hasWebsite) {
+  // Site FORA DO AR / estacionado = sem site VÁLIDO (mesma régua de "sem site").
+  const siteMorto = input.hasWebsite && !!input.site && input.site.reachable === false;
+  const semSiteValido = !input.hasWebsite || siteMorto;
+
+  if (semSiteValido) {
     if (!hasSocial) {
       base = 84;
-      motivo = "Sem site e sem redes sociais — presença digital zero; máxima oportunidade de vender um site.";
+      motivo = siteMorto
+        ? "Site cadastrado está FORA DO AR (sem presença digital funcional) — oportunidade de fazer um site novo."
+        : "Sem site e sem redes sociais — presença digital zero; máxima oportunidade de vender um site.";
     } else {
       base = 75;
-      motivo = "Tem redes sociais mas não tem site — oportunidade de vender um site próprio.";
+      motivo = siteMorto
+        ? "Site fora do ar; só tem redes sociais — oportunidade de vender um site próprio."
+        : "Tem redes sociais mas não tem site — oportunidade de vender um site próprio.";
     }
     // Contactabilidade: lead que dá pra abordar vale mais.
     if (input.hasWhatsapp) {
@@ -65,9 +74,6 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
     } else {
       notes.push("Sem contato direto — buscar e-mail/Instagram");
     }
-  } else if (input.site && input.site.reachable === false) {
-    base = 70;
-    motivo = "Site cadastrado mas fora do ar / inacessível — presença quebrada.";
   } else if (badSite) {
     base = 80;
     motivo = "Site fraco/datado: " + badReasons.join("; ");
@@ -106,7 +112,8 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
     tier,
     is_gold: score >= 80,
     motivo,
-    has_website: input.hasWebsite,
+    has_website: input.hasWebsite && !siteMorto,
+    site_fora_do_ar: siteMorto,
     bad_site: badSite,
     bad_site_reasons: badReasons,
     has_instagram: input.hasInstagram,
