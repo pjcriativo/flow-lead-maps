@@ -149,6 +149,147 @@ footer .fbot{text-align:center;padding-top:22px;color:#7c93a8;font-size:.82rem}
 @media(max-width:560px){.servicos,.servicos.s4,.servicos.s2,.depos{grid-template-columns:1fr}.gal a:first-child{grid-column:span 2}footer .fg{grid-template-columns:1fr}}
 `;
 
+// ===== TEMA ESCURO-PREMIUM (só clima "escuro-premium": advocacia/contador/etc.) =====
+// Layer de TEMA por cima do CSS estrutural: recolore o corpo inteiro pro padrão
+// agência (grafite dominante + dourado + serif Playfair nas seções), redesenha os
+// cards (profundidade, borda dourada, número índice serifado 01-06 via counter),
+// transforma "por que escolher" em bloco de autoridade, e adiciona acabamento
+// editorial (fio ornamental + losango dourado sob cada título). NÃO muda o HTML
+// (saúde/claro recebe só o CSS claro — sem regressão). Playfair já vem do hero.
+// Redefinir as vars de paleta recolore gradientes de botão e links inline de graça.
+const CSS_ESCURO = `
+:root{--primaria:#c9a24b;--secundaria:#e6c87d;--escura:#0a1520;--clara:#0f2136;--contraste:#17130a;--ouro:#c9a24b;--ouro2:#e6c87d;--breu:#0a1520;--breu2:#0f2136;--card1:#101f33;--card2:#0b1626;--linha:rgba(201,162,75,.22);--tx:#f2f6fa;--tx2:#c4d3e1;--mut:#8ea3b8}
+body{background:var(--breu);color:var(--tx2)}
+::selection{background:rgba(201,162,75,.28);color:#fff}
+
+/* header escuro translúcido + dourado */
+header.top{background:rgba(10,21,32,.72);border-bottom:1px solid rgba(201,162,75,.16);transition:background .3s,box-shadow .3s,border-color .3s}
+header.top.scrolled{background:rgba(7,15,24,.94);box-shadow:0 12px 34px -16px rgba(0,0,0,.72);border-bottom-color:rgba(201,162,75,.3)}
+.top .bar{height:78px}
+.brand{font-family:'Playfair Display',Georgia,serif;font-weight:700;color:#fff}
+.brand .dot{background:linear-gradient(135deg,var(--ouro2),var(--ouro));color:#17130a;box-shadow:0 8px 20px -8px rgba(201,162,75,.6)}
+.top nav a{color:var(--tx2)}
+.top nav a:hover{color:var(--ouro2)}
+
+/* botões: dourado sólido (texto escuro via --contraste) */
+.btn-p{box-shadow:0 12px 28px -10px rgba(201,162,75,.5)}
+.btn-p:hover{filter:brightness(1.06);box-shadow:0 18px 38px -10px rgba(201,162,75,.6)}
+.btn-white{background:linear-gradient(135deg,var(--ouro2),var(--ouro));color:#17130a}
+.btn-white:hover{background:linear-gradient(135deg,#f0d491,var(--ouro))}
+
+/* faixa de prova: números serifados dourados + divisores finos */
+.trust{background:var(--breu2);border-top:1px solid var(--linha);border-bottom:1px solid var(--linha)}
+.trust .grid{padding:34px 0}
+.trust .it{position:relative}
+.trust .it+.it::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);height:40px;width:1px;background:var(--linha)}
+.trust .it b{font-family:'Playfair Display',serif;font-weight:700;font-size:2rem;color:var(--ouro2)}
+.trust .it span{color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-size:.72rem}
+
+/* base de seção: respiro maior + título serif + kicker dourado + ornamento */
+section{padding:104px 0}
+.sec-head{max-width:680px;margin:0 auto 60px}
+.kicker{background:none;border:0;padding:0;color:var(--ouro);letter-spacing:.2em;font-size:.75rem;font-weight:700;margin-bottom:18px}
+.kicker svg{width:15px;height:15px;color:var(--ouro)}
+.sec-head h2{font-family:'Playfair Display',Georgia,serif;font-weight:700;color:#fff;font-size:clamp(2rem,3.6vw,2.9rem);position:relative;padding-bottom:26px}
+.sec-head h2::after{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:70px;height:1px;background:linear-gradient(90deg,transparent,var(--ouro),transparent)}
+.sec-head h2::before{content:"";position:absolute;left:50%;bottom:-3px;transform:translateX(-50%) rotate(45deg);width:7px;height:7px;background:var(--ouro)}
+.sec-head p{color:var(--tx2);font-size:1.08rem;margin-top:24px}
+
+/* serviços/áreas: cards com profundidade, número índice 01-06 e ícone dourado */
+.servicos{counter-reset:serv;gap:24px}
+.card{position:relative;overflow:hidden;background:linear-gradient(160deg,var(--card1),var(--card2));border:1px solid rgba(201,162,75,.16);border-radius:18px;padding:40px 30px 32px}
+.card::before{counter-increment:serv;content:counter(serv,decimal-leading-zero);position:absolute;top:18px;right:24px;font-family:'Playfair Display',serif;font-weight:700;font-size:2.7rem;line-height:1;color:rgba(201,162,75,.22);transition:color .22s}
+.card::after{content:"";position:absolute;left:0;top:0;height:3px;width:0;background:linear-gradient(90deg,var(--ouro2),var(--ouro));transition:width .35s ease}
+.card:hover{transform:translateY(-7px);border-color:rgba(201,162,75,.5);box-shadow:0 34px 66px -30px rgba(0,0,0,.75)}
+.card:hover::before{color:rgba(201,162,75,.42)}
+.card:hover::after{width:100%}
+.card .ic{width:54px;height:54px;border-radius:13px;background:rgba(201,162,75,.1);border:1px solid rgba(201,162,75,.32);color:var(--ouro2);margin-bottom:22px}
+.card h3{color:#fff;font-size:1.2rem;letter-spacing:-.01em}
+.card p{color:var(--mut)}
+
+/* por que escolher: bloco de autoridade (barra dourada + ícone dourado + profundidade) */
+.dif{background:var(--breu2)}
+.dif .grid{gap:22px}
+.dif .row{background:linear-gradient(160deg,var(--card1),var(--card2));border:1px solid rgba(201,162,75,.15);border-left:3px solid var(--ouro);border-radius:14px;padding:26px 28px}
+.dif .row:hover{transform:translateX(5px);box-shadow:0 22px 46px -28px rgba(0,0,0,.7);border-color:rgba(201,162,75,.4);border-left-color:var(--ouro2)}
+.dif .row .ic{background:rgba(201,162,75,.1);border:1px solid rgba(201,162,75,.3);color:var(--ouro2)}
+.dif .row h3{color:#fff}
+.dif .row p{color:var(--mut)}
+
+/* sobre: spread editorial (foto emoldurada dourada + selo dourado + serif) */
+.sobre{background:var(--breu)}
+.sobre .grid{gap:60px}
+.sobre .art .foto{border:1px solid rgba(201,162,75,.25);box-shadow:0 34px 66px -28px rgba(0,0,0,.75)}
+.sobre .art .badge{color:#17130a;box-shadow:0 20px 40px -14px rgba(201,162,75,.5)}
+.sobre .art .badge b{font-family:'Playfair Display',serif}
+.sobre h2{font-family:'Playfair Display',Georgia,serif;font-weight:700;color:#fff;font-size:clamp(1.9rem,3.2vw,2.6rem);position:relative;padding-bottom:20px;margin-bottom:22px}
+.sobre h2::after{content:"";position:absolute;left:0;bottom:0;width:60px;height:1px;background:linear-gradient(90deg,var(--ouro),transparent)}
+.sobre h2::before{content:"";position:absolute;left:0;bottom:-3px;transform:rotate(45deg);width:7px;height:7px;background:var(--ouro)}
+.sobre p{color:var(--tx2)}
+.sobre .nums{gap:16px;margin-top:30px}
+.sobre .num{background:rgba(201,162,75,.06);border:1px solid rgba(201,162,75,.2)}
+.sobre .num b{font-family:'Playfair Display',serif;color:var(--ouro2)}
+.sobre .num span{color:var(--mut)}
+
+/* galeria */
+.galeria{background:var(--breu2)}
+.gal a{border:1px solid rgba(201,162,75,.16);box-shadow:0 18px 36px -24px rgba(0,0,0,.7)}
+.gal img{filter:saturate(.9)}
+
+/* depoimentos: cartão escuro com aspas serifadas douradas */
+.depo{background:var(--breu)}
+.depo .sec-head h2{color:#fff}
+.depo .sec-head p{color:var(--tx2)}
+.depo .kicker{background:none;color:var(--ouro)}
+.depos .d{position:relative;background:linear-gradient(160deg,var(--card1),var(--card2));border:1px solid rgba(201,162,75,.16);border-radius:18px}
+.depos .d::before{content:"\\201C";position:absolute;top:2px;right:22px;font-family:'Playfair Display',serif;font-size:4rem;line-height:1;color:rgba(201,162,75,.24)}
+.depos .d:hover{background:linear-gradient(160deg,#12233a,#0d1a2c);border-color:rgba(201,162,75,.32)}
+.depos .d .q{color:var(--tx)}
+.depos .d .av{color:#17130a}
+.depos .d .who b{color:#fff}
+.depos .d .who span,.gsel{color:var(--mut)}
+
+/* faq escuro */
+.faq{background:var(--breu2)}
+.faq-item{background:linear-gradient(160deg,var(--card1),var(--card2));border:1px solid rgba(201,162,75,.16)}
+.faq-item.open{border-color:rgba(201,162,75,.4);box-shadow:0 20px 44px -26px rgba(0,0,0,.7)}
+.faq-item button{color:#fff}
+.faq-item .sig{color:var(--ouro2)}
+.faq-item .ans{color:var(--tx2)}
+
+/* contato: ícones dourados, mapa emoldurado, textos legíveis */
+.local{background:var(--breu)}
+.local .linha .ic{background:rgba(201,162,75,.1);border:1px solid rgba(201,162,75,.3);color:var(--ouro2)}
+.local .info{color:var(--tx2)}
+.local .info strong{color:#fff}
+.local .mapa{border:1px solid rgba(201,162,75,.25);filter:saturate(.92) contrast(1.03)}
+
+/* cta final: overlay escuro + título serif + ornamento */
+.cta-final .ov{background:linear-gradient(135deg,rgba(9,18,28,.94),rgba(9,18,28,.82)),linear-gradient(0deg,var(--breu),transparent 62%)}
+.cta-final .wrap{padding:108px 22px}
+.cta-final h2{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:clamp(2rem,3.8vw,3rem);position:relative;padding-bottom:28px}
+.cta-final h2::after{content:"";position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:70px;height:1px;background:linear-gradient(90deg,transparent,var(--ouro),transparent)}
+.cta-final h2::before{content:"";position:absolute;left:50%;bottom:9px;transform:translateX(-50%) rotate(45deg);width:7px;height:7px;background:var(--ouro)}
+.cta-final p{color:var(--tx2)}
+
+/* footer: grafite mais profundo + dourado */
+footer{background:#060e17;color:var(--tx2);border-top:1px solid var(--linha)}
+footer .fbrand{font-family:'Playfair Display',serif;color:#fff}
+footer h4{color:var(--ouro2)}
+footer a{color:var(--tx2)}
+footer a:hover{color:var(--ouro2)}
+footer .fsoc a{background:rgba(201,162,75,.1);border:1px solid rgba(201,162,75,.24);color:var(--ouro2)}
+footer .fsoc a:hover{background:var(--ouro);color:#17130a;border-color:var(--ouro)}
+footer .fbot{color:var(--mut);border-top-color:rgba(255,255,255,.06)}
+
+/* responsivo: faixa some divisores e VIRA 1 COLUNA no celular pequeno — o rótulo
+   longo em serif 2rem estouraria a grade de 2 col a ~360px. Blindagem de quebra. */
+.trust .it{min-width:0}
+.trust .it b{overflow-wrap:anywhere}
+@media(max-width:900px){.trust .it+.it::before{display:none}}
+@media(max-width:560px){section{padding:78px 0}.trust .grid{grid-template-columns:1fr!important}.trust .it b{font-size:1.7rem}}
+`;
+
 export function templatePremium(d: SiteData, cfg: NichoCfg): string {
   const nota = fmtNota(d.rating);
   const revs = fmtReviews(d.reviews);
@@ -269,7 +410,10 @@ ${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmb
     '<a href="#contato">Contato</a>',
   ].join("");
 
-  return `${head(d, "", CSS + hero.css)}
+  // Corpo CLARO (saúde/estética) OU ESCURO-PREMIUM (profissional): o segundo
+  // layeriza o tema escuro por cima da estrutura — saúde nunca é afetada.
+  const bodyCss = cfg.clima === "escuro-premium" ? CSS + CSS_ESCURO : CSS;
+  return `${head(d, "", bodyCss + hero.css)}
 <body>
 <header class="top"><div class="wrap bar">
 <div class="brand"><span class="dot">${icone(cfg.brandIcon)}</span>${esc(d.nome)}</div>
