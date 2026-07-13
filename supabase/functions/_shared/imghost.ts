@@ -9,8 +9,11 @@ type DB = any;
 
 const BUCKET = "site-assets";
 // Quantos heroes curados existem por nicho (seed em site-assets/hero/<nicho>/N.jpg).
+// Inclui nichos FINOS (advocacia) além dos template-ids — o hero é mais específico
+// que o template (advocacia usa o template "profissional", mas hero de Direito).
 const CURADOS: Record<string, number> = {
   saude: 3,
+  advocacia: 3,
   "servico-local": 3,
   profissional: 3,
   generico: 2,

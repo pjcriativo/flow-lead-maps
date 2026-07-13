@@ -178,5 +178,6 @@ export function conteudoFallback(mp: MateriaPrima, nicho: TemplateId): ConteudoI
     sobre,
     faq: FAQ_BASE[nicho],
     cta: CTA[nicho],
+    servicosReais: false, // rule-based nunca extrai serviços reais
   };
 }

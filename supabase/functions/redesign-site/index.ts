@@ -8,7 +8,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { coletarConteudoSite } from "../_shared/materiaprima.ts";
 import { coletarReviews } from "../_shared/reviews.ts";
 import { getProviderChain, type MateriaPrima, type ConteudoIA } from "../_shared/ai/index.ts";
-import { detectarNicho } from "../_shared/site/nicho.ts";
+import { detectarNicho, heroNicho } from "../_shared/site/nicho.ts";
 import { montarHtml } from "../_shared/site/montar.ts";
 import { conteudoFallback } from "../_shared/site/fallback.ts";
 import { resolverImagens } from "../_shared/imghost.ts";
@@ -158,7 +158,14 @@ Deno.serve(async (req) => {
 
     const [ai, fotos] = await Promise.all([
       gerarConteudo(),
-      resolverImagens(admin, Deno.env.get("SUPABASE_URL")!, rd.id, nicho, imagens, log),
+      resolverImagens(
+        admin,
+        Deno.env.get("SUPABASE_URL")!,
+        rd.id,
+        heroNicho(mp.categoria, nicho),
+        imagens,
+        log,
+      ),
     ]);
 
     const conteudo: ConteudoIA = ai.conteudo;
@@ -175,12 +182,13 @@ Deno.serve(async (req) => {
 
     const custoTotal = custoIa + coleta.custoUsd;
     const conteudoLegivel = mp.legivel;
-    const avisoGenerico =
-      usouFallback || !conteudoLegivel
-        ? usouFallback
-          ? `Copy genérica: IA indisponível (${errosIa.join(" | ")}).`
-          : "Copy dos serviços tende a genérica: o site atual do lead é ilegível (texto em imagem/JS)."
-        : null;
+    // FLAG de honestidade (D): serviços vieram do site real OU são genéricos do nicho.
+    const servicosReais = conteudo.servicosReais;
+    const avisoGenerico = servicosReais
+      ? null
+      : usouFallback
+        ? `Serviços GENÉRICOS do nicho: IA indisponível (${errosIa.join(" | ")}); usado conteúdo rule-based.`
+        : `Serviços GENÉRICOS do nicho: não foi possível extrair as áreas reais do site do lead${conteudoLegivel ? "" : " (site ilegível — texto em imagem/JS)"}.`;
 
     const now = new Date().toISOString();
     const obs = [
@@ -188,7 +196,7 @@ Deno.serve(async (req) => {
       `depoimentos=${depoimentos.length}`,
       `heroReal=${fotos.heroReal} galeria=${fotos.galeria.length}`,
       `img=${fotos.debug}`,
-      `legivel=${conteudoLegivel}`,
+      `servicosReais=${servicosReais} legivel=${conteudoLegivel}`,
       avisoGenerico ?? "",
       `apify=${coleta.debug}`,
     ]
@@ -226,6 +234,9 @@ Deno.serve(async (req) => {
         fallback: usouFallback,
         depoimentos: depoimentos.length,
         servicos: conteudo.servicos.length,
+        servicosReais,
+        heroNicho: heroNicho(mp.categoria, nicho),
+        temNota: mp.rating != null,
         diferenciais: conteudo.diferenciais.length,
         faq: conteudo.faq.length,
         imagensUsadas: imagens.length,

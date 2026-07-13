@@ -61,6 +61,8 @@ export type ConteudoIA = {
   faq: FaqIA[];
   /** Rótulo do CTA principal. Ex.: "Agendar avaliação". */
   cta: string;
+  /** true se os serviços vieram do TEXTO REAL do site; false = genérico do nicho. */
+  servicosReais: boolean;
 };
 
 export type GerarConteudoResult = {

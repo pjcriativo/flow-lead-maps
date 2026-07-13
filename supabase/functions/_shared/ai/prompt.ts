@@ -10,6 +10,7 @@ export const SYSTEM = `Você é um COPYWRITER e diretor de conteúdo sênior, es
 REGRAS:
 1. NUNCA invente fatos: nada de anos de experiência, prêmios, números, endereços, preços ou depoimentos que não estejam nos dados. Se não sabe, não afirme.
 2. Seja ESPECÍFICO do negócio: use a categoria, a cidade e (quando houver) o TEXTO REAL do site atual. PROIBIDO clichê genérico ("sorrisos que transformam", "qualidade e compromisso", "bem-vindo ao nosso site").
+2b. ADAPTE o vocabulário ao RAMO. Ex.: advocacia/jurídico fala de causa, defesa, direitos, cliente, consultoria, áreas de atuação — NUNCA "paciente", "tratamento", "sorriso", "bem-estar". Não vaze vocabulário de saúde num negócio que não é de saúde.
 3. Prova social: use a NOTA do Google e o nº de avaliações no hero/sobre — é o ativo mais forte.
 4. SERVIÇOS: se o texto do site atual listar serviços/especialidades, use ESSES (reescritos com clareza). Se o site for ilegível ou não listar, escreva serviços PADRÃO e realistas da categoria (sem inventar procedimentos exóticos).
 5. DIFERENCIAIS: 3-4 motivos para escolher o negócio (benefícios reais/coerentes, ex.: atendimento humanizado, estrutura moderna, nota alta no Google).
@@ -24,8 +25,10 @@ RESPONDA APENAS com um JSON válido (sem markdown, sem cercas), neste formato EX
   "diferenciais": [ { "titulo": "curto", "descricao": "~80 car.", "icone": "palavra da lista" } ],
   "sobre": "2-4 frases, autoridade, use nota/avaliações reais, sem inventar",
   "faq": [ { "pergunta": "curta", "resposta": "1-2 frases úteis" } ],
-  "cta": "ação curta (ex.: Agendar avaliação)"
+  "cta": "ação curta (ex.: Agendar avaliação)",
+  "servicos_reais": true
 }
+IMPORTANTE: "servicos_reais" = true SOMENTE se os serviços/áreas vieram do TEXTO REAL do site do lead. Se você teve que usar serviços genéricos do nicho (site ilegível ou sem lista), coloque false — é honestidade obrigatória.
 Use 4-6 servicos, 3-4 diferenciais, 2-4 faq (só com dado real). O campo "icone" DEVE ser uma destas palavras: ${ICONES}.`;
 
 export function promptUsuario(mp: MateriaPrima, nicho: string): string {
@@ -92,6 +95,7 @@ export function sanear(raw: unknown): ConteudoIA {
     sobre: String(o.sobre ?? "").trim(),
     faq,
     cta: String(o.cta ?? "").trim() || "Fale conosco",
+    servicosReais: o.servicos_reais === true || o.servicosReais === true,
   };
 }
 

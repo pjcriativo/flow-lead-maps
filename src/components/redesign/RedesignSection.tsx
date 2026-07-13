@@ -115,9 +115,10 @@ export function RedesignSection({
         u.fallback
           ? "copy rule-based (IA off)"
           : `${u.provider}/${u.modelo} · ~US$ ${u.custoUsd.toFixed(4)}`,
+        u.temNota ? "nota ✓" : "sem nota (prova social omitida)",
         u.depoimentos ? `${u.depoimentos} depoimentos Google` : "sem depoimentos",
-        `${u.servicos} serviços`,
-        u.heroReal ? "hero: foto real" : "hero: curado do nicho",
+        `${u.servicos} serviços ${u.servicosReais ? "(reais)" : "(genéricos)"}`,
+        u.heroReal ? "hero: foto real" : `hero: curado (${u.heroNicho})`,
         u.galeria ? `galeria ${u.galeria}` : "sem galeria",
         u.usouNota ? "nota ✓" : null,
         u.usouWhatsapp ? "WhatsApp ✓" : null,

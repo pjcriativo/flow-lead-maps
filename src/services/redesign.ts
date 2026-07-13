@@ -21,6 +21,12 @@ export type RedesignUsage = {
   /** Depoimentos REAIS do Google que entraram. */
   depoimentos: number;
   servicos: number;
+  /** true = serviços extraídos do site real; false = genéricos do nicho (flag). */
+  servicosReais: boolean;
+  /** pasta de hero curado usada (ex.: "advocacia", "saude"). */
+  heroNicho: string;
+  /** false = lead sem nota no Google (site não exibe estrela/nota). */
+  temNota: boolean;
   diferenciais: number;
   faq: number;
   imagensUsadas: number;

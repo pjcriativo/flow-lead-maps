@@ -95,12 +95,30 @@ function bater(texto: string, lista: string[]): boolean {
 }
 
 export function detectarNicho(categoria: string | null, textos = ""): TemplateId {
-  const t = `${categoria ?? ""} ${textos}`.toLowerCase();
+  // A CATEGORIA manda (sinal forte e confiável). Só se ela não indicar nada é
+  // que olhamos os textos do site — que podem enganar (um escritório de advocacia
+  // menciona "plano de saúde"/"direito à saúde" e cairia em "saude" por engano).
+  const cat = (categoria ?? "").toLowerCase();
+  if (bater(cat, SAUDE)) return "saude";
+  if (bater(cat, PROFISSIONAL)) return "profissional";
+  if (bater(cat, SERVICO_LOCAL)) return "servico-local";
+  // Categoria genérica/ausente → usa os textos como desempate.
+  const t = `${cat} ${textos}`.toLowerCase();
   if (bater(t, SAUDE)) return "saude";
   if (bater(t, PROFISSIONAL)) return "profissional";
   if (bater(t, SERVICO_LOCAL)) return "servico-local";
-  // fallback: serviço local é o mais genérico e vibrante
   return "servico-local";
+}
+
+/**
+ * Nicho FINO só para escolher o HERO curado (mais específico que o template).
+ * Ex.: advocacia usa o template "profissional", mas hero de Direito (hero/advocacia/).
+ * Retorna a pasta em site-assets/hero/<x>/; cai no template-id se não houver.
+ */
+export function heroNicho(categoria: string | null, template: TemplateId): string {
+  const t = (categoria ?? "").toLowerCase();
+  if (/advoca|advogad|jurídic|juridic|direito/.test(t)) return "advocacia";
+  return template;
 }
 
 /** Rótulo bonito da categoria (capitaliza, remove ruído). */
