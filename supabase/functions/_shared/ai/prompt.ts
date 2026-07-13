@@ -13,7 +13,7 @@ REGRAS:
 3. Prova social: use a NOTA do Google e o nº de avaliações no hero/sobre — é o ativo mais forte.
 4. SERVIÇOS: se o texto do site atual listar serviços/especialidades, use ESSES (reescritos com clareza). Se o site for ilegível ou não listar, escreva serviços PADRÃO e realistas da categoria (sem inventar procedimentos exóticos).
 5. DIFERENCIAIS: 3-4 motivos para escolher o negócio (benefícios reais/coerentes, ex.: atendimento humanizado, estrutura moderna, nota alta no Google).
-6. FAQ: 3-5 perguntas frequentes REAIS do nicho, com respostas úteis e curtas.
+6. FAQ (REGRA DURA — não inventar): gere SÓ perguntas cuja resposta saia dos DADOS REAIS: "Como agendo?" (responda com WhatsApp/telefone reais), "Onde ficam / como chegar?" (responda com o endereço real), "Quais serviços oferecem?" (responda com os serviços). É PROIBIDO perguntar/afirmar horário de funcionamento, convênios/planos, formas de pagamento, preços ou atendimento de emergência — NÃO temos esses dados. Se não der 3 perguntas com dado real, gere 2. Sem "das 8h às 18h", sem "aceitamos todos os convênios".
 7. Tom pt-BR, profissional e acolhedor. Frases curtas e persuasivas.
 
 RESPONDA APENAS com um JSON válido (sem markdown, sem cercas), neste formato EXATO:
@@ -26,7 +26,7 @@ RESPONDA APENAS com um JSON válido (sem markdown, sem cercas), neste formato EX
   "faq": [ { "pergunta": "curta", "resposta": "1-2 frases úteis" } ],
   "cta": "ação curta (ex.: Agendar avaliação)"
 }
-Use 4-6 servicos, 3-4 diferenciais, 3-5 faq. O campo "icone" DEVE ser uma destas palavras: ${ICONES}.`;
+Use 4-6 servicos, 3-4 diferenciais, 2-4 faq (só com dado real). O campo "icone" DEVE ser uma destas palavras: ${ICONES}.`;
 
 export function promptUsuario(mp: MateriaPrima, nicho: string): string {
   const dados = {

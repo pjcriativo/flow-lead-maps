@@ -11,6 +11,7 @@ import { getProviderChain, type MateriaPrima, type ConteudoIA } from "../_shared
 import { detectarNicho } from "../_shared/site/nicho.ts";
 import { montarHtml } from "../_shared/site/montar.ts";
 import { conteudoFallback } from "../_shared/site/fallback.ts";
+import { resolverImagens } from "../_shared/imghost.ts";
 import type { Depoimento } from "../_shared/site/tipos.ts";
 
 Deno.serve(async (req) => {
@@ -93,9 +94,11 @@ Deno.serve(async (req) => {
     };
 
     // 2. Salva os depoimentos reais vinculados ao lead (substitui os anteriores).
+    // photo=null de propósito: os avatares do Google (lh3) expiram/bloqueiam — o
+    // template usa a inicial do nome. Nenhuma URL lh3 vai pro site final.
     const depoimentos: Depoimento[] = coleta.reviews.map((r) => ({
       author: r.author,
-      photo: r.photo,
+      photo: null,
       rating: r.rating,
       text: r.text,
       when: r.when,
@@ -120,37 +123,54 @@ Deno.serve(async (req) => {
     // 3. Nicho → template.
     const nicho = detectarNicho(mp.categoria, mp.textos);
 
-    // 4. IA gera o CONTEÚDO (copy). Cadeia: Claude → OpenAI → fallback rule-based.
-    let conteudo: ConteudoIA | undefined;
-    let modelo = "fallback (rule-based)";
-    let provider = "fallback";
-    let inTok = 0,
-      outTok = 0,
-      custoIa = 0,
-      usouFallback = true;
-    const errosIa: string[] = [];
-    for (const p of getProviderChain()) {
-      try {
-        const out = await p.fn(mp, nicho);
-        conteudo = out.conteudo;
-        modelo = out.modelo;
-        provider = p.nome;
-        inTok = out.inputTokens;
-        outTok = out.outputTokens;
-        custoIa = out.custoUsd;
-        usouFallback = false;
-        log(`IA: ${p.nome} (${out.modelo}) ok`);
-        break;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        errosIa.push(`${p.nome}: ${msg}`);
-        log(`IA: ${p.nome} falhou — ${msg}`);
-      }
-    }
-    if (!conteudo) conteudo = conteudoFallback(mp, nicho);
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { persistSession: false } },
+    );
 
-    // 5. Template premium monta o HTML final (design fixo, dados reais + copy + reviews).
-    const html = montarHtml(mp, conteudo, nicho, depoimentos);
+    // 4+5 em PARALELO (economiza wall-clock): IA gera o CONTEÚDO (copy, cadeia
+    // Claude→OpenAI→fallback) enquanto o imghost escolhe/curadoria/re-hospeda as
+    // imagens (hero real claro/landscape ou curado do nicho; nada de lh3).
+    const errosIa: string[] = [];
+    const gerarConteudo = async () => {
+      for (const p of getProviderChain()) {
+        try {
+          const out = await p.fn(mp, nicho);
+          log(`IA: ${p.nome} (${out.modelo}) ok`);
+          return { ...out, provider: p.nome, usouFallback: false };
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          errosIa.push(`${p.nome}: ${msg}`);
+          log(`IA: ${p.nome} falhou — ${msg}`);
+        }
+      }
+      return {
+        conteudo: conteudoFallback(mp, nicho),
+        modelo: "fallback (rule-based)",
+        inputTokens: 0,
+        outputTokens: 0,
+        custoUsd: 0,
+        provider: "fallback",
+        usouFallback: true,
+      };
+    };
+
+    const [ai, fotos] = await Promise.all([
+      gerarConteudo(),
+      resolverImagens(admin, Deno.env.get("SUPABASE_URL")!, rd.id, nicho, imagens, log),
+    ]);
+
+    const conteudo: ConteudoIA = ai.conteudo;
+    const modelo = ai.modelo;
+    const provider = ai.provider;
+    const inTok = ai.inputTokens;
+    const outTok = ai.outputTokens;
+    const custoIa = ai.custoUsd;
+    const usouFallback = ai.usouFallback;
+
+    // 6. Template premium monta o HTML final (design fixo, dados reais + copy + reviews).
+    const html = montarHtml(mp, conteudo, nicho, depoimentos, fotos);
     if (!html || html.length < 800) throw new Error("Falha ao montar o HTML do template");
 
     const custoTotal = custoIa + coleta.custoUsd;
@@ -166,7 +186,8 @@ Deno.serve(async (req) => {
     const obs = [
       `provider=${provider} modelo=${modelo}`,
       `depoimentos=${depoimentos.length}`,
-      `fotos=${imagens.length}`,
+      `heroReal=${fotos.heroReal} galeria=${fotos.galeria.length}`,
+      `img=${fotos.debug}`,
       `legivel=${conteudoLegivel}`,
       avisoGenerico ?? "",
       `apify=${coleta.debug}`,
@@ -209,6 +230,9 @@ Deno.serve(async (req) => {
         faq: conteudo.faq.length,
         imagensUsadas: imagens.length,
         fotosReais: imagens.length,
+        heroReal: fotos.heroReal,
+        galeria: fotos.galeria.length,
+        fotosDebug: fotos.debug,
         temLogo: !!mp.logo,
         cores: mp.cores,
         usouNota: mp.rating != null,

@@ -25,6 +25,10 @@ export type RedesignUsage = {
   faq: number;
   imagensUsadas: number;
   fotosReais: number;
+  /** true = hero usa foto real do lead; false = hero curado do nicho (Storage). */
+  heroReal: boolean;
+  /** nº de fotos reais curadas na galeria (0 = seção omitida). */
+  galeria: number;
   temLogo: boolean;
   cores: string[];
   usouNota: boolean;

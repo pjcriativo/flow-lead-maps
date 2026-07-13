@@ -10,6 +10,7 @@ import { head, waFloat, estrelas, fmtNota, fmtReviews, ctaHref, scriptAnim } fro
 
 const CSS = `
 header.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.9);backdrop-filter:blur(12px);border-bottom:1px solid #eef2f6;transition:box-shadow .3s}
+header.top.scrolled{box-shadow:0 6px 24px -12px rgba(15,41,66,.35)}
 .top .bar{display:flex;align-items:center;justify-content:space-between;height:72px}
 .brand{display:flex;align-items:center;gap:10px;font-family:'Plus Jakarta Sans';font-weight:800;font-size:1.22rem;color:var(--escura)}
 .brand .dot{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--primaria),var(--secundaria));display:grid;place-items:center;color:#fff}
@@ -23,6 +24,8 @@ header.top{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.9);back
 .btn-o:hover{border-color:var(--primaria);color:var(--primaria)}
 .btn-ghost{background:rgba(255,255,255,.14);color:#fff;border:1.5px solid rgba(255,255,255,.4)}
 .btn-ghost:hover{background:rgba(255,255,255,.24)}
+.btn-white{background:#fff;color:var(--primaria);border:0;font-weight:700}
+.btn-white:hover{transform:translateY(-2px);background:#f8fafc}
 
 /* HERO full-width com parallax */
 .hero{position:relative;min-height:min(94vh,880px);display:flex;align-items:center;overflow:hidden;color:#fff}
@@ -54,6 +57,8 @@ section{padding:88px 0}
 .sec-head p{color:#64748b;margin-top:13px;font-size:1.06rem}
 
 .servicos{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.servicos.s4{grid-template-columns:repeat(4,1fr)}
+.servicos.s2{grid-template-columns:repeat(2,1fr);max-width:760px;margin:0 auto}
 .card{background:#fff;border:1px solid #eef2f6;border-radius:20px;padding:32px 28px;transition:transform .2s,box-shadow .2s,border-color .2s}
 .card:hover{transform:translateY(-7px);box-shadow:0 26px 50px -22px rgba(15,41,66,.32);border-color:color-mix(in srgb,var(--primaria) 34%,#eef2f6)}
 .card .ic{width:56px;height:56px;border-radius:15px;background:linear-gradient(135deg,color-mix(in srgb,var(--primaria) 16%,#fff),color-mix(in srgb,var(--secundaria) 14%,#fff));color:var(--primaria);display:grid;place-items:center;margin-bottom:20px}
@@ -155,9 +160,10 @@ ${d.reviews ? `<div class="it reveal"${rev(1)}><b>${revs}</b><span>avaliações 
 ${local ? `<div class="it reveal"${rev(3)}><b>${esc(local)}</b><span>atendimento</span></div>` : ""}
 </div></div></div>`;
 
+  const gClasse = d.servicos.length === 4 ? " s4" : d.servicos.length === 2 ? " s2" : "";
   const servicos = d.servicos.length
     ? `<section id="servicos"><div class="wrap"><div class="sec-head reveal"><span class="kicker">${icone("tooth")} Nossos serviços</span><h2>Tratamentos com excelência</h2><p>Cuidado completo e personalizado para você e sua família.</p></div>
-<div class="servicos">${d.servicos.map((s, i) => `<div class="card reveal"${rev(i % 3)}><div class="ic">${icone(s.icone)}</div><h3>${esc(s.titulo)}</h3><p>${esc(s.descricao)}</p></div>`).join("")}</div></div></section>`
+<div class="servicos${gClasse}">${d.servicos.map((s, i) => `<div class="card reveal"${rev(i % 3)}><div class="ic">${icone(s.icone)}</div><h3>${esc(s.titulo)}</h3><p>${esc(s.descricao)}</p></div>`).join("")}</div></div></section>`
     : "";
 
   const dif = d.diferenciais.length
@@ -182,10 +188,10 @@ ${local ? `<div class="it reveal"${rev(3)}><b>${esc(local)}</b><span>atendimento
     : "";
 
   const galeria =
-    d.fotos.length >= 2
+    d.fotos.length >= 3
       ? `<section class="galeria"><div class="wrap"><div class="sec-head reveal"><span class="kicker">${icone("camera")} Ambiente</span><h2>Conheça nosso espaço</h2></div>
 <div class="gal reveal">${d.fotos
-          .slice(0, 5)
+          .slice(0, 3)
           .map(
             (f) =>
               `<a href="${esc(f)}" target="_blank" rel="noopener"><img src="${esc(f)}" alt="${esc(d.nome)}" loading="lazy"></a>`,
@@ -276,7 +282,7 @@ ${local_sec}
 <div class="wrap">
 <h2 class="reveal">${esc(d.headline)}</h2>
 <p class="reveal"${rev(1)}>Agende agora pelo WhatsApp e cuide do seu sorriso com quem é referência${local ? " em " + esc(local) : ""}.</p>
-<a class="btn btn-ghost reveal"${rev(2)} style="background:#fff;color:var(--primaria);border:0;font-weight:700" href="${esc(cta)}" target="_blank" rel="noopener">${icone("message-circle")} ${esc(d.cta)}</a>
+<a class="btn btn-white reveal"${rev(2)} href="${esc(cta)}" target="_blank" rel="noopener">${icone("message-circle")} ${esc(d.cta)}</a>
 </div></section>
 
 <footer><div class="wrap">

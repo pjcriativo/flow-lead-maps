@@ -14,14 +14,31 @@ export function fmtReviews(reviews: number | null): string {
   return reviews.toLocaleString("pt-BR");
 }
 
-/** 5 estrelas preenchidas conforme a nota (meia-estrela via gradiente). */
+// IDs de gradiente ÚNICOS por instância (evita id duplicado = HTML inválido).
+let _starSeq = 0;
+
+const STAR_D = "M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18.8 6.2 21l1.1-6.5L2.6 9.8l6.5-.9L12 3Z";
+
+/** 5 estrelas conforme a nota. Cheia = sólida; parcial = gradiente com offset real. */
 export function estrelas(rating: number | null, tamanho = 20): string {
   const r = rating ?? 0;
+  const seq = ++_starSeq;
   let out = "";
   for (let i = 1; i <= 5; i++) {
-    const fill = r >= i ? 1 : r > i - 1 ? r - (i - 1) : 0;
-    const id = `st${i}-${Math.round(fill * 100)}`;
-    out += `<svg width="${tamanho}" height="${tamanho}" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="${id}"><stop offset="${fill * 100}%" stop-color="#f5b301"/><stop offset="${fill * 100}%" stop-color="#d7d7d7"/></linearGradient></defs><path fill="url(#${id})" d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18.8 6.2 21l1.1-6.5L2.6 9.8l6.5-.9L12 3Z"/></svg>`;
+    const fill = Math.max(0, Math.min(1, r - (i - 1)));
+    let paint: string;
+    let defs = "";
+    if (fill >= 0.99) {
+      paint = "#f5b301"; // estrela sólida
+    } else if (fill <= 0.01) {
+      paint = "#d7d7d7"; // vazia
+    } else {
+      const id = `st${seq}-${i}`;
+      const pct = (fill * 100).toFixed(0);
+      defs = `<defs><linearGradient id="${id}"><stop offset="${pct}%" stop-color="#f5b301"/><stop offset="${pct}%" stop-color="#d7d7d7"/></linearGradient></defs>`;
+      paint = `url(#${id})`;
+    }
+    out += `<svg width="${tamanho}" height="${tamanho}" viewBox="0 0 24 24" aria-hidden="true">${defs}<path fill="${paint}" d="${STAR_D}"/></svg>`;
   }
   return `<span class="estrelas" style="display:inline-flex;gap:2px;line-height:0">${out}</span>`;
 }
@@ -91,8 +108,12 @@ var rm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').m
 var els=[].slice.call(document.querySelectorAll('.reveal'));
 if(rm||!('IntersectionObserver'in window)){els.forEach(function(e){e.classList.add('in')});}
 else{var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}})},{threshold:.12,rootMargin:'0px 0px -8% 0px'});els.forEach(function(e){io.observe(e)});}
+// parallax: requestAnimationFrame com ticking; desligado no mobile e reduced-motion
 var px=document.querySelector('.parallax');
-if(px&&!rm){window.addEventListener('scroll',function(){var y=window.pageYOffset;px.style.transform='translateY('+(y*.18)+'px)';},{passive:true});}
+if(px&&!rm&&window.innerWidth>768){var ticking=false;window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(function(){px.style.transform='translate3d(0,'+(window.pageYOffset*.15)+'px,0)';ticking=false;});}},{passive:true});}
+// header ganha sombra ao rolar
+var hd=document.querySelector('header.top');
+if(hd){var onSc=function(){hd.classList.toggle('scrolled',window.pageYOffset>10);};onSc();window.addEventListener('scroll',onSc,{passive:true});}
 [].slice.call(document.querySelectorAll('.faq-item')).forEach(function(it){var b=it.querySelector('button');if(b){b.addEventListener('click',function(){var open=it.classList.contains('open');[].slice.call(document.querySelectorAll('.faq-item.open')).forEach(function(o){if(o!==it)o.classList.remove('open')});it.classList.toggle('open',!open);});}});
 var yr=document.getElementById('__ano');if(yr){yr.textContent=new Date().getFullYear();}
 })();</script>`;

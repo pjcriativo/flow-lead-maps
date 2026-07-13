@@ -117,7 +117,8 @@ export function RedesignSection({
           : `${u.provider}/${u.modelo} · ~US$ ${u.custoUsd.toFixed(4)}`,
         u.depoimentos ? `${u.depoimentos} depoimentos Google` : "sem depoimentos",
         `${u.servicos} serviços`,
-        `${u.fotosReais} fotos`,
+        u.heroReal ? "hero: foto real" : "hero: curado do nicho",
+        u.galeria ? `galeria ${u.galeria}` : "sem galeria",
         u.usouNota ? "nota ✓" : null,
         u.usouWhatsapp ? "WhatsApp ✓" : null,
       ]

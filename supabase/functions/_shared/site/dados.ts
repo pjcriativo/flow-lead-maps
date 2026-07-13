@@ -111,11 +111,22 @@ const mapServico = (s: { titulo: string; descricao?: string; icone?: string }): 
   icone: s.icone ?? "check-circle",
 });
 
+/** Grade sem buraco: 3, 4 ou 6 cards. Nunca 5 (deixaria vão na 2ª linha). */
+function grade(n: number): number {
+  if (n >= 6) return 6;
+  if (n === 5) return 4;
+  return n; // 0..4 (4 vira 2x2 no template)
+}
+
+/** Fotos já resolvidas (re-hospedadas no Storage). Se não vier, usa fallback local. */
+export type FotosOverride = { hero: string; sobre: string; cta: string; galeria: string[] };
+
 export function montarSiteData(
   mp: MateriaPrima,
   conteudo: ConteudoIA,
   nicho: TemplateId,
   depoimentos: Depoimento[] = [],
+  fotosOverride?: FotosOverride,
 ): SiteData {
   const whatsapp = firstBrWhatsapp(mp.whatsapp) ?? firstBrWhatsapp(mp.telefone);
   const whatsappUrl = whatsapp
@@ -126,11 +137,11 @@ export function montarSiteData(
     ? `tel:${telDigitsRaw.startsWith("+") ? telDigitsRaw : "+55" + telDigitsRaw.replace(/^55/, "")}`
     : null;
 
-  const fotos = resolverFotoSet(mp.imagens, nicho);
+  const fotos = fotosOverride ?? resolverFotoSet(mp.imagens, nicho);
 
   const servicos = (conteudo.servicos ?? [])
     .filter((s) => s && s.titulo)
-    .slice(0, 6)
+    .slice(0, grade((conteudo.servicos ?? []).filter((s) => s && s.titulo).length))
     .map(mapServico);
   const diferenciais = (conteudo.diferenciais ?? [])
     .filter((s) => s && s.titulo)

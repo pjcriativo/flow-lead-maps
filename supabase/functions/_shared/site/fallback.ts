@@ -98,46 +98,36 @@ const DIFERENCIAIS_BASE: Record<TemplateId, ServicoIA[]> = {
   ],
 };
 
+// FAQ genérico SEGURO: perguntas respondíveis com dado real (agendar/onde/serviços).
+// Nada de horário, convênio, pagamento ou emergência (não temos esses dados).
 const FAQ_BASE: Record<TemplateId, { pergunta: string; resposta: string }[]> = {
   saude: [
     {
-      pergunta: "Como agendo um horário?",
-      resposta: "É só chamar no WhatsApp — respondemos rapidinho e encontramos o melhor horário.",
+      pergunta: "Como faço para agendar?",
+      resposta:
+        "É só chamar no WhatsApp — respondemos rápido e encontramos o melhor horário para você.",
     },
     {
       pergunta: "Onde vocês ficam?",
       resposta:
-        "Veja o endereço e o mapa na seção de localização; tem link para chegar pelo Google Maps.",
-    },
-    {
-      pergunta: "Atendem por convênio?",
-      resposta:
-        "Fale com a gente pelo WhatsApp para confirmar as formas de atendimento e pagamento.",
+        "Veja o endereço e o mapa na seção de localização, com link para chegar pelo Google Maps.",
     },
   ],
   "servico-local": [
     {
-      pergunta: "Preciso agendar?",
-      resposta: "Recomendamos agendar pelo WhatsApp para garantir seu horário sem espera.",
+      pergunta: "Como faço para agendar?",
+      resposta: "Fale com a gente pelo WhatsApp e garanta seu horário sem espera.",
     },
     {
-      pergunta: "Quais as formas de pagamento?",
-      resposta: "Fale com a gente pelo WhatsApp para ver as opções disponíveis.",
-    },
-    {
-      pergunta: "Onde ficam?",
+      pergunta: "Onde vocês ficam?",
       resposta: "O endereço e o mapa estão na seção de localização, com link para chegar.",
     },
   ],
   profissional: [
     {
-      pergunta: "Como funciona a primeira conversa?",
+      pergunta: "Como falo com vocês?",
       resposta:
         "Entre em contato pelo WhatsApp; entendemos seu caso e explicamos os próximos passos.",
-    },
-    {
-      pergunta: "Vocês atendem à distância?",
-      resposta: "Fale com a gente para verificarmos a melhor forma de atendimento para o seu caso.",
     },
     {
       pergunta: "Onde fica o escritório?",
