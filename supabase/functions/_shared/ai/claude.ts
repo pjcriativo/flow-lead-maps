@@ -1,21 +1,25 @@
 // Provedor de IA: Claude (Anthropic Messages API). Melhor para copy/design.
-// Chave em ANTHROPIC_API_KEY; modelo em ANTHROPIC_MODEL (default claude-sonnet-4-5).
+// Chave em ANTHROPIC_API_KEY; modelo em ANTHROPIC_MODEL (default claude-opus-4-8).
+// Para custo menor com qualidade ótima, setar ANTHROPIC_MODEL=claude-sonnet-5.
 // Gera SÓ o CONTEÚDO (copy) em JSON; o template monta o HTML.
+// NB: sem `temperature` — Opus 4.8 / Sonnet 5 removeram o parâmetro (retornam 400).
+// O formato JSON é forçado pelo system prompt (sem prefill — prefill dá 400 em 4.6+).
 import type { AiProvider } from "./types.ts";
 import { SYSTEM, promptUsuario, sanear, extrairJson } from "./prompt.ts";
 
-// Preço por 1M tokens (USD). Ajuste conforme o modelo escolhido.
+// Preço por 1M tokens de INPUT/OUTPUT (USD) por modelo. Fonte: catálogo atual.
 const PRECOS: Record<string, { in: number; out: number }> = {
+  "claude-opus-4-8": { in: 5, out: 25 },
+  "claude-opus-4-7": { in: 5, out: 25 },
+  "claude-sonnet-5": { in: 3, out: 15 },
   "claude-sonnet-4-5": { in: 3, out: 15 },
-  "claude-opus-4-8": { in: 15, out: 75 },
-  "claude-3-5-sonnet-latest": { in: 3, out: 15 },
-  "claude-3-5-haiku-latest": { in: 0.8, out: 4 },
+  "claude-haiku-4-5": { in: 1, out: 5 },
 };
 
 export const gerarConteudoClaude: AiProvider = async (mp, nicho) => {
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) throw new Error("ANTHROPIC_API_KEY não configurada.");
-  const modelo = Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-4-5";
+  const modelo = Deno.env.get("ANTHROPIC_MODEL") || "claude-opus-4-8";
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -27,7 +31,6 @@ export const gerarConteudoClaude: AiProvider = async (mp, nicho) => {
     body: JSON.stringify({
       model: modelo,
       max_tokens: 3000,
-      temperature: 0.6,
       system: SYSTEM + "\n\nResponda APENAS com o JSON, começando por { e terminando por }.",
       messages: [{ role: "user", content: promptUsuario(mp, nicho) }],
     }),
