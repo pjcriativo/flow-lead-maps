@@ -2,13 +2,27 @@
 // mostra preview, editor inline (texto/imagem) e comparador antes/depois.
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Loader2, RefreshCw, Wand2, Pencil, Eye, Columns2, ExternalLink, Save, Trash2,
-  X, Download, Globe,
+  Loader2,
+  RefreshCw,
+  Wand2,
+  Pencil,
+  Eye,
+  Columns2,
+  ExternalLink,
+  Save,
+  Trash2,
+  X,
+  Download,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatDataHora } from "@/lib/format";
@@ -42,12 +56,16 @@ function expiraLabel(expira_em: string | null): { texto: string; vencido: boolea
   if (dias > 1) return { texto: `expira em ${dias} dias`, vencido: false };
   if (dias === 1) return { texto: "expira amanhã", vencido: false };
   if (dias === 0) return { texto: "expira hoje", vencido: false };
-  return { texto: `expirado há ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? "s" : ""}`, vencido: true };
+  return {
+    texto: `expirado há ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? "s" : ""}`,
+    vencido: true,
+  };
 }
 
-export function RedesignSection(
-  { focusLeadId, onFocusConsumed }: { focusLeadId?: string | null; onFocusConsumed?: () => void } = {},
-) {
+export function RedesignSection({
+  focusLeadId,
+  onFocusConsumed,
+}: { focusLeadId?: string | null; onFocusConsumed?: () => void } = {}) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [redesigns, setRedesigns] = useState<Redesign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +88,9 @@ export function RedesignSection(
       setLoading(false);
     }
   };
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+  }, []);
 
   // Vindo de "Meus Leads" (link do card): abre o redesign daquele lead assim que a lista carrega.
   useEffect(() => {
@@ -90,10 +110,16 @@ export function RedesignSection(
     try {
       const res = await gerarRedesign(leadId);
       const u = res.usage;
-      toast.success(
-        `Site gerado! ${u.modelo} · ${u.outputTokens} tokens · ~US$ ${u.custoUsd.toFixed(4)} · ${u.imagensUsadas} imagens${u.temLogo ? " + logo" : ""}`,
-        { duration: 8000 },
-      );
+      const selo = [
+        `template "${u.template}"`,
+        u.fallback ? "conteúdo rule-based (IA off)" : `${u.modelo} · ~US$ ${u.custoUsd.toFixed(4)}`,
+        u.usouNota ? "nota ✓" : null,
+        u.usouWhatsapp ? "WhatsApp ✓" : null,
+        `${u.imagensUsadas} fotos`,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      toast.success(`Site gerado! ${selo}`, { duration: 8000 });
       await carregar();
       setAberto(res.redesign);
     } catch (e) {
@@ -123,9 +149,13 @@ export function RedesignSection(
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Redesign</h1>
-          <p className="text-sm text-muted-foreground">Gere o site novo do lead com IA e ajuste no editor.</p>
+          <p className="text-sm text-muted-foreground">
+            Gere o site novo do lead com IA e ajuste no editor.
+          </p>
         </div>
-        <Button variant="outline" size="sm" onClick={carregar}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
+        <Button variant="outline" size="sm" onClick={carregar}>
+          <RefreshCw className="h-4 w-4" /> Atualizar
+        </Button>
       </div>
 
       {/* Gerar novo redesign */}
@@ -133,76 +163,142 @@ export function RedesignSection(
         <h2 className="mb-2 text-sm font-semibold">Gerar novo redesign</h2>
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[280px] flex-1">
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Lead</label>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Lead
+            </label>
             <Select value={leadSel} onValueChange={setLeadSel} disabled={gerando || !leads.length}>
-              <SelectTrigger aria-label="Escolher lead"><SelectValue placeholder="Escolha um lead" /></SelectTrigger>
+              <SelectTrigger aria-label="Escolher lead">
+                <SelectValue placeholder="Escolha um lead" />
+              </SelectTrigger>
               <SelectContent className="max-h-80">
                 {leads.map((l) => (
                   <SelectItem key={l.id} value={l.id}>
-                    {l.business_name}{l.website ? " · tem site" : " · sem site"}{l.rating ? ` · ★${l.rating}` : ""}
+                    {l.business_name}
+                    {l.website ? " · tem site" : " · sem site"}
+                    {l.rating ? ` · ★${l.rating}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={() => handleGerar(leadSel)} disabled={gerando || !leadSel} className="bg-primary font-semibold hover:bg-primary/90">
-            {gerando ? <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</> : <><Wand2 className="h-4 w-4" /> Redesenhar</>}
+          <Button
+            onClick={() => handleGerar(leadSel)}
+            disabled={gerando || !leadSel}
+            className="bg-primary font-semibold hover:bg-primary/90"
+          >
+            {gerando ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Gerando...
+              </>
+            ) : (
+              <>
+                <Wand2 className="h-4 w-4" /> Redesenhar
+              </>
+            )}
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          {leadsComSite.length} leads com site (matéria-prima melhor). Custo por geração ~US$ 0,01–0,05 (OpenAI).
+          {leadsComSite.length} leads com site (matéria-prima melhor). Custo por geração ~US$
+          0,01–0,05 (OpenAI).
         </p>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando...</div>
+        <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
+        </div>
       ) : error ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
       ) : redesigns.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-16 text-center">
           <Wand2 className="mx-auto h-8 w-8 text-muted-foreground" />
           <h3 className="mt-4 font-semibold">Nenhum redesign ainda</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Escolha um lead acima e clique em Redesenhar.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Escolha um lead acima e clique em Redesenhar.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {redesigns.map((r) => (
-            <div key={r.id} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+            <div
+              key={r.id}
+              className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]"
+            >
               <div className="h-40 overflow-hidden border-b border-border bg-white">
                 {r.html_gerado ? (
-                  <iframe title={`preview-${r.id}`} srcDoc={r.html_editado ?? r.html_gerado}
-                    className="pointer-events-none h-[500px] w-[1250px] origin-top-left scale-[0.32] border-0" />
+                  <iframe
+                    title={`preview-${r.id}`}
+                    srcDoc={r.html_editado ?? r.html_gerado}
+                    className="pointer-events-none h-[500px] w-[1250px] origin-top-left scale-[0.32] border-0"
+                  />
                 ) : (
                   <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    {r.status === "gerando" ? "gerando…" : r.status === "erro" ? "erro na geração" : "sem preview"}
+                    {r.status === "gerando"
+                      ? "gerando…"
+                      : r.status === "erro"
+                        ? "erro na geração"
+                        : "sem preview"}
                   </div>
                 )}
               </div>
               <div className="flex flex-1 flex-col gap-2 p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold leading-tight text-foreground">{r.lead_nome ?? nomeLead(r.lead_id)}</span>
-                  <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_STYLE[r.status])}>{r.status}</span>
+                  <span className="font-semibold leading-tight text-foreground">
+                    {r.lead_nome ?? nomeLead(r.lead_id)}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-xs font-medium",
+                      STATUS_STYLE[r.status],
+                    )}
+                  >
+                    {r.status}
+                  </span>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {r.modelo ? `${r.modelo}` : ""}{r.custo_usd != null ? ` · ~US$ ${Number(r.custo_usd).toFixed(4)}` : ""}
+                  {r.modelo ? `${r.modelo}` : ""}
+                  {r.custo_usd != null ? ` · ~US$ ${Number(r.custo_usd).toFixed(4)}` : ""}
                   {r.gerado_em ? ` · ${formatDataHora(r.gerado_em)}` : ""}
                 </div>
                 {(() => {
                   const exp = expiraLabel(r.expira_em);
                   return exp ? (
-                    <div className={cn("text-xs font-medium", exp.vencido ? "text-destructive" : "text-muted-foreground")}>
+                    <div
+                      className={cn(
+                        "text-xs font-medium",
+                        exp.vencido ? "text-destructive" : "text-muted-foreground",
+                      )}
+                    >
                       {exp.texto}
                     </div>
                   ) : null;
                 })()}
                 <div className="mt-auto flex items-center gap-2 pt-1">
-                  <Button size="sm" className="flex-1" onClick={() => setAberto(r)} disabled={!r.html_gerado}>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAberto(r)}
+                    disabled={!r.html_gerado}
+                  >
                     <Pencil className="h-4 w-4" /> Abrir editor
                   </Button>
-                  <Button size="sm" variant="ghost" title="Redesenhar de novo" onClick={() => handleGerar(r.lead_id)} disabled={gerando}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Redesenhar de novo"
+                    onClick={() => handleGerar(r.lead_id)}
+                    disabled={gerando}
+                  >
                     <Wand2 className="h-4 w-4" />
                   </Button>
-                  <Button size="sm" variant="ghost" title="Excluir" onClick={() => handleExcluir(r)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Excluir"
+                    onClick={() => handleExcluir(r)}
+                  >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
@@ -217,7 +313,9 @@ export function RedesignSection(
           redesign={aberto}
           onClose={() => setAberto(null)}
           onSaved={(html) => {
-            setRedesigns((prev) => prev.map((r) => (r.id === aberto.id ? { ...r, html_editado: html } : r)));
+            setRedesigns((prev) =>
+              prev.map((r) => (r.id === aberto.id ? { ...r, html_editado: html } : r)),
+            );
           }}
         />
       )}
@@ -228,7 +326,15 @@ export function RedesignSection(
 /* -------------------- Editor + comparador (modal cheio) -------------------- */
 type Modo = "preview" | "editar" | "comparar";
 
-function EditorRedesign({ redesign, onClose, onSaved }: { redesign: Redesign; onClose: () => void; onSaved: (html: string) => void }) {
+function EditorRedesign({
+  redesign,
+  onClose,
+  onSaved,
+}: {
+  redesign: Redesign;
+  onClose: () => void;
+  onSaved: (html: string) => void;
+}) {
   const [html, setHtml] = useState(redesign.html_editado ?? redesign.html_gerado ?? "");
   const [modo, setModo] = useState<Modo>("preview");
   const [salvando, setSalvando] = useState(false);
@@ -236,11 +342,16 @@ function EditorRedesign({ redesign, onClose, onSaved }: { redesign: Redesign; on
 
   const salvar = async () => {
     const doc = iframeRef.current?.contentDocument;
-    if (!doc) { toast.error("Não consegui ler o editor."); return; }
+    if (!doc) {
+      toast.error("Não consegui ler o editor.");
+      return;
+    }
     setSalvando(true);
     try {
       const clone = doc.documentElement.cloneNode(true) as HTMLElement;
-      clone.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
+      clone
+        .querySelectorAll("[contenteditable]")
+        .forEach((el) => el.removeAttribute("contenteditable"));
       clone.querySelectorAll(".__img-edit").forEach((el) => el.classList.remove("__img-edit"));
       clone.querySelector("#__editor")?.remove();
       clone.querySelector("#__editorstyle")?.remove();
@@ -276,9 +387,32 @@ function EditorRedesign({ redesign, onClose, onSaved }: { redesign: Redesign; on
           <span className="text-sm font-semibold">{redesign.lead_nome ?? "Redesign"}</span>
           <div className="ml-2 flex rounded-md border border-border p-0.5">
             {(["preview", "editar", "comparar"] as Modo[]).map((m) => (
-              <button key={m} onClick={() => setModo(m)}
-                className={cn("rounded px-3 py-1 text-xs font-medium capitalize", modo === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-                {m === "preview" ? <><Eye className="mr-1 inline h-3.5 w-3.5" />Preview</> : m === "editar" ? <><Pencil className="mr-1 inline h-3.5 w-3.5" />Editar</> : <><Columns2 className="mr-1 inline h-3.5 w-3.5" />Antes/Depois</>}
+              <button
+                key={m}
+                onClick={() => setModo(m)}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-medium capitalize",
+                  modo === m
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {m === "preview" ? (
+                  <>
+                    <Eye className="mr-1 inline h-3.5 w-3.5" />
+                    Preview
+                  </>
+                ) : m === "editar" ? (
+                  <>
+                    <Pencil className="mr-1 inline h-3.5 w-3.5" />
+                    Editar
+                  </>
+                ) : (
+                  <>
+                    <Columns2 className="mr-1 inline h-3.5 w-3.5" />
+                    Antes/Depois
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -286,12 +420,23 @@ function EditorRedesign({ redesign, onClose, onSaved }: { redesign: Redesign; on
         <div className="flex items-center gap-2">
           {modo === "editar" && (
             <Button size="sm" onClick={salvar} disabled={salvando}>
-              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
+              {salvando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}{" "}
+              Salvar
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={abrirNovaAba}><ExternalLink className="h-4 w-4" /> Abrir</Button>
-          <Button size="sm" variant="outline" onClick={baixar}><Download className="h-4 w-4" /> HTML</Button>
-          <Button size="sm" variant="ghost" onClick={onClose}><X className="h-4 w-4" /></Button>
+          <Button size="sm" variant="outline" onClick={abrirNovaAba}>
+            <ExternalLink className="h-4 w-4" /> Abrir
+          </Button>
+          <Button size="sm" variant="outline" onClick={baixar}>
+            <Download className="h-4 w-4" /> HTML
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -299,16 +444,31 @@ function EditorRedesign({ redesign, onClose, onSaved }: { redesign: Redesign; on
         {modo === "comparar" ? (
           <div className="grid h-full grid-cols-2 gap-px bg-border">
             <div className="flex flex-col bg-white">
-              <div className="bg-black/70 px-2 py-1 text-xs text-white">Antes {redesign.site_original_url ? "" : "(sem site atual)"}</div>
+              <div className="bg-black/70 px-2 py-1 text-xs text-white">
+                Antes {redesign.site_original_url ? "" : "(sem site atual)"}
+              </div>
               {redesign.site_original_url ? (
-                <iframe title="antes" src={redesign.site_original_url} className="h-full w-full border-0" />
+                <iframe
+                  title="antes"
+                  src={redesign.site_original_url}
+                  className="h-full w-full border-0"
+                />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Este lead não tinha site.</div>
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  Este lead não tinha site.
+                </div>
               )}
             </div>
             <div className="flex flex-col bg-white">
-              <div className="bg-primary px-2 py-1 text-xs text-primary-foreground">Depois (novo site)</div>
-              <iframe title="depois" srcDoc={html} sandbox="allow-scripts allow-same-origin allow-popups" className="h-full w-full border-0" />
+              <div className="bg-primary px-2 py-1 text-xs text-primary-foreground">
+                Depois (novo site)
+              </div>
+              <iframe
+                title="depois"
+                srcDoc={html}
+                sandbox="allow-scripts allow-same-origin allow-popups"
+                className="h-full w-full border-0"
+              />
             </div>
           </div>
         ) : (
@@ -325,7 +485,15 @@ function EditorRedesign({ redesign, onClose, onSaved }: { redesign: Redesign; on
       {modo === "comparar" && redesign.site_original_url && (
         <div className="bg-card px-4 py-1 text-center text-xs text-muted-foreground">
           Se o "Antes" ficar em branco, o site atual bloqueia incorporação —{" "}
-          <a href={redesign.site_original_url} target="_blank" rel="noreferrer" className="text-primary underline"><Globe className="inline h-3 w-3" /> abrir em nova aba</a>.
+          <a
+            href={redesign.site_original_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary underline"
+          >
+            <Globe className="inline h-3 w-3" /> abrir em nova aba
+          </a>
+          .
         </div>
       )}
     </div>
