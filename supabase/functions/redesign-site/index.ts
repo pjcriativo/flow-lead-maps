@@ -1,15 +1,17 @@
-// Edge Function: redesign-site (v2 — TEMPLATE premium + IA preenche).
-// Fluxo: coleta a matéria-prima (dados reais do lead + conteúdo do site atual) →
-// detecta o nicho → escolhe o TEMPLATE premium → a IA gera SÓ o CONTEÚDO (copy)
-// com base nos dados reais → o template monta o HTML final. O design é fixo e
-// profissional; só o texto varia. Salva em `redesigns` (RLS por usuário).
+// Edge Function: redesign-site (v3 — nível agência).
+// Fluxo: matéria-prima (dados reais + conteúdo do site atual) + DEPOIMENTOS REAIS
+// do Google (Apify) → detecta nicho → escolhe template premium → IA (Claude→OpenAI)
+// gera SÓ o conteúdo (copy) com base nos dados reais → template monta o HTML grande
+// com animações. Salva em `redesigns` e os reviews em `lead_reviews` (RLS por user).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { coletarConteudoSite } from "../_shared/materiaprima.ts";
-import { getAiProvider, type MateriaPrima } from "../_shared/ai/index.ts";
+import { coletarReviews } from "../_shared/reviews.ts";
+import { getProviderChain, type MateriaPrima, type ConteudoIA } from "../_shared/ai/index.ts";
 import { detectarNicho } from "../_shared/site/nicho.ts";
 import { montarHtml } from "../_shared/site/montar.ts";
 import { conteudoFallback } from "../_shared/site/fallback.ts";
+import type { Depoimento } from "../_shared/site/tipos.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -52,9 +54,21 @@ Deno.serve(async (req) => {
   if (rdErr || !rd)
     return json({ error: "Falha ao criar redesign: " + (rdErr?.message ?? "") }, 500);
 
+  const logs: string[] = [];
+  const log = (m: string) => logs.push(m);
+
   try {
-    // 1. Matéria-prima: dados reais do lead + conteúdo do site atual (se houver).
-    const siteC = lead.website ? await coletarConteudoSite(lead.website) : null;
+    // 1. Matéria-prima (site atual) + DEPOIMENTOS reais do Google (Apify), em paralelo.
+    const [siteC, coleta] = await Promise.all([
+      lead.website ? coletarConteudoSite(lead.website) : Promise.resolve(null),
+      coletarReviews(lead.place_id, { maxReviews: 8, maxImages: 6, log }),
+    ]);
+
+    // Fotos reais: do site atual + do Google (Apify).
+    const imagens = [...(siteC?.imagens ?? []), ...coleta.imagens].filter(
+      (v, i, a) => a.indexOf(v) === i,
+    );
+
     const mp: MateriaPrima = {
       nome: lead.business_name,
       categoria: lead.category,
@@ -71,54 +85,102 @@ Deno.serve(async (req) => {
       instagram: lead.instagram_url ?? siteC?.instagram ?? null,
       facebook: lead.facebook_url ?? siteC?.facebook ?? null,
       textos: siteC?.textos ?? "",
-      imagens: siteC?.imagens ?? [],
+      imagens,
       logo: siteC?.logo ?? null,
       cores: siteC?.cores ?? [],
+      descricao: siteC?.descricao ?? null,
+      legivel: siteC?.legivel ?? false,
     };
 
-    // 2. Nicho → template.
-    const nicho = detectarNicho(mp.categoria, mp.textos);
-
-    // 3. IA gera o CONTEÚDO (copy). Se falhar, usa fallback rule-based específico.
-    let conteudo,
-      modelo,
-      inTok,
-      outTok,
-      custo,
-      usouFallback,
-      erroIa: string | null = null;
-    try {
-      const ai = getAiProvider();
-      const out = await ai(mp, nicho);
-      conteudo = out.conteudo;
-      modelo = out.modelo;
-      inTok = out.inputTokens;
-      outTok = out.outputTokens;
-      custo = out.custoUsd;
-      usouFallback = false;
-    } catch (e) {
-      erroIa = e instanceof Error ? e.message : String(e);
-      conteudo = conteudoFallback(mp, nicho);
-      modelo = "fallback (rule-based)";
-      inTok = 0;
-      outTok = 0;
-      custo = 0;
-      usouFallback = true;
+    // 2. Salva os depoimentos reais vinculados ao lead (substitui os anteriores).
+    const depoimentos: Depoimento[] = coleta.reviews.map((r) => ({
+      author: r.author,
+      photo: r.photo,
+      rating: r.rating,
+      text: r.text,
+      when: r.when,
+    }));
+    if (depoimentos.length) {
+      await supabase.from("lead_reviews").delete().eq("lead_id", leadId);
+      await supabase.from("lead_reviews").insert(
+        coleta.reviews.map((r) => ({
+          user_id: userId,
+          lead_id: leadId,
+          author_name: r.author,
+          author_photo: r.photo,
+          rating: r.rating,
+          text: r.text,
+          when_label: r.when,
+          review_url: r.url,
+          source: "google",
+        })),
+      );
     }
 
-    // 4. Template premium monta o HTML final (design fixo, dados reais + copy).
-    const html = montarHtml(mp, conteudo, nicho);
-    if (!html || html.length < 500) throw new Error("Falha ao montar o HTML do template");
+    // 3. Nicho → template.
+    const nicho = detectarNicho(mp.categoria, mp.textos);
+
+    // 4. IA gera o CONTEÚDO (copy). Cadeia: Claude → OpenAI → fallback rule-based.
+    let conteudo: ConteudoIA | undefined;
+    let modelo = "fallback (rule-based)";
+    let provider = "fallback";
+    let inTok = 0,
+      outTok = 0,
+      custoIa = 0,
+      usouFallback = true;
+    const errosIa: string[] = [];
+    for (const p of getProviderChain()) {
+      try {
+        const out = await p.fn(mp, nicho);
+        conteudo = out.conteudo;
+        modelo = out.modelo;
+        provider = p.nome;
+        inTok = out.inputTokens;
+        outTok = out.outputTokens;
+        custoIa = out.custoUsd;
+        usouFallback = false;
+        log(`IA: ${p.nome} (${out.modelo}) ok`);
+        break;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errosIa.push(`${p.nome}: ${msg}`);
+        log(`IA: ${p.nome} falhou — ${msg}`);
+      }
+    }
+    if (!conteudo) conteudo = conteudoFallback(mp, nicho);
+
+    // 5. Template premium monta o HTML final (design fixo, dados reais + copy + reviews).
+    const html = montarHtml(mp, conteudo, nicho, depoimentos);
+    if (!html || html.length < 800) throw new Error("Falha ao montar o HTML do template");
+
+    const custoTotal = custoIa + coleta.custoUsd;
+    const conteudoLegivel = mp.legivel;
+    const avisoGenerico =
+      usouFallback || !conteudoLegivel
+        ? usouFallback
+          ? `Copy genérica: IA indisponível (${errosIa.join(" | ")}).`
+          : "Copy dos serviços tende a genérica: o site atual do lead é ilegível (texto em imagem/JS)."
+        : null;
 
     const now = new Date().toISOString();
-    const obs = usouFallback ? `IA indisponível (${erroIa}); usado conteúdo rule-based.` : null;
+    const obs = [
+      `provider=${provider} modelo=${modelo}`,
+      `depoimentos=${depoimentos.length}`,
+      `fotos=${imagens.length}`,
+      `legivel=${conteudoLegivel}`,
+      avisoGenerico ?? "",
+      `apify=${coleta.debug}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
     const { data: done, error: upErr } = await supabase
       .from("redesigns")
       .update({
         html_gerado: html,
         status: "pronto",
         modelo,
-        custo_usd: custo,
+        custo_usd: custoTotal,
         observacoes: obs,
         gerado_em: now,
         updated_at: now,
@@ -133,16 +195,27 @@ Deno.serve(async (req) => {
       lead_nome: lead.business_name,
       usage: {
         template: nicho,
+        provider,
         modelo,
         inputTokens: inTok,
         outputTokens: outTok,
-        custoUsd: custo,
+        custoIaUsd: custoIa,
+        custoApifyUsd: coleta.custoUsd,
+        custoUsd: custoTotal,
         fallback: usouFallback,
-        imagensUsadas: mp.imagens.length,
+        depoimentos: depoimentos.length,
+        servicos: conteudo.servicos.length,
+        diferenciais: conteudo.diferenciais.length,
+        faq: conteudo.faq.length,
+        imagensUsadas: imagens.length,
+        fotosReais: imagens.length,
         temLogo: !!mp.logo,
         cores: mp.cores,
         usouNota: mp.rating != null,
         usouWhatsapp: !!mp.whatsapp,
+        conteudoLegivel,
+        avisoGenerico,
+        logs,
       },
     });
   } catch (e) {

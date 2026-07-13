@@ -66,11 +66,34 @@ h1,h2,h3,.display{font-family:'Plus Jakarta Sans','Inter',sans-serif;line-height
 img{max-width:100%;display:block}
 a{color:inherit;text-decoration:none}
 .wrap{width:100%;max-width:1140px;margin:0 auto;padding:0 22px}
-.wa-float{position:fixed;right:18px;bottom:18px;z-index:60;display:inline-flex;align-items:center;gap:9px;background:#25d366;color:#fff;font-weight:700;font-size:.95rem;padding:13px 20px;border-radius:999px;box-shadow:0 12px 30px rgba(37,211,102,.45);transition:transform .15s ease,box-shadow .15s ease}
+.wa-float{position:fixed;right:18px;bottom:18px;z-index:60;display:inline-flex;align-items:center;gap:9px;background:#25d366;color:#fff;font-weight:700;font-size:.95rem;padding:13px 20px;border-radius:999px;box-shadow:0 12px 30px rgba(37,211,102,.45);transition:transform .15s ease,box-shadow .15s ease;animation:waPulse 2.4s ease-in-out infinite}
 .wa-float:hover{transform:translateY(-2px);box-shadow:0 16px 38px rgba(37,211,102,.55)}
+@keyframes waPulse{0%,100%{box-shadow:0 12px 30px rgba(37,211,102,.45)}50%{box-shadow:0 12px 30px rgba(37,211,102,.45),0 0 0 12px rgba(37,211,102,.12)}}
+/* reveal no scroll (respeita prefers-reduced-motion) */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1);transition-delay:var(--d,0ms)}
+.reveal.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.wa-float{animation:none}}
 ${fonteExtraCss}
 ${css}
 @media(max-width:640px){.wa-float span{display:none}.wa-float{padding:15px;border-radius:50%}}
 </style>
 </head>`;
+}
+
+/**
+ * Script de animações (no fim do <body>): reveal no scroll via IntersectionObserver,
+ * parallax sutil no hero (.parallax), e accordion do FAQ (.faq-item > button).
+ * Sem dependências. Respeita prefers-reduced-motion.
+ */
+export function scriptAnim(): string {
+  return `<script>(function(){
+var rm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+var els=[].slice.call(document.querySelectorAll('.reveal'));
+if(rm||!('IntersectionObserver'in window)){els.forEach(function(e){e.classList.add('in')});}
+else{var io=new IntersectionObserver(function(en){en.forEach(function(x){if(x.isIntersecting){x.target.classList.add('in');io.unobserve(x.target);}})},{threshold:.12,rootMargin:'0px 0px -8% 0px'});els.forEach(function(e){io.observe(e)});}
+var px=document.querySelector('.parallax');
+if(px&&!rm){window.addEventListener('scroll',function(){var y=window.pageYOffset;px.style.transform='translateY('+(y*.18)+'px)';},{passive:true});}
+[].slice.call(document.querySelectorAll('.faq-item')).forEach(function(it){var b=it.querySelector('button');if(b){b.addEventListener('click',function(){var open=it.classList.contains('open');[].slice.call(document.querySelectorAll('.faq-item.open')).forEach(function(o){if(o!==it)o.classList.remove('open')});it.classList.toggle('open',!open);});}});
+var yr=document.getElementById('__ano');if(yr){yr.textContent=new Date().getFullYear();}
+})();</script>`;
 }

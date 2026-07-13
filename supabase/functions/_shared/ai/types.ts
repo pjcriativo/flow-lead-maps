@@ -27,6 +27,10 @@ export type MateriaPrima = {
   logo: string | null;
   /** Cores predominantes (hex) do site atual. */
   cores: string[];
+  /** Meta description / título do site atual (contexto extra). */
+  descricao: string | null;
+  /** false quando o site do lead é ilegível → copy tende a genérico (avisar). */
+  legivel: boolean;
 };
 
 /** Um serviço/diferencial para um card (título + descrição + ícone). */
@@ -37,6 +41,9 @@ export type ServicoIA = {
   icone: string;
 };
 
+/** Pergunta/resposta do FAQ. */
+export type FaqIA = { pergunta: string; resposta: string };
+
 /**
  * CONTEÚDO gerado pela IA (o que entra nos placeholders do template).
  * A IA preenche isto com base nos dados reais — não inventa fatos.
@@ -44,10 +51,14 @@ export type ServicoIA = {
 export type ConteudoIA = {
   headline: string;
   subheadline: string;
-  /** 3–6 serviços/diferenciais reais (extraídos do site/categoria). */
+  /** 3–6 serviços REAIS (extraídos do site/categoria), reescritos. */
   servicos: ServicoIA[];
+  /** 3–4 diferenciais (por que escolher) — benefícios, sem inventar fatos. */
+  diferenciais: ServicoIA[];
   /** Texto "sobre" com autoridade (reescrito, sem inventar). */
   sobre: string;
+  /** 3–5 perguntas frequentes do nicho, respondidas. */
+  faq: FaqIA[];
   /** Rótulo do CTA principal. Ex.: "Agendar avaliação". */
   cta: string;
 };

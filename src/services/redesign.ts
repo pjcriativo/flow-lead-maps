@@ -5,18 +5,34 @@ import type { Redesign } from "@/types";
 export type RedesignUsage = {
   /** Template premium usado (nicho): saude | servico-local | profissional. */
   template: string;
+  /** Motor de IA usado: claude | openai | fallback. */
+  provider: string;
   modelo: string;
   inputTokens: number;
   outputTokens: number;
+  /** Custo só da IA. */
+  custoIaUsd: number;
+  /** Custo do Apify (reviews). */
+  custoApifyUsd: number;
+  /** Custo total (IA + Apify). */
   custoUsd: number;
-  /** true = IA indisponível, conteúdo rule-based (custo 0). */
+  /** true = IA indisponível, conteúdo rule-based. */
   fallback: boolean;
+  /** Depoimentos REAIS do Google que entraram. */
+  depoimentos: number;
+  servicos: number;
+  diferenciais: number;
+  faq: number;
   imagensUsadas: number;
+  fotosReais: number;
   temLogo: boolean;
   cores: string[];
-  /** Dados reais que entraram (para exibir no toast). */
   usouNota: boolean;
   usouWhatsapp: boolean;
+  /** false = site do lead ilegível → copy tende a genérica. */
+  conteudoLegivel: boolean;
+  /** Aviso honesto quando a copy ficou genérica (ou null). */
+  avisoGenerico: string | null;
 };
 
 /** Lista os redesigns do usuário (com o nome do lead). */

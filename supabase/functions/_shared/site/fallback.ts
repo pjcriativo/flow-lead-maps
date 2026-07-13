@@ -60,6 +60,92 @@ const SERVICOS_BASE: Record<TemplateId, ServicoIA[]> = {
   ],
 };
 
+const DIFERENCIAIS_BASE: Record<TemplateId, ServicoIA[]> = {
+  saude: [
+    {
+      titulo: "Nota alta no Google",
+      descricao: "A confiança de quem já foi atendido.",
+      icone: "star",
+    },
+    {
+      titulo: "Atendimento humanizado",
+      descricao: "Você acolhido do início ao fim.",
+      icone: "heart",
+    },
+    {
+      titulo: "Estrutura moderna",
+      descricao: "Ambiente confortável e equipado.",
+      icone: "sparkles",
+    },
+  ],
+  "servico-local": [
+    {
+      titulo: "Bem avaliado",
+      descricao: "Reputação construída com clientes reais.",
+      icone: "star",
+    },
+    { titulo: "Rapidez", descricao: "Seu tempo respeitado, sem enrolação.", icone: "clock" },
+    { titulo: "Capricho", descricao: "Atenção aos detalhes em cada serviço.", icone: "sparkles" },
+  ],
+  profissional: [
+    { titulo: "Credibilidade", descricao: "Reputação sólida e bem avaliada.", icone: "shield" },
+    {
+      titulo: "Atendimento próximo",
+      descricao: "Acompanhamento de perto em cada caso.",
+      icone: "users",
+    },
+    { titulo: "Resultado", descricao: "Foco no que realmente importa para você.", icone: "award" },
+  ],
+};
+
+const FAQ_BASE: Record<TemplateId, { pergunta: string; resposta: string }[]> = {
+  saude: [
+    {
+      pergunta: "Como agendo um horário?",
+      resposta: "É só chamar no WhatsApp — respondemos rapidinho e encontramos o melhor horário.",
+    },
+    {
+      pergunta: "Onde vocês ficam?",
+      resposta:
+        "Veja o endereço e o mapa na seção de localização; tem link para chegar pelo Google Maps.",
+    },
+    {
+      pergunta: "Atendem por convênio?",
+      resposta:
+        "Fale com a gente pelo WhatsApp para confirmar as formas de atendimento e pagamento.",
+    },
+  ],
+  "servico-local": [
+    {
+      pergunta: "Preciso agendar?",
+      resposta: "Recomendamos agendar pelo WhatsApp para garantir seu horário sem espera.",
+    },
+    {
+      pergunta: "Quais as formas de pagamento?",
+      resposta: "Fale com a gente pelo WhatsApp para ver as opções disponíveis.",
+    },
+    {
+      pergunta: "Onde ficam?",
+      resposta: "O endereço e o mapa estão na seção de localização, com link para chegar.",
+    },
+  ],
+  profissional: [
+    {
+      pergunta: "Como funciona a primeira conversa?",
+      resposta:
+        "Entre em contato pelo WhatsApp; entendemos seu caso e explicamos os próximos passos.",
+    },
+    {
+      pergunta: "Vocês atendem à distância?",
+      resposta: "Fale com a gente para verificarmos a melhor forma de atendimento para o seu caso.",
+    },
+    {
+      pergunta: "Onde fica o escritório?",
+      resposta: "O endereço e o mapa estão na seção de contato, com link para chegar.",
+    },
+  ],
+};
+
 export function conteudoFallback(mp: MateriaPrima, nicho: TemplateId): ConteudoIA {
   const cidade = mp.cidade ? mp.cidade.charAt(0) + mp.cidade.slice(1).toLowerCase() : null;
   const cat = (mp.categoria ?? "atendimento").toLowerCase();
@@ -98,7 +184,9 @@ export function conteudoFallback(mp: MateriaPrima, nicho: TemplateId): ConteudoI
     headline,
     subheadline,
     servicos: SERVICOS_BASE[nicho],
+    diferenciais: DIFERENCIAIS_BASE[nicho],
     sobre,
+    faq: FAQ_BASE[nicho],
     cta: CTA[nicho],
   };
 }

@@ -102,10 +102,12 @@ export function computeScore(input: ScoreInput): ScoreBreakdown {
   let ratingBonus = 0;
   if (input.rating != null) {
     const rc = input.reviewCount ?? 0;
-    if (input.rating >= 4.7 && rc >= 40) ratingBonus = 12; // reputação "ouro"
+    if (input.rating >= 4.7 && rc >= 40)
+      ratingBonus = 12; // reputação "ouro"
     else if (input.rating >= 4.5 && rc >= 20) ratingBonus = 6;
     else if (input.rating >= 4.0) ratingBonus = 2;
-    if (ratingBonus) notes.push(`Bônus de reputação: nota ${input.rating}${rc ? ` (${rc} avaliações)` : ""}`);
+    if (ratingBonus)
+      notes.push(`Bônus de reputação: nota ${input.rating}${rc ? ` (${rc} avaliações)` : ""}`);
   }
 
   const score = clamp(base + ratingBonus, 0, 100);

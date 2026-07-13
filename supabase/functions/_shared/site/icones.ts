@@ -46,8 +46,12 @@ const P: Record<string, string> = {
   droplet: '<path d="M12 3s6 6 6 10a6 6 0 0 1-12 0c0-4 6-10 6-10Z"/>',
 };
 
-/** Devolve o SVG (24x24, stroke currentColor) da palavra-chave dada. */
+/**
+ * Devolve o SVG (stroke currentColor) da palavra-chave dada. Tamanho DEFAULT 1em
+ * (acompanha o texto) — contêineres com `.ic svg{width:..}` sobrescrevem. Isso
+ * evita SVG gigante quando o ícone fica solto em texto (ex.: kicker, .mini).
+ */
 export function icone(nome: string | undefined): string {
   const path = P[(nome ?? "").toLowerCase().trim()] ?? P["check-circle"];
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+  return `<svg viewBox="0 0 24 24" width="1em" height="1em" style="flex:none;vertical-align:-.15em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
 }

@@ -3,9 +3,9 @@
 // vira wa.me com mensagem, endereço vira link+mapa, fotos ganham fallback, cores
 // são resolvidas. Nada sai com placeholder cru.
 import type { MateriaPrima, ConteudoIA } from "../ai/types.ts";
-import type { SiteData, Cores, TemplateId, Servico } from "./tipos.ts";
+import type { SiteData, Cores, TemplateId, Servico, Depoimento } from "./tipos.ts";
 import { firstBrWhatsapp } from "../phone.ts";
-import { resolverFotos } from "./imagens.ts";
+import { resolverFotoSet } from "./imagens.ts";
 import { categoriaLabel } from "./nicho.ts";
 
 /** Escapa texto para inserir com segurança no HTML. */
@@ -105,10 +105,17 @@ function mapsLink(lat: number | null, lng: number | null, endereco: string | nul
 
 /* -------------------------------- montar --------------------------------- */
 
+const mapServico = (s: { titulo: string; descricao?: string; icone?: string }): Servico => ({
+  titulo: s.titulo,
+  descricao: s.descricao ?? "",
+  icone: s.icone ?? "check-circle",
+});
+
 export function montarSiteData(
   mp: MateriaPrima,
   conteudo: ConteudoIA,
   nicho: TemplateId,
+  depoimentos: Depoimento[] = [],
 ): SiteData {
   const whatsapp = firstBrWhatsapp(mp.whatsapp) ?? firstBrWhatsapp(mp.telefone);
   const whatsappUrl = whatsapp
@@ -119,16 +126,16 @@ export function montarSiteData(
     ? `tel:${telDigitsRaw.startsWith("+") ? telDigitsRaw : "+55" + telDigitsRaw.replace(/^55/, "")}`
     : null;
 
-  const { hero, galeria } = resolverFotos(mp.imagens, nicho);
+  const fotos = resolverFotoSet(mp.imagens, nicho);
 
-  const servicos: Servico[] = (conteudo.servicos ?? [])
+  const servicos = (conteudo.servicos ?? [])
     .filter((s) => s && s.titulo)
     .slice(0, 6)
-    .map((s) => ({
-      titulo: s.titulo,
-      descricao: s.descricao ?? "",
-      icone: s.icone ?? "check-circle",
-    }));
+    .map(mapServico);
+  const diferenciais = (conteudo.diferenciais ?? [])
+    .filter((s) => s && s.titulo)
+    .slice(0, 4)
+    .map(mapServico);
 
   return {
     nome: mp.nome,
@@ -144,8 +151,10 @@ export function montarSiteData(
     endereco: mp.endereco,
     mapsUrl: mapsLink(mp.latitude, mp.longitude, mp.endereco),
     mapEmbedUrl: mapEmbed(mp.latitude, mp.longitude, mp.endereco),
-    fotoHero: hero,
-    fotos: galeria,
+    fotoHero: fotos.hero,
+    fotoSobre: fotos.sobre,
+    fotoCta: fotos.cta,
+    fotos: fotos.galeria,
     logo: mp.logo,
     cores: resolverCores(mp.cores, nicho),
     instagram: mp.instagram,
@@ -153,7 +162,10 @@ export function montarSiteData(
     headline: conteudo.headline,
     subheadline: conteudo.subheadline,
     servicos,
+    diferenciais,
     sobre: conteudo.sobre,
+    faq: (conteudo.faq ?? []).filter((f) => f.pergunta && f.resposta).slice(0, 6),
     cta: conteudo.cta || "Fale conosco",
+    depoimentos: (depoimentos ?? []).filter((d) => d.text && d.text.length >= 15).slice(0, 6),
   };
 }

@@ -19,11 +19,17 @@ const NICHO_TAGS: Array<{ re: RegExp; selectors: string[] }> = [
   { re: /odontol|dentist/i, selectors: ['["amenity"="dentist"]', '["healthcare"="dentist"]'] },
   // "estética" antes de "clínica" — "clínica de estética" deve virar beleza, não UBS.
   { re: /est[eé]tica/i, selectors: ['["shop"="beauty"]', '["beauty"]'] },
-  { re: /cl[ií]nica|m[eé]dic|sa[uú]de/i, selectors: ['["amenity"="clinic"]', '["healthcare"="clinic"]', '["amenity"="doctors"]'] },
+  {
+    re: /cl[ií]nica|m[eé]dic|sa[uú]de/i,
+    selectors: ['["amenity"="clinic"]', '["healthcare"="clinic"]', '["amenity"="doctors"]'],
+  },
   { re: /restaurante/i, selectors: ['["amenity"="restaurant"]'] },
   { re: /lanchonete|hamburgue/i, selectors: ['["amenity"="fast_food"]'] },
   { re: /academia|fitness|crossfit/i, selectors: ['["leisure"="fitness_centre"]'] },
-  { re: /sal[aã]o de beleza|cabeleireir/i, selectors: ['["shop"="hairdresser"]', '["shop"="beauty"]'] },
+  {
+    re: /sal[aã]o de beleza|cabeleireir/i,
+    selectors: ['["shop"="hairdresser"]', '["shop"="beauty"]'],
+  },
   { re: /barbearia|barbeiro/i, selectors: ['["shop"="hairdresser"]'] },
   { re: /advocacia|advogad|jur[ií]dic/i, selectors: ['["office"="lawyer"]'] },
   { re: /contab|contador/i, selectors: ['["office"="accountant"]'] },
@@ -31,7 +37,10 @@ const NICHO_TAGS: Array<{ re: RegExp; selectors: string[] }> = [
   { re: /pet ?shop|veterin[aá]ri/i, selectors: ['["shop"="pet"]', '["amenity"="veterinary"]'] },
   { re: /oficina|mec[aâ]nica/i, selectors: ['["shop"="car_repair"]'] },
   { re: /fot[oó]graf/i, selectors: ['["craft"="photographer"]', '["shop"="photo"]'] },
-  { re: /marketing|publicidade/i, selectors: ['["office"="advertising_agency"]', '["office"="marketing"]'] },
+  {
+    re: /marketing|publicidade/i,
+    selectors: ['["office"="advertising_agency"]', '["office"="marketing"]'],
+  },
   { re: /farm[aá]cia/i, selectors: ['["amenity"="pharmacy"]'] },
   { re: /padaria|confeitaria/i, selectors: ['["shop"="bakery"]'] },
   { re: /escola|curso/i, selectors: ['["amenity"="school"]', '["amenity"="language_school"]'] },
@@ -49,7 +58,10 @@ function selectorsFor(nicho: string): string[] {
   const hit = NICHO_TAGS.find((t) => t.re.test(n));
   if (hit) return hit.selectors;
   // fallback: POIs com nome contendo o termo principal do nicho
-  const termo = n.trim().split(/\s+/)[0].replace(/[^a-z0-9]/g, "");
+  const termo = n
+    .trim()
+    .split(/\s+/)[0]
+    .replace(/[^a-z0-9]/g, "");
   return [`["name"~"${termo}",i]`];
 }
 
@@ -93,7 +105,17 @@ async function overpass(query: string): Promise<any> {
   throw new Error(`Overpass indisponível (${lastErr})`);
 }
 
-export const searchOsm: ProviderSearch = async ({ nicho, cidade, uf, lat, lng, raioKm, alvo, seen, log }) => {
+export const searchOsm: ProviderSearch = async ({
+  nicho,
+  cidade,
+  uf,
+  lat,
+  lng,
+  raioKm,
+  alvo,
+  seen,
+  log,
+}) => {
   const selectors = selectorsFor(nicho);
   const found: RawPlace[] = [];
   const nomesEnderecos = new Set<string>(); // dedupe extra por nome+endereço
@@ -132,7 +154,9 @@ out center tags ${Math.min(alvo * 3, 200)};`;
           source: "osm",
           source_id,
           name,
-          category: tag(tags, "amenity", "shop", "office", "healthcare", "craft", "leisure", "tourism") ?? null,
+          category:
+            tag(tags, "amenity", "shop", "office", "healthcare", "craft", "leisure", "tourism") ??
+            null,
           address: buildAddress(tags),
           phone: tag(tags, "contact:phone", "phone"),
           website: tag(tags, "contact:website", "website"),

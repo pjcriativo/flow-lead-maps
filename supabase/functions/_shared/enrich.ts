@@ -22,14 +22,36 @@ const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
 // Domínios/lixo que NÃO são e-mail de contato do negócio.
 const EMAIL_JUNK = [
-  "example.com", "example.org", "exemplo.com", "sentry.io", "sentry-next.wixpress.com",
-  "wixpress.com", "wix.com", "godaddy.com", "domain.com", "dominio.com", "email.com",
-  "yourdomain", "seudominio", "sradmin", "no-reply", "noreply", "@2x", ".png", ".jpg",
-  ".jpeg", ".gif", ".svg", ".webp", ".css", ".js",
+  "example.com",
+  "example.org",
+  "exemplo.com",
+  "sentry.io",
+  "sentry-next.wixpress.com",
+  "wixpress.com",
+  "wix.com",
+  "godaddy.com",
+  "domain.com",
+  "dominio.com",
+  "email.com",
+  "yourdomain",
+  "seudominio",
+  "sradmin",
+  "no-reply",
+  "noreply",
+  "@2x",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".svg",
+  ".webp",
+  ".css",
+  ".js",
 ];
 
 // E-mails PLACEHOLDER de template (não são de negócio real).
-const EMAIL_PLACEHOLDER = /^(your|you|youremail|email|e-?mail|name|nome|seu|sua|seuemail|user|username|teste|test|abc|xyz|info@info|mail@mail|admin@admin)@|@(example|exemplo|domain|dominio|yourdomain|seudominio|test|teste|email|mail|placeholder)\./i;
+const EMAIL_PLACEHOLDER =
+  /^(your|you|youremail|email|e-?mail|name|nome|seu|sua|seuemail|user|username|teste|test|abc|xyz|info@info|mail@mail|admin@admin)@|@(example|exemplo|domain|dominio|yourdomain|seudominio|test|teste|email|mail|placeholder)\./i;
 
 function emailValido(e: string): boolean {
   if (e.length > 80) return false;
@@ -44,9 +66,19 @@ const PARKED_RE =
 
 // Plataformas de site grátis / construtor (sinal de site fraco).
 const BUILDER_HOSTS = [
-  "wixsite.com", "wix.com", "sites.google.com", "blogspot.com",
-  "wordpress.com", "webnode.", "weebly.com", "godaddysites.com",
-  "negocio.site", "business.site", "linktr.ee", "fb.com", "facebook.com",
+  "wixsite.com",
+  "wix.com",
+  "sites.google.com",
+  "blogspot.com",
+  "wordpress.com",
+  "webnode.",
+  "weebly.com",
+  "godaddysites.com",
+  "negocio.site",
+  "business.site",
+  "linktr.ee",
+  "fb.com",
+  "facebook.com",
   "instagram.com",
 ];
 
@@ -77,9 +109,7 @@ export function extractEmail(html: string): string | null {
   // preferir e-mails "de contato"
   clean.sort((a, b) => {
     const score = (e: string) =>
-      /(contato|comercial|atendimento|faleconosco|vendas|financeiro)/.test(e)
-        ? 0
-        : 1;
+      /(contato|comercial|atendimento|faleconosco|vendas|financeiro)/.test(e) ? 0 : 1;
     return score(a) - score(b);
   });
   return clean[0];
@@ -87,7 +117,9 @@ export function extractEmail(html: string): string | null {
 
 export function extractWhatsapp(html: string): string | null {
   // links de whatsapp explícitos
-  for (const m of html.matchAll(/https?:\/\/[^"'\s]*(?:wa\.me|api\.whatsapp\.com|whatsapp\.com)\/[^"'\s]*/gi)) {
+  for (const m of html.matchAll(
+    /https?:\/\/[^"'\s]*(?:wa\.me|api\.whatsapp\.com|whatsapp\.com)\/[^"'\s]*/gi,
+  )) {
     const w = whatsappFromLink(m[0]);
     if (w) return w;
   }
@@ -100,7 +132,19 @@ export function extractWhatsapp(html: string): string | null {
 }
 
 // Palavras que não são perfil (paths do próprio Instagram).
-const IG_NAO_PERFIL = new Set(["p", "reel", "reels", "explore", "accounts", "sharer", "stories", "tv", "about", "developer", "legal"]);
+const IG_NAO_PERFIL = new Set([
+  "p",
+  "reel",
+  "reels",
+  "explore",
+  "accounts",
+  "sharer",
+  "stories",
+  "tv",
+  "about",
+  "developer",
+  "legal",
+]);
 
 export function extractInstagram(html: string): string | null {
   for (const m of html.matchAll(/https?:\/\/(?:www\.)?instagram\.com\/([A-Za-z0-9_.]+)/gi)) {
@@ -111,10 +155,21 @@ export function extractInstagram(html: string): string | null {
   return null;
 }
 
-const FB_NAO_PERFIL = new Set(["sharer", "sharer.php", "plugins", "tr", "dialog", "events", "groups", "profile.php"]);
+const FB_NAO_PERFIL = new Set([
+  "sharer",
+  "sharer.php",
+  "plugins",
+  "tr",
+  "dialog",
+  "events",
+  "groups",
+  "profile.php",
+]);
 
 export function extractFacebook(html: string): string | null {
-  for (const m of html.matchAll(/https?:\/\/(?:www\.|m\.|pt-br\.|business\.)?facebook\.com\/([A-Za-z0-9_.-]+)/gi)) {
+  for (const m of html.matchAll(
+    /https?:\/\/(?:www\.|m\.|pt-br\.|business\.)?facebook\.com\/([A-Za-z0-9_.-]+)/gi,
+  )) {
     const handle = m[1]?.replace(/\/$/, "");
     if (!handle || FB_NAO_PERFIL.has(handle.toLowerCase())) continue;
     return `https://facebook.com/${handle}`;
@@ -130,7 +185,11 @@ export function evaluateSite(html: string, finalUrl: string): SiteEval {
   const reasons: string[] = [];
   const lower = html.toLowerCase();
   const host = (() => {
-    try { return new URL(finalUrl).host.toLowerCase(); } catch { return ""; }
+    try {
+      return new URL(finalUrl).host.toLowerCase();
+    } catch {
+      return "";
+    }
   })();
   // primeira dobra ~ primeiros 4000 chars do body
   const firstFold = lower.slice(0, 4000);
@@ -189,7 +248,7 @@ async function fetchHtml(url: string): Promise<Fetched> {
       redirect: "follow",
       headers: {
         "User-Agent": BROWSER_UA,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
       },
     });
@@ -198,9 +257,8 @@ async function fetchHtml(url: string): Promise<Fetched> {
     const raw = await res.text();
     // BUG corrigido: truncar só o início cortava o RODAPÉ (onde ficam e-mail/IG).
     // Em páginas grandes, mantém cabeçalho + rodapé.
-    const html = raw.length > 1_500_000
-      ? raw.slice(0, 900_000) + "\n<!--…-->\n" + raw.slice(-600_000)
-      : raw;
+    const html =
+      raw.length > 1_500_000 ? raw.slice(0, 900_000) + "\n<!--…-->\n" + raw.slice(-600_000) : raw;
     return { ok: true, status: res.status, finalUrl, html };
   } catch (_e) {
     return { ok: false, status: 0, finalUrl: url, html: "" };
@@ -220,12 +278,20 @@ export async function enrichFromWebsite(
   let base = website.trim();
   if (!/^https?:\/\//i.test(base)) base = "https://" + base;
   let origin = base;
-  try { origin = new URL(base).origin; } catch { /* mantém base */ }
+  try {
+    origin = new URL(base).origin;
+  } catch {
+    /* mantém base */
+  }
 
   const home = await fetchHtml(base);
   if (!home.ok) {
     return {
-      site: { reachable: false, bad: false, reasons: [`site fora do ar (HTTP ${home.status || "timeout/DNS"})`] },
+      site: {
+        reachable: false,
+        bad: false,
+        reasons: [`site fora do ar (HTTP ${home.status || "timeout/DNS"})`],
+      },
       email: null,
       whatsapp: firstBrWhatsapp(fallbackPhone),
       instagram: null,
@@ -235,10 +301,18 @@ export async function enrichFromWebsite(
   }
 
   // Domínio estacionado / à venda / em construção = site NÃO válido.
-  const semTexto = home.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length < 200;
+  const semTexto =
+    home.html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim().length < 200;
   if (PARKED_RE.test(home.html.slice(0, 8000)) || semTexto) {
     return {
-      site: { reachable: false, bad: false, reasons: ["domínio estacionado/à venda ou em construção (sem site funcional)"] },
+      site: {
+        reachable: false,
+        bad: false,
+        reasons: ["domínio estacionado/à venda ou em construção (sem site funcional)"],
+      },
       email: null,
       whatsapp: firstBrWhatsapp(fallbackPhone),
       instagram: null,

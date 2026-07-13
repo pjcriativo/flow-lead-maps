@@ -43,7 +43,17 @@ function mapItem(it: any): RawPlace | null {
   };
 }
 
-export const searchApify: ProviderSearch = async ({ nicho, cidade, uf, lat, lng, raioKm, limite, seen, log }) => {
+export const searchApify: ProviderSearch = async ({
+  nicho,
+  cidade,
+  uf,
+  lat,
+  lng,
+  raioKm,
+  limite,
+  seen,
+  log,
+}) => {
   const token = Deno.env.get("APIFY_API_TOKEN");
   if (!token) throw new Error("APIFY_API_TOKEN não configurada no secret da Edge Function.");
 
@@ -90,7 +100,10 @@ export const searchApify: ProviderSearch = async ({ nicho, cidade, uf, lat, lng,
   let usd = 0;
   const TERMINAIS = ["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"];
   while (!TERMINAIS.includes(status)) {
-    if (Date.now() > deadline) { log("Apify: tempo limite — pegando o que já coletou"); break; }
+    if (Date.now() > deadline) {
+      log("Apify: tempo limite — pegando o que já coletou");
+      break;
+    }
     await sleep(4000);
     const st = await fetch(`${API}/actor-runs/${runId}?token=${encodeURIComponent(token)}`);
     const sj = await st.json().catch(() => ({}));
@@ -100,9 +113,13 @@ export const searchApify: ProviderSearch = async ({ nicho, cidade, uf, lat, lng,
   }
 
   // Resultados do dataset (mesmo em timeout, o que já foi escrito vem).
-  const dsRes = await fetch(`${API}/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=true&limit=${maxPlaces}`);
+  const dsRes = await fetch(
+    `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=true&limit=${maxPlaces}`,
+  );
   const items: any[] = await dsRes.json().catch(() => []);
-  log(`Apify: ${items.length} lugares no dataset${usd ? ` · custo do run ~US$ ${usd.toFixed(3)}` : ""}`);
+  log(
+    `Apify: ${items.length} lugares no dataset${usd ? ` · custo do run ~US$ ${usd.toFixed(3)}` : ""}`,
+  );
 
   const found: RawPlace[] = [];
   const nomesEnderecos = new Set<string>();

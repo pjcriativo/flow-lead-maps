@@ -13,14 +13,20 @@ const NICHO_CATS: Array<{ re: RegExp; cats: string[] }> = [
   { re: /odontol|dentist/i, cats: ["healthcare.dentist"] },
   // "estética" antes de "clínica" — "clínica de estética" deve virar beleza.
   { re: /est[eé]tica|beleza/i, cats: ["service.beauty", "commercial.health_and_beauty"] },
-  { re: /cl[ií]nica|m[eé]dic|consult[oó]rio|sa[uú]de/i, cats: ["healthcare.clinic_or_praxis", "healthcare.hospital"] },
+  {
+    re: /cl[ií]nica|m[eé]dic|consult[oó]rio|sa[uú]de/i,
+    cats: ["healthcare.clinic_or_praxis", "healthcare.hospital"],
+  },
   { re: /restaurante/i, cats: ["catering.restaurant"] },
   { re: /lanchonete|hamburgue|fast/i, cats: ["catering.fast_food"] },
   { re: /academia|fitness|crossfit/i, cats: ["sport.fitness.fitness_centre", "leisure.fitness"] },
   { re: /sal[aã]o|cabeleireir|barbe/i, cats: ["service.beauty.hairdresser"] },
   { re: /advocacia|advogad|jur[ií]dic/i, cats: ["service.financial", "office"] },
   { re: /contab|contador/i, cats: ["service.financial"] },
-  { re: /imobili[aá]ria|corretor de im[oó]veis/i, cats: ["service.estate_agent", "commercial.real_estate"] },
+  {
+    re: /imobili[aá]ria|corretor de im[oó]veis/i,
+    cats: ["service.estate_agent", "commercial.real_estate"],
+  },
   { re: /pet ?shop|veterin[aá]ri/i, cats: ["commercial.pet", "service.veterinary"] },
   { re: /oficina|mec[aâ]nica/i, cats: ["service.vehicle.repair"] },
   { re: /farm[aá]cia/i, cats: ["healthcare.pharmacy"] },
@@ -36,9 +42,20 @@ function catsFor(nicho: string): string[] {
   return hit ? hit.cats : ["commercial"]; // fallback amplo
 }
 
-async function geocodeCidade(cidade: string, uf: string, key: string): Promise<{ lat: number; lon: number } | null> {
+async function geocodeCidade(
+  cidade: string,
+  uf: string,
+  key: string,
+): Promise<{ lat: number; lon: number } | null> {
   const text = uf ? `${cidade}, ${uf}, Brasil` : `${cidade}, Brasil`;
-  const params = new URLSearchParams({ text, type: "city", lang: "pt", limit: "1", format: "json", apiKey: key });
+  const params = new URLSearchParams({
+    text,
+    type: "city",
+    lang: "pt",
+    limit: "1",
+    format: "json",
+    apiKey: key,
+  });
   const res = await fetch(`${GEOCODE_URL}?${params.toString()}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`Geoapify geocode: ${data?.message ?? "HTTP " + res.status}`);
@@ -71,14 +88,28 @@ function mapFeature(f: any): RawPlace | null {
     website: p.website ?? p.datasource?.raw?.website ?? raw(f, "contact:website"),
     rating: null, // Geoapify (base OSM) não traz nota
     review_count: null,
-    instagram: instagram ? (instagram.startsWith("http") ? instagram : `https://instagram.com/${instagram}`) : null,
+    instagram: instagram
+      ? instagram.startsWith("http")
+        ? instagram
+        : `https://instagram.com/${instagram}`
+      : null,
     facebook: raw(f, "contact:facebook"),
     lat: p.lat ?? null,
     lng: p.lon ?? null,
   };
 }
 
-export const searchGeoapify: ProviderSearch = async ({ nicho, cidade, uf, lat, lng, raioKm, alvo, seen, log }) => {
+export const searchGeoapify: ProviderSearch = async ({
+  nicho,
+  cidade,
+  uf,
+  lat,
+  lng,
+  raioKm,
+  alvo,
+  seen,
+  log,
+}) => {
   const key = Deno.env.get("GEOAPIFY_API_KEY");
   if (!key) throw new Error("GEOAPIFY_API_KEY não configurada no secret da Edge Function.");
 

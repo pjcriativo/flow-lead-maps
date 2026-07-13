@@ -112,14 +112,19 @@ export function RedesignSection({
       const u = res.usage;
       const selo = [
         `template "${u.template}"`,
-        u.fallback ? "conteúdo rule-based (IA off)" : `${u.modelo} · ~US$ ${u.custoUsd.toFixed(4)}`,
+        u.fallback
+          ? "copy rule-based (IA off)"
+          : `${u.provider}/${u.modelo} · ~US$ ${u.custoUsd.toFixed(4)}`,
+        u.depoimentos ? `${u.depoimentos} depoimentos Google` : "sem depoimentos",
+        `${u.servicos} serviços`,
+        `${u.fotosReais} fotos`,
         u.usouNota ? "nota ✓" : null,
         u.usouWhatsapp ? "WhatsApp ✓" : null,
-        `${u.imagensUsadas} fotos`,
       ]
         .filter(Boolean)
         .join(" · ");
-      toast.success(`Site gerado! ${selo}`, { duration: 8000 });
+      toast.success(`Site gerado! ${selo}`, { duration: 9000 });
+      if (u.avisoGenerico) toast.warning(u.avisoGenerico, { duration: 9000 });
       await carregar();
       setAberto(res.redesign);
     } catch (e) {

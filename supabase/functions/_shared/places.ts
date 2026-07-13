@@ -43,7 +43,14 @@ export function buildQueries(nicho: string, cidade: string, uf: string): string[
   const c = cidade.trim();
   const u = uf.trim().toUpperCase();
   const local = u ? `${c}, ${u}` : c;
-  const zonas = ["centro", "zona sul", "zona norte", "zona leste", "zona oeste", "região metropolitana"];
+  const zonas = [
+    "centro",
+    "zona sul",
+    "zona norte",
+    "zona leste",
+    "zona oeste",
+    "região metropolitana",
+  ];
   const queries = [
     `${n} em ${local}`,
     `${n} ${c}`,

@@ -6,6 +6,17 @@ export type TemplateId = "saude" | "servico-local" | "profissional";
 
 export type Servico = { titulo: string; descricao: string; icone: string };
 
+export type Faq = { pergunta: string; resposta: string };
+
+/** Depoimento REAL do Google (via Apify) — nunca inventado. */
+export type Depoimento = {
+  author: string | null;
+  photo: string | null;
+  rating: number | null;
+  text: string;
+  when: string | null;
+};
+
 export type Cores = {
   primaria: string;
   secundaria: string;
@@ -33,8 +44,10 @@ export type SiteData = {
   mapsUrl: string | null; // link do Google Maps
   mapEmbedUrl: string | null; // iframe embed (sem API key)
 
-  // visual
+  // visual (fotos DISTINTAS por seção — nunca repete)
   fotoHero: string; // SEMPRE preenchida (real ou fallback do nicho)
+  fotoSobre: string;
+  fotoCta: string;
   fotos: string[]; // galeria (real ou fallback do nicho)
   logo: string | null;
   cores: Cores;
@@ -45,6 +58,11 @@ export type SiteData = {
   headline: string;
   subheadline: string;
   servicos: Servico[];
+  diferenciais: Servico[];
   sobre: string;
+  faq: Faq[];
   cta: string;
+
+  // depoimentos REAIS do Google (via Apify) — vazio quando não coletados
+  depoimentos: Depoimento[];
 };
