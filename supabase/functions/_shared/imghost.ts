@@ -4,8 +4,13 @@
 // e, se nenhuma foto real servir pro hero, usa um HERO CURADO por nicho (também
 // no nosso Storage). REGRA: nunca hero escuro/amador; galeria só com fotos reais.
 import { Image } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
+import { hashSemente } from "./site/variantes.ts";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DB = any;
+
+// Bancos EDITORIAIS escuros premium por CLIMA (hero-premium/<x>/N.jpg). Usados
+// só no hero de clima escuro (profissional). Não são as fotos candidatas do lead.
+const PREMIUM: Record<string, number> = { profissional: 4 };
 
 const BUCKET = "site-assets";
 // Quantos heroes curados existem por nicho (seed em site-assets/hero/<nicho>/N.jpg).
@@ -29,6 +34,18 @@ export function heroCurado(baseUrl: string, nicho: string, idx = 0): string {
   const total = CURADOS[n];
   const i = (idx % total) + 1;
   return publicUrl(baseUrl, `hero/${n}/${i}.jpg`);
+}
+
+/**
+ * URL de uma imagem EDITORIAL escura premium do clima, escolhida pela SEMENTE
+ * (determinística). Usada no hero de clima escuro (profissional) — nunca a foto
+ * candida do lead. Retorna null se não houver banco premium p/ o clima.
+ */
+export function heroPremiumUrl(baseUrl: string, clima: string, seed: string): string | null {
+  const total = PREMIUM[clima];
+  if (!total) return null;
+  const i = (hashSemente(seed + ":img") % total) + 1;
+  return publicUrl(baseUrl, `hero-premium/${clima}/${i}.jpg`);
 }
 
 /** Reduz a URL para uma miniatura (análise rápida), preservando o aspecto. */

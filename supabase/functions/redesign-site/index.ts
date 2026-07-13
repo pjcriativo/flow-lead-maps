@@ -12,7 +12,7 @@ import { detectarNicho, heroNicho } from "../_shared/site/nicho.ts";
 import { varianteHero } from "../_shared/site/variantes.ts";
 import { montarHtml } from "../_shared/site/montar.ts";
 import { conteudoFallback } from "../_shared/site/fallback.ts";
-import { resolverImagens } from "../_shared/imghost.ts";
+import { resolverImagens, heroPremiumUrl } from "../_shared/imghost.ts";
 import type { Depoimento } from "../_shared/site/tipos.ts";
 
 Deno.serve(async (req) => {
@@ -184,6 +184,14 @@ Deno.serve(async (req) => {
     // que oscilam) — mesma chamada feita dentro de montarHtml.
     const seed: string = lead.place_id || lead.id;
     const heroVar = varianteHero(seed, detectarNicho(mp.categoria, ""));
+
+    // HERO de clima ESCURO (profissional): usa imagem EDITORIAL do banco premium
+    // (escolhida pela semente) em vez da foto candida do lead. Só o hero muda —
+    // sobre/galeria/cta seguem com as fotos reais/curadas do imghost.
+    if (nicho === "profissional") {
+      const editorial = heroPremiumUrl(Deno.env.get("SUPABASE_URL")!, "profissional", seed);
+      if (editorial) fotos.hero = editorial;
+    }
 
     const html = montarHtml(mp, conteudo, nicho, depoimentos, fotos, seed);
     if (!html || html.length < 800) throw new Error("Falha ao montar o HTML do template");

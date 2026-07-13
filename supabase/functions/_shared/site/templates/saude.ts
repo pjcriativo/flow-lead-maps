@@ -4,6 +4,7 @@ import type { SiteData } from "../tipos.ts";
 import { templatePremium, type NichoCfg } from "./premium.ts";
 
 const CFG: NichoCfg = {
+  clima: "claro", // saúde/estética têm clima claro/limpo próprio (não o escuro)
   brandIcon: "tooth",
   navServicos: "Serviços",
   servKicker: "Nossos serviços",

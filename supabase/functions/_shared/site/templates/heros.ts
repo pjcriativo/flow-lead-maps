@@ -11,6 +11,7 @@ import { esc } from "../dados.ts";
 import { icone } from "../icones.ts";
 import { estrelas, fmtNota, fmtReviews, ctaHref } from "../comuns.ts";
 import type { NichoCfg } from "./premium.ts";
+import { heroBlocoProfissional } from "./heros_profissional.ts";
 
 const rev = (i: number) => ` style="--d:${i * 90}ms"`;
 
@@ -141,8 +142,11 @@ const BLOCOS: Record<HeroId, { render: (d: SiteData, cfg: NichoCfg) => string; c
   C: { render: heroC, css: CSS_C },
 };
 
-/** Renderiza o bloco de hero da variante escolhida (html + css da variante). */
+/** Renderiza o bloco de hero da variante escolhida (html + css da variante).
+ * Despacha pelo CLIMA: "escuro-premium" (advocacia/contador/consultoria) usa a
+ * biblioteca escura/dourada; "claro" (saúde/estética) usa os blocos claros acima. */
 export function heroBloco(d: SiteData, cfg: NichoCfg): { html: string; css: string } {
+  if (cfg.clima === "escuro-premium") return heroBlocoProfissional(d, cfg);
   const b = BLOCOS[d.heroVar] ?? BLOCOS.A;
   return { html: b.render(d, cfg), css: b.css };
 }

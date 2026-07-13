@@ -5,6 +5,7 @@ import type { SiteData } from "../tipos.ts";
 import { templatePremium, type NichoCfg } from "./premium.ts";
 
 const CFG: NichoCfg = {
+  clima: "escuro-premium", // advocacia/contador/consultoria: hero escuro + dourado + serif
   brandIcon: "scale",
   navServicos: "Atuação",
   servKicker: "Áreas de atuação",

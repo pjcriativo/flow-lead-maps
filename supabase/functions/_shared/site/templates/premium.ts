@@ -10,6 +10,13 @@ import { head, waFloat, estrelas, fmtNota, fmtReviews, ctaHref, scriptAnim } fro
 import { heroBloco } from "./heros.ts";
 
 export type NichoCfg = {
+  /**
+   * CLIMA visual do HERO. "escuro-premium" = fundo escuro dramático + dourado +
+   * serif display + imagem editorial (advocacia/contador/consultoria). "claro" =
+   * o hero limpo/claro atual (saúde/estética — têm padrão premium próprio, NÃO
+   * aplicar o escuro aqui). Só o HERO muda por clima; o resto do template é igual.
+   */
+  clima: "escuro-premium" | "claro";
   brandIcon: string;
   navServicos: string;
   servKicker: string;
