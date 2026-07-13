@@ -4,6 +4,9 @@
 
 export type TemplateId = "saude" | "servico-local" | "profissional";
 
+/** Variante de HERO da biblioteca de blocos (composição por semente). */
+export type HeroId = "A" | "B" | "C";
+
 export type Servico = { titulo: string; descricao: string; icone: string };
 
 export type Faq = { pergunta: string; resposta: string };
@@ -65,4 +68,8 @@ export type SiteData = {
 
   // depoimentos REAIS do Google (via Apify) — vazio quando não coletados
   depoimentos: Depoimento[];
+
+  // composição por blocos: semente estável do lead + variante de hero escolhida
+  seed: string;
+  heroVar: HeroId;
 };

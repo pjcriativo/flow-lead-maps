@@ -7,6 +7,7 @@ import type { SiteData } from "../tipos.ts";
 import { esc } from "../dados.ts";
 import { icone } from "../icones.ts";
 import { head, waFloat, estrelas, fmtNota, fmtReviews, ctaHref, scriptAnim } from "../comuns.ts";
+import { heroBloco } from "./heros.ts";
 
 export type NichoCfg = {
   brandIcon: string;
@@ -49,19 +50,6 @@ header.top.scrolled{box-shadow:0 6px 24px -12px rgba(15,41,66,.35)}
 .btn-ghost:hover{background:rgba(255,255,255,.24)}
 .btn-white{background:#fff;color:var(--primaria);border:0;font-weight:700}
 .btn-white:hover{transform:translateY(-2px);background:#f8fafc}
-.hero{position:relative;min-height:min(94vh,880px);display:flex;align-items:center;overflow:hidden;color:#fff}
-.hero .parallax{position:absolute;inset:-12% 0;z-index:0;will-change:transform}
-.hero .parallax img{width:100%;height:118%;object-fit:cover}
-.hero .ov{position:absolute;inset:0;z-index:1;background:linear-gradient(105deg,color-mix(in srgb,var(--escura) 88%,transparent) 32%,color-mix(in srgb,var(--escura) 30%,transparent))}
-.hero .wrap{position:relative;z-index:2;padding:90px 22px}
-.hero .selo{display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);backdrop-filter:blur(6px);padding:9px 16px;border-radius:999px;font-size:.86rem;font-weight:600}
-.hero .selo b{color:#ffd76a}
-.hero h1{font-size:clamp(2.3rem,5.4vw,4rem);font-weight:800;margin:22px 0 18px;max-width:760px;text-shadow:0 2px 40px rgba(0,0,0,.25)}
-.hero p.sub{font-size:1.22rem;max-width:540px;color:#eef4f8}
-.hero .acoes{display:flex;flex-wrap:wrap;gap:14px;margin-top:34px}
-.hero .mini{display:flex;align-items:center;gap:10px;margin-top:26px;font-size:.95rem;color:#dbe6ee}
-.hero .scroll{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:2;color:rgba(255,255,255,.7);animation:bob 1.8s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,8px)}}
 .trust{background:var(--escura);color:#fff}
 .trust .grid{display:grid;gap:10px;padding:30px 0}
 .trust .it{text-align:center;padding:10px}
@@ -104,7 +92,7 @@ section{padding:88px 0}
 .sobre .num b{display:block;font-family:'Plus Jakarta Sans';font-size:1.7rem;color:var(--primaria)}
 .sobre .num span{font-size:.8rem;color:#64748b}
 .galeria{background:var(--clara)}
-.gal{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.gal{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .gal a{border-radius:16px;overflow:hidden;aspect-ratio:1;box-shadow:0 14px 30px -20px rgba(15,41,66,.4)}
 .gal a:first-child{grid-column:span 2;grid-row:span 2;aspect-ratio:auto}
 .gal img{width:100%;height:100%;object-fit:cover;transition:transform .5s}
@@ -127,7 +115,7 @@ section{padding:88px 0}
 .faq-item .sig{flex:0 0 auto;transition:transform .25s;color:var(--primaria)}
 .faq-item.open .sig{transform:rotate(45deg)}
 .faq-item .ans{max-height:0;overflow:hidden;transition:max-height .3s ease,padding .3s ease;padding:0 22px;color:#64748b}
-.faq-item.open .ans{max-height:320px;padding:0 22px 22px}
+.faq-item.open .ans{max-height:600px;padding:0 22px 22px}
 .local .grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:stretch}
 .local .info{display:flex;flex-direction:column;justify-content:center}
 .local .linha{display:flex;gap:14px;align-items:flex-start;margin-bottom:20px}
@@ -150,8 +138,8 @@ footer .fsoc{display:flex;gap:12px;margin-top:14px}
 footer .fsoc a{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.08);display:grid;place-items:center;margin:0}
 footer .fsoc a:hover{background:var(--primaria)}
 footer .fbot{text-align:center;padding-top:22px;color:#7c93a8;font-size:.82rem}
-@media(max-width:900px){.servicos,.depos{grid-template-columns:1fr 1fr}.dif .grid{grid-template-columns:1fr}.sobre .grid,.local .grid{grid-template-columns:1fr}.gal{grid-template-columns:repeat(2,1fr)}.trust .grid{grid-template-columns:1fr 1fr !important}.top nav{display:none}footer .fg{grid-template-columns:1fr 1fr}}
-@media(max-width:560px){.servicos,.depos{grid-template-columns:1fr}.gal a:first-child{grid-column:span 2}footer .fg{grid-template-columns:1fr}}
+@media(max-width:900px){.servicos,.servicos.s4,.servicos.s2,.depos{grid-template-columns:1fr 1fr}.dif .grid{grid-template-columns:1fr}.sobre .grid,.local .grid{grid-template-columns:1fr}.gal{grid-template-columns:repeat(2,1fr)}.trust .grid{grid-template-columns:1fr 1fr !important}.top nav{display:none}footer .fg{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.servicos,.servicos.s4,.servicos.s2,.depos{grid-template-columns:1fr}.gal a:first-child{grid-column:span 2}footer .fg{grid-template-columns:1fr}}
 `;
 
 export function templatePremium(d: SiteData, cfg: NichoCfg): string {
@@ -162,10 +150,8 @@ export function templatePremium(d: SiteData, cfg: NichoCfg): string {
   const local = d.cidade ? `${d.cidade}${d.estado ? "/" + d.estado : ""}` : "";
   const rev = (i: number) => ` style="--d:${i * 90}ms"`;
 
-  // HERO SELO — condicional: com nota mostra estrelas; SEM nota, elemento real.
-  const selo = temNota
-    ? `<span class="selo reveal">${estrelas(d.rating, 15)} <b>${nota}</b> · ${revs ? revs + " avaliações no Google" : "avaliação no Google"}</span>`
-    : `<span class="selo reveal">${icone(cfg.brandIcon)} ${esc(d.categoriaLabel)}${local ? " · " + esc(local) : ""}</span>`;
+  // HERO — bloco da biblioteca (variante escolhida por semente em d.heroVar).
+  const hero = heroBloco(d, cfg);
 
   // BARRA DE PROVA SOCIAL — só itens REAIS (sem nota/estrela falsa).
   const trustItems: string[] = [];
@@ -235,7 +221,7 @@ export function templatePremium(d: SiteData, cfg: NichoCfg): string {
         .slice(0, 6)
         .map(
           (r, i) =>
-            `<div class="d reveal"${rev(i % 3)}>${estrelas(r.rating ?? d.rating ?? 5, 16)}<p class="q">"${esc(r.text.length > 240 ? r.text.slice(0, 237) + "…" : r.text)}"</p><div class="who">${r.photo ? `<img class="av" src="${esc(r.photo)}" alt="${esc(r.author ?? "")}" loading="lazy">` : `<span class="av">${esc(inicial(r.author))}</span>`}<div><b>${esc(r.author ?? "Cliente")}</b><span class="gsel">${icone("check-circle")} via Google${r.when ? " · " + esc(r.when) : ""}</span></div></div></div>`,
+            `<div class="d reveal"${rev(i % 3)}>${r.rating != null ? estrelas(r.rating, 16) : ""}<p class="q">"${esc(r.text.length > 240 ? r.text.slice(0, 237) + "…" : r.text)}"</p><div class="who">${r.photo ? `<img class="av" src="${esc(r.photo)}" alt="${esc(r.author ?? "")}" loading="lazy">` : `<span class="av">${esc(inicial(r.author))}</span>`}<div><b>${esc(r.author ?? "Cliente")}</b><span class="gsel">${icone("check-circle")} via Google${r.when ? " · " + esc(r.when) : ""}</span></div></div></div>`,
         )
         .join("")}</div></div></section>`
     : "";
@@ -276,7 +262,7 @@ ${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmb
     '<a href="#contato">Contato</a>',
   ].join("");
 
-  return `${head(d, "", CSS)}
+  return `${head(d, "", CSS + hero.css)}
 <body>
 <header class="top"><div class="wrap bar">
 <div class="brand"><span class="dot">${icone(cfg.brandIcon)}</span>${esc(d.nome)}</div>
@@ -284,18 +270,7 @@ ${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmb
 <a class="btn btn-p" href="${esc(cta)}" target="_blank" rel="noopener">${esc(d.cta)}</a>
 </div></header>
 
-<section class="hero">
-<div class="parallax"><img src="${esc(d.fotoHero)}" alt="${esc(d.nome)}"></div>
-<div class="ov"></div>
-<div class="wrap">
-${selo}
-<h1 class="reveal"${rev(1)}>${esc(d.headline)}</h1>
-<p class="sub reveal"${rev(2)}>${esc(d.subheadline)}</p>
-<div class="acoes reveal"${rev(3)}><a class="btn btn-p" href="${esc(cta)}" target="_blank" rel="noopener">${icone("message-circle")} ${esc(d.cta)}</a>${d.mapsUrl ? `<a class="btn btn-ghost" href="${esc(d.mapsUrl)}" target="_blank" rel="noopener">${icone("map-pin")} Como chegar</a>` : ""}</div>
-<div class="mini reveal"${rev(4)}>${icone("check-circle")} ${esc(d.categoriaLabel)}${local ? " · " + esc(local) : ""}</div>
-</div>
-<div class="scroll"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
-</section>
+${hero.html}
 
 ${trust}
 ${servicos}

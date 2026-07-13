@@ -9,6 +9,7 @@ import { coletarConteudoSite } from "../_shared/materiaprima.ts";
 import { coletarReviews } from "../_shared/reviews.ts";
 import { getProviderChain, type MateriaPrima, type ConteudoIA } from "../_shared/ai/index.ts";
 import { detectarNicho, heroNicho } from "../_shared/site/nicho.ts";
+import { varianteHero } from "../_shared/site/variantes.ts";
 import { montarHtml } from "../_shared/site/montar.ts";
 import { conteudoFallback } from "../_shared/site/fallback.ts";
 import { resolverImagens } from "../_shared/imghost.ts";
@@ -177,7 +178,14 @@ Deno.serve(async (req) => {
     const usouFallback = ai.usouFallback;
 
     // 6. Template premium monta o HTML final (design fixo, dados reais + copy + reviews).
-    const html = montarHtml(mp, conteudo, nicho, depoimentos, fotos);
+    // SEMENTE estável do lead (place_id do Google; senão o uuid do lead). NUNCA o
+    // redesign_id — regenerar o mesmo lead tem que dar SEMPRE a mesma variante.
+    // A variante usa o nicho ESTÁVEL (categoria do banco, sem textos do scrape,
+    // que oscilam) — mesma chamada feita dentro de montarHtml.
+    const seed: string = lead.place_id || lead.id;
+    const heroVar = varianteHero(seed, detectarNicho(mp.categoria, ""));
+
+    const html = montarHtml(mp, conteudo, nicho, depoimentos, fotos, seed);
     if (!html || html.length < 800) throw new Error("Falha ao montar o HTML do template");
 
     const custoTotal = custoIa + coleta.custoUsd;
@@ -194,6 +202,7 @@ Deno.serve(async (req) => {
     const obs = [
       `provider=${provider} modelo=${modelo}`,
       `depoimentos=${depoimentos.length}`,
+      `heroVar=${heroVar} seed=${seed}`,
       `heroReal=${fotos.heroReal} galeria=${fotos.galeria.length}`,
       `img=${fotos.debug}`,
       `servicosReais=${servicosReais} legivel=${conteudoLegivel}`,
@@ -236,6 +245,8 @@ Deno.serve(async (req) => {
         servicos: conteudo.servicos.length,
         servicosReais,
         heroNicho: heroNicho(mp.categoria, nicho),
+        heroVar,
+        seed,
         temNota: mp.rating != null,
         diferenciais: conteudo.diferenciais.length,
         faq: conteudo.faq.length,

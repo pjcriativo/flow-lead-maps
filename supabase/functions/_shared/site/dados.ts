@@ -3,7 +3,7 @@
 // vira wa.me com mensagem, endereço vira link+mapa, fotos ganham fallback, cores
 // são resolvidas. Nada sai com placeholder cru.
 import type { MateriaPrima, ConteudoIA } from "../ai/types.ts";
-import type { SiteData, Cores, TemplateId, Servico, Depoimento } from "./tipos.ts";
+import type { SiteData, Cores, TemplateId, Servico, Depoimento, HeroId } from "./tipos.ts";
 import { firstBrWhatsapp } from "../phone.ts";
 import { resolverFotoSet } from "./imagens.ts";
 import { categoriaLabel } from "./nicho.ts";
@@ -127,6 +127,7 @@ export function montarSiteData(
   nicho: TemplateId,
   depoimentos: Depoimento[] = [],
   fotosOverride?: FotosOverride,
+  bloco?: { seed: string; heroVar: HeroId },
 ): SiteData {
   const whatsapp = firstBrWhatsapp(mp.whatsapp) ?? firstBrWhatsapp(mp.telefone);
   const whatsappUrl = whatsapp
@@ -178,5 +179,7 @@ export function montarSiteData(
     faq: (conteudo.faq ?? []).filter((f) => f.pergunta && f.resposta).slice(0, 6),
     cta: conteudo.cta || "Fale conosco",
     depoimentos: (depoimentos ?? []).filter((d) => d.text && d.text.length >= 15).slice(0, 6),
+    seed: bloco?.seed ?? mp.nome,
+    heroVar: bloco?.heroVar ?? "A",
   };
 }

@@ -25,6 +25,10 @@ export type RedesignUsage = {
   servicosReais: boolean;
   /** pasta de hero curado usada (ex.: "advocacia", "saude"). */
   heroNicho: string;
+  /** variante de HERO escolhida pela semente (A | B | C) — determinística. */
+  heroVar: string;
+  /** semente estável usada na escolha (place_id ?? lead_id). */
+  seed: string;
   /** false = lead sem nota no Google (site não exibe estrela/nota). */
   temNota: boolean;
   diferenciais: number;

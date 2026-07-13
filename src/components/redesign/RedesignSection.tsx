@@ -118,7 +118,7 @@ export function RedesignSection({
         u.temNota ? "nota ✓" : "sem nota (prova social omitida)",
         u.depoimentos ? `${u.depoimentos} depoimentos Google` : "sem depoimentos",
         `${u.servicos} serviços ${u.servicosReais ? "(reais)" : "(genéricos)"}`,
-        u.heroReal ? "hero: foto real" : `hero: curado (${u.heroNicho})`,
+        u.heroReal ? `hero ${u.heroVar}: foto real` : `hero ${u.heroVar}: curado (${u.heroNicho})`,
         u.galeria ? `galeria ${u.galeria}` : "sem galeria",
         u.usouNota ? "nota ✓" : null,
         u.usouWhatsapp ? "WhatsApp ✓" : null,
