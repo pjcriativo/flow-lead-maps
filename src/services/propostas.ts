@@ -1,131 +1,242 @@
-// Camada de serviço — Propostas (Fase 2).
-// HOJE: dados mock em memória. DEPOIS: trocar SÓ o corpo destas funções pelas
-// chamadas às Edge Functions (generate-proposal / send-proposal). As telas
-// consomem ESTAS assinaturas e não mudam quando a API real entrar.
+// Camada de serviço — Propostas (Fase 2) LIGADA ao Supabase (RLS pela sessão).
+// A copy é montada por TEMPLATE LOCAL (grátis) com dados REAIS do lead: elogio
+// das avaliações do Google + motivo do site ruim (score_breakdown da Fase 1) +
+// link do site JÁ PUBLICADO (Fase 4) como prévia. NÃO gera site novo, SEM preço
+// na 1ª abordagem. "Melhorar com IA" é opcional (edge melhorar-proposta).
+import { supabase } from "@/integrations/supabase/client";
 import type { Proposta } from "@/types";
 
-const delay = (ms = 350) => new Promise((r) => setTimeout(r, ms));
+// Linha do banco + nome do lead via join.
+type Row = {
+  id: string;
+  lead_id: string;
+  assunto: string;
+  corpo: string;
+  valor: number | null;
+  status: Proposta["status"];
+  criada_em: string;
+  enviada_em: string | null;
+  respondida_em: string | null;
+  leads?: { business_name: string } | null;
+};
 
-// Negócios de exemplo (mock) para gerar propostas enquanto não há API.
-const NEGOCIOS_EXEMPLO = [
-  { id: "lead-101", nome: "Clínica Odontológica Sorriso Real", motivo: "site sem versão mobile e sem botão de WhatsApp na primeira dobra" },
-  { id: "lead-102", nome: "Advocacia Menezes & Costa", motivo: "domínio em Google Sites gratuito, layout datado e sem prova social" },
-  { id: "lead-103", nome: "Academia Corpo em Foco", motivo: "site não responsivo e sem CTA de agendamento visível" },
-  { id: "lead-104", nome: "Restaurante Sabor da Serra", motivo: "cardápio escondido, sem depoimentos e sem link de reserva" },
-];
+const SELECT =
+  "id, lead_id, assunto, corpo, valor, status, criada_em, enviada_em, respondida_em, leads(business_name)";
 
-// Monta o texto da proposta no tom do plugin: rapport real, cita o motivo do
-// site ruim, SEM preço na primeira abordagem.
-function montarCorpo(nome: string, motivo: string): string {
+function toProposta(r: Row): Proposta {
+  return {
+    id: r.id,
+    lead_id: r.lead_id,
+    lead_nome: r.leads?.business_name ?? "—",
+    assunto: r.assunto,
+    corpo: r.corpo,
+    valor: r.valor,
+    status: r.status,
+    criada_em: r.criada_em,
+    enviada_em: r.enviada_em,
+    respondida_em: r.respondida_em,
+  };
+}
+
+/** Lista todas as propostas do usuário (mais recentes primeiro). */
+export async function listarPropostas(): Promise<Proposta[]> {
+  const { data, error } = await supabase
+    .from("propostas")
+    .select(SELECT)
+    .order("criada_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => toProposta(r as unknown as Row));
+}
+
+/** Lista as propostas de um lead específico. */
+export async function listarPropostasPorLead(leadId: string): Promise<Proposta[]> {
+  const { data, error } = await supabase
+    .from("propostas")
+    .select(SELECT)
+    .eq("lead_id", leadId)
+    .order("criada_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => toProposta(r as unknown as Row));
+}
+
+/** Lead elegível para proposta: tem site publicado ATIVO e ainda sem proposta. */
+export type LeadCandidato = {
+  lead_id: string;
+  lead_nome: string;
+  site_id: string;
+  site_url: string;
+};
+
+/** Leads com site publicado ativo e SEM proposta ainda (candidatos a gerar). */
+export async function listarLeadsParaProposta(): Promise<LeadCandidato[]> {
+  const nowIso = new Date().toISOString();
+  const { data: sites, error: sErr } = await supabase
+    .from("sites_publicados")
+    .select("id, lead_id, url_publica, publicado_em, leads(business_name)")
+    .eq("arquivos_removidos", false)
+    .neq("status", "reprovado")
+    .gt("expira_em", nowIso)
+    .order("publicado_em", { ascending: false });
+  if (sErr) throw sErr;
+
+  const { data: props, error: pErr } = await supabase.from("propostas").select("lead_id");
+  if (pErr) throw pErr;
+  const comProposta = new Set((props ?? []).map((p) => (p as { lead_id: string }).lead_id));
+
+  const vistos = new Set<string>();
+  const out: LeadCandidato[] = [];
+  for (const s of (sites ?? []) as unknown as Array<{
+    id: string;
+    lead_id: string;
+    url_publica: string;
+    leads?: { business_name: string } | null;
+  }>) {
+    if (comProposta.has(s.lead_id) || vistos.has(s.lead_id)) continue;
+    vistos.add(s.lead_id);
+    out.push({
+      lead_id: s.lead_id,
+      lead_nome: s.leads?.business_name ?? "—",
+      site_id: s.id,
+      site_url: s.url_publica,
+    });
+  }
+  return out;
+}
+
+// ---- Montagem da copy (template local, grátis) ----
+function motivoDoLead(scoreBreakdown: unknown): string {
+  const m = (scoreBreakdown as { motivo?: unknown } | null)?.motivo;
+  if (typeof m === "string" && m.trim())
+    return m
+      .trim()
+      .replace(/\.$/, "")
+      .replace(/^[A-ZÀ-Ú]/, (c) => c.toLowerCase());
+  return "não passa a credibilidade que a sua reputação merece e não facilita o contato pelo celular";
+}
+
+function elogio(nome: string, rating: number | null, reviews: number | null): string {
+  const nota = rating != null ? rating.toFixed(1).replace(".", ",") : "";
+  if (rating != null && reviews)
+    return `Encontrei a ${nome} no Google e reparei na ótima reputação de vocês — nota ${nota} com ${reviews.toLocaleString("pt-BR")} avaliações de clientes reais.`;
+  if (rating != null)
+    return `Encontrei a ${nome} no Google e reparei na ótima reputação de vocês — nota ${nota}.`;
+  return `Encontrei a ${nome} no Google e vi que vocês têm uma presença sólida e clientes fiéis.`;
+}
+
+function montarCorpo(
+  nome: string,
+  motivo: string,
+  siteUrl: string,
+  rating: number | null,
+  reviews: number | null,
+): string {
   return [
-    `Olá, tudo bem? Encontrei a ${nome} no Google e reparei que vocês têm ótima reputação — nota alta e muitas avaliações de clientes reais.`,
+    elogio(nome, rating, reviews),
     "",
     `Justamente por isso me chamou atenção que o site atual ${motivo}. Hoje boa parte dos clientes decide pelo celular, e um site assim faz perder contato que já estava quase fechado.`,
     "",
-    "Eu trabalho refazendo sites desse tipo com foco em agendamento/contato pelo WhatsApp e visual moderno. Posso te mostrar, sem compromisso, uma prévia de como ficaria a nova versão da sua página?",
+    "Eu refiz a página de vocês com foco em contato pelo WhatsApp e visual moderno. Fiz uma prévia, sem compromisso, pra você ver como fica:",
+    siteUrl,
+    "",
+    "Se fizer sentido, respondo aqui mesmo e a gente ajusta o que você quiser.",
     "",
     "Um abraço,",
     "Equipe Flow Leads",
   ].join("\n");
 }
 
-// Store mutável em memória (persiste durante a sessão do navegador).
-let seq = 3;
-let store: Proposta[] = [
-  {
-    id: "prop-1",
-    lead_id: "lead-201",
-    lead_nome: "Estética Bella Pele",
-    assunto: "Uma versão muito melhor do site da Bella Pele",
-    corpo: montarCorpo("Estética Bella Pele", "não abre direito no celular e não tem botão de WhatsApp"),
-    valor: null,
-    status: "respondida",
-    criada_em: "2026-07-02T14:10:00.000Z",
-    enviada_em: "2026-07-02T14:25:00.000Z",
-    respondida_em: "2026-07-04T09:05:00.000Z",
-  },
-  {
-    id: "prop-2",
-    lead_id: "lead-202",
-    lead_nome: "Pet Shop Amigo Fiel",
-    assunto: "Reparei no site do Amigo Fiel — dá pra melhorar muito",
-    corpo: montarCorpo("Pet Shop Amigo Fiel", "usa um template antigo e não mostra os serviços com clareza"),
-    valor: 1800,
-    status: "enviada",
-    criada_em: "2026-07-08T11:00:00.000Z",
-    enviada_em: "2026-07-08T11:20:00.000Z",
-    respondida_em: null,
-  },
-  {
-    id: "prop-3",
-    lead_id: "lead-203",
-    lead_nome: "Oficina Turbo Mecânica",
-    assunto: "Rascunho — proposta Turbo Mecânica",
-    corpo: montarCorpo("Oficina Turbo Mecânica", "não é responsivo e não tem nenhuma chamada para contato"),
-    valor: null,
-    status: "rascunho",
-    criada_em: "2026-07-10T16:40:00.000Z",
-    enviada_em: null,
-    respondida_em: null,
-  },
-];
+/** Gera uma proposta (rascunho) a partir de um lead COM site publicado. */
+export async function gerarProposta(leadId: string): Promise<Proposta> {
+  const { data: lead, error: lErr } = await supabase
+    .from("leads")
+    .select("id, business_name, rating, review_count, score_breakdown")
+    .eq("id", leadId)
+    .single();
+  if (lErr || !lead) throw new Error("Lead não encontrado");
 
-/** Lista todas as propostas do usuário. */
-export async function listarPropostas(): Promise<Proposta[]> {
-  // TODO: LIGAR API — GET propostas do usuário/org no Supabase (RLS).
-  await delay();
-  return store.map((p) => ({ ...p }));
-}
+  const nowIso = new Date().toISOString();
+  const { data: site } = await supabase
+    .from("sites_publicados")
+    .select("id, url_publica")
+    .eq("lead_id", leadId)
+    .eq("arquivos_removidos", false)
+    .neq("status", "reprovado")
+    .gt("expira_em", nowIso)
+    .order("publicado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!site)
+    throw new Error(
+      "Este lead ainda não tem um site publicado — publique a prévia antes de gerar a proposta.",
+    );
 
-/** Lista as propostas de um lead específico. */
-export async function listarPropostasPorLead(leadId: string): Promise<Proposta[]> {
-  // TODO: LIGAR API — GET propostas filtradas por lead_id.
-  await delay();
-  return store.filter((p) => p.lead_id === leadId).map((p) => ({ ...p }));
-}
+  const nome = lead.business_name as string;
+  const rating = lead.rating != null ? Number(lead.rating) : null;
+  const reviews = (lead.review_count as number | null) ?? null;
+  const motivo = motivoDoLead(lead.score_breakdown);
+  const siteUrl = (site as { url_publica: string }).url_publica;
+  const corpo = montarCorpo(nome, motivo, siteUrl, rating, reviews);
+  const assunto = `Uma versão muito melhor do site — ${nome}`.slice(0, 78);
 
-/** Gera uma nova proposta (rascunho) a partir de um lead. */
-export async function gerarProposta(): Promise<Proposta> {
-  // TODO: LIGAR API — Edge Function generate-proposal (template com variáveis
-  // ou IA). Recebe o lead + o motivo do site ruim (score_breakdown da Fase 1).
-  await delay(600);
-  const alvo = NEGOCIOS_EXEMPLO[seq % NEGOCIOS_EXEMPLO.length];
-  seq += 1;
-  const nova: Proposta = {
-    id: `prop-${seq}`,
-    lead_id: alvo.id,
-    lead_nome: alvo.nome,
-    assunto: `Uma versão muito melhor do site — ${alvo.nome}`,
-    corpo: montarCorpo(alvo.nome, alvo.motivo),
-    valor: null,
-    status: "rascunho",
-    criada_em: new Date().toISOString(),
-    enviada_em: null,
-    respondida_em: null,
-  };
-  store = [nova, ...store];
-  return { ...nova };
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) throw new Error("Não autenticado");
+
+  const { data: nova, error: iErr } = await supabase
+    .from("propostas")
+    .insert({
+      user_id: userId,
+      lead_id: leadId,
+      site_id: (site as { id: string }).id,
+      assunto,
+      corpo,
+      valor: null,
+      status: "rascunho",
+    })
+    .select(SELECT)
+    .single();
+  if (iErr || !nova) throw new Error(iErr?.message ?? "Falha ao gerar a proposta");
+  return toProposta(nova as unknown as Row);
 }
 
 /** Salva a edição de uma proposta (assunto, corpo, valor). */
 export async function salvarProposta(proposta: Proposta): Promise<Proposta> {
-  // TODO: LIGAR API — UPDATE da proposta no Supabase.
-  await delay();
-  store = store.map((p) => (p.id === proposta.id ? { ...proposta } : p));
-  return { ...proposta };
+  const { data, error } = await supabase
+    .from("propostas")
+    .update({ assunto: proposta.assunto, corpo: proposta.corpo, valor: proposta.valor })
+    .eq("id", proposta.id)
+    .select(SELECT)
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Falha ao salvar");
+  return toProposta(data as unknown as Row);
 }
 
-/** Envia a proposta por e-mail (marca como enviada). */
+/** Marca a proposta como enviada (a CÓPIA do texto é feita na UI) e move o
+ * lead para 'contacted' (best-effort). Envio real por SMTP fica p/ depois. */
 export async function enviarProposta(id: string): Promise<Proposta> {
-  // TODO: LIGAR API — Edge Function send-proposal (Resend/SES por org, com
-  // SPF/DKIM). Aqui apenas simula a mudança de status.
-  await delay(600);
-  let atualizada: Proposta | undefined;
-  store = store.map((p) => {
-    if (p.id !== id) return p;
-    atualizada = { ...p, status: "enviada" as const, enviada_em: new Date().toISOString() };
-    return atualizada;
+  const { data, error } = await supabase
+    .from("propostas")
+    .update({ status: "enviada", enviada_em: new Date().toISOString() })
+    .eq("id", id)
+    .select(SELECT)
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Falha ao marcar como enviada");
+  const row = data as unknown as Row;
+  // best-effort: não bloqueia a proposta se a atualização do lead falhar.
+  await supabase.from("leads").update({ status: "contacted" }).eq("id", row.lead_id);
+  return toProposta(row);
+}
+
+/** HÍBRIDO — reescreve a copy com IA (Claude via edge). Devolve o texto para a
+ * UI revisar/editar; NÃO persiste (o usuário salva depois). */
+export async function melhorarPropostaComIA(
+  proposta: Proposta,
+): Promise<{ assunto: string; corpo: string }> {
+  const { data, error } = await supabase.functions.invoke("melhorar-proposta", {
+    body: { assunto: proposta.assunto, corpo: proposta.corpo, lead_nome: proposta.lead_nome },
   });
-  if (!atualizada) throw new Error("Proposta não encontrada");
-  return { ...atualizada };
+  if (error) throw error;
+  const d = data as { assunto?: string; corpo?: string; error?: string };
+  if (d?.error) throw new Error(d.error);
+  return { assunto: d.assunto ?? proposta.assunto, corpo: d.corpo ?? proposta.corpo };
 }
