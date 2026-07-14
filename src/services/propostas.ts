@@ -211,20 +211,28 @@ export async function salvarProposta(proposta: Proposta): Promise<Proposta> {
   return toProposta(data as unknown as Row);
 }
 
-/** Marca a proposta como enviada (a CÓPIA do texto é feita na UI) e move o
- * lead para 'contacted' (best-effort). Envio real por SMTP fica p/ depois. */
-export async function enviarProposta(id: string): Promise<Proposta> {
-  const { data, error } = await supabase
-    .from("propostas")
-    .update({ status: "enviada", enviada_em: new Date().toISOString() })
-    .eq("id", id)
-    .select(SELECT)
-    .single();
-  if (error || !data) throw new Error(error?.message ?? "Falha ao marcar como enviada");
-  const row = data as unknown as Row;
-  // best-effort: não bloqueia a proposta se a atualização do lead falhar.
-  await supabase.from("leads").update({ status: "contacted" }).eq("id", row.lead_id);
-  return toProposta(row);
+/** Resultado do envio: sucesso (proposta atualizada) OU lead sem e-mail (a UI
+ * cai no "copiar"). Falha real do Resend é lançada como erro (não vira sucesso). */
+export type EnviarResult = { ok: true; proposta: Proposta } | { ok: false; reason: "sem_email" };
+
+/** ENVIO REAL por e-mail (edge send-proposal → Resend). Em sucesso: marca a
+ * proposta enviada, grava o id do Resend e move o lead para 'proposta_enviada'
+ * (tudo no servidor). Lead sem e-mail → { ok:false, reason:'sem_email' }. */
+export async function enviarProposta(id: string): Promise<EnviarResult> {
+  const { data, error } = await supabase.functions.invoke("send-proposal", {
+    body: { proposta_id: id },
+  });
+  if (error) throw error;
+  const d = data as {
+    ok?: boolean;
+    reason?: string;
+    error?: string;
+    proposta?: unknown;
+  };
+  if (d?.reason === "sem_email") return { ok: false, reason: "sem_email" };
+  if (d?.error) throw new Error(d.error);
+  if (!d?.proposta) throw new Error("Resposta inválida do envio");
+  return { ok: true, proposta: toProposta(d.proposta as Row) };
 }
 
 /** HÍBRIDO — reescreve a copy com IA (Claude via edge). Devolve o texto para a

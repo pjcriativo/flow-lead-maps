@@ -231,6 +231,8 @@ export type Database = {
           criada_em: string;
           enviada_em: string | null;
           respondida_em: string | null;
+          email_message_id: string | null;
+          email_para: string | null;
         };
         Insert: {
           id?: string;
@@ -244,6 +246,8 @@ export type Database = {
           criada_em?: string;
           enviada_em?: string | null;
           respondida_em?: string | null;
+          email_message_id?: string | null;
+          email_para?: string | null;
         };
         Update: {
           id?: string;
@@ -257,6 +261,8 @@ export type Database = {
           criada_em?: string;
           enviada_em?: string | null;
           respondida_em?: string | null;
+          email_message_id?: string | null;
+          email_para?: string | null;
         };
         Relationships: [];
       };

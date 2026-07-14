@@ -126,22 +126,35 @@ export function PropostasSection() {
     [propostas],
   );
 
+  // ENVIO REAL por e-mail (Resend). Lead sem e-mail → cai no "copiar" (fallback),
+  // sem fingir que enviou. Falha do Resend → erro real (não vira sucesso).
   const handleEnviar = async (p: Proposta) => {
     setEnviandoId(p.id);
     try {
-      const copiou = await copiar(`${p.assunto}\n\n${p.corpo}`);
-      const atualizada = await enviarProposta(p.id);
-      setPropostas((prev) => prev.map((x) => (x.id === atualizada.id ? atualizada : x)));
-      toast.success(
-        copiou
-          ? `Copiada e marcada como enviada — cole no e-mail/WhatsApp de "${p.lead_nome}".`
-          : `Marcada como enviada (copie o texto manualmente na edição).`,
-      );
+      const r = await enviarProposta(p.id);
+      if (!r.ok) {
+        const copiou = await copiar(`${p.assunto}\n\n${p.corpo}`);
+        toast.warning(
+          copiou
+            ? `"${p.lead_nome}" não tem e-mail cadastrado — texto copiado, envie manualmente.`
+            : `"${p.lead_nome}" não tem e-mail cadastrado. Copie o texto na edição.`,
+        );
+        return;
+      }
+      setPropostas((prev) => prev.map((x) => (x.id === r.proposta.id ? r.proposta : x)));
+      toast.success(`E-mail enviado para "${p.lead_nome}".`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao enviar");
     } finally {
       setEnviandoId(null);
     }
+  };
+
+  // Copiar assunto + mensagem (fallback separado do envio).
+  const handleCopiar = async (p: Proposta) => {
+    const ok = await copiar(`${p.assunto}\n\n${p.corpo}`);
+    if (ok) toast.success(`Texto de "${p.lead_nome}" copiado.`);
+    else toast.error("Não foi possível copiar — abra a edição e copie manualmente.");
   };
 
   return (
@@ -244,7 +257,17 @@ export function PropostasSection() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          title={p.status === "rascunho" ? "Copiar e marcar enviada" : "Já enviada"}
+                          title="Copiar assunto + mensagem"
+                          onClick={() => handleCopiar(p)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title={
+                            p.status === "rascunho" ? "Enviar por e-mail (Resend)" : "Já enviada"
+                          }
                           onClick={() => handleEnviar(p)}
                           disabled={p.status !== "rascunho" || enviandoId === p.id}
                         >

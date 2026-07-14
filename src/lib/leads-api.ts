@@ -143,8 +143,9 @@ export async function enrichLead(leadId: string): Promise<Lead> {
     body: { lead_id: leadId },
   });
   if (error) throw error;
-  if ((data as any)?.error) throw new Error((data as any).error);
-  return (data as any).lead as Lead;
+  const d = data as { error?: string; lead?: Lead } | null;
+  if (d?.error) throw new Error(d.error);
+  return d?.lead as Lead;
 }
 
 /** Lista os leads do usuário, ordenados por score desc. */
@@ -191,6 +192,7 @@ export const LEAD_STATUSES = [
   "new",
   "enriched",
   "contacted",
+  "proposta_enviada",
   "responded",
   "meeting",
   "won",
@@ -204,6 +206,7 @@ export const STATUS_LABELS: Record<string, string> = {
   new: "Novo",
   enriched: "Enriquecido",
   contacted: "Contatado",
+  proposta_enviada: "Proposta enviada",
   responded: "Respondeu",
   meeting: "Reunião",
   won: "Ganho",
