@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   XCircle,
   LogOut,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,14 +42,21 @@ import { ContratosSection } from "@/components/contratos/ContratosSection";
 import { RedesignSection } from "@/components/redesign/RedesignSection";
 import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
+import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
       { title: "Painel — Flow Leads" },
-      { name: "description", content: "Prospecte, qualifique e gerencie seus leads no painel do Flow Leads." },
+      {
+        name: "description",
+        content: "Prospecte, qualifique e gerencie seus leads no painel do Flow Leads.",
+      },
       { property: "og:title", content: "Painel — Flow Leads" },
-      { property: "og:description", content: "Prospecte, qualifique e gerencie seus leads no painel do Flow Leads." },
+      {
+        property: "og:description",
+        content: "Prospecte, qualifique e gerencie seus leads no painel do Flow Leads.",
+      },
       { property: "og:url", content: "https://flowleads.com.br/dashboard" },
     ],
     links: [{ rel: "canonical", href: "https://flowleads.com.br/dashboard" }],
@@ -65,7 +73,19 @@ function getUserId(): string {
   return currentUserId;
 }
 
-type Section = "buscar" | "listas" | "pipeline" | "leads" | "propostas" | "contratos" | "financeiro" | "redesign" | "publicar" | "sheets" | "settings";
+type Section =
+  | "buscar"
+  | "listas"
+  | "pipeline"
+  | "leads"
+  | "propostas"
+  | "whatsapp"
+  | "contratos"
+  | "financeiro"
+  | "redesign"
+  | "publicar"
+  | "sheets"
+  | "settings";
 
 const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
@@ -73,6 +93,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
   { id: "leads", label: "Meus Leads", Icon: Users },
   { id: "propostas", label: "Propostas", Icon: FileText },
+  { id: "whatsapp", label: "WhatsApp", Icon: MessageCircle },
   { id: "contratos", label: "Contratos", Icon: ScrollText },
   { id: "financeiro", label: "Financeiro", Icon: Wallet },
   { id: "redesign", label: "Redesign", Icon: Wand2 },
@@ -141,7 +162,9 @@ function Dashboard() {
             Sair
           </button>
         </div>
-        <div className="border-t border-sidebar-border p-4 text-xs text-sidebar-foreground/50">v1.0</div>
+        <div className="border-t border-sidebar-border p-4 text-xs text-sidebar-foreground/50">
+          v1.0
+        </div>
       </aside>
 
       {/* Mobile top tabs */}
@@ -166,20 +189,30 @@ function Dashboard() {
         {section === "buscar" && <SearchSection />}
         {section === "listas" && (
           <MinhasListasSection
-            onOpenRedesign={(leadId) => { setFocusRedesignLead(leadId); setSection("redesign"); }}
+            onOpenRedesign={(leadId) => {
+              setFocusRedesignLead(leadId);
+              setSection("redesign");
+            }}
           />
         )}
         {section === "pipeline" && <PipelineSection />}
         {section === "leads" && (
           <LeadsManager
-            onOpenRedesign={(leadId) => { setFocusRedesignLead(leadId); setSection("redesign"); }}
+            onOpenRedesign={(leadId) => {
+              setFocusRedesignLead(leadId);
+              setSection("redesign");
+            }}
           />
         )}
         {section === "propostas" && <PropostasSection />}
+        {section === "whatsapp" && <WhatsAppSection />}
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
         {section === "redesign" && (
-          <RedesignSection focusLeadId={focusRedesignLead} onFocusConsumed={() => setFocusRedesignLead(null)} />
+          <RedesignSection
+            focusLeadId={focusRedesignLead}
+            onFocusConsumed={() => setFocusRedesignLead(null)}
+          />
         )}
         {section === "publicar" && <PublicarSection />}
         {section === "sheets" && (
@@ -200,11 +233,19 @@ function Dashboard() {
 
 /* -------------------- Google Sheets (fluxo legado) -------------------- */
 function SheetsSection({
-  sheetUrl, setSheetUrl, googleConnected, setGoogleConnected, sheetVerified, setSheetVerified,
+  sheetUrl,
+  setSheetUrl,
+  googleConnected,
+  setGoogleConnected,
+  sheetVerified,
+  setSheetVerified,
 }: {
-  sheetUrl: string; setSheetUrl: (s: string) => void;
-  googleConnected: boolean; setGoogleConnected: (b: boolean) => void;
-  sheetVerified: boolean; setSheetVerified: (b: boolean) => void;
+  sheetUrl: string;
+  setSheetUrl: (s: string) => void;
+  googleConnected: boolean;
+  setGoogleConnected: (b: boolean) => void;
+  sheetVerified: boolean;
+  setSheetVerified: (b: boolean) => void;
 }) {
   const [connecting] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -231,7 +272,9 @@ function SheetsSection({
     const userId = getUserId();
     fetch(`${API_BASE}/auth/status/${userId}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (j?.authenticated) setGoogleConnected(true); })
+      .then((j) => {
+        if (j?.authenticated) setGoogleConnected(true);
+      })
       .catch(() => {});
   }, [setGoogleConnected]);
 
@@ -251,14 +294,21 @@ function SheetsSection({
       const res = await fetch(`${API_BASE}/sheets/list?user_id=${encodeURIComponent(userId)}`);
       if (!res.ok) throw new Error(`Falha ao carregar as planilhas: ${res.status}`);
       const json = await res.json();
-      const list = Array.isArray(json.sheets) ? json.sheets : Array.isArray(json) ? json : [];
+      const list: Array<{
+        url?: string;
+        id?: string;
+        name?: string;
+        title?: string;
+        sheet_name?: string;
+      }> = Array.isArray(json.sheets) ? json.sheets : Array.isArray(json) ? json : [];
       const normalized = list
-        .filter((s: any) => s && (s.url || s.id))
-        .map((s: any) => ({
+        .filter((s) => s && (s.url || s.id))
+        .map((s) => ({
           name: s.name ?? s.title ?? s.sheet_name ?? "Planilha sem título",
           url: s.url ?? `https://docs.google.com/spreadsheets/d/${s.id}/edit`,
         }));
-      if (normalized.length === 0) setSheetsError("Nenhuma planilha encontrada. Cole uma URL manualmente.");
+      if (normalized.length === 0)
+        setSheetsError("Nenhuma planilha encontrada. Cole uma URL manualmente.");
       else setSheetsList(normalized);
     } catch {
       setSheetsError("Não foi possível carregar as planilhas. Cole a URL manualmente.");
@@ -292,8 +342,8 @@ function SheetsSection({
       } else {
         setSheetError(j.error ?? j.message ?? "Não foi possível acessar a planilha");
       }
-    } catch (e: any) {
-      setSheetError(e.message ?? "Erro de rede");
+    } catch (e) {
+      setSheetError(e instanceof Error ? e.message : "Erro de rede");
     } finally {
       setTesting(false);
     }
@@ -301,7 +351,11 @@ function SheetsSection({
 
   const disconnect = async () => {
     const userId = getUserId();
-    try { await fetch(`${API_BASE}/auth/revoke/${userId}`, { method: "POST" }); } catch {}
+    try {
+      await fetch(`${API_BASE}/auth/revoke/${userId}`, { method: "POST" });
+    } catch {
+      /* ignora erro de revogação (best-effort) */
+    }
     setGoogleConnected(false);
     setSheetVerified(false);
     setSheetUrl("");
@@ -317,12 +371,16 @@ function SheetsSection({
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Google Sheets</h1>
-        <p className="text-sm text-muted-foreground">Sincronize leads direto para uma planilha (fluxo legado).</p>
+        <p className="text-sm text-muted-foreground">
+          Sincronize leads direto para uma planilha (fluxo legado).
+        </p>
       </div>
       <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         {!googleConnected ? (
           <>
-            <p className="text-sm text-muted-foreground">Conecte sua conta Google para sincronizar leads nas suas planilhas.</p>
+            <p className="text-sm text-muted-foreground">
+              Conecte sua conta Google para sincronizar leads nas suas planilhas.
+            </p>
             <button
               onClick={connectGoogle}
               disabled={connecting}
@@ -332,10 +390,22 @@ function SheetsSection({
                 <Loader2 className="h-4 w-4 animate-spin text-[#4285F4]" />
               ) : (
                 <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
-                  <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92c1.71-1.57 2.68-3.88 2.68-6.61z"/>
-                  <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>
-                  <path fill="#FBBC05" d="M3.97 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.29-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3.01-2.33z"/>
-                  <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A8.99 8.99 0 0 0 9 0 9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+                  <path
+                    fill="#4285F4"
+                    d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92c1.71-1.57 2.68-3.88 2.68-6.61z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M3.97 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.29-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3.01-2.33z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A8.99 8.99 0 0 0 9 0 9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"
+                  />
                 </svg>
               )}
               {connecting ? "Aguardando o Google..." : "Conectar conta Google"}
@@ -347,15 +417,31 @@ function SheetsSection({
             <div className="flex items-center justify-between rounded-md border border-[oklch(0.7_0.18_150)]/40 bg-[oklch(0.7_0.18_150)]/10 p-3 text-sm">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-[oklch(0.55_0.18_150)]" />
-                <span className="font-medium text-[oklch(0.45_0.18_150)]">Conta Google conectada</span>
+                <span className="font-medium text-[oklch(0.45_0.18_150)]">
+                  Conta Google conectada
+                </span>
               </div>
-              <button onClick={disconnect} className="text-xs text-muted-foreground underline underline-offset-2 hover:text-destructive">Desconectar</button>
+              <button
+                onClick={disconnect}
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-destructive"
+              >
+                Desconectar
+              </button>
             </div>
 
             {!manualMode && (
               <div className="space-y-2">
-                <Button variant="outline" onClick={loadSheets} disabled={loadingSheets} className="w-full justify-start gap-2">
-                  {loadingSheets ? <Loader2 className="h-4 w-4 animate-spin" /> : <SheetIcon className="h-4 w-4" />}
+                <Button
+                  variant="outline"
+                  onClick={loadSheets}
+                  disabled={loadingSheets}
+                  className="w-full justify-start gap-2"
+                >
+                  {loadingSheets ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <SheetIcon className="h-4 w-4" />
+                  )}
                   {loadingSheets ? "Carregando suas planilhas..." : "Carregar minhas planilhas"}
                 </Button>
                 {sheetsError && <p className="text-sm text-destructive">{sheetsError}</p>}
@@ -367,13 +453,23 @@ function SheetsSection({
                         <SelectValue placeholder="Escolha uma planilha..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {sheetsList.map((s) => <SelectItem key={s.url} value={s.url}>{s.name}</SelectItem>)}
+                        {sheetsList.map((s) => (
+                          <SelectItem key={s.url} value={s.url}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 )}
-                <button type="button" onClick={() => { setManualMode(true); setSheetsError(null); }}
-                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-primary">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualMode(true);
+                    setSheetsError(null);
+                  }}
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-primary"
+                >
                   Ou cole a URL manualmente
                 </button>
               </div>
@@ -382,11 +478,25 @@ function SheetsSection({
             {manualMode && (
               <div className="space-y-2">
                 <Label htmlFor="url">URL da planilha do Google</Label>
-                <Input id="url" placeholder="Cole aqui a URL da sua planilha do Google"
+                <Input
+                  id="url"
+                  placeholder="Cole aqui a URL da sua planilha do Google"
                   value={sheetUrl}
-                  onChange={(e) => { setSheetUrl(e.target.value); setSheetVerified(false); setSheetTitle(""); setSheetError(""); }} />
-                <button type="button" onClick={() => { setManualMode(false); setSheetsError(null); }}
-                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-primary">
+                  onChange={(e) => {
+                    setSheetUrl(e.target.value);
+                    setSheetVerified(false);
+                    setSheetTitle("");
+                    setSheetError("");
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualMode(false);
+                    setSheetsError(null);
+                  }}
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-primary"
+                >
                   Voltar para Carregar minhas planilhas
                 </button>
               </div>
@@ -394,7 +504,13 @@ function SheetsSection({
 
             <div className="flex flex-wrap gap-3">
               <Button variant="outline" onClick={verifySheet} disabled={testing || !sheetUrl}>
-                {testing ? <><Loader2 className="animate-spin" /> Verificando acesso à planilha…</> : "Testar e salvar planilha"}
+                {testing ? (
+                  <>
+                    <Loader2 className="animate-spin" /> Verificando acesso à planilha…
+                  </>
+                ) : (
+                  "Testar e salvar planilha"
+                )}
               </Button>
             </div>
             {sheetVerified && (
@@ -427,8 +543,12 @@ function SettingsSection() {
       <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between rounded-md border border-border p-3">
           <div>
-            <Label htmlFor="email-enrich" className="cursor-pointer text-sm font-medium">Buscar e-mails por padrão</Label>
-            <div className="text-xs text-muted-foreground">Ativar "Buscar e-mails" (visita o site) em toda nova busca.</div>
+            <Label htmlFor="email-enrich" className="cursor-pointer text-sm font-medium">
+              Buscar e-mails por padrão
+            </Label>
+            <div className="text-xs text-muted-foreground">
+              Ativar "Buscar e-mails" (visita o site) em toda nova busca.
+            </div>
           </div>
           <Switch id="email-enrich" defaultChecked />
         </div>
