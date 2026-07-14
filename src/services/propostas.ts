@@ -211,13 +211,16 @@ export async function salvarProposta(proposta: Proposta): Promise<Proposta> {
   return toProposta(data as unknown as Row);
 }
 
-/** Resultado do envio: sucesso (proposta atualizada) OU lead sem e-mail (a UI
- * cai no "copiar"). Falha real do Resend é lançada como erro (não vira sucesso). */
-export type EnviarResult = { ok: true; proposta: Proposta } | { ok: false; reason: "sem_email" };
+/** Resultado do envio: sucesso (proposta atualizada), lead sem e-mail (a UI cai
+ * no "copiar") ou lead em opt-out (não envia). Falha real do Resend é lançada
+ * como erro (não vira sucesso). */
+export type EnviarResult =
+  { ok: true; proposta: Proposta } | { ok: false; reason: "sem_email" | "opt_out" };
 
 /** ENVIO REAL por e-mail (edge send-proposal → Resend). Em sucesso: marca a
  * proposta enviada, grava o id do Resend e move o lead para 'proposta_enviada'
- * (tudo no servidor). Lead sem e-mail → { ok:false, reason:'sem_email' }. */
+ * (tudo no servidor). Lead sem e-mail → 'sem_email'; lead descadastrado (LGPD)
+ * → 'opt_out'. */
 export async function enviarProposta(id: string): Promise<EnviarResult> {
   const { data, error } = await supabase.functions.invoke("send-proposal", {
     body: { proposta_id: id },
@@ -230,9 +233,20 @@ export async function enviarProposta(id: string): Promise<EnviarResult> {
     proposta?: unknown;
   };
   if (d?.reason === "sem_email") return { ok: false, reason: "sem_email" };
+  if (d?.reason === "opt_out") return { ok: false, reason: "opt_out" };
   if (d?.error) throw new Error(d.error);
   if (!d?.proposta) throw new Error("Resposta inválida do envio");
   return { ok: true, proposta: toProposta(d.proposta as Row) };
+}
+
+/** Conjunto de lead_ids que já receberam follow-up (para o badge no Pipeline). */
+export async function listarLeadIdsComFollowUp(): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("propostas")
+    .select("lead_id")
+    .gt("follow_up_count", 0);
+  if (error) throw error;
+  return new Set((data ?? []).map((p) => (p as { lead_id: string }).lead_id));
 }
 
 /** HÍBRIDO — reescreve a copy com IA (Claude via edge). Devolve o texto para a

@@ -1,14 +1,19 @@
 // Fase 1 — Kanban/Pipeline: colunas por status; arrastar um card SALVA o novo
 // status no banco (leads.status) via updateLeadStatus.
 import { useEffect, useState } from "react";
-import { Loader2, RefreshCw, GripVertical } from "lucide-react";
+import { Loader2, RefreshCw, GripVertical, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  fetchLeads, updateLeadStatus, LEAD_STATUSES, STATUS_LABELS,
-  type Lead, type LeadStatus,
+  fetchLeads,
+  updateLeadStatus,
+  LEAD_STATUSES,
+  STATUS_LABELS,
+  type Lead,
+  type LeadStatus,
 } from "@/lib/leads-api";
+import { listarLeadIdsComFollowUp } from "@/services/propostas";
 import { ScoreBadge, WhatsCell, EmailCell } from "./leads-shared";
 
 export function PipelineSection() {
@@ -17,20 +22,25 @@ export function PipelineSection() {
   const [error, setError] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
+  const [followupIds, setFollowupIds] = useState<Set<string>>(new Set());
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      setLeads(await fetchLeads());
-    } catch (e: any) {
-      setError(e?.message ?? "Falha ao carregar leads");
+      const [ls, fu] = await Promise.all([fetchLeads(), listarLeadIdsComFollowUp()]);
+      setLeads(ls);
+      setFollowupIds(fu);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao carregar leads");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const handleDrop = async (status: LeadStatus) => {
     const id = dragId;
@@ -46,10 +56,10 @@ export function PipelineSection() {
     try {
       await updateLeadStatus(id, status);
       toast.success(`"${lead.business_name}" → ${STATUS_LABELS[status]}`);
-    } catch (e: any) {
+    } catch (e) {
       // reverte
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: prevStatus } : l)));
-      toast.error(`Não foi possível mover: ${e?.message ?? "erro"}`);
+      toast.error(`Não foi possível mover: ${e instanceof Error ? e.message : "erro"}`);
     }
   };
 
@@ -66,12 +76,20 @@ export function PipelineSection() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Pipeline</h1>
-          <p className="text-sm text-muted-foreground">Arraste um lead para mudar o status — salva no banco na hora.</p>
+          <p className="text-sm text-muted-foreground">
+            Arraste um lead para mudar o status — salva no banco na hora.
+          </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" /> Atualizar</Button>
+        <Button variant="outline" size="sm" onClick={load}>
+          <RefreshCw className="h-4 w-4" /> Atualizar
+        </Button>
       </div>
 
-      {error && <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+      {error && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <div className="flex gap-3 overflow-x-auto pb-4">
         {LEAD_STATUSES.map((status) => {
@@ -79,7 +97,10 @@ export function PipelineSection() {
           return (
             <div
               key={status}
-              onDragOver={(e) => { e.preventDefault(); setOverCol(status); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOverCol(status);
+              }}
               onDragLeave={() => setOverCol((c) => (c === status ? null : c))}
               onDrop={() => handleDrop(status)}
               className={cn(
@@ -89,7 +110,9 @@ export function PipelineSection() {
             >
               <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
                 <span className="text-sm font-semibold">{STATUS_LABELS[status]}</span>
-                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{items.length}</span>
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
+                  {items.length}
+                </span>
               </div>
               <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2">
                 {items.map((l) => (
@@ -97,17 +120,32 @@ export function PipelineSection() {
                     key={l.id}
                     draggable
                     onDragStart={() => setDragId(l.id)}
-                    onDragEnd={() => { setDragId(null); setOverCol(null); }}
+                    onDragEnd={() => {
+                      setDragId(null);
+                      setOverCol(null);
+                    }}
                     className={cn(
                       "group cursor-grab rounded-lg border border-border bg-card p-3 shadow-sm active:cursor-grabbing",
                       dragId === l.id && "opacity-50",
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold leading-tight text-foreground">{l.business_name}</span>
+                      <span className="text-sm font-semibold leading-tight text-foreground">
+                        {l.business_name}
+                      </span>
                       <ScoreBadge lead={l} />
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">{l.city}{l.state ? `/${l.state}` : ""}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {l.city}
+                      {l.state ? `/${l.state}` : ""}
+                    </div>
+                    {followupIds.has(l.id) && (
+                      <div className="mt-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                          <Send className="h-3 w-3" /> Follow-up enviado
+                        </span>
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center gap-3 text-xs">
                       <WhatsCell lead={l} />
                       <EmailCell lead={l} />

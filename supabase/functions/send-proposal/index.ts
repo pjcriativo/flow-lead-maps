@@ -43,12 +43,14 @@ Deno.serve(async (req) => {
     .single();
   if (pErr || !prop) return json({ error: "Proposta não encontrada" }, 404);
 
-  // E-mail do lead (o enrich da Fase 1 preenche quando acha).
+  // E-mail do lead (o enrich da Fase 1 preenche quando acha) + opt-out.
   const { data: lead } = await supabase
     .from("leads")
-    .select("id, email, business_name")
+    .select("id, email, business_name, email_opt_out")
     .eq("id", prop.lead_id)
     .single();
+  // Opt-out GLOBAL (LGPD): nunca envia a quem pediu descadastro.
+  if (lead?.email_opt_out) return json({ ok: false, reason: "opt_out" });
   const email = (lead?.email ?? "").trim();
   if (!email) return json({ ok: false, reason: "sem_email" });
 

@@ -133,6 +133,10 @@ export function PropostasSection() {
     try {
       const r = await enviarProposta(p.id);
       if (!r.ok) {
+        if (r.reason === "opt_out") {
+          toast.warning(`"${p.lead_nome}" pediu descadastro (LGPD) — não é possível enviar.`);
+          return;
+        }
         const copiou = await copiar(`${p.assunto}\n\n${p.corpo}`);
         toast.warning(
           copiou

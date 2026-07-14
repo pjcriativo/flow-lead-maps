@@ -44,6 +44,9 @@ export type Database = {
           notes: string | null;
           created_at: string;
           updated_at: string;
+          email_opt_out: boolean;
+          email_opt_out_em: string | null;
+          opt_out_token: string | null;
         };
         Insert: {
           id?: string;
@@ -80,6 +83,9 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
+          email_opt_out?: boolean;
+          email_opt_out_em?: string | null;
+          opt_out_token?: string | null;
         };
         Update: {
           id?: string;
@@ -116,6 +122,9 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
+          email_opt_out?: boolean;
+          email_opt_out_em?: string | null;
+          opt_out_token?: string | null;
         };
         Relationships: [];
       };
@@ -233,6 +242,9 @@ export type Database = {
           respondida_em: string | null;
           email_message_id: string | null;
           email_para: string | null;
+          follow_up_enviado_em: string | null;
+          follow_up_count: number;
+          follow_up_message_id: string | null;
         };
         Insert: {
           id?: string;
@@ -248,6 +260,9 @@ export type Database = {
           respondida_em?: string | null;
           email_message_id?: string | null;
           email_para?: string | null;
+          follow_up_enviado_em?: string | null;
+          follow_up_count?: number;
+          follow_up_message_id?: string | null;
         };
         Update: {
           id?: string;
@@ -263,6 +278,9 @@ export type Database = {
           respondida_em?: string | null;
           email_message_id?: string | null;
           email_para?: string | null;
+          follow_up_enviado_em?: string | null;
+          follow_up_count?: number;
+          follow_up_message_id?: string | null;
         };
         Relationships: [];
       };
