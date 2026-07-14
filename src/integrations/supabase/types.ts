@@ -328,7 +328,16 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      email_rampa_status: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          ativa: boolean;
+          dia: number;
+          teto: number;
+          enviados_hoje: number;
+          restante: number;
+        }[];
+      };
     };
     Enums: {
       [_ in never]: never;

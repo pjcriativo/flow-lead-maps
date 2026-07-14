@@ -215,7 +215,22 @@ export async function salvarProposta(proposta: Proposta): Promise<Proposta> {
  * no "copiar") ou lead em opt-out (não envia). Falha real do Resend é lançada
  * como erro (não vira sucesso). */
 export type EnviarResult =
-  { ok: true; proposta: Proposta } | { ok: false; reason: "sem_email" | "opt_out" };
+  { ok: true; proposta: Proposta } | { ok: false; reason: "sem_email" | "opt_out" | "teto_dia" };
+
+/** Status da rampa de aquecimento do e-mail (teto do dia / restante). */
+export type RampaStatus = {
+  ativa: boolean;
+  dia: number;
+  teto: number;
+  enviados_hoje: number;
+  restante: number;
+};
+
+export async function statusRampa(): Promise<RampaStatus | null> {
+  const { data, error } = await supabase.rpc("email_rampa_status");
+  if (error) return null;
+  return (data as RampaStatus[])?.[0] ?? null;
+}
 
 /** ENVIO REAL por e-mail (edge send-proposal → Resend). Em sucesso: marca a
  * proposta enviada, grava o id do Resend e move o lead para 'proposta_enviada'
@@ -234,6 +249,7 @@ export async function enviarProposta(id: string): Promise<EnviarResult> {
   };
   if (d?.reason === "sem_email") return { ok: false, reason: "sem_email" };
   if (d?.reason === "opt_out") return { ok: false, reason: "opt_out" };
+  if (d?.reason === "teto_dia") return { ok: false, reason: "teto_dia" };
   if (d?.error) throw new Error(d.error);
   if (!d?.proposta) throw new Error("Resposta inválida do envio");
   return { ok: true, proposta: toProposta(d.proposta as Row) };

@@ -54,6 +54,11 @@ Deno.serve(async (req) => {
   const email = (lead?.email ?? "").trim();
   if (!email) return json({ ok: false, reason: "sem_email" });
 
+  // Rampa de aquecimento: respeita o teto do dia (proposta + follow-up somados,
+  // global). Se estourou, não envia — a UI avisa pra tentar amanhã.
+  const { data: rampa } = await supabase.rpc("email_rampa_status");
+  if ((rampa?.[0]?.restante ?? 0) <= 0) return json({ ok: false, reason: "teto_dia" });
+
   const RESEND = Deno.env.get("RESEND_API_KEY");
   if (!RESEND)
     return json({ ok: false, error: "Envio indisponível: RESEND_API_KEY não configurada." });

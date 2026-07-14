@@ -45,7 +45,9 @@ import {
   enviarProposta,
   listarLeadsParaProposta,
   melhorarPropostaComIA,
+  statusRampa,
   type LeadCandidato,
+  type RampaStatus,
 } from "@/services/propostas";
 
 const STATUS_LABEL: Record<PropostaStatus, string> = {
@@ -92,12 +94,15 @@ export function PropostasSection() {
   const [statusFiltro, setStatusFiltro] = useState<string>("all");
   const [editando, setEditando] = useState<Proposta | null>(null);
   const [abrindoGerar, setAbrindoGerar] = useState(false);
+  const [rampa, setRampa] = useState<RampaStatus | null>(null);
 
   const carregar = async () => {
     setLoading(true);
     setError(null);
     try {
-      setPropostas(await listarPropostas());
+      const [ps, r] = await Promise.all([listarPropostas(), statusRampa()]);
+      setPropostas(ps);
+      setRampa(r);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao carregar propostas");
     } finally {
@@ -137,6 +142,11 @@ export function PropostasSection() {
           toast.warning(`"${p.lead_nome}" pediu descadastro (LGPD) — não é possível enviar.`);
           return;
         }
+        if (r.reason === "teto_dia") {
+          toast.warning("Limite diário do aquecimento atingido — os próximos e-mails saem amanhã.");
+          setRampa(await statusRampa());
+          return;
+        }
         const copiou = await copiar(`${p.assunto}\n\n${p.corpo}`);
         toast.warning(
           copiou
@@ -147,6 +157,7 @@ export function PropostasSection() {
       }
       setPropostas((prev) => prev.map((x) => (x.id === r.proposta.id ? r.proposta : x)));
       toast.success(`E-mail enviado para "${p.lead_nome}".`);
+      setRampa(await statusRampa());
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao enviar");
     } finally {
@@ -170,6 +181,14 @@ export function PropostasSection() {
             {propostas.length} propostas · {totais.rascunho} rascunho · {totais.enviada} enviadas ·{" "}
             {totais.respondida} respondidas
           </p>
+          {rampa && (
+            <p className="mt-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                Aquecimento{rampa.ativa ? ` · dia ${rampa.dia}` : " (não iniciado)"} · teto{" "}
+                {rampa.teto}/dia · {rampa.enviados_hoje} enviados hoje · {rampa.restante} restante
+              </span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={carregar}>

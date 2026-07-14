@@ -41,8 +41,10 @@ Deno.serve(async (req) => {
   const RESEND = Deno.env.get("RESEND_API_KEY");
   if (!RESEND) return json({ error: "RESEND_API_KEY não configurada" }, 503);
   const from = Deno.env.get("EMAIL_FROM") || DEFAULT_FROM;
-  // Teto/dia: env FOLLOWUP_MAX_DIA (default 50). O cron manda body vazio → usa o
-  // env; um override opcional `max` no body serve só para teste do teto.
+  const funcsBase = `${SUPABASE_URL}/functions/v1`;
+
+  // Teto do dia vem da RAMPA de aquecimento (proposta + follow-up SOMADOS, global).
+  // O excedente fica pra amanhã (não marca o que não enviou). body {max} = só teste.
   let bodyMax: unknown;
   if (req.method === "POST") {
     try {
@@ -51,9 +53,20 @@ Deno.serve(async (req) => {
       /* corpo vazio/{} */
     }
   }
-  const envTeto = Math.max(1, parseInt(Deno.env.get("FOLLOWUP_MAX_DIA") || "50", 10) || 50);
-  const teto = typeof bodyMax === "number" && bodyMax > 0 ? Math.floor(bodyMax) : envTeto;
-  const funcsBase = `${SUPABASE_URL}/functions/v1`;
+  const { data: rampa } = await admin.rpc("email_rampa_status");
+  const restante = rampa?.[0]?.restante ?? 0;
+  const teto =
+    typeof bodyMax === "number" && bodyMax >= 0
+      ? Math.min(Math.floor(bodyMax), restante)
+      : restante;
+  if (teto <= 0)
+    return json({
+      ok: true,
+      enviados: 0,
+      teto: 0,
+      motivo: "teto do dia atingido",
+      rampa: rampa?.[0],
+    });
 
   const agora = new Date();
   const d3 = new Date(agora.getTime() - DIAS * 24 * 60 * 60 * 1000).toISOString();
@@ -141,6 +154,7 @@ Deno.serve(async (req) => {
     agora: agora.toISOString(),
     d3_corte: d3,
     teto,
+    rampa: rampa?.[0],
     candidatos: (cands ?? []).length,
     enviados: itens.length,
     itens,
