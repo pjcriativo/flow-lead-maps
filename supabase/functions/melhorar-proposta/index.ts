@@ -2,7 +2,16 @@
 // Recebe a copy montada por template e pede ao Claude para reescrever mais
 // persuasiva/humana, SEM preço, preservando o link único e sem gatilhos de spam.
 // Devolve { assunto, corpo } — a UI revisa e o usuário salva. Chave em secret.
+//
+// 🔒 RATE-LIMIT POR ORG (achado da auditoria: qualquer autenticado gastava IA à vontade).
+// Exige getUser (a org sai do JWT), conta o uso do dia em ia_uso e barra ao estourar o teto
+// (MELHORAR_PROPOSTA_MAX_DIA, default 30) com mensagem CLARA — não erro genérico. O uso só é
+// registrado quando a IA responde de fato (falha não consome cota). ia_uso também dá ao dono
+// a visibilidade de consumo por org.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+
+const TETO_PADRAO = 30;
 
 const SYSTEM = `Você é redator de prospecção B2B no Brasil. Reescreve uma mensagem de
 PRIMEIRA ABORDAGEM (e-mail/WhatsApp) para dono de negócio local, tornando-a mais
@@ -22,6 +31,43 @@ Deno.serve(async (req) => {
 
   const key = Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) return json({ error: "IA indisponível (sem chave configurada)" }, 503);
+
+  // AUTH OBRIGATÓRIA — a org (para o limite e o registro) sai do JWT, nunca do corpo.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  const userId = userData.user.id;
+
+  // service_role: ia_uso não é escrita pelo cliente (senão ele zeraria a própria cota).
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+
+  // RATE-LIMIT por org: quantas melhorias esta org já fez HOJE (UTC)?
+  const teto = Number(Deno.env.get("MELHORAR_PROPOSTA_MAX_DIA") || TETO_PADRAO);
+  const inicioDoDia = new Date();
+  inicioDoDia.setUTCHours(0, 0, 0, 0);
+  const { count: usados } = await admin
+    .from("ia_uso")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("funcao", "melhorar-proposta")
+    .gte("criado_em", inicioDoDia.toISOString());
+  const jaUsou = usados ?? 0;
+  if (jaUsou >= teto)
+    return json({
+      reason: "rate_limit",
+      limite: teto,
+      usados: jaUsou,
+      error: `Limite diário de "Melhorar com IA" atingido nesta conta: ${jaUsou}/${teto} hoje. O contador zera à meia-noite (UTC). Se precisar de mais, ajuste MELHORAR_PROPOSTA_MAX_DIA.`,
+    });
 
   let body: { assunto?: string; corpo?: string; lead_nome?: string };
   try {
@@ -82,5 +128,8 @@ Preserve o link exatamente como está${urlOriginal ? ` (${urlOriginal})` : ""}.`
   if (urlOriginal && !novoCorpo.includes(urlOriginal)) novoCorpo += `\n\n${urlOriginal}`;
   const novoAssunto = (out.assunto ?? assunto).slice(0, 120);
 
-  return json({ assunto: novoAssunto, corpo: novoCorpo });
+  // Consome a cota SÓ agora (a IA respondeu de fato). Alimenta o limite e a visão de custo.
+  await admin.from("ia_uso").insert({ user_id: userId, funcao: "melhorar-proposta", modelo });
+
+  return json({ assunto: novoAssunto, corpo: novoCorpo, usados: jaUsou + 1, limite: teto });
 });
