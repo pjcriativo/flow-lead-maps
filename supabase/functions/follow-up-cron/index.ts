@@ -161,12 +161,24 @@ Deno.serve(async (req) => {
   // {remetente} por org (profiles.full_name). Sem nome configurado, o follow-up NÃO sai:
   // assinar com nome inventado é pior do que tentar de novo amanhã.
   const remetentePorOrg = new Map<string, string>();
+  // REPLY-TO por org: onde a resposta do lead cai. Sem ele o follow-up pede resposta e ela
+  // some numa caixa que o dono não lê — não manda (tenta amanhã, já cadastrado).
+  const replyToPorOrg = new Map<string, string>();
   const orgIds = [...new Set(((cands ?? []) as Array<{ user_id: string }>).map((c) => c.user_id))];
   if (orgIds.length) {
-    const { data: profs } = await admin.from("profiles").select("id, full_name").in("id", orgIds);
-    for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+    const { data: profs } = await admin
+      .from("profiles")
+      .select("id, full_name, reply_to_email")
+      .in("id", orgIds);
+    for (const p of (profs ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      reply_to_email: string | null;
+    }>) {
       const n = (p.full_name ?? "").trim();
       if (n) remetentePorOrg.set(p.id, n);
+      const r = (p.reply_to_email ?? "").trim();
+      if (r) replyToPorOrg.set(p.id, r);
     }
   }
 
@@ -227,6 +239,16 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const replyTo = replyToPorOrg.get(c.user_id);
+    if (!replyTo) {
+      falhas.push({
+        lead_id: c.lead_id,
+        motivo:
+          'Sem "E-mail para respostas" (Configurações) — a resposta do lead não teria onde chegar.',
+      });
+      continue;
+    }
+
     const dias = diasAte(c.site_id ? (expiraPorSite.get(c.site_id) ?? null) : null, agora);
     const assunto = /^re:/i.test(c.assunto ?? "")
       ? c.assunto
@@ -236,7 +258,7 @@ Deno.serve(async (req) => {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [email], subject: assunto, text: corpo }),
+      body: JSON.stringify({ from, to: [email], reply_to: replyTo, subject: assunto, text: corpo }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await res.json().catch(() => ({}));

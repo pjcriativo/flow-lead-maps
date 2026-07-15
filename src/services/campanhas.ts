@@ -390,6 +390,8 @@ export type EnviarLoteResult = {
   opt_out: number;
   teto_dia: number;
   erro: number;
+  /** Falta o "E-mail para respostas" da org: problema de CONFIG, não do lead. */
+  sem_reply_to: number;
 };
 
 /** REVISÃO EM LOTE — envia todas as propostas APROVADAS da campanha, respeitando o
@@ -403,7 +405,14 @@ export async function enviarAprovadasDaCampanha(campanhaId: string): Promise<Env
     .order("criada_em", { ascending: true });
   if (error) throw error;
 
-  const r: EnviarLoteResult = { enviadas: 0, sem_email: 0, opt_out: 0, teto_dia: 0, erro: 0 };
+  const r: EnviarLoteResult = {
+    enviadas: 0,
+    sem_email: 0,
+    opt_out: 0,
+    teto_dia: 0,
+    erro: 0,
+    sem_reply_to: 0,
+  };
   for (const p of (aprovadas ?? []) as Array<{ id: string }>) {
     try {
       const res = await enviarProposta(p.id);
@@ -412,6 +421,11 @@ export async function enviarAprovadasDaCampanha(campanhaId: string): Promise<Env
       } else if (res.reason === "teto_dia") {
         r.teto_dia += 1;
         break; // teto do dia da org — o resto sai amanhã
+      } else if (res.reason === "sem_reply_to") {
+        // Config da ORG, não do lead: sem Reply-To NENHUMA proposta sai. Insistir lead a
+        // lead só produziria N erros iguais — para na hora.
+        r.sem_reply_to += 1;
+        break;
       } else if (res.reason === "sem_email") {
         r.sem_email += 1;
       } else if (res.reason === "opt_out") {

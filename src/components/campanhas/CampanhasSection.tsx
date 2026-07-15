@@ -631,8 +631,12 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
           opt_out: `"${p.lead_nome}" pediu descadastro (LGPD).`,
           teto_dia: "Teto do dia atingido — o resto sai amanhã.",
           sem_email: `"${p.lead_nome}" não tem e-mail.`,
+          sem_reply_to:
+            r.error ?? 'Cadastre o "E-mail para respostas" em Configurações antes de enviar.',
         };
-        toast.warning(msg[r.reason] ?? "Não foi possível enviar.");
+        toast.warning(msg[r.reason] ?? "Não foi possível enviar.", {
+          duration: r.reason === "sem_reply_to" ? 8000 : undefined,
+        });
         if (r.reason === "teto_dia") setRampa(await statusRampa());
         return false;
       }
@@ -687,6 +691,13 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
     setEnviandoLote(true);
     try {
       const r = await enviarAprovadasDaCampanha(campanha.id);
+      if (r.sem_reply_to > 0 && r.enviadas === 0) {
+        toast.error(
+          'Nada enviado: cadastre o "E-mail para respostas" em Configurações. Sem ele, a resposta do lead chega numa caixa que você não lê.',
+          { duration: 8000 },
+        );
+        return;
+      }
       const partes = [
         `${r.enviadas} enviada(s)`,
         r.teto_dia ? `${r.teto_dia} barradas pelo teto (amanhã)` : "",

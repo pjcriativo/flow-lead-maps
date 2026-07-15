@@ -71,11 +71,36 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: "Envio indisponível: RESEND_API_KEY não configurada." });
   const from = Deno.env.get("EMAIL_FROM") || DEFAULT_FROM;
 
+  // REPLY-TO da org: é onde a resposta do lead cai. Sem ele, o e-mail pede "responde este
+  // e-mail" e a resposta some numa caixa que o dono não lê — pior do que não enviar. Barra.
+  // (O From continua no domínio VERIFICADO: trocá-lo pelo e-mail do usuário seria spoofing.)
+  const { data: perfil } = await supabase
+    .from("profiles")
+    .select("reply_to_email")
+    .eq("id", userData.user.id)
+    .maybeSingle();
+  const replyTo = (
+    (perfil as { reply_to_email: string | null } | null)?.reply_to_email ?? ""
+  ).trim();
+  if (!replyTo)
+    return json({
+      ok: false,
+      reason: "sem_reply_to",
+      error:
+        'Cadastre o "E-mail para respostas" em Configurações antes de enviar — sem ele, a resposta do lead chega numa caixa que você não lê.',
+    });
+
   // Envia pelo Resend (corpo em texto puro — menos "cara de spam").
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [email], subject: prop.assunto, text: prop.corpo }),
+    body: JSON.stringify({
+      from,
+      to: [email],
+      reply_to: replyTo,
+      subject: prop.assunto,
+      text: prop.corpo,
+    }),
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json().catch(() => ({}));

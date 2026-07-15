@@ -342,7 +342,12 @@ export async function reabrirProposta(proposta: Proposta): Promise<Proposta> {
  * como erro (não vira sucesso). */
 export type EnviarResult =
   | { ok: true; proposta: Proposta }
-  | { ok: false; reason: "sem_email" | "opt_out" | "teto_dia" | "nao_aprovada" };
+  | {
+      ok: false;
+      reason: "sem_email" | "opt_out" | "teto_dia" | "nao_aprovada" | "sem_reply_to";
+      /** Mensagem pronta do servidor (o caso sem_reply_to explica o que fazer). */
+      error?: string;
+    };
 
 /** Status da rampa de aquecimento do e-mail (teto do dia / restante). */
 export type RampaStatus = {
@@ -378,6 +383,8 @@ export async function enviarProposta(id: string): Promise<EnviarResult> {
   if (d?.reason === "opt_out") return { ok: false, reason: "opt_out" };
   if (d?.reason === "teto_dia") return { ok: false, reason: "teto_dia" };
   if (d?.reason === "nao_aprovada") return { ok: false, reason: "nao_aprovada" };
+  // Sem Reply-To cadastrado: o servidor manda a mensagem pronta (diz o que fazer).
+  if (d?.reason === "sem_reply_to") return { ok: false, reason: "sem_reply_to", error: d.error };
   if (d?.error) throw new Error(d.error);
   if (!d?.proposta) throw new Error("Resposta inválida do envio");
   return { ok: true, proposta: toProposta(d.proposta as Row) };

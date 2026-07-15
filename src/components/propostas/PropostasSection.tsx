@@ -156,6 +156,13 @@ export function PropostasSection() {
           );
           return false;
         }
+        if (r.reason === "sem_reply_to") {
+          toast.error(
+            r.error ?? 'Cadastre o "E-mail para respostas" em Configurações antes de enviar.',
+            { duration: 8000 },
+          );
+          return false;
+        }
         if (r.reason === "opt_out") {
           toast.warning(`"${p.lead_nome}" pediu descadastro (LGPD) — não é possível enviar.`);
           return false;

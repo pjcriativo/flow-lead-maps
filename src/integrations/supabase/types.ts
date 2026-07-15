@@ -137,12 +137,15 @@ export type Database = {
           email: string | null;
           full_name: string | null;
           company_name: string | null;
+          /** Reply-To dos e-mails da org — onde a resposta do lead chega. NÃO é o From. */
+          reply_to_email: string | null;
           updated_at: string | null;
         };
         Insert: never;
         Update: {
           full_name?: string | null;
           company_name?: string | null;
+          reply_to_email?: string | null;
           updated_at?: string | null;
         };
         Relationships: [];
