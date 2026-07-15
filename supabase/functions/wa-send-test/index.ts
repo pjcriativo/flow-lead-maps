@@ -1,15 +1,34 @@
-// Edge: wa-send-test (WhatsApp peça 1). Envia 1 mensagem de texto de TESTE para um
-// número informado (o do próprio dono), via Evolution GO (POST /send/text com o
-// token da instância). Mostra o erro/sucesso REAL da Evolution — não mascara.
-// ⚠️ PEÇA 1 = só PROVAR conexão. NÃO É disparo em massa/proposta/follow-up por
-// WhatsApp nem seleção de leads — isso é peça 2 (depois do aquecimento de chip).
+// Edge: wa-send-test — envia 1 mensagem de teste pelo WhatsApp DA ORG do usuário logado.
+//
+// 🔒 CORREÇÃO DO INCIDENTE: esta edge NÃO tinha getUser e enviava pela instância GLOBAL —
+// ou seja, a org B mandava mensagem pelo número da org A. Agora: AUTH OBRIGATÓRIA e o envio
+// usa SEMPRE o token da instância da própria org (resolvida pelo user_id do JWT). A edge não
+// aceita nome/id/token de instância vindo do cliente — não há como apontar para outra org.
+// ⚠️ PEÇA 1 = só PROVAR conexão. NÃO é disparo em massa/proposta por WhatsApp (peça 2).
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { resolverInstancia, statusInstancia, waBase } from "../_shared/wa.ts";
+import {
+  resolverInstanciaDaOrg,
+  statusInstancia,
+  sincronizarInstancia,
+  waBase,
+} from "../_shared/wa.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
   if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
+
+  // AUTH OBRIGATÓRIA — a org sai do JWT, nunca do corpo.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  const userId = userData.user.id;
 
   let body: { number?: string; text?: string };
   try {
@@ -23,12 +42,26 @@ Deno.serve(async (req) => {
   const text =
     (body.text || "").trim() || "✅ Teste do Flow Leads — conexão do WhatsApp funcionando!";
 
-  const inst = await resolverInstancia(false);
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+
+  // Instância DA ORG (não cria: se ela não tem, não há o que enviar).
+  const inst = await resolverInstanciaDaOrg(admin, userId, false);
   if (!inst)
-    return json({ ok: false, error: "Instância não existe — conecte o WhatsApp primeiro." });
+    return json({
+      ok: false,
+      error: "A sua org ainda não tem WhatsApp — conecte o seu número primeiro.",
+    });
   const st = await statusInstancia(inst.token);
+  await sincronizarInstancia(admin, inst, st);
   if (!st?.loggedIn)
-    return json({ ok: false, error: "WhatsApp não está conectado — pareie o QR primeiro." });
+    return json({
+      ok: false,
+      error: "O seu WhatsApp não está conectado — pareie o seu número primeiro.",
+    });
 
   const r = await fetch(`${waBase()}/send/text`, {
     method: "POST",

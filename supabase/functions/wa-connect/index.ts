@@ -1,15 +1,22 @@
-// Edge: wa-connect (WhatsApp peça 1). Cria/lê a instância dedicada na Evolution GO
-// e devolve o QR (pra parear o número dedicado) ou o status "conectado". Secrets
-// EVOLUTION_URL/API_KEY só no servidor. NÃO envia nada, NÃO mexe em leads.
-// body {fresh:true} (clique explícito em "Conectar") RECRIA a sessão p/ um QR novo,
-// porque a Evolution GO devolve um QR ESTÁTICO válido só ~60s; o polling manda
-// {} e só relê status/QR atual (não recria, pra não matar o pareamento em curso).
+// Edge: wa-connect — conecta o WhatsApp DA ORG do usuário logado (multi-tenant).
+//
+// 🔒 CORREÇÃO DO INCIDENTE: esta edge NÃO tinha getUser e operava numa instância GLOBAL
+// ("flowleads") — qualquer org via/usava a de outra. Agora: AUTH OBRIGATÓRIA (getUser) e a
+// instância é resolvida SEMPRE pelo user_id do caller (wa_instancias.nome ARMAZENADO). Não
+// aceita nome/id de instância vindo do cliente, não lista instância de outra org, e recriar
+// (QR/código) mexe SÓ na instância da própria org — nunca derruba a conexão de outra (o DoS).
+//
+// Secrets EVOLUTION_URL/EVOLUTION_API_KEY seguem só no servidor e servem apenas para
+// GERENCIAR instâncias; o token de cada org vive em wa_instancia_tokens (RLS sem policy).
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import {
-  resolverInstancia,
-  recriarInstancia,
+  resolverInstanciaDaOrg,
+  recriarInstanciaDaOrg,
   statusInstancia,
+  sincronizarInstancia,
   pairInstancia,
+  qrInstancia,
   waBase,
 } from "../_shared/wa.ts";
 
@@ -21,61 +28,76 @@ Deno.serve(async (req) => {
     return json({ error: "Método não permitido" }, 405);
   if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
 
+  // AUTH OBRIGATÓRIA — a org sai do JWT, nunca do corpo da requisição.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  const userId = userData.user.id;
+
+  // service_role só para as tabelas wa_* (inacessíveis ao cliente).
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+
   let fresh = false;
   let phone = "";
-  try {
-    const b = await req.json();
-    fresh = !!b?.fresh;
-    phone = (b?.phone || "").replace(/\D/g, "");
-  } catch {
-    /* corpo vazio */
-  }
-
-  let inst = await resolverInstancia(true);
-  if (!inst)
-    return json({
-      status: "erro",
-      error: "Não foi possível criar/ler a instância na Evolution GO",
-    });
-
-  const st = await statusInstancia(inst.token);
-  if (st?.loggedIn) {
-    return json({ status: "conectado", instancia: inst.name, numero: inst.jid || st.name });
-  }
-
-  // CÓDIGO DE PAREAMENTO (recomendado): recria a sessão e gera o código do número.
-  // Mais confiável que o QR (que é estático e expira em ~60s).
-  if (phone && phone.length >= 12) {
-    const nova = await recriarInstancia();
-    if (nova) {
-      inst = nova;
-      await sleep(2500);
+  if (req.method === "POST") {
+    try {
+      const b = await req.json();
+      fresh = !!b?.fresh;
+      phone = (b?.phone || "").replace(/\D/g, "");
+    } catch {
+      /* corpo vazio */
     }
-    const code = await pairInstancia(inst.token, phone);
+  }
+
+  // CÓDIGO DE PAREAMENTO (recomendado): recria a instância DA ORG e gera o código.
+  if (phone && phone.length >= 12) {
+    const nova = await recriarInstanciaDaOrg(admin, userId);
+    if (!nova) return json({ status: "erro", error: "Não foi possível preparar a sua instância." });
+    await sleep(2500);
+    const code = await pairInstancia(nova.token, phone);
     if (!code)
       return json({ status: "erro", error: "Não foi possível gerar o código de pareamento." });
-    return json({ status: "code", instancia: inst.name, code });
+    return json({ status: "code", instancia: nova.nome, code });
   }
 
-  // Clique explícito em "Conectar" (QR) → recria a sessão para um QR fresco (~60s).
+  // Clique explícito em "Conectar" (QR) → recria a instância DA ORG p/ um QR fresco (~60s).
   if (fresh) {
-    const nova = await recriarInstancia();
-    if (nova) {
-      inst = nova;
-      await sleep(2500); // dá tempo do socket subir e gerar o QR
-    }
+    const nova = await recriarInstanciaDaOrg(admin, userId);
+    if (!nova) return json({ status: "erro", error: "Não foi possível preparar a sua instância." });
+    await sleep(2500);
+    const qr = await qrInstancia(nova.token);
+    if (!qr)
+      return json({
+        status: "aguardando",
+        instancia: nova.nome,
+        aviso: "QR ainda não disponível — clique em Conectar novamente.",
+      });
+    return json({ status: "qr", instancia: nova.nome, qr });
   }
 
-  // Busca o QR (GET /instance/qr com o token da instância).
-  const q = await fetch(`${waBase()}/instance/qr`, { headers: { apikey: inst.token } });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const qj: any = await q.json().catch(() => ({}));
-  const qr = qj?.data?.Qrcode || "";
+  // Polling: lê o status da instância DA ORG (cria a dela se ainda não existir).
+  const inst = await resolverInstanciaDaOrg(admin, userId, true);
+  if (!inst) return json({ status: "erro", error: "Não foi possível criar/ler a sua instância." });
+  const st = await statusInstancia(inst.token);
+  const numero = await sincronizarInstancia(admin, inst, st);
+  if (st?.loggedIn)
+    return json({ status: "conectado", instancia: inst.nome, numero: numero ?? inst.numero });
+
+  const qr = await qrInstancia(inst.token);
   if (!qr)
     return json({
       status: "aguardando",
-      instancia: inst.name,
+      instancia: inst.nome,
       aviso: "QR ainda não disponível — clique em Conectar novamente.",
     });
-  return json({ status: "qr", instancia: inst.name, qr });
+  return json({ status: "qr", instancia: inst.nome, qr });
 });
