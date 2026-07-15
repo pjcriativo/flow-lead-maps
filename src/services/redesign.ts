@@ -82,6 +82,19 @@ export async function gerarRedesign(
   return data as any;
 }
 
+/** Busca um redesign por id (com o nome do lead) — usado no preview da campanha. */
+export async function obterRedesign(id: string): Promise<Redesign> {
+  const { data, error } = await supabase
+    .from("redesigns")
+    .select("*, leads(business_name)")
+    .eq("id", id)
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Redesign não encontrado");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = data as any;
+  return { ...r, lead_nome: r.leads?.business_name ?? undefined };
+}
+
 /** Salva a edição do usuário (html_editado) — é o que vai para publicação. */
 export async function salvarEdicao(id: string, html: string): Promise<void> {
   const { error } = await supabase

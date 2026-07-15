@@ -18,19 +18,37 @@ import {
   CheckCircle2,
   Globe,
   Circle,
+  Eye,
+  Send,
+  Mail,
+  ShieldCheck,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatData } from "@/lib/format";
-import type { Campanha, CampanhaLeadView, CampanhaLeadEstado } from "@/types";
-import { statusRampa } from "@/services/propostas";
-import type { RampaStatus } from "@/services/propostas";
-import { gerarPropostaRascunhoSemSite } from "@/services/propostas";
-import { gerarRedesign } from "@/services/redesign";
+import type { Campanha, CampanhaLeadView, CampanhaLeadEstado, Proposta, Redesign } from "@/types";
+import {
+  statusRampa,
+  gerarPropostaRascunhoSemSite,
+  enviarProposta,
+  type RampaStatus,
+} from "@/services/propostas";
+import { gerarRedesign, obterRedesign } from "@/services/redesign";
+import { EditorRedesign } from "@/components/redesign/RedesignSection";
+import { RevisarPropostaDialog } from "@/components/propostas/PropostasSection";
 import {
   listarCampanhas,
   criarCampanhaDaLista,
@@ -39,6 +57,10 @@ import {
   listarCampanhaLeadsView,
   redesignProntoDoLead,
   atualizarCampanhaLead,
+  descartarCampanhaLead,
+  aprovarCampanhaLead,
+  aprovarTodosDaCampanha,
+  enviarAprovadasDaCampanha,
 } from "@/services/campanhas";
 import { listarListas, type LeadListComStats } from "@/lib/lists-api";
 
@@ -386,6 +408,12 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
   const [preparando, setPreparando] = useState(false);
   const [progresso, setProgresso] = useState<Progresso | null>(null);
   const [rampa, setRampa] = useState<RampaStatus | null>(null);
+  const [previewRedesign, setPreviewRedesign] = useState<Redesign | null>(null);
+  const [editando, setEditando] = useState<CampanhaLeadView | null>(null);
+  const [descartando, setDescartando] = useState<CampanhaLeadView | null>(null);
+  const [acaoId, setAcaoId] = useState<string | null>(null);
+  const [aprovandoLote, setAprovandoLote] = useState(false);
+  const [enviandoLote, setEnviandoLote] = useState(false);
 
   const carregar = async () => {
     setLoading(true);
@@ -499,6 +527,137 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
 
   const prepararSelecionados = () => prepararLeads(selecionaveis.filter((v) => sel.has(v.id)));
 
+  // Ver o site: abre o EditorRedesign (preview + editar HTML) — do HTML no banco, SEM publicar.
+  const verSite = async (v: CampanhaLeadView) => {
+    if (!v.redesign_id) return;
+    setAcaoId(v.id);
+    try {
+      setPreviewRedesign(await obterRedesign(v.redesign_id));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao abrir o site");
+    } finally {
+      setAcaoId(null);
+    }
+  };
+
+  // Regenerar o site (custa IA): novo redesign + revincula ao lead da campanha.
+  const regenerarSite = async (v: CampanhaLeadView) => {
+    if (!confirm(`Regenerar o site de "${v.lead_nome}"? Gera um novo redesign (custa IA).`)) return;
+    setAcaoId(v.id);
+    try {
+      const r = await gerarRedesign(v.lead_id);
+      await atualizarCampanhaLead(v.id, { redesign_id: r.redesign.id });
+      patchRow(v.id, { redesign_id: r.redesign.id });
+      toast.success(`Site de "${v.lead_nome}" regenerado.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao regenerar");
+    } finally {
+      setAcaoId(null);
+    }
+  };
+
+  const confirmarDescartar = async (motivo: string) => {
+    const v = descartando;
+    if (!v) return;
+    try {
+      await descartarCampanhaLead(v.id, motivo);
+      patchRow(v.id, {
+        estado: "descartado",
+        proposta: null,
+        proposta_id: null,
+        motivo_descarte: motivo,
+      });
+      toast.success(`"${v.lead_nome}" descartado.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao descartar");
+    } finally {
+      setDescartando(null);
+    }
+  };
+
+  const handleEnviar = async (p: Proposta): Promise<boolean> => {
+    setAcaoId(p.id);
+    try {
+      const r = await enviarProposta(p.id);
+      if (!r.ok) {
+        const msg: Record<string, string> = {
+          nao_aprovada: `"${p.lead_nome}" ainda não foi aprovada.`,
+          opt_out: `"${p.lead_nome}" pediu descadastro (LGPD).`,
+          teto_dia: "Teto do dia atingido — o resto sai amanhã.",
+          sem_email: `"${p.lead_nome}" não tem e-mail.`,
+        };
+        toast.warning(msg[r.reason] ?? "Não foi possível enviar.");
+        if (r.reason === "teto_dia") setRampa(await statusRampa());
+        return false;
+      }
+      setView((prev) =>
+        prev.map((x) => (x.proposta_id === r.proposta.id ? { ...x, proposta: r.proposta } : x)),
+      );
+      toast.success(`E-mail enviado para "${p.lead_nome}".`);
+      setRampa(await statusRampa());
+      return true;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao enviar");
+      return false;
+    } finally {
+      setAcaoId(null);
+    }
+  };
+
+  // Override do "Aprovar" no diálogo: publica o site + injeta o link (publish-on-approve).
+  const aprovarComPublish =
+    (campanhaLeadId: string) =>
+    async (p: Proposta): Promise<Proposta> => {
+      const atualizada = await aprovarCampanhaLead(campanhaLeadId, p);
+      patchRow(campanhaLeadId, { estado: "aprovado", proposta: atualizada });
+      return atualizada;
+    };
+
+  const aprovarLote = async () => {
+    const n = view.filter((v) => v.estado === "rascunho").length;
+    if (n === 0 || aprovandoLote) return;
+    if (
+      !confirm(`Aprovar e PUBLICAR os ${n} rascunhos? Cada um gera a URL pública e injeta o link.`)
+    )
+      return;
+    setAprovandoLote(true);
+    try {
+      const r = await aprovarTodosDaCampanha(campanha.id);
+      toast.success(`${r.aprovados} aprovados` + (r.erros ? `, ${r.erros} com erro` : "") + ".");
+      await carregar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao aprovar em lote");
+    } finally {
+      setAprovandoLote(false);
+    }
+  };
+
+  const enviarLote = async () => {
+    const n = view.filter(
+      (v) => v.estado === "aprovado" && v.proposta?.status === "aprovada",
+    ).length;
+    if (n === 0 || enviandoLote) return;
+    if (!confirm(`Enviar as ${n} propostas aprovadas agora?`)) return;
+    setEnviandoLote(true);
+    try {
+      const r = await enviarAprovadasDaCampanha(campanha.id);
+      const partes = [
+        `${r.enviadas} enviada(s)`,
+        r.teto_dia ? `${r.teto_dia} barradas pelo teto (amanhã)` : "",
+        r.sem_email ? `${r.sem_email} sem e-mail` : "",
+        r.opt_out ? `${r.opt_out} opt-out` : "",
+        r.erro ? `${r.erro} erro` : "",
+      ].filter(Boolean);
+      if (r.enviadas > 0) toast.success(partes.join(" · "));
+      else toast.warning(partes.join(" · ") || "Nada enviado.");
+      await carregar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao enviar em lote");
+    } finally {
+      setEnviandoLote(false);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -523,7 +682,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             onClick={prepararSelecionados}
@@ -536,6 +695,32 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
               <Sparkles className="h-4 w-4" />
             )}
             Gerar site + proposta ({sel.size})
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={aprovarLote}
+            disabled={aprovandoLote || totais.rascunho === 0}
+          >
+            {aprovandoLote ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
+            Aprovar todos ({totais.rascunho})
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={enviarLote}
+            disabled={enviandoLote || totais.aprovado === 0}
+          >
+            {enviandoLote ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Enviar aprovados ({totais.aprovado})
           </Button>
         </div>
       </div>
@@ -631,7 +816,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                         <EstadoPill estado={v.estado} enviada={v.proposta?.status === "enviada"} />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
                           {selecionavel && (
                             <Button
                               size="sm"
@@ -643,6 +828,64 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                               <Wand2 className="h-4 w-4" />
                             </Button>
                           )}
+                          {(v.estado === "rascunho" || v.estado === "aprovado") && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Ver o site (preview, sem publicar)"
+                                onClick={() => verSite(v)}
+                                disabled={!v.redesign_id || acaoId === v.id}
+                              >
+                                {acaoId === v.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Revisar / editar proposta"
+                                onClick={() => setEditando(v)}
+                                disabled={!v.proposta}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Regenerar o site (custa IA)"
+                                onClick={() => regenerarSite(v)}
+                                disabled={acaoId === v.id}
+                              >
+                                <Wand2 className="h-4 w-4" />
+                              </Button>
+                              {v.estado === "aprovado" && v.proposta?.status === "aprovada" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Enviar por e-mail"
+                                  onClick={() => v.proposta && handleEnviar(v.proposta)}
+                                  disabled={acaoId === v.proposta?.id}
+                                >
+                                  {acaoId === v.proposta?.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Send className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Descartar"
+                                onClick={() => setDescartando(v)}
+                              >
+                                <XCircle className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -653,6 +896,91 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
           </div>
         </div>
       )}
+
+      {/* Preview do site (iframe do HTML no banco — SEM publicar) + editor de HTML inline */}
+      {previewRedesign && (
+        <EditorRedesign
+          redesign={previewRedesign}
+          onClose={() => setPreviewRedesign(null)}
+          onSaved={(html) => setPreviewRedesign((p) => (p ? { ...p, html_editado: html } : p))}
+        />
+      )}
+
+      {/* Revisar / editar a proposta. Aprovar aqui PUBLICA o site e injeta o link (Etapa 3). */}
+      {editando && editando.proposta && (
+        <RevisarPropostaDialog
+          proposta={editando.proposta}
+          onClose={() => setEditando(null)}
+          onChange={(atualizada) => patchRow(editando.id, { proposta: atualizada })}
+          onEnviar={handleEnviar}
+          onAprovar={aprovarComPublish(editando.id)}
+        />
+      )}
+
+      {descartando && (
+        <DescartarDialog
+          nome={descartando.lead_nome}
+          onClose={() => setDescartando(null)}
+          onConfirmar={confirmarDescartar}
+        />
+      )}
     </div>
+  );
+}
+
+/* -------------------- Descartar um lead da campanha (com motivo) -------------------- */
+function DescartarDialog({
+  nome,
+  onClose,
+  onConfirmar,
+}: {
+  nome: string;
+  onClose: () => void;
+  onConfirmar: (motivo: string) => Promise<void>;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const confirmar = async () => {
+    setSalvando(true);
+    await onConfirmar(motivo.trim());
+    setSalvando(false);
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-destructive" /> Descartar "{nome}"
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            O lead sai da campanha. A proposta rascunho é removida; o site gerado (redesign) fica
+            guardado para reuso.
+          </p>
+          <Label htmlFor="motivo-descarte">Motivo (opcional)</Label>
+          <Textarea
+            id="motivo-descarte"
+            rows={3}
+            placeholder="ex.: fora do perfil, já é cliente, pediu para não contatar…"
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value)}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={salvando}>
+            Cancelar
+          </Button>
+          <Button variant="destructive" onClick={confirmar} disabled={salvando}>
+            {salvando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <XCircle className="h-4 w-4" />
+            )}
+            Descartar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
