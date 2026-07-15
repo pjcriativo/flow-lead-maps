@@ -798,7 +798,17 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {v.tem_redesign_pronto ? (
+                        {v.estado === "aprovado" ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                            <Globe className="h-3.5 w-3.5" /> site publicado
+                          </span>
+                        ) : v.estado === "rascunho" || v.estado === "gerando" ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> site gerado
+                          </span>
+                        ) : v.estado === "descartado" ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : v.tem_redesign_pronto ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
                             <CheckCircle2 className="h-3.5 w-3.5" /> prévia pronta · reusa
                           </span>
