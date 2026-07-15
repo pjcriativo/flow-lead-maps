@@ -23,6 +23,10 @@ import {
   Mail,
   ShieldCheck,
   XCircle,
+  ExternalLink,
+  CheckCheck,
+  Undo2,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -61,6 +65,8 @@ import {
   aprovarCampanhaLead,
   aprovarTodosDaCampanha,
   enviarAprovadasDaCampanha,
+  concluirCampanha,
+  reabrirCampanha,
 } from "@/services/campanhas";
 import { listarListas, type LeadListComStats } from "@/lib/lists-api";
 
@@ -257,7 +263,14 @@ function CampanhaCard({
           <span className="font-semibold leading-tight text-foreground">{c.nome}</span>
           <Megaphone className="h-4 w-4 shrink-0 text-muted-foreground" />
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">{formatData(c.criada_em)}</div>
+        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+          {formatData(c.criada_em)}
+          {c.status === "concluida" && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-800">
+              <CheckCheck className="h-3 w-3" /> Concluída
+            </span>
+          )}
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <span className="font-medium">
             <b className="text-base tabular-nums">{c.total}</b> leads
@@ -414,6 +427,8 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
   const [acaoId, setAcaoId] = useState<string | null>(null);
   const [aprovandoLote, setAprovandoLote] = useState(false);
   const [enviandoLote, setEnviandoLote] = useState(false);
+  const [concluida, setConcluida] = useState(campanha.status === "concluida");
+  const [concluindo, setConcluindo] = useState(false);
 
   const carregar = async () => {
     setLoading(true);
@@ -658,6 +673,36 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
     }
   };
 
+  // Concluir/reabrir a campanha. Concluir NÃO apaga nada: os pendentes ficam intactos,
+  // a UI só trava as ações (gerar/aprovar/enviar/descartar). Reabrir destrava.
+  const alternarConclusao = async () => {
+    const pend = view.filter((v) => v.estado === "pendente").length;
+    if (
+      !concluida &&
+      pend > 0 &&
+      !confirm(
+        `Concluir a campanha? ${pend} lead(s) pendente(s) ficam intactos (sem gerar/apagar) — dá para reabrir depois.`,
+      )
+    )
+      return;
+    setConcluindo(true);
+    try {
+      if (concluida) {
+        await reabrirCampanha(campanha.id);
+        setConcluida(false);
+        toast.success("Campanha reaberta.");
+      } else {
+        await concluirCampanha(campanha.id);
+        setConcluida(true);
+        toast.success("Campanha concluída.");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao alterar a campanha");
+    } finally {
+      setConcluindo(false);
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -683,47 +728,76 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {!concluida && (
+            <>
+              <Button
+                size="sm"
+                onClick={prepararSelecionados}
+                disabled={preparando || sel.size === 0}
+                className="bg-primary font-semibold hover:bg-primary/90"
+              >
+                {preparando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Gerar site + proposta ({sel.size})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={aprovarLote}
+                disabled={aprovandoLote || totais.rascunho === 0}
+              >
+                {aprovandoLote ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4" />
+                )}
+                Aprovar todos ({totais.rascunho})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={enviarLote}
+                disabled={enviandoLote || totais.aprovado === 0}
+              >
+                {enviandoLote ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Enviar aprovados ({totais.aprovado})
+              </Button>
+            </>
+          )}
           <Button
             size="sm"
-            onClick={prepararSelecionados}
-            disabled={preparando || sel.size === 0}
-            className="bg-primary font-semibold hover:bg-primary/90"
+            variant={concluida ? "default" : "outline"}
+            onClick={alternarConclusao}
+            disabled={concluindo}
           >
-            {preparando ? (
+            {concluindo ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : concluida ? (
+              <Undo2 className="h-4 w-4" />
             ) : (
-              <Sparkles className="h-4 w-4" />
+              <CheckCheck className="h-4 w-4" />
             )}
-            Gerar site + proposta ({sel.size})
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={aprovarLote}
-            disabled={aprovandoLote || totais.rascunho === 0}
-          >
-            {aprovandoLote ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ShieldCheck className="h-4 w-4" />
-            )}
-            Aprovar todos ({totais.rascunho})
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={enviarLote}
-            disabled={enviandoLote || totais.aprovado === 0}
-          >
-            {enviandoLote ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            Enviar aprovados ({totais.aprovado})
+            {concluida ? "Reabrir campanha" : "Concluir campanha"}
           </Button>
         </div>
       </div>
+
+      {concluida && (
+        <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900">
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>
+            <b>Campanha concluída.</b> As ações estão travadas e os leads pendentes ficaram
+            intactos. Clique em <b>Reabrir campanha</b> para voltar a preparar/aprovar/enviar.
+          </span>
+        </div>
+      )}
 
       {preparando && progresso && (
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
@@ -761,7 +835,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                       checked={selecionaveis.length > 0 && sel.size === selecionaveis.length}
                       onCheckedChange={selTodosPendentes}
                       aria-label="Selecionar todos os pendentes"
-                      disabled={preparando || selecionaveis.length === 0}
+                      disabled={preparando || selecionaveis.length === 0 || concluida}
                     />
                   </th>
                   {["Lead", "Matéria-prima", "Estado", "Ações"].map((h) => (
@@ -782,7 +856,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                             checked={sel.has(v.id)}
                             onCheckedChange={() => toggleSel(v.id)}
                             aria-label={`Selecionar ${v.lead_nome}`}
-                            disabled={preparando}
+                            disabled={preparando || concluida}
                           />
                         )}
                       </td>
@@ -799,9 +873,21 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                       </td>
                       <td className="px-4 py-3">
                         {v.estado === "aprovado" ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
-                            <Globe className="h-3.5 w-3.5" /> site publicado
-                          </span>
+                          v.url_publica ? (
+                            <a
+                              href={v.url_publica}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:underline"
+                            >
+                              <Globe className="h-3.5 w-3.5" /> Abrir site publicado
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                              <Globe className="h-3.5 w-3.5" /> site publicado
+                            </span>
+                          )
                         ) : v.estado === "rascunho" || v.estado === "gerando" ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700">
                             <CheckCircle2 className="h-3.5 w-3.5" /> site gerado
@@ -833,7 +919,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                               variant="ghost"
                               title="Preparar este (gerar site + proposta)"
                               onClick={() => prepararLeads([v])}
-                              disabled={preparando}
+                              disabled={preparando || concluida}
                             >
                               <Wand2 className="h-4 w-4" />
                             </Button>
@@ -867,7 +953,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                                 variant="ghost"
                                 title="Regenerar o site (custa IA)"
                                 onClick={() => regenerarSite(v)}
-                                disabled={acaoId === v.id}
+                                disabled={acaoId === v.id || concluida}
                               >
                                 <Wand2 className="h-4 w-4" />
                               </Button>
@@ -877,7 +963,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                                   variant="ghost"
                                   title="Enviar por e-mail"
                                   onClick={() => v.proposta && handleEnviar(v.proposta)}
-                                  disabled={acaoId === v.proposta?.id}
+                                  disabled={acaoId === v.proposta?.id || concluida}
                                 >
                                   {acaoId === v.proposta?.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -891,6 +977,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                                 variant="ghost"
                                 title="Descartar"
                                 onClick={() => setDescartando(v)}
+                                disabled={concluida}
                               >
                                 <XCircle className="h-4 w-4 text-destructive" />
                               </Button>

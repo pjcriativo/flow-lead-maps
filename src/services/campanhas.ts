@@ -143,7 +143,8 @@ export async function listarCampanhaLeadsView(campanhaId: string): Promise<Campa
   if (leadIds.length === 0) return [];
 
   const nowIso = new Date().toISOString();
-  const [{ data: leads }, { data: reds }, propostas] = await Promise.all([
+  const redesignIds = linhas.map((l) => l.redesign_id).filter((x): x is string => !!x);
+  const [{ data: leads }, { data: reds }, { data: sites }, propostas] = await Promise.all([
     supabase.from("leads").select("id, business_name, email, website").in("id", leadIds),
     // redesigns 'pronto' NÃO expirados desses leads → reusáveis (não regenera).
     supabase
@@ -152,11 +153,27 @@ export async function listarCampanhaLeadsView(campanhaId: string): Promise<Campa
       .in("lead_id", leadIds)
       .eq("status", "pronto")
       .gt("expira_em", nowIso),
+    // site publicado ativo de cada redesign da campanha → url_publica ("Abrir site").
+    redesignIds.length
+      ? supabase
+          .from("sites_publicados")
+          .select("redesign_id, url_publica")
+          .in("redesign_id", redesignIds)
+          .eq("arquivos_removidos", false)
+          .neq("status", "reprovado")
+          .gt("expira_em", nowIso)
+      : Promise.resolve({ data: [] as { redesign_id: string; url_publica: string }[] }),
     listarPropostasPorCampanha(campanhaId),
   ]);
 
   const leadById = new Map((leads ?? []).map((l) => [(l as { id: string }).id, l]));
   const temRedesignPronto = new Set((reds ?? []).map((r) => (r as { lead_id: string }).lead_id));
+  const urlPorRedesign = new Map(
+    ((sites ?? []) as { redesign_id: string; url_publica: string }[]).map((s) => [
+      s.redesign_id,
+      s.url_publica,
+    ]),
+  );
   const propById = new Map(propostas.map((p) => [p.id, p]));
 
   return linhas.map((cl) => {
@@ -173,10 +190,23 @@ export async function listarCampanhaLeadsView(campanhaId: string): Promise<Campa
       redesign_id: cl.redesign_id,
       proposta_id: cl.proposta_id,
       proposta: cl.proposta_id ? (propById.get(cl.proposta_id) ?? null) : null,
+      url_publica: cl.redesign_id ? (urlPorRedesign.get(cl.redesign_id) ?? null) : null,
       motivo_descarte: cl.motivo_descarte,
       erro: cl.erro,
     };
   });
+}
+
+/** Conclui a campanha (status='concluida'). NÃO apaga nada — leads 'pendente' ficam
+ * intactos; a UI apenas trava as ações. Reabrir volta para 'ativa'. */
+export async function concluirCampanha(id: string): Promise<void> {
+  const { error } = await supabase.from("campanhas").update({ status: "concluida" }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function reabrirCampanha(id: string): Promise<void> {
+  const { error } = await supabase.from("campanhas").update({ status: "ativa" }).eq("id", id);
+  if (error) throw error;
 }
 
 /** redesign 'pronto' não expirado do lead (o mais recente) para REUSO — ou null. */

@@ -78,6 +78,8 @@ export interface CampanhaLeadView {
   proposta_id: string | null;
   /** Proposta gerada (quando estado ≥ rascunho), para revisar/editar/enviar. */
   proposta: Proposta | null;
+  /** URL pública do site publicado (só quando aprovado/publicado); null caso contrário. */
+  url_publica: string | null;
   motivo_descarte: string | null;
   erro: string | null;
 }
