@@ -162,7 +162,13 @@ function quemProcura(categoria: string | null, cidade: string | null): string {
   return "quem procura um serviço como o de vocês";
 }
 
-/** Abertura A — lead COM nota e avaliações reais. */
+/**
+ * Abertura A — lead COM nota e avaliações reais.
+ *
+ * NÃO cita a cidade, e isso é DELIBERADO (decisão do dono, não esquecimento): aqui a
+ * especificidade vem de nota + avaliações + categoria + motivo. A cidade só aparece na
+ * abertura B, que não tem esses dados pra usar. Não "conserte" injetando cidade.
+ */
 function aberturaA(d: DadosCopy, motivo: string): string {
   const avaliacoes = (d.n_avaliacoes ?? 0).toLocaleString("pt-BR");
   return [
