@@ -180,7 +180,10 @@ function aberturaB(d: DadosCopy, motivo: string): string {
 /** Corpo comum às duas aberturas. */
 function corpoComum(d: DadosCopy): string {
   return [
-    `${capitalizar(quemProcura(d.categoria, d.cidade))} decide em poucos segundos, no celular, olhando o que aparece. Se o que aparece não passa a mesma impressão que o trabalho de vocês passa, vocês perdem o contato antes de qualquer conversa — e nem ficam sabendo que perderam.`,
+    // Antes esta frase repetia "quem procura {categoria} em {cidade}", que a abertura B já
+    // diz na linha anterior — duas vezes seguidas. Como o corpo é COMUM às duas aberturas,
+    // a frase agora não depende de categoria/cidade: serve às duas sem repetir nada.
+    `A decisão acontece em poucos segundos, no celular, olhando o que aparece. Se o que aparece não passa a mesma impressão que o trabalho de vocês passa, vocês perdem o contato antes de qualquer conversa — e nem ficam sabendo que perderam.`,
     "",
     "Peguei o que já é público de vocês (fotos, avaliações reais, endereço, WhatsApp) e refiz a página. Não é maquete nem apresentação: está no ar, abre no celular agora.",
     "",
@@ -190,10 +193,6 @@ function corpoComum(d: DadosCopy): string {
     "",
     d.remetente,
   ].join("\n");
-}
-
-function capitalizar(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**
