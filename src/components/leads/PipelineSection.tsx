@@ -188,7 +188,9 @@ export function PipelineSection() {
                         </span>
                       </div>
                     )}
-                    <div className="mt-2 flex items-center gap-3 text-xs">
+                    {/* min-w-0 na linha: sem isso o flex não deixa o e-mail encolher e ele
+                        escapa do card (a coluna corta o texto no meio). */}
+                    <div className="mt-2 flex min-w-0 items-center gap-3 overflow-hidden text-xs">
                       <WhatsCell lead={l} />
                       <EmailCell lead={l} />
                     </div>

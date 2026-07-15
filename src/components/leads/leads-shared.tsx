@@ -303,12 +303,16 @@ export function SiteCell({ lead }: { lead: Lead }) {
 export function EmailCell({ lead }: { lead: Lead }) {
   if (!lead.email) return <span className="text-muted-foreground">—</span>;
   return (
+    // min-w-0 + truncate: sem isso o <a> é um item de flex que se recusa a encolher abaixo
+    // do conteúdo (min-width:auto) e o e-mail longo VAZA pra fora do card no Kanban.
+    // O ícone leva shrink-0 pra não ser espremido no lugar do texto.
     <a
       href={`mailto:${lead.email}`}
-      className="inline-flex items-center gap-1 text-[#16A34A] hover:underline"
+      title={lead.email}
+      className="inline-flex min-w-0 items-center gap-1 text-[#16A34A] hover:underline"
     >
-      <Mail className="h-3.5 w-3.5" />
-      {lead.email}
+      <Mail className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{lead.email}</span>
     </a>
   );
 }
@@ -320,13 +324,14 @@ export function waLink(whatsapp?: string | null) {
 export function WhatsCell({ lead }: { lead: Lead }) {
   if (!lead.whatsapp) return <span className="text-muted-foreground">—</span>;
   return (
+    // shrink-0: rótulo fixo e curto — quem cede espaço é o e-mail, não este.
     <a
       href={waLink(lead.whatsapp)}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-[#16A34A] hover:underline"
+      className="inline-flex shrink-0 items-center gap-1 text-[#16A34A] hover:underline"
     >
-      <MessageCircle className="h-3.5 w-3.5" />
+      <MessageCircle className="h-3.5 w-3.5 shrink-0" />
       WhatsApp
     </a>
   );
