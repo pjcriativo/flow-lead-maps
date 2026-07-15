@@ -67,6 +67,14 @@ export function WhatsAppSection() {
     }
   };
 
+  // Ao abrir a tela, lê o status da instância DA PRÓPRIA ORG. Sem isto, o estado começa
+  // vazio e quem JÁ está conectado vê o formulário de conectar, como se não estivesse —
+  // o servidor só era consultado ao clicar em "Gerar código"/"Mostrar QR".
+  useEffect(() => {
+    conectarQr(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Enquanto aguarda pareamento (QR ou código), faz polling do status.
   useEffect(() => {
     if (!aguardandoPareamento) return;
