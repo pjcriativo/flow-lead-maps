@@ -9,10 +9,14 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SitePublicado, SitePublicadoStatus, LeadPublicavel } from "@/types";
 import type { SitePublicadoRow } from "@/services/publicacao.core";
 
-// O join `leads(business_name)` do PostgREST pode vir como objeto ou null.
-type ComLead<T> = T & { leads: { business_name: string } | null };
+// O join `leads(...)` do PostgREST pode vir como objeto ou null.
+type ComLead<T> = T & { leads: { business_name: string; status?: string } | null };
 
-function toSite(row: SitePublicadoRow, leadNome?: string | null): SitePublicado {
+function toSite(
+  row: SitePublicadoRow,
+  leadNome?: string | null,
+  leadStatus?: string | null,
+): SitePublicado {
   return {
     id: row.id,
     lead_id: row.lead_id,
@@ -24,6 +28,7 @@ function toSite(row: SitePublicadoRow, leadNome?: string | null): SitePublicado 
     expira_em: row.expira_em,
     arquivos_removidos: row.arquivos_removidos,
     lead_nome: leadNome ?? undefined,
+    lead_status: leadStatus ?? undefined,
   };
 }
 
@@ -64,12 +69,12 @@ const despublicarSiteFn = createServerFn({ method: "POST" })
 export async function listarSites(): Promise<SitePublicado[]> {
   const { data, error } = await supabase
     .from("sites_publicados")
-    .select("*, leads(business_name)")
+    .select("*, leads(business_name, status)")
     .order("publicado_em", { ascending: false });
   if (error) throw error;
   const rows = (data ?? []) as unknown as ComLead<SitePublicadoRow>[];
   return rows
-    .map((r) => toSite(r, r.leads?.business_name))
+    .map((r) => toSite(r, r.leads?.business_name, r.leads?.status))
     .filter((s) => !s.arquivos_removidos || s.status === "expirado");
 }
 

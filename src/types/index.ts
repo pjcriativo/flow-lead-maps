@@ -158,6 +158,8 @@ export type SitePublicadoStatus = "publicado" | "aprovado" | "reprovado" | "expi
 export interface SitePublicado {
   id: string;
   lead_id: string;
+  /** Status do lead — decide se o site é protegido da expiração (ver STATUS_PROTEGIDOS). */
+  lead_status?: string;
   /** Redesign de origem (o HTML publicado veio dele). */
   redesign_id: string;
   slug: string;

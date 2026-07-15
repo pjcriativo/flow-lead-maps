@@ -15,10 +15,12 @@ import {
   ThumbsUp,
   ThumbsDown,
   Clock,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { STATUS_PROTEGIDOS } from "@/lib/expiracao";
 import type { SitePublicado, SitePublicadoStatus, LeadPublicavel } from "@/types";
 import {
   listarSites,
@@ -73,7 +75,24 @@ function diasParaExpirar(expira_em: string): number {
 
 function ExpiraCell({ site }: { site: SitePublicado }) {
   if (site.status === "expirado") {
-    return <span className="text-muted-foreground">Expirado</span>;
+    // O cron já tirou do ar e apagou o arquivo; o registro fica pro histórico.
+    return (
+      <span className="text-muted-foreground">
+        Expirado{site.arquivos_removidos ? " · arquivos removidos" : ""}
+      </span>
+    );
+  }
+  // PROTEGIDO: mostrar contagem regressiva aqui seria mentir — o cron renova o prazo
+  // (+90d) enquanto o lead estiver nesse estado, então o relógio nunca dispara.
+  if (site.lead_status && STATUS_PROTEGIDOS.includes(site.lead_status)) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-green-700"
+        title={`Lead em "${site.lead_status}" — o site não expira; o prazo é renovado automaticamente.`}
+      >
+        <ShieldCheck className="h-3.5 w-3.5" /> Protegido
+      </span>
+    );
   }
   const dias = diasParaExpirar(site.expira_em);
   if (dias <= 0) return <span className="text-red-600">Expira hoje</span>;
