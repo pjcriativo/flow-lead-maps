@@ -16,10 +16,21 @@
 -- 1) Reconstrói email_config como POR ORG, herdando o ramp_start global atual para as
 --    orgs existentes (o domínio já aquece desde a virada de produção — não zerar o
 --    progresso). Novas orgs nascem sem rampa (ramp_start null).
+-- Idempotente: só reconstrói se ainda for o singleton antigo (tem a coluna `id`).
+-- Re-rodar após a migração é no-op (não quebra nem re-semeia).
 do $$
 declare
   g record;
+  eh_singleton boolean;
 begin
+  select exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'email_config' and column_name = 'id'
+  ) into eh_singleton;
+  if not eh_singleton then
+    return; -- já está no formato por-org
+  end if;
+
   select ramp_start, ramp_tiers, ramp_max into g from public.email_config where id = 1;
 
   drop table if exists public.email_config;
