@@ -215,6 +215,60 @@ export async function gerarProposta(leadId: string, campanhaId?: string): Promis
   return toProposta(nova as unknown as Row);
 }
 
+/** Placeholder do link da prévia no corpo do rascunho de campanha. Ao APROVAR, é
+ * substituído pela URL pública real (publish-on-approve, Etapa 3). */
+export const PLACEHOLDER_LINK_PREVIA = "(o link da prévia é gerado quando você aprovar)";
+
+/** CAMPANHA — gera uma proposta RASCUNHO SEM exigir site publicado. O corpo usa um
+ * placeholder no lugar do link: a prévia é revisada por iframe do redesign (sem URL
+ * pública); o link público só nasce na aprovação. Liga à campanha; site_id fica nulo. */
+export async function gerarPropostaRascunhoSemSite(
+  leadId: string,
+  campanhaId: string,
+): Promise<Proposta> {
+  const { data: lead, error: lErr } = await supabase
+    .from("leads")
+    .select("id, business_name, rating, review_count, score_breakdown")
+    .eq("id", leadId)
+    .single();
+  if (lErr || !lead) throw new Error("Lead não encontrado");
+
+  const nome = lead.business_name as string;
+  const rating = lead.rating != null ? Number(lead.rating) : null;
+  const reviews = (lead.review_count as number | null) ?? null;
+  const motivo = motivoDoLead(lead.score_breakdown);
+  const corpo = montarCorpo(nome, motivo, PLACEHOLDER_LINK_PREVIA, rating, reviews);
+  const assunto = `Uma versão muito melhor do site — ${nome}`.slice(0, 78);
+
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) throw new Error("Não autenticado");
+
+  const { data: nova, error: iErr } = await supabase
+    .from("propostas")
+    .insert({
+      user_id: userId,
+      lead_id: leadId,
+      site_id: null,
+      assunto,
+      corpo,
+      valor: null,
+      status: "rascunho",
+      campanha_id: campanhaId,
+    })
+    .select(SELECT)
+    .single();
+  if (iErr || !nova) throw new Error(iErr?.message ?? "Falha ao gerar a proposta");
+  return toProposta(nova as unknown as Row);
+}
+
+/** Injeta a URL pública da prévia no corpo: substitui o placeholder, ou anexa ao fim
+ * se o usuário o removeu ao editar (o texto editado à mão é preservado). */
+export function injetarLinkPrevia(corpo: string, url: string): string {
+  if (corpo.includes(PLACEHOLDER_LINK_PREVIA)) return corpo.replace(PLACEHOLDER_LINK_PREVIA, url);
+  return `${corpo.trimEnd()}\n\nVeja a prévia (sem compromisso): ${url}`;
+}
+
 /** Salva a edição de uma proposta (assunto, corpo, valor). Mantém 'rascunho'. */
 export async function salvarProposta(proposta: Proposta): Promise<Proposta> {
   const { data, error } = await supabase

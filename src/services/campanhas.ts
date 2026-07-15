@@ -1,11 +1,18 @@
-// Camada de serviço — CAMPANHAS (Fase 2) LIGADA ao Supabase (RLS pela sessão).
-// Uma campanha nasce de uma LISTA e reúne as propostas (rascunho) geradas para os
-// leads elegíveis dela (com site publicado e ainda sem proposta). A revisão em lote
-// aprova/edita/envia essas propostas reusando o PORTÃO DE REVISÃO (send-proposal só
-// aceita 'aprovada') e a RAMPA POR ORG (teto do dia da própria org).
+// Camada de serviço — CAMPANHAS (Fase 2, portão do site) LIGADA ao Supabase (RLS).
+// Modelo SOB DEMANDA: criar campanha de uma lista NÃO gera nada — só cria campanha_leads
+// 'pendente' (custo zero). O usuário SELECIONA quem preparar → só esses geram site
+// (reusando redesign pronto quando houver) + proposta rascunho, revisada por PREVIEW
+// (iframe do HTML, sem publicar). Publicar (URL pública) só acontece na APROVAÇÃO.
+// Mantém intactos: portão da proposta, envio em lote, rampa por org.
 import { supabase } from "@/integrations/supabase/client";
-import type { Campanha, Proposta } from "@/types";
-import { gerarProposta, enviarProposta } from "@/services/propostas";
+import type { Campanha, CampanhaLeadView, Proposta } from "@/types";
+import {
+  injetarLinkPrevia,
+  enviarProposta,
+  salvarProposta,
+  listarPropostasPorCampanha,
+} from "@/services/propostas";
+import { publicarSite } from "@/services/publicacao";
 
 type CampanhaRow = {
   id: string;
@@ -15,26 +22,53 @@ type CampanhaRow = {
   criada_em: string;
 };
 
-const CONTAGEM_VAZIA = { total: 0, rascunho: 0, aprovada: 0, enviada: 0, respondida: 0 };
+const CONTAGEM_VAZIA = {
+  total: 0,
+  pendente: 0,
+  rascunho: 0,
+  aprovado: 0,
+  enviado: 0,
+  descartado: 0,
+  erro: 0,
+};
 
-/** Lista as campanhas do usuário com as contagens de propostas por status. */
+/** Lista as campanhas do usuário com as contagens dos leads por estado. 'enviado' =
+ * lead aprovado cuja proposta já saiu (proposta.status='enviada'). */
 export async function listarCampanhas(): Promise<Campanha[]> {
-  const [{ data: camps, error: cErr }, { data: props, error: pErr }] = await Promise.all([
-    supabase
-      .from("campanhas")
-      .select("id, list_id, nome, status, criada_em")
-      .order("criada_em", { ascending: false }),
-    supabase.from("propostas").select("campanha_id, status").not("campanha_id", "is", null),
-  ]);
+  const [{ data: camps, error: cErr }, { data: cls, error: clErr }, { data: props, error: pErr }] =
+    await Promise.all([
+      supabase
+        .from("campanhas")
+        .select("id, list_id, nome, status, criada_em")
+        .order("criada_em", { ascending: false }),
+      supabase.from("campanha_leads").select("campanha_id, estado, proposta_id"),
+      supabase.from("propostas").select("id, status").not("campanha_id", "is", null),
+    ]);
   if (cErr) throw cErr;
+  if (clErr) throw clErr;
   if (pErr) throw pErr;
 
+  const statusProposta = new Map(
+    (props ?? []).map((p) => [(p as { id: string }).id, (p as { status: string }).status]),
+  );
   const contagem = new Map<string, typeof CONTAGEM_VAZIA>();
-  for (const p of (props ?? []) as Array<{ campanha_id: string; status: string }>) {
-    const c = contagem.get(p.campanha_id) ?? { ...CONTAGEM_VAZIA };
+  for (const cl of (cls ?? []) as Array<{
+    campanha_id: string;
+    estado: string;
+    proposta_id: string | null;
+  }>) {
+    const c = contagem.get(cl.campanha_id) ?? { ...CONTAGEM_VAZIA };
     c.total += 1;
-    if (p.status in c) (c as unknown as Record<string, number>)[p.status] += 1;
-    contagem.set(p.campanha_id, c);
+    // 'gerando' conta como pendente (em preparo).
+    if (cl.estado === "aprovado") {
+      if (cl.proposta_id && statusProposta.get(cl.proposta_id) === "enviada") c.enviado += 1;
+      else c.aprovado += 1;
+    } else if (cl.estado === "gerando") {
+      c.pendente += 1;
+    } else if (cl.estado in c) {
+      (c as unknown as Record<string, number>)[cl.estado] += 1;
+    }
+    contagem.set(cl.campanha_id, c);
   }
 
   return ((camps ?? []) as CampanhaRow[]).map((c) => ({
@@ -47,56 +81,24 @@ export async function listarCampanhas(): Promise<Campanha[]> {
   }));
 }
 
-export type CriarCampanhaResult = {
-  campanha_id: string;
-  geradas: number; // propostas rascunho criadas
-  sem_site: number; // leads da lista sem site publicado (não entram)
-  ja_com_proposta: number; // leads que já tinham proposta (pulados)
-};
-
-/** Cria a campanha a partir de uma lista e GERA as propostas (rascunho) para os
- * leads elegíveis: os que têm site publicado ativo e ainda não têm proposta.
- * Reporta honestamente quantos ficaram de fora (sem site / já com proposta). */
+/** Cria a campanha a partir de uma lista. CUSTO ZERO: NÃO gera site nem proposta —
+ * só cria os campanha_leads 'pendente' (TODOS os leads da lista entram). */
 export async function criarCampanhaDaLista(
   listId: string,
   nome: string,
-): Promise<CriarCampanhaResult> {
+): Promise<{ campanha_id: string; total: number }> {
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) throw new Error("Não autenticado");
 
-  // Leads da lista.
   const { data: leadsDaLista, error: lErr } = await supabase
     .from("leads")
     .select("id")
     .eq("list_id", listId);
   if (lErr) throw lErr;
   const leadIds = (leadsDaLista ?? []).map((l) => (l as { id: string }).id);
-  if (leadIds.length === 0)
-    throw new Error("Esta lista está vazia — não há leads para gerar propostas.");
+  if (leadIds.length === 0) throw new Error("Esta lista está vazia — não há leads.");
 
-  const nowIso = new Date().toISOString();
-  // Leads com site publicado ATIVO.
-  const { data: sites, error: sErr } = await supabase
-    .from("sites_publicados")
-    .select("lead_id")
-    .in("lead_id", leadIds)
-    .eq("arquivos_removidos", false)
-    .neq("status", "reprovado")
-    .gt("expira_em", nowIso);
-  if (sErr) throw sErr;
-  const comSite = new Set((sites ?? []).map((s) => (s as { lead_id: string }).lead_id));
-
-  // Leads que já têm proposta (não duplica).
-  const { data: props, error: pErr } = await supabase.from("propostas").select("lead_id");
-  if (pErr) throw pErr;
-  const comProposta = new Set((props ?? []).map((p) => (p as { lead_id: string }).lead_id));
-
-  const elegiveis = leadIds.filter((id) => comSite.has(id) && !comProposta.has(id));
-  const semSite = leadIds.filter((id) => !comSite.has(id)).length;
-  const jaComProposta = leadIds.filter((id) => comSite.has(id) && comProposta.has(id)).length;
-
-  // Cria a campanha.
   const { data: camp, error: cErr } = await supabase
     .from("campanhas")
     .insert({ user_id: userId, list_id: listId, nome: nome.trim() || "Campanha", status: "ativa" })
@@ -104,18 +106,224 @@ export async function criarCampanhaDaLista(
     .single();
   if (cErr || !camp) throw new Error(cErr?.message ?? "Falha ao criar a campanha");
 
-  // Gera as propostas (rascunho) vinculadas à campanha. Erros por lead são pulados.
-  let geradas = 0;
-  for (const leadId of elegiveis) {
+  const linhas = leadIds.map((lead_id) => ({
+    campanha_id: camp.id,
+    lead_id,
+    user_id: userId,
+    estado: "pendente",
+  }));
+  const { error: iErr } = await supabase.from("campanha_leads").insert(linhas);
+  if (iErr) {
+    // desfaz a campanha se não conseguiu semear os leads (não deixa campanha órfã)
+    await supabase.from("campanhas").delete().eq("id", camp.id);
+    throw new Error("Falha ao adicionar os leads à campanha: " + iErr.message);
+  }
+  return { campanha_id: camp.id, total: leadIds.length };
+}
+
+/** Carrega a revisão em lote: cada lead da campanha + o que já foi preparado
+ * (redesign/proposta) + indicadores (tem site próprio, tem redesign pronto reusável). */
+export async function listarCampanhaLeadsView(campanhaId: string): Promise<CampanhaLeadView[]> {
+  const { data: cls, error } = await supabase
+    .from("campanha_leads")
+    .select("id, lead_id, estado, redesign_id, proposta_id, motivo_descarte, erro, criado_em")
+    .eq("campanha_id", campanhaId)
+    .order("criado_em", { ascending: true });
+  if (error) throw error;
+  const linhas = (cls ?? []) as Array<{
+    id: string;
+    lead_id: string;
+    estado: CampanhaLeadView["estado"];
+    redesign_id: string | null;
+    proposta_id: string | null;
+    motivo_descarte: string | null;
+    erro: string | null;
+  }>;
+  const leadIds = linhas.map((l) => l.lead_id);
+  if (leadIds.length === 0) return [];
+
+  const nowIso = new Date().toISOString();
+  const [{ data: leads }, { data: reds }, propostas] = await Promise.all([
+    supabase.from("leads").select("id, business_name, email, website").in("id", leadIds),
+    // redesigns 'pronto' NÃO expirados desses leads → reusáveis (não regenera).
+    supabase
+      .from("redesigns")
+      .select("lead_id")
+      .in("lead_id", leadIds)
+      .eq("status", "pronto")
+      .gt("expira_em", nowIso),
+    listarPropostasPorCampanha(campanhaId),
+  ]);
+
+  const leadById = new Map((leads ?? []).map((l) => [(l as { id: string }).id, l]));
+  const temRedesignPronto = new Set((reds ?? []).map((r) => (r as { lead_id: string }).lead_id));
+  const propById = new Map(propostas.map((p) => [p.id, p]));
+
+  return linhas.map((cl) => {
+    const lead = leadById.get(cl.lead_id) as
+      { business_name: string; email: string | null; website: string | null } | undefined;
+    return {
+      id: cl.id,
+      lead_id: cl.lead_id,
+      lead_nome: lead?.business_name ?? "—",
+      lead_email: lead?.email ?? null,
+      tem_website: !!lead?.website,
+      tem_redesign_pronto: temRedesignPronto.has(cl.lead_id),
+      estado: cl.estado,
+      redesign_id: cl.redesign_id,
+      proposta_id: cl.proposta_id,
+      proposta: cl.proposta_id ? (propById.get(cl.proposta_id) ?? null) : null,
+      motivo_descarte: cl.motivo_descarte,
+      erro: cl.erro,
+    };
+  });
+}
+
+/** redesign 'pronto' não expirado do lead (o mais recente) para REUSO — ou null. */
+export async function redesignProntoDoLead(leadId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("redesigns")
+    .select("id")
+    .eq("lead_id", leadId)
+    .eq("status", "pronto")
+    .gt("expira_em", new Date().toISOString())
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/** Atualiza estado/vínculos de um campanha_lead (patch parcial). */
+export async function atualizarCampanhaLead(
+  id: string,
+  patch: {
+    estado?: CampanhaLeadView["estado"];
+    redesign_id?: string | null;
+    proposta_id?: string | null;
+    erro?: string | null;
+    motivo_descarte?: string | null;
+  },
+): Promise<void> {
+  const { error } = await supabase
+    .from("campanha_leads")
+    .update({ ...patch, atualizado_em: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Descarta um lead da campanha (com motivo). Apaga a proposta rascunho (barata);
+ * mantém o redesign (caro) para reuso. Não pode descartar o que já foi enviado. */
+export async function descartarCampanhaLead(id: string, motivo: string): Promise<void> {
+  const { data: cl } = await supabase
+    .from("campanha_leads")
+    .select("proposta_id")
+    .eq("id", id)
+    .single();
+  const propostaId = (cl as { proposta_id: string | null } | null)?.proposta_id;
+  if (propostaId) {
+    // só remove a proposta se ainda for rascunho/aprovada (não enviada)
+    await supabase
+      .from("propostas")
+      .delete()
+      .eq("id", propostaId)
+      .in("status", ["rascunho", "aprovada"]);
+  }
+  await atualizarCampanhaLead(id, {
+    estado: "descartado",
+    proposta_id: null,
+    motivo_descarte: motivo.trim() || "Sem motivo informado",
+  });
+}
+
+/** APROVAÇÃO (publish-on-approve, Etapa 3): publica o redesign do lead (gera a URL
+ * pública), injeta o link na proposta (preservando o texto editado), aprova a proposta
+ * e marca o lead 'aprovado'. ANTES disso, o redesign não tem NENHUMA URL pública.
+ * Recebe a proposta editada (do diálogo) para gravar o texto final antes de publicar. */
+export async function aprovarCampanhaLead(
+  campanhaLeadId: string,
+  propostaEditada: Proposta,
+): Promise<Proposta> {
+  const { data: cl, error: clErr } = await supabase
+    .from("campanha_leads")
+    .select("id, estado, redesign_id, proposta_id")
+    .eq("id", campanhaLeadId)
+    .single();
+  if (clErr || !cl) throw new Error("Lead da campanha não encontrado");
+  const row = cl as { estado: string; redesign_id: string | null; proposta_id: string | null };
+  if (row.estado !== "rascunho") throw new Error("Só é possível aprovar um rascunho.");
+  if (!row.redesign_id) throw new Error("Este lead não tem site gerado para publicar.");
+  if (!row.proposta_id) throw new Error("Este lead não tem proposta para enviar.");
+
+  // 1) grava o texto editado à mão (antes de publicar/injetar).
+  await salvarProposta(propostaEditada);
+  // 2) publica o redesign → URL pública real (só agora nasce a URL).
+  const site = await publicarSite(row.redesign_id);
+  // 3) injeta o link no corpo editado + aprova a proposta + liga o site_id.
+  const corpoComLink = injetarLinkPrevia(propostaEditada.corpo, site.url_publica);
+  const { data: prop, error: upErr } = await supabase
+    .from("propostas")
+    .update({
+      corpo: corpoComLink,
+      site_id: site.id,
+      status: "aprovada",
+      aprovada_em: new Date().toISOString(),
+    })
+    .eq("id", row.proposta_id)
+    .eq("status", "rascunho")
+    .select(
+      "id, lead_id, assunto, corpo, valor, status, criada_em, aprovada_em, enviada_em, respondida_em, leads(business_name, email)",
+    )
+    .single();
+  if (upErr || !prop) throw new Error(upErr?.message ?? "Falha ao aprovar a proposta");
+  // 4) marca o lead da campanha aprovado.
+  await atualizarCampanhaLead(campanhaLeadId, { estado: "aprovado" });
+
+  const r = prop as unknown as {
+    id: string;
+    lead_id: string;
+    assunto: string;
+    corpo: string;
+    valor: number | null;
+    status: Proposta["status"];
+    criada_em: string;
+    aprovada_em: string | null;
+    enviada_em: string | null;
+    respondida_em: string | null;
+    leads?: { business_name: string; email: string | null } | null;
+  };
+  return {
+    id: r.id,
+    lead_id: r.lead_id,
+    lead_nome: r.leads?.business_name ?? "—",
+    lead_email: r.leads?.email ?? null,
+    assunto: r.assunto,
+    corpo: r.corpo,
+    valor: r.valor,
+    status: r.status,
+    criada_em: r.criada_em,
+    aprovada_em: r.aprovada_em,
+    enviada_em: r.enviada_em,
+    respondida_em: r.respondida_em,
+  };
+}
+
+export type AprovarLoteResult = { aprovados: number; erros: number };
+
+/** REVISÃO EM LOTE — aprova (publish-on-approve) todos os leads 'rascunho' da campanha.
+ * Publica um a um (Storage), injeta o link e aprova. Erros por lead são contados. */
+export async function aprovarTodosDaCampanha(campanhaId: string): Promise<AprovarLoteResult> {
+  const view = await listarCampanhaLeadsView(campanhaId);
+  const rascunhos = view.filter((v) => v.estado === "rascunho" && v.proposta);
+  const r: AprovarLoteResult = { aprovados: 0, erros: 0 };
+  for (const v of rascunhos) {
     try {
-      await gerarProposta(leadId, camp.id);
-      geradas += 1;
+      await aprovarCampanhaLead(v.id, v.proposta as Proposta);
+      r.aprovados += 1;
     } catch {
-      /* pula o lead problemático — não derruba a campanha inteira */
+      r.erros += 1;
     }
   }
-
-  return { campanha_id: camp.id, geradas, sem_site: semSite, ja_com_proposta: jaComProposta };
+  return r;
 }
 
 /** Renomeia a campanha. */
@@ -124,24 +332,10 @@ export async function renomearCampanha(id: string, nome: string): Promise<void> 
   if (error) throw error;
 }
 
-/** Exclui a campanha (as propostas continuam existindo, só desvinculadas). */
+/** Exclui a campanha (campanha_leads caem por cascade; propostas ficam desvinculadas). */
 export async function excluirCampanha(id: string): Promise<void> {
   const { error } = await supabase.from("campanhas").delete().eq("id", id);
   if (error) throw error;
-}
-
-/** REVISÃO EM LOTE — aprova de uma vez todas as propostas em rascunho da campanha
- * (rascunho → aprovada). O texto atual de cada uma é o que será enviado. Devolve
- * quantas foram aprovadas. */
-export async function aprovarTodasDaCampanha(campanhaId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from("propostas")
-    .update({ status: "aprovada", aprovada_em: new Date().toISOString() })
-    .eq("campanha_id", campanhaId)
-    .eq("status", "rascunho")
-    .select("id");
-  if (error) throw error;
-  return (data ?? []).length;
 }
 
 export type EnviarLoteResult = {
@@ -152,8 +346,8 @@ export type EnviarLoteResult = {
   erro: number;
 };
 
-/** REVISÃO EM LOTE — envia todas as propostas APROVADAS da campanha, uma a uma,
- * respeitando o portão (só aprovada) e a rampa por org (para no teto do dia). */
+/** REVISÃO EM LOTE — envia todas as propostas APROVADAS da campanha, respeitando o
+ * portão (só aprovada) e a rampa por org (para no teto do dia). */
 export async function enviarAprovadasDaCampanha(campanhaId: string): Promise<EnviarLoteResult> {
   const { data: aprovadas, error } = await supabase
     .from("propostas")
@@ -171,13 +365,13 @@ export async function enviarAprovadasDaCampanha(campanhaId: string): Promise<Env
         r.enviadas += 1;
       } else if (res.reason === "teto_dia") {
         r.teto_dia += 1;
-        break; // bateu o teto do dia da org — o resto sai amanhã
+        break; // teto do dia da org — o resto sai amanhã
       } else if (res.reason === "sem_email") {
         r.sem_email += 1;
       } else if (res.reason === "opt_out") {
         r.opt_out += 1;
       } else {
-        r.erro += 1; // nao_aprovada (não deveria acontecer aqui) etc.
+        r.erro += 1;
       }
     } catch {
       r.erro += 1;
@@ -186,4 +380,4 @@ export async function enviarAprovadasDaCampanha(campanhaId: string): Promise<Env
   return r;
 }
 
-export type { Campanha, Proposta };
+export type { Campanha, CampanhaLeadView, Proposta };

@@ -333,7 +333,10 @@ export function RedesignSection({
 /* -------------------- Editor + comparador (modal cheio) -------------------- */
 type Modo = "preview" | "editar" | "comparar";
 
-function EditorRedesign({
+// Exportado para REUSO na revisão em lote das Campanhas (preview + editor inline +
+// regenerar), sem recriar o modal. Preview é iframe srcDoc (HTML do banco), nunca
+// URL pública — o rascunho é revisado sem publicar.
+export function EditorRedesign({
   redesign,
   onClose,
   onSaved,

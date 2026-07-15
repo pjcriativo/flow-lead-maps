@@ -477,11 +477,15 @@ export function RevisarPropostaDialog({
   onClose,
   onChange,
   onEnviar,
+  onAprovar,
 }: {
   proposta: Proposta;
   onClose: () => void;
   onChange: (p: Proposta) => void;
   onEnviar: (p: Proposta) => Promise<boolean>;
+  /** Override do "Aprovar" — nas Campanhas, aprovar PUBLICA o site e injeta o link
+   * (publish-on-approve). Sem override, usa aprovarProposta (fluxo avulso, sem publicar). */
+  onAprovar?: (p: Proposta) => Promise<Proposta>;
 }) {
   const [prop, setProp] = useState<Proposta>(proposta);
   const [assunto, setAssunto] = useState(proposta.assunto);
@@ -526,12 +530,16 @@ export function RevisarPropostaDialog({
     }
   };
 
-  // Salva o texto final E aprova numa tacada (o texto aprovado é o que sai).
+  // Salva o texto final E aprova numa tacada (o texto aprovado é o que sai). Nas
+  // Campanhas, onAprovar publica o site e injeta o link antes de aprovar.
   const aprovar = async () => {
     setBusy("aprovar");
     try {
-      const atualizada = await aprovarProposta({ ...prop, assunto, corpo, valor: parseValor() });
+      const editada = { ...prop, assunto, corpo, valor: parseValor() };
+      const atualizada = onAprovar ? await onAprovar(editada) : await aprovarProposta(editada);
       setProp(atualizada);
+      setCorpo(atualizada.corpo);
+      setAssunto(atualizada.assunto);
       onChange(atualizada);
       toast.success("Proposta aprovada — pronta para enviar.");
     } catch (e) {

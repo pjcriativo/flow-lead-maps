@@ -1,7 +1,7 @@
-// Fase 2 — CAMPANHAS. Agrupa a abordagem de uma LISTA num lote revisável. Tela 1:
-// lista de campanhas (com progresso). Tela 2 (revisão em lote): as propostas da
-// campanha, com aprovar/enviar EM LOTE e revisar por linha — tudo passando pelo
-// PORTÃO DE REVISÃO (nada sai sem aprovar) e pela RAMPA POR ORG (teto do dia).
+// Fase 2 — CAMPANHAS (portão do site). Modelo SOB DEMANDA: criar campanha de uma lista
+// NÃO gera nada (todos os leads entram 'pendente', custo zero). O usuário SELECIONA
+// quem preparar → só esses geram site (reusando redesign pronto) + proposta rascunho,
+// revisada por PREVIEW (iframe, sem publicar). Publicar (URL) só na aprovação.
 import { useEffect, useMemo, useState } from "react";
 import {
   Loader2,
@@ -11,37 +11,73 @@ import {
   ArrowLeft,
   Pencil,
   Trash2,
-  Send,
-  ShieldCheck,
+  Wand2,
   Search,
   FolderOpen,
+  Sparkles,
+  CheckCircle2,
+  Globe,
+  Circle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { formatData } from "@/lib/format";
-import type { Campanha, Proposta } from "@/types";
-import { StatusPill, RevisarPropostaDialog } from "@/components/propostas/PropostasSection";
-import { listarPropostasPorCampanha, enviarProposta, statusRampa } from "@/services/propostas";
+import type { Campanha, CampanhaLeadView, CampanhaLeadEstado } from "@/types";
+import { statusRampa } from "@/services/propostas";
 import type { RampaStatus } from "@/services/propostas";
+import { gerarPropostaRascunhoSemSite } from "@/services/propostas";
+import { gerarRedesign } from "@/services/redesign";
 import {
   listarCampanhas,
   criarCampanhaDaLista,
   renomearCampanha,
   excluirCampanha,
-  aprovarTodasDaCampanha,
-  enviarAprovadasDaCampanha,
+  listarCampanhaLeadsView,
+  redesignProntoDoLead,
+  atualizarCampanhaLead,
 } from "@/services/campanhas";
 import { listarListas, type LeadListComStats } from "@/lib/lists-api";
+
+const ESTADO_STYLE: Record<CampanhaLeadEstado, string> = {
+  pendente: "bg-secondary text-muted-foreground",
+  gerando: "bg-amber-100 text-amber-800",
+  rascunho: "bg-blue-50 text-blue-700",
+  aprovado: "bg-green-100 text-green-800",
+  descartado: "bg-secondary text-muted-foreground line-through",
+  erro: "bg-red-50 text-red-700",
+};
+const ESTADO_LABEL: Record<CampanhaLeadEstado, string> = {
+  pendente: "Pendente",
+  gerando: "Gerando…",
+  rascunho: "Rascunho",
+  aprovado: "Aprovado",
+  descartado: "Descartado",
+  erro: "Erro",
+};
+
+function EstadoPill({ estado, enviada }: { estado: CampanhaLeadEstado; enviada?: boolean }) {
+  if (estado === "aprovado" && enviada) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+        Enviada
+      </span>
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        ESTADO_STYLE[estado],
+      )}
+    >
+      {ESTADO_LABEL[estado]}
+    </span>
+  );
+}
 
 export function CampanhasSection() {
   const [campanhas, setCampanhas] = useState<Campanha[]>([]);
@@ -80,12 +116,7 @@ export function CampanhasSection() {
   };
 
   const handleExcluir = async (c: Campanha) => {
-    if (
-      !confirm(
-        `Excluir a campanha "${c.nome}"? As ${c.total} propostas continuam existindo (apenas desvinculadas). Esta ação não pode ser desfeita.`,
-      )
-    )
-      return;
+    if (!confirm(`Excluir a campanha "${c.nome}"? Esta ação não pode ser desfeita.`)) return;
     const prev = campanhas;
     setCampanhas((p) => p.filter((x) => x.id !== c.id));
     try {
@@ -97,7 +128,6 @@ export function CampanhasSection() {
     }
   };
 
-  // Abre a revisão em lote de uma campanha recém-criada (recarrega e acha por id).
   const abrirRecemCriada = async (campanhaId: string) => {
     const lista = await listarCampanhas();
     setCampanhas(lista);
@@ -123,8 +153,8 @@ export function CampanhasSection() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Campanhas</h1>
           <p className="text-sm text-muted-foreground">
-            Agrupe a abordagem de uma lista num lote e revise tudo de uma vez. {campanhas.length}{" "}
-            campanhas.
+            Agrupe a abordagem de uma lista. Criar é de graça — você escolhe quem preparar. {""}
+            {campanhas.length} campanhas.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -154,8 +184,8 @@ export function CampanhasSection() {
           <Megaphone className="mx-auto h-8 w-8 text-muted-foreground" />
           <h3 className="mt-4 font-semibold">Nenhuma campanha ainda</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Clique em "Criar campanha" e escolha uma lista — as propostas dos leads com site
-            publicado entram no lote para você revisar.
+            Clique em "Criar campanha" e escolha uma lista. Todos os leads entram como pendentes —
+            você seleciona quais preparar (gerar site + proposta) para revisar.
           </p>
         </div>
       ) : (
@@ -196,7 +226,8 @@ function CampanhaCard({
   onRenomear: () => void;
   onExcluir: () => void;
 }) {
-  const pct = c.total > 0 ? Math.round((c.enviada / c.total) * 100) : 0;
+  const preparados = c.rascunho + c.aprovado + c.enviado;
+  const pct = c.total > 0 ? Math.round((preparados / c.total) * 100) : 0;
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <button className="flex-1 text-left" onClick={onAbrir}>
@@ -207,11 +238,13 @@ function CampanhaCard({
         <div className="mt-1 text-xs text-muted-foreground">{formatData(c.criada_em)}</div>
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           <span className="font-medium">
-            <b className="text-base tabular-nums">{c.total}</b> propostas
+            <b className="text-base tabular-nums">{c.total}</b> leads
           </span>
-          <span className="text-muted-foreground">{c.rascunho} rascunho</span>
-          <span className="text-amber-700">{c.aprovada} aprovadas</span>
-          <span className="text-blue-700">{c.enviada} enviadas</span>
+          <span className="text-muted-foreground">{c.pendente} pendentes</span>
+          <span className="text-blue-700">{c.rascunho} rascunho</span>
+          <span className="text-green-700">{c.aprovado} aprovados</span>
+          {c.enviado > 0 && <span className="text-blue-700">{c.enviado} enviados</span>}
+          {c.erro > 0 && <span className="text-destructive">{c.erro} erro</span>}
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
           <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
@@ -219,7 +252,7 @@ function CampanhaCard({
       </button>
       <div className="flex items-center gap-1.5 border-t border-border pt-2">
         <Button size="sm" variant="ghost" className="flex-1" onClick={onAbrir}>
-          <ShieldCheck className="h-4 w-4" /> Revisar em lote
+          <Megaphone className="h-4 w-4" /> Abrir revisão
         </Button>
         <Button size="sm" variant="ghost" title="Renomear" onClick={onRenomear}>
           <Pencil className="h-4 w-4" />
@@ -264,18 +297,9 @@ function CriarCampanhaDialog({
     setCriandoId(l.id);
     try {
       const r = await criarCampanhaDaLista(l.id, l.name);
-      if (r.geradas === 0) {
-        toast.warning(
-          `Campanha criada, mas nenhuma proposta foi gerada: ${r.sem_site} lead(s) sem site publicado` +
-            (r.ja_com_proposta ? `, ${r.ja_com_proposta} já com proposta` : "") +
-            ". Publique prévias na aba Publicar primeiro.",
-        );
-      } else {
-        toast.success(
-          `Campanha criada com ${r.geradas} proposta(s) em rascunho.` +
-            (r.sem_site ? ` (${r.sem_site} sem site ficaram de fora.)` : ""),
-        );
-      }
+      toast.success(
+        `Campanha criada com ${r.total} leads pendentes (custo zero). Selecione quem preparar.`,
+      );
       onCriada(r.campanha_id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao criar a campanha");
@@ -293,8 +317,8 @@ function CriarCampanhaDialog({
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            A campanha gera uma proposta (rascunho) para cada lead da lista que já tem um site
-            publicado. Você revisa e aprova em lote antes de enviar.
+            Todos os leads da lista entram como <b>pendentes</b> — criar não gera nada e não custa
+            nada. Depois você seleciona quem preparar (gerar site + proposta) para revisar.
           </p>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -351,26 +375,27 @@ function CriarCampanhaDialog({
   );
 }
 
-/* -------------------- Revisão em lote -------------------- */
+/* -------------------- Revisão em lote (ETAPA 1: preparar sob demanda) -------------------- */
+type Progresso = { feito: number; total: number; reusados: number; gerados: number; erros: number };
+
 function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: () => void }) {
-  const [propostas, setPropostas] = useState<Proposta[]>([]);
+  const [view, setView] = useState<CampanhaLeadView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editando, setEditando] = useState<Proposta | null>(null);
-  const [enviandoId, setEnviandoId] = useState<string | null>(null);
-  const [aprovandoTodas, setAprovandoTodas] = useState(false);
-  const [enviandoLote, setEnviandoLote] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [preparando, setPreparando] = useState(false);
+  const [progresso, setProgresso] = useState<Progresso | null>(null);
   const [rampa, setRampa] = useState<RampaStatus | null>(null);
 
   const carregar = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [ps, r] = await Promise.all([listarPropostasPorCampanha(campanha.id), statusRampa()]);
-      setPropostas(ps);
+      const [v, r] = await Promise.all([listarCampanhaLeadsView(campanha.id), statusRampa()]);
+      setView(v);
       setRampa(r);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao carregar propostas da campanha");
+      setError(e instanceof Error ? e.message : "Falha ao carregar a campanha");
     } finally {
       setLoading(false);
     }
@@ -380,85 +405,99 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campanha.id]);
 
-  const totais = useMemo(
-    () => ({
-      total: propostas.length,
-      rascunho: propostas.filter((p) => p.status === "rascunho").length,
-      aprovada: propostas.filter((p) => p.status === "aprovada").length,
-      enviada: propostas.filter((p) => p.status === "enviada").length,
-    }),
-    [propostas],
+  const totais = useMemo(() => {
+    const t = { total: view.length, pendente: 0, rascunho: 0, aprovado: 0, enviado: 0, erro: 0 };
+    for (const v of view) {
+      if (v.estado === "pendente" || v.estado === "gerando") t.pendente += 1;
+      else if (v.estado === "rascunho") t.rascunho += 1;
+      else if (v.estado === "aprovado") {
+        if (v.proposta?.status === "enviada") t.enviado += 1;
+        else t.aprovado += 1;
+      } else if (v.estado === "erro") t.erro += 1;
+    }
+    return t;
+  }, [view]);
+
+  // Selecionáveis para preparar: pendentes, os que deram erro (retry) e os 'gerando'
+  // presos de uma sessão que caiu (as checkboxes ficam desabilitadas durante o preparo).
+  const selecionaveis = useMemo(
+    () =>
+      view.filter((v) => v.estado === "pendente" || v.estado === "erro" || v.estado === "gerando"),
+    [view],
   );
+  const toggleSel = (id: string) =>
+    setSel((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const selTodosPendentes = () => {
+    if (sel.size === selecionaveis.length) setSel(new Set());
+    else setSel(new Set(selecionaveis.map((v) => v.id)));
+  };
 
-  const handleEnviar = async (p: Proposta): Promise<boolean> => {
-    setEnviandoId(p.id);
-    try {
-      const r = await enviarProposta(p.id);
-      if (!r.ok) {
-        const msg: Record<string, string> = {
-          nao_aprovada: `"${p.lead_nome}" ainda não foi aprovada.`,
-          opt_out: `"${p.lead_nome}" pediu descadastro (LGPD).`,
-          teto_dia: "Limite diário do aquecimento atingido — o resto sai amanhã.",
-          sem_email: `"${p.lead_nome}" não tem e-mail cadastrado.`,
-        };
-        toast.warning(msg[r.reason] ?? "Não foi possível enviar.");
-        if (r.reason === "teto_dia") setRampa(await statusRampa());
-        return false;
+  const patchRow = (id: string, patch: Partial<CampanhaLeadView>) =>
+    setView((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+
+  // GERAÇÃO SOB DEMANDA. Reusa redesign pronto; gera se faltar. Progresso ao vivo por
+  // lead (não há stream NDJSON de redesign — o invoke é bloqueante 10–40s por lead).
+  const prepararLeads = async (alvos: CampanhaLeadView[]) => {
+    if (!alvos.length || preparando) return;
+    setPreparando(true);
+    const acc: Progresso = { feito: 0, total: alvos.length, reusados: 0, gerados: 0, erros: 0 };
+    setProgresso({ ...acc });
+    for (const v of alvos) {
+      patchRow(v.id, { estado: "gerando", erro: null });
+      try {
+        await atualizarCampanhaLead(v.id, { estado: "gerando", erro: null });
+        let redesignId: string | null = null;
+        let reused = false;
+        if (v.tem_redesign_pronto) {
+          redesignId = await redesignProntoDoLead(v.lead_id);
+          reused = !!redesignId;
+        }
+        if (!redesignId) {
+          const r = await gerarRedesign(v.lead_id);
+          redesignId = r.redesign.id;
+        }
+        const prop = await gerarPropostaRascunhoSemSite(v.lead_id, campanha.id);
+        await atualizarCampanhaLead(v.id, {
+          estado: "rascunho",
+          redesign_id: redesignId,
+          proposta_id: prop.id,
+          erro: null,
+        });
+        patchRow(v.id, {
+          estado: "rascunho",
+          redesign_id: redesignId,
+          proposta_id: prop.id,
+          proposta: prop,
+          tem_redesign_pronto: true,
+        });
+        acc.feito += 1;
+        if (reused) acc.reusados += 1;
+        else acc.gerados += 1;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Falha ao preparar";
+        await atualizarCampanhaLead(v.id, { estado: "erro", erro: msg }).catch(() => {});
+        patchRow(v.id, { estado: "erro", erro: msg });
+        acc.feito += 1;
+        acc.erros += 1;
       }
-      setPropostas((prev) => prev.map((x) => (x.id === r.proposta.id ? r.proposta : x)));
-      toast.success(`E-mail enviado para "${p.lead_nome}".`);
-      setRampa(await statusRampa());
-      return true;
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao enviar");
-      return false;
-    } finally {
-      setEnviandoId(null);
+      setProgresso({ ...acc });
     }
+    setPreparando(false);
+    setSel(new Set());
+    toast.success(
+      `Preparados ${acc.gerados + acc.reusados}/${acc.total} (${acc.reusados} reusados` +
+        (acc.erros ? `, ${acc.erros} erro` : "") +
+        ").",
+    );
+    await carregar();
   };
 
-  const aprovarTodas = async () => {
-    if (totais.rascunho === 0) return;
-    if (
-      !confirm(
-        `Aprovar as ${totais.rascunho} propostas em rascunho? Elas ficam prontas para envio (o texto atual de cada uma é o que será enviado).`,
-      )
-    )
-      return;
-    setAprovandoTodas(true);
-    try {
-      const n = await aprovarTodasDaCampanha(campanha.id);
-      toast.success(`${n} proposta(s) aprovada(s).`);
-      await carregar();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao aprovar em lote");
-    } finally {
-      setAprovandoTodas(false);
-    }
-  };
-
-  const enviarAprovadas = async () => {
-    if (totais.aprovada === 0) return;
-    if (!confirm(`Enviar as ${totais.aprovada} propostas aprovadas agora?`)) return;
-    setEnviandoLote(true);
-    try {
-      const r = await enviarAprovadasDaCampanha(campanha.id);
-      const partes = [
-        `${r.enviadas} enviada(s)`,
-        r.teto_dia ? `${r.teto_dia} barrada(s) pelo teto do dia (saem amanhã)` : "",
-        r.sem_email ? `${r.sem_email} sem e-mail` : "",
-        r.opt_out ? `${r.opt_out} em opt-out` : "",
-        r.erro ? `${r.erro} com erro` : "",
-      ].filter(Boolean);
-      if (r.enviadas > 0) toast.success(partes.join(" · "));
-      else toast.warning(partes.join(" · ") || "Nada enviado.");
-      await carregar();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao enviar em lote");
-    } finally {
-      setEnviandoLote(false);
-    }
-  };
+  const prepararSelecionados = () => prepararLeads(selecionaveis.filter((v) => sel.has(v.id)));
 
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
@@ -470,8 +509,9 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{campanha.nome}</h1>
             <p className="text-sm text-muted-foreground">
-              {totais.total} propostas · {totais.rascunho} rascunho · {totais.aprovada} aprovadas ·{" "}
-              {totais.enviada} enviadas
+              {totais.total} leads · {totais.pendente} pendentes · {totais.rascunho} rascunho ·{" "}
+              {totais.aprovado} aprovados · {totais.enviado} enviados
+              {totais.erro > 0 ? ` · ${totais.erro} erro` : ""}
             </p>
             {rampa && (
               <p className="mt-1.5">
@@ -485,50 +525,45 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
         </div>
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
             size="sm"
-            onClick={aprovarTodas}
-            disabled={aprovandoTodas || totais.rascunho === 0}
-          >
-            {aprovandoTodas ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ShieldCheck className="h-4 w-4" />
-            )}
-            Aprovar todas ({totais.rascunho})
-          </Button>
-          <Button
-            size="sm"
-            onClick={enviarAprovadas}
-            disabled={enviandoLote || totais.aprovada === 0}
+            onClick={prepararSelecionados}
+            disabled={preparando || sel.size === 0}
             className="bg-primary font-semibold hover:bg-primary/90"
           >
-            {enviandoLote ? (
+            {preparando ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" />
             )}
-            Enviar aprovadas ({totais.aprovada})
+            Gerar site + proposta ({sel.size})
           </Button>
         </div>
       </div>
 
+      {preparando && progresso && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+          <div className="flex items-center gap-2 font-medium">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            Preparando {progresso.feito}/{progresso.total}…
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {progresso.gerados} gerados · {progresso.reusados} reusados (redesign pronto) ·{" "}
+            {progresso.erros} erro. Cada geração nova custa IA (~US$ 0,01–0,05); reuso é grátis.
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Carregando propostas...
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando leads...
         </div>
       ) : error ? (
         <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
-      ) : propostas.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-card p-16 text-center">
-          <Megaphone className="mx-auto h-8 w-8 text-muted-foreground" />
-          <h3 className="mt-4 font-semibold">Nenhuma proposta nesta campanha</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Os leads desta lista ainda não têm site publicado. Publique prévias na aba Publicar e
-            crie a campanha de novo.
-          </p>
+      ) : view.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-card p-16 text-center text-sm text-muted-foreground">
+          Esta campanha não tem leads.
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
@@ -536,7 +571,15 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
             <table className="w-full text-[15px]">
               <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  {["Lead", "Destinatário", "Status", "Ações"].map((h) => (
+                  <th className="px-4 py-3">
+                    <Checkbox
+                      checked={selecionaveis.length > 0 && sel.size === selecionaveis.length}
+                      onCheckedChange={selTodosPendentes}
+                      aria-label="Selecionar todos os pendentes"
+                      disabled={preparando || selecionaveis.length === 0}
+                    />
+                  </th>
+                  {["Lead", "Matéria-prima", "Estado", "Ações"].map((h) => (
                     <th key={h} className="px-4 py-3 font-medium">
                       {h}
                     </th>
@@ -544,63 +587,71 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                 </tr>
               </thead>
               <tbody>
-                {propostas.map((p) => (
-                  <tr key={p.id} className="border-t border-border hover:bg-secondary/30">
-                    <td className="px-4 py-3 font-semibold text-foreground">{p.lead_nome}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {p.lead_email ?? "— sem e-mail —"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusPill status={p.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title="Revisar / editar"
-                          onClick={() => setEditando(p)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title={
-                            p.status === "aprovada"
-                              ? "Enviar por e-mail"
-                              : p.status === "rascunho"
-                                ? "Aprove antes de enviar"
-                                : "Já enviada"
-                          }
-                          onClick={() => handleEnviar(p)}
-                          disabled={p.status !== "aprovada" || enviandoId === p.id}
-                        >
-                          {enviandoId === p.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Send className="h-4 w-4" />
+                {view.map((v) => {
+                  const selecionavel = v.estado === "pendente" || v.estado === "erro";
+                  return (
+                    <tr key={v.id} className="border-t border-border hover:bg-secondary/30">
+                      <td className="px-4 py-3">
+                        {selecionavel && (
+                          <Checkbox
+                            checked={sel.has(v.id)}
+                            onCheckedChange={() => toggleSel(v.id)}
+                            aria-label={`Selecionar ${v.lead_nome}`}
+                            disabled={preparando}
+                          />
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-foreground">{v.lead_nome}</div>
+                        {v.estado === "erro" && v.erro && (
+                          <div className="text-xs text-destructive">{v.erro}</div>
+                        )}
+                        {v.estado === "descartado" && v.motivo_descarte && (
+                          <div className="text-xs text-muted-foreground">
+                            descartado: {v.motivo_descarte}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {v.tem_redesign_pronto ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> prévia pronta · reusa
+                          </span>
+                        ) : v.tem_website ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Globe className="h-3.5 w-3.5" /> tem site · vai gerar
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                            <Circle className="h-3.5 w-3.5" /> sem site · gera do zero
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <EstadoPill estado={v.estado} enviada={v.proposta?.status === "enviada"} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          {selecionavel && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Preparar este (gerar site + proposta)"
+                              onClick={() => prepararLeads([v])}
+                              disabled={preparando}
+                            >
+                              <Wand2 className="h-4 w-4" />
+                            </Button>
                           )}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
-      )}
-
-      {editando && (
-        <RevisarPropostaDialog
-          proposta={editando}
-          onClose={() => setEditando(null)}
-          onChange={(atualizada) =>
-            setPropostas((prev) => prev.map((p) => (p.id === atualizada.id ? atualizada : p)))
-          }
-          onEnviar={handleEnviar}
-        />
       )}
     </div>
   );

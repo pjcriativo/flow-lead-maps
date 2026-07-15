@@ -49,12 +49,37 @@ export interface Campanha {
   status: CampanhaStatus;
   /** ISO datetime. */
   criada_em: string;
-  /** Contagens das propostas da campanha (para o progresso na tela). */
+  /** Contagens dos leads da campanha por estado (progresso na tela). */
   total: number;
+  pendente: number;
   rascunho: number;
-  aprovada: number;
-  enviada: number;
-  respondida: number;
+  aprovado: number;
+  enviado: number;
+  descartado: number;
+  erro: number;
+}
+
+/** Estado de um lead dentro de uma campanha (pipeline do portão do site). */
+export type CampanhaLeadEstado =
+  "pendente" | "gerando" | "rascunho" | "aprovado" | "descartado" | "erro";
+
+/** Linha da revisão em lote: o lead na campanha + o que já foi preparado para ele. */
+export interface CampanhaLeadView {
+  id: string; // id do campanha_leads
+  lead_id: string;
+  lead_nome: string;
+  lead_email: string | null;
+  /** Lead tem site próprio (matéria-prima melhor para gerar o redesign). */
+  tem_website: boolean;
+  /** Lead já tem um redesign 'pronto' não expirado — será REUSADO (não regenera). */
+  tem_redesign_pronto: boolean;
+  estado: CampanhaLeadEstado;
+  redesign_id: string | null;
+  proposta_id: string | null;
+  /** Proposta gerada (quando estado ≥ rascunho), para revisar/editar/enviar. */
+  proposta: Proposta | null;
+  motivo_descarte: string | null;
+  erro: string | null;
 }
 
 /** Status de um contrato. */

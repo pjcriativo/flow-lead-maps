@@ -320,6 +320,48 @@ export type Database = {
         };
         Relationships: [];
       };
+      campanha_leads: {
+        Row: {
+          id: string;
+          campanha_id: string;
+          lead_id: string;
+          user_id: string;
+          estado: string;
+          redesign_id: string | null;
+          proposta_id: string | null;
+          motivo_descarte: string | null;
+          erro: string | null;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: {
+          id?: string;
+          campanha_id: string;
+          lead_id: string;
+          user_id: string;
+          estado?: string;
+          redesign_id?: string | null;
+          proposta_id?: string | null;
+          motivo_descarte?: string | null;
+          erro?: string | null;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+        Update: {
+          id?: string;
+          campanha_id?: string;
+          lead_id?: string;
+          user_id?: string;
+          estado?: string;
+          redesign_id?: string | null;
+          proposta_id?: string | null;
+          motivo_descarte?: string | null;
+          erro?: string | null;
+          criado_em?: string;
+          atualizado_em?: string;
+        };
+        Relationships: [];
+      };
       sites_publicados: {
         Row: {
           id: string;
