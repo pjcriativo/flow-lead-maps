@@ -1,5 +1,16 @@
 // Peças de UI compartilhadas da Fase 1 (busca, pipeline, gestão de leads).
-import { Star, Globe, MessageCircle, Mail, ExternalLink, Info, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Star,
+  Globe,
+  MessageCircle,
+  Mail,
+  ExternalLink,
+  Info,
+  CheckCircle2,
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,7 +19,11 @@ import { cn } from "@/lib/utils";
 export const PAGE_SIZE = 20;
 
 export function Paginacao({
-  total, page, onPage, pageSize = PAGE_SIZE, unidade = "leads",
+  total,
+  page,
+  onPage,
+  pageSize = PAGE_SIZE,
+  unidade = "leads",
 }: {
   total: number;
   page: number;
@@ -26,7 +41,12 @@ export function Paginacao({
         <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => onPage(page - 1)}>
           <ChevronLeft className="h-4 w-4" /> Anterior
         </Button>
-        <Button size="sm" variant="outline" disabled={page >= paginas} onClick={() => onPage(page + 1)}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={page >= paginas}
+          onClick={() => onPage(page + 1)}
+        >
           Próxima <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -43,16 +63,50 @@ import type { Lead, ScoreBreakdown } from "@/lib/leads-api";
 import { STATUS_LABELS } from "@/lib/leads-api";
 
 export const UF_LIST = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
-  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
 ];
 
 export const QTD_OPTIONS = ["20", "30", "50", "70", "100", "200", "300", "500"];
 
 export const NICHE_TAGS = [
-  "Clínica Odontológica", "Agência de Marketing", "Advocacia", "Restaurante",
-  "Academia", "Salão de Beleza", "Oficina Mecânica", "Contador",
-  "Corretor de Imóveis", "Pet Shop", "Clínica de Estética", "Fotógrafo",
+  "Clínica Odontológica",
+  "Agência de Marketing",
+  "Advocacia",
+  "Restaurante",
+  "Academia",
+  "Salão de Beleza",
+  "Oficina Mecânica",
+  "Contador",
+  "Corretor de Imóveis",
+  "Pet Shop",
+  "Clínica de Estética",
+  "Fotógrafo",
 ];
 
 export function getBreakdown(lead: Lead): ScoreBreakdown | null {
@@ -79,37 +133,49 @@ export function faixaLabel(score: number): string {
 function Sinal({ ok, label }: { ok: boolean; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      {ok
-        ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#16A34A]" />
-        : <XCircle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />}
+      {ok ? (
+        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#16A34A]" />
+      ) : (
+        <XCircle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+      )}
       <span className={ok ? "text-foreground" : "text-muted-foreground"}>{label}</span>
     </div>
   );
 }
 
-function ScoreBreakdownCard({ lead, bd }: { lead: Lead; bd: ScoreBreakdown | null }) {
+export function ScoreBreakdownCard({ lead, bd }: { lead: Lead; bd: ScoreBreakdown | null }) {
+  // Shape MODERNO (score.ts) tem as flags booleanas; o legado (leads antigos) não —
+  // sem esta guarda, os Sinais renderizariam undefined como "false" e mentiriam.
+  const moderno = !!bd && typeof bd.has_website === "boolean";
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
         <span className="text-lg font-bold tabular-nums">
-          {lead.score}<span className="text-xs font-normal text-muted-foreground">/100</span>
+          {lead.score}
+          <span className="text-xs font-normal text-muted-foreground">/100</span>
         </span>
-        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset", scoreColor(lead.score))}>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset",
+            scoreColor(lead.score),
+          )}
+        >
           {faixaLabel(lead.score)}
         </span>
       </div>
       {bd?.motivo && <p className="text-xs text-muted-foreground">{bd.motivo}</p>}
-      {bd && (
+      {moderno && (
         <div className="space-y-1 border-t border-border pt-2 text-xs">
-          <Sinal ok={!bd.has_website} label="Sem site próprio" />
-          {bd.has_website && <Sinal ok={bd.bad_site} label="Site fraco/datado" />}
-          <Sinal ok={bd.has_whatsapp} label="WhatsApp p/ abordagem" />
-          <Sinal ok={bd.has_instagram} label="Tem Instagram" />
-          <Sinal ok={bd.has_email} label="E-mail público" />
+          <Sinal ok={!bd!.has_website} label="Sem site próprio" />
+          {bd!.has_website && <Sinal ok={bd!.bad_site} label="Site fraco/datado" />}
+          <Sinal ok={bd!.has_whatsapp} label="WhatsApp p/ abordagem" />
+          <Sinal ok={bd!.has_instagram} label="Tem Instagram" />
+          <Sinal ok={bd!.has_email} label="E-mail público" />
         </div>
       )}
       <p className="border-t border-border pt-2 text-[11px] leading-snug text-muted-foreground">
-        Quanto <b className="text-foreground">maior</b>, mais fácil de vender — presença digital fraca.
+        Quanto <b className="text-foreground">maior</b>, mais fácil de vender — presença digital
+        fraca.
       </p>
     </div>
   );
@@ -141,21 +207,30 @@ export function ScoreLegend() {
   return (
     <HoverCard openDelay={100} closeDelay={60}>
       <HoverCardTrigger asChild>
-        <button type="button" className="ml-1 inline-flex items-center align-middle text-muted-foreground hover:text-foreground">
+        <button
+          type="button"
+          className="ml-1 inline-flex items-center align-middle text-muted-foreground hover:text-foreground"
+        >
           <Info className="h-3.5 w-3.5" />
         </button>
       </HoverCardTrigger>
       <HoverCardContent align="start" className="w-80">
         <p className="text-sm font-semibold">Score de Oportunidade</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Quanto <b className="text-foreground">MAIOR</b>, mais fácil de vender — o negócio tem presença
-          digital fraca (sem site ou site ruim). Score <b className="text-foreground">BAIXO</b> = já tem
-          site bom, menos oportunidade.
+          Quanto <b className="text-foreground">MAIOR</b>, mais fácil de vender — o negócio tem
+          presença digital fraca (sem site ou site ruim). Score{" "}
+          <b className="text-foreground">BAIXO</b> = já tem site bom, menos oportunidade.
         </p>
         <div className="mt-2 space-y-1 text-xs">
-          <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" /> 80–100 · Alta oportunidade</div>
-          <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 50–79 · Média</div>
-          <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-gray-400" /> 0–49 · Baixa (já tem presença)</div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-green-500" /> 80–100 · Alta oportunidade
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> 50–79 · Média
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-gray-400" /> 0–49 · Baixa (já tem presença)
+          </div>
         </div>
       </HoverCardContent>
     </HoverCard>
@@ -258,12 +333,11 @@ export function WhatsCell({ lead }: { lead: Lead }) {
 }
 
 export function MapsButton({ lead }: { lead: Lead }) {
-  const href =
-    lead.place_id
-      ? `https://www.google.com/maps/place/?q=place_id:${lead.place_id}`
-      : `https://www.google.com/maps/search/${encodeURIComponent(
-          `${lead.business_name} ${lead.city ?? ""}`,
-        )}`;
+  const href = lead.place_id
+    ? `https://www.google.com/maps/place/?q=place_id:${lead.place_id}`
+    : `https://www.google.com/maps/search/${encodeURIComponent(
+        `${lead.business_name} ${lead.city ?? ""}`,
+      )}`;
   return (
     <a
       href={href}

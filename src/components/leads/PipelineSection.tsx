@@ -17,6 +17,7 @@ import {
 } from "@/lib/leads-api";
 import { listarLeadIdsComFollowUp } from "@/services/propostas";
 import { ScoreBadge, WhatsCell, EmailCell } from "./leads-shared";
+import { LeadDetalhe } from "./LeadDetalhe";
 
 const LIMITE_INICIAL = 25; // cards renderizados por coluna antes do "ver mais"
 
@@ -28,6 +29,7 @@ export function PipelineSection() {
   const [overCol, setOverCol] = useState<string | null>(null);
   const [followupIds, setFollowupIds] = useState<Set<string>>(new Set());
   const [limites, setLimites] = useState<Record<string, number>>({});
+  const [detalhe, setDetalhe] = useState<Lead | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -87,6 +89,13 @@ export function PipelineSection() {
       [status]: Math.min((m[status] ?? LIMITE_INICIAL) + LIMITE_INICIAL, total),
     }));
 
+  // Clique no card abre o detalhe (ignora cliques em links/botões internos e durante o arraste).
+  const abrirDetalhe = (e: React.MouseEvent, lead: Lead) => {
+    if (dragId) return;
+    if ((e.target as HTMLElement).closest("a,button")) return;
+    setDetalhe(lead);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
@@ -101,7 +110,7 @@ export function PipelineSection() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Pipeline</h1>
           <p className="text-sm text-muted-foreground">
-            Arraste um lead para mudar o status — salva no banco na hora.
+            Arraste um lead para mudar o status (salva na hora) · clique no card para ver o detalhe.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load}>
@@ -156,8 +165,9 @@ export function PipelineSection() {
                       setDragId(null);
                       setOverCol(null);
                     }}
+                    onClick={(e) => abrirDetalhe(e, l)}
                     className={cn(
-                      "group cursor-grab rounded-lg border border-border bg-card p-3 shadow-sm active:cursor-grabbing",
+                      "group cursor-pointer rounded-lg border border-border bg-card p-3 shadow-sm",
                       dragId === l.id && "opacity-50",
                     )}
                   >
@@ -203,6 +213,8 @@ export function PipelineSection() {
           );
         })}
       </div>
+
+      {detalhe && <LeadDetalhe lead={detalhe} onClose={() => setDetalhe(null)} />}
     </div>
   );
 }
