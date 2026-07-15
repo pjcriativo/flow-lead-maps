@@ -129,9 +129,21 @@ export function normalizarCidade(cidade: string | null): string | null {
     .join(" ");
 }
 
-/** Abertura A exige nota E avaliações: é o que a frase "as avaliações provam isso" afirma. */
+/**
+ * Piso da abertura A. O dono definiu "tem nota e avaliações → A; sem nota → B", mas não previu
+ * NOTA RUIM: a abertura A afirma "em {categoria}, isso é raro" e "quem chega até vocês sai
+ * satisfeito, e as avaliações provam isso". Com 3,7 as avaliações provam o CONTRÁRIO — seria
+ * lisonja que o próprio dado desmente, e o dono do negócio sabe a nota dele melhor que nós.
+ *
+ * 4,5 é o piso onde as duas frases se sustentam. Abaixo disso cai na abertura B, que não faz
+ * afirmação nenhuma sobre reputação (nunca mente, só não elogia). Nos dados reais isso afeta
+ * 16 de 173 leads com nota — 91% estão em 4,8+ e seguem na abertura A.
+ */
+export const NOTA_MINIMA_ABERTURA_A = 4.5;
+
+/** Abertura A exige nota BOA E avaliações: é o que as frases dela afirmam. */
 export function usaAberturaA(d: Pick<DadosCopy, "nota" | "n_avaliacoes">): boolean {
-  return d.nota != null && (d.n_avaliacoes ?? 0) > 0;
+  return d.nota != null && d.nota >= NOTA_MINIMA_ABERTURA_A && (d.n_avaliacoes ?? 0) > 0;
 }
 
 /** "em {categoria}" — omite o trecho se a categoria faltar, em vez de inventar uma. */
