@@ -15,6 +15,11 @@ import {
   Copy,
   Sparkles,
   Building2,
+  CheckCircle2,
+  ShieldCheck,
+  Lock,
+  Unlock,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,6 +47,8 @@ import {
   listarPropostas,
   gerarProposta,
   salvarProposta,
+  aprovarProposta,
+  reabrirProposta,
   enviarProposta,
   listarLeadsParaProposta,
   melhorarPropostaComIA,
@@ -52,12 +59,14 @@ import {
 
 const STATUS_LABEL: Record<PropostaStatus, string> = {
   rascunho: "Rascunho",
+  aprovada: "Aprovada",
   enviada: "Enviada",
   respondida: "Respondida",
 };
 
 const STATUS_STYLE: Record<PropostaStatus, string> = {
   rascunho: "bg-secondary text-muted-foreground",
+  aprovada: "bg-amber-100 text-amber-800",
   enviada: "bg-blue-50 text-blue-700",
   respondida: "bg-green-100 text-green-800",
 };
@@ -125,27 +134,35 @@ export function PropostasSection() {
   const totais = useMemo(
     () => ({
       rascunho: propostas.filter((p) => p.status === "rascunho").length,
+      aprovada: propostas.filter((p) => p.status === "aprovada").length,
       enviada: propostas.filter((p) => p.status === "enviada").length,
       respondida: propostas.filter((p) => p.status === "respondida").length,
     }),
     [propostas],
   );
 
-  // ENVIO REAL por e-mail (Resend). Lead sem e-mail → cai no "copiar" (fallback),
-  // sem fingir que enviou. Falha do Resend → erro real (não vira sucesso).
-  const handleEnviar = async (p: Proposta) => {
+  // ENVIO REAL por e-mail (Resend). Só envia proposta APROVADA (portão de revisão);
+  // o servidor recusa rascunho. Lead sem e-mail → cai no "copiar" (fallback), sem
+  // fingir que enviou. Falha do Resend → erro real. Devolve true só em sucesso.
+  const handleEnviar = async (p: Proposta): Promise<boolean> => {
     setEnviandoId(p.id);
     try {
       const r = await enviarProposta(p.id);
       if (!r.ok) {
+        if (r.reason === "nao_aprovada") {
+          toast.warning(
+            `"${p.lead_nome}" ainda não foi aprovada. Revise e clique em "Aprovar para envio" antes de enviar.`,
+          );
+          return false;
+        }
         if (r.reason === "opt_out") {
           toast.warning(`"${p.lead_nome}" pediu descadastro (LGPD) — não é possível enviar.`);
-          return;
+          return false;
         }
         if (r.reason === "teto_dia") {
           toast.warning("Limite diário do aquecimento atingido — os próximos e-mails saem amanhã.");
           setRampa(await statusRampa());
-          return;
+          return false;
         }
         const copiou = await copiar(`${p.assunto}\n\n${p.corpo}`);
         toast.warning(
@@ -153,13 +170,15 @@ export function PropostasSection() {
             ? `"${p.lead_nome}" não tem e-mail cadastrado — texto copiado, envie manualmente.`
             : `"${p.lead_nome}" não tem e-mail cadastrado. Copie o texto na edição.`,
         );
-        return;
+        return false;
       }
       setPropostas((prev) => prev.map((x) => (x.id === r.proposta.id ? r.proposta : x)));
       toast.success(`E-mail enviado para "${p.lead_nome}".`);
       setRampa(await statusRampa());
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao enviar");
+      return false;
     } finally {
       setEnviandoId(null);
     }
@@ -178,8 +197,8 @@ export function PropostasSection() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Propostas</h1>
           <p className="text-sm text-muted-foreground">
-            {propostas.length} propostas · {totais.rascunho} rascunho · {totais.enviada} enviadas ·{" "}
-            {totais.respondida} respondidas
+            {propostas.length} propostas · {totais.rascunho} rascunho · {totais.aprovada} aprovadas
+            · {totais.enviada} enviadas · {totais.respondida} respondidas
           </p>
           {rampa && (
             <p className="mt-1.5">
@@ -222,6 +241,7 @@ export function PropostasSection() {
           <SelectContent>
             <SelectItem value="all">Todos os status</SelectItem>
             <SelectItem value="rascunho">Rascunho</SelectItem>
+            <SelectItem value="aprovada">Aprovada</SelectItem>
             <SelectItem value="enviada">Enviada</SelectItem>
             <SelectItem value="respondida">Respondida</SelectItem>
           </SelectContent>
@@ -272,7 +292,7 @@ export function PropostasSection() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          title="Editar"
+                          title="Revisar / editar"
                           onClick={() => setEditando(p)}
                         >
                           <Pencil className="h-4 w-4" />
@@ -289,10 +309,14 @@ export function PropostasSection() {
                           size="sm"
                           variant="ghost"
                           title={
-                            p.status === "rascunho" ? "Enviar por e-mail (Resend)" : "Já enviada"
+                            p.status === "aprovada"
+                              ? "Enviar por e-mail (Resend)"
+                              : p.status === "rascunho"
+                                ? "Aprove na revisão antes de enviar"
+                                : "Já enviada"
                           }
                           onClick={() => handleEnviar(p)}
-                          disabled={p.status !== "rascunho" || enviandoId === p.id}
+                          disabled={p.status !== "aprovada" || enviandoId === p.id}
                         >
                           {enviandoId === p.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -323,13 +347,13 @@ export function PropostasSection() {
       )}
 
       {editando && (
-        <EditarPropostaDialog
+        <RevisarPropostaDialog
           proposta={editando}
           onClose={() => setEditando(null)}
-          onSalvo={(atualizada) => {
-            setPropostas((prev) => prev.map((p) => (p.id === atualizada.id ? atualizada : p)));
-            setEditando(null);
-          }}
+          onChange={(atualizada) =>
+            setPropostas((prev) => prev.map((p) => (p.id === atualizada.id ? atualizada : p)))
+          }
+          onEnviar={handleEnviar}
         />
       )}
     </div>
@@ -441,51 +465,101 @@ function GerarPropostaDialog({
   );
 }
 
-function EditarPropostaDialog({
+/**
+ * PORTÃO DE REVISÃO (FIX 1) — como um rascunho no Gmail: mostra PRA QUEM vai
+ * (e-mail do lead), o assunto, o corpo final editável à mão e o link da prévia.
+ * Só depois de "Aprovar para envio" (rascunho → aprovada) o botão "Enviar" aparece.
+ * Enquanto aprovada, o texto fica TRAVADO (é exatamente o que sai); para mexer, o
+ * usuário "Reabre para editar". O envio (send-proposal) recusa qualquer não-aprovada.
+ */
+function RevisarPropostaDialog({
   proposta,
   onClose,
-  onSalvo,
+  onChange,
+  onEnviar,
 }: {
   proposta: Proposta;
   onClose: () => void;
-  onSalvo: (p: Proposta) => void;
+  onChange: (p: Proposta) => void;
+  onEnviar: (p: Proposta) => Promise<boolean>;
 }) {
+  const [prop, setProp] = useState<Proposta>(proposta);
   const [assunto, setAssunto] = useState(proposta.assunto);
   const [corpo, setCorpo] = useState(proposta.corpo);
   const [valor, setValor] = useState(proposta.valor?.toString() ?? "");
-  const [salvando, setSalvando] = useState(false);
-  const [melhorando, setMelhorando] = useState(false);
+  const [busy, setBusy] = useState<null | "salvar" | "melhorar" | "aprovar" | "reabrir" | "enviar">(
+    null,
+  );
+
+  const editavel = prop.status === "rascunho";
+  const aprovada = prop.status === "aprovada";
+  const jaSaiu = prop.status === "enviada" || prop.status === "respondida";
+  const semEmail = !prop.lead_email;
+  const linkPrevia = corpo.match(/https?:\/\/\S+/)?.[0] ?? "";
+  const parseValor = () => (valor.trim() === "" ? null : Number(valor.replace(",", ".")));
 
   const salvar = async () => {
-    setSalvando(true);
+    setBusy("salvar");
     try {
-      const atualizada = await salvarProposta({
-        ...proposta,
-        assunto,
-        corpo,
-        valor: valor.trim() === "" ? null : Number(valor.replace(",", ".")),
-      });
-      toast.success("Proposta salva.");
-      onSalvo(atualizada);
+      const atualizada = await salvarProposta({ ...prop, assunto, corpo, valor: parseValor() });
+      setProp(atualizada);
+      onChange(atualizada);
+      toast.success("Rascunho salvo.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao salvar");
     } finally {
-      setSalvando(false);
+      setBusy(null);
     }
   };
 
   const melhorar = async () => {
-    setMelhorando(true);
+    setBusy("melhorar");
     try {
-      const r = await melhorarPropostaComIA({ ...proposta, assunto, corpo });
+      const r = await melhorarPropostaComIA({ ...prop, assunto, corpo });
       setAssunto(r.assunto);
       setCorpo(r.corpo);
-      toast.success("Copy melhorada pela IA — revise e salve.");
+      toast.success("Copy melhorada pela IA — revise e aprove.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao melhorar com IA");
     } finally {
-      setMelhorando(false);
+      setBusy(null);
     }
+  };
+
+  // Salva o texto final E aprova numa tacada (o texto aprovado é o que sai).
+  const aprovar = async () => {
+    setBusy("aprovar");
+    try {
+      const atualizada = await aprovarProposta({ ...prop, assunto, corpo, valor: parseValor() });
+      setProp(atualizada);
+      onChange(atualizada);
+      toast.success("Proposta aprovada — pronta para enviar.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao aprovar");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reabrir = async () => {
+    setBusy("reabrir");
+    try {
+      const atualizada = await reabrirProposta(prop);
+      setProp(atualizada);
+      onChange(atualizada);
+      toast.message("Reaberta para edição — aprove de novo antes de enviar.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao reabrir");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const enviar = async () => {
+    setBusy("enviar");
+    const ok = await onEnviar(prop);
+    setBusy(null);
+    if (ok) onClose();
   };
 
   const copiar2 = async () => {
@@ -499,35 +573,78 @@ function EditarPropostaDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-primary" /> {proposta.lead_nome}
+            <Mail className="h-4 w-4 text-primary" /> Revisar proposta — {prop.lead_nome}
+            <StatusPill status={prop.status} />
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Destinatário — pra QUEM vai */}
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+              semEmail
+                ? "border-destructive/40 bg-destructive/10 text-destructive"
+                : "border-border bg-secondary/40 text-foreground",
+            )}
+          >
+            {semEmail ? <AlertTriangle className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+            <span className="font-medium">Para:</span>
+            {semEmail ? (
+              <span>sem e-mail cadastrado — não será possível enviar por aqui (use "Copiar").</span>
+            ) : (
+              <span className="font-mono">{prop.lead_email}</span>
+            )}
+          </div>
+
+          {/* Aviso de aprovação */}
+          {aprovada && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                <b>Aprovada e travada.</b> O texto abaixo é exatamente o que será enviado. Para
+                alterar, clique em <b>Reabrir para editar</b>.
+              </span>
+            </div>
+          )}
+          {jaSaiu && (
+            <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              <CheckCircle2 className="h-4 w-4" /> Já enviada
+              {prop.enviada_em ? ` em ${formatData(prop.enviada_em)}` : ""}.
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="assunto">Assunto</Label>
-            <Input id="assunto" value={assunto} onChange={(e) => setAssunto(e.target.value)} />
+            <Input
+              id="assunto"
+              value={assunto}
+              onChange={(e) => setAssunto(e.target.value)}
+              disabled={!editavel}
+            />
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="corpo">Mensagem</Label>
               <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={melhorar}
-                  disabled={melhorando || salvando}
-                >
-                  {melhorando ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Melhorando...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" /> Melhorar com IA
-                    </>
-                  )}
-                </Button>
+                {editavel && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={melhorar}
+                    disabled={busy !== null}
+                  >
+                    {busy === "melhorar" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Melhorando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" /> Melhorar com IA
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   size="sm"
@@ -544,11 +661,25 @@ function EditarPropostaDialog({
               value={corpo}
               onChange={(e) => setCorpo(e.target.value)}
               rows={12}
-              className="font-mono text-sm leading-relaxed"
+              disabled={!editavel}
+              className="font-mono text-sm leading-relaxed disabled:opacity-100"
             />
+            {linkPrevia && (
+              <p className="truncate text-xs text-muted-foreground">
+                Prévia no e-mail:{" "}
+                <a
+                  href={linkPrevia}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-primary hover:underline"
+                >
+                  {linkPrevia}
+                </a>
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              Sem preço na primeira abordagem — o valor entra depois da resposta. O link é a prévia
-              já publicada.
+              Sem preço na primeira abordagem — o valor entra depois da resposta. O texto que você
+              aprovar é exatamente o que vai no e-mail.
             </p>
           </div>
           <div className="space-y-1.5">
@@ -559,22 +690,75 @@ function EditarPropostaDialog({
               placeholder="ex.: 1800"
               value={valor}
               onChange={(e) => setValor(e.target.value)}
+              disabled={!editavel}
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={salvando}>
-            Cancelar
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" onClick={onClose} disabled={busy !== null}>
+            {jaSaiu ? "Fechar" : "Cancelar"}
           </Button>
-          <Button onClick={salvar} disabled={salvando || melhorando}>
-            {salvando ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Salvando...
-              </>
-            ) : (
-              "Salvar"
-            )}
-          </Button>
+
+          {editavel && (
+            <>
+              <Button variant="secondary" onClick={salvar} disabled={busy !== null}>
+                {busy === "salvar" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Salvando...
+                  </>
+                ) : (
+                  "Salvar rascunho"
+                )}
+              </Button>
+              <Button
+                onClick={aprovar}
+                disabled={busy !== null}
+                className="bg-primary font-semibold hover:bg-primary/90"
+              >
+                {busy === "aprovar" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Aprovando...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-4 w-4" /> Aprovar para envio
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+
+          {aprovada && (
+            <>
+              <Button variant="outline" onClick={reabrir} disabled={busy !== null}>
+                {busy === "reabrir" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Reabrindo...
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="h-4 w-4" /> Reabrir para editar
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={enviar}
+                disabled={busy !== null || semEmail}
+                className="bg-primary font-semibold hover:bg-primary/90"
+              >
+                {busy === "enviar" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Enviando...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4" /> Enviar agora
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

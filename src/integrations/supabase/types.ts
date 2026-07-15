@@ -143,6 +143,7 @@ export type Database = {
           created_at: string;
           uf: string | null;
           fonte: string | null;
+          follow_up_ativo: boolean;
         };
         Insert: {
           id?: string;
@@ -158,6 +159,7 @@ export type Database = {
           created_at?: string;
           uf?: string | null;
           fonte?: string | null;
+          follow_up_ativo?: boolean;
         };
         Update: {
           id?: string;
@@ -173,6 +175,7 @@ export type Database = {
           created_at?: string;
           uf?: string | null;
           fonte?: string | null;
+          follow_up_ativo?: boolean;
         };
         Relationships: [];
       };
@@ -240,6 +243,7 @@ export type Database = {
           criada_em: string;
           enviada_em: string | null;
           respondida_em: string | null;
+          aprovada_em: string | null;
           email_message_id: string | null;
           email_para: string | null;
           follow_up_enviado_em: string | null;
@@ -258,6 +262,7 @@ export type Database = {
           criada_em?: string;
           enviada_em?: string | null;
           respondida_em?: string | null;
+          aprovada_em?: string | null;
           email_message_id?: string | null;
           email_para?: string | null;
           follow_up_enviado_em?: string | null;
@@ -276,6 +281,7 @@ export type Database = {
           criada_em?: string;
           enviada_em?: string | null;
           respondida_em?: string | null;
+          aprovada_em?: string | null;
           email_message_id?: string | null;
           email_para?: string | null;
           follow_up_enviado_em?: string | null;

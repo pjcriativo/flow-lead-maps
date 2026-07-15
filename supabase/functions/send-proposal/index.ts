@@ -7,9 +7,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 
-// Identidade do remetente (multi-tenant: por ora via env; estrutura pronta p/ org).
-// Começa com o domínio de TESTE do Resend; trocar p/ domínio verificado =
-// mudar EMAIL_FROM + verificar DNS, sem tocar no código.
+// Identidade do remetente. EMAIL_FROM é GLOBAL hoje (uma reputação de domínio p/
+// todas as orgs). TODO (blueprint — identidade de envio por org): cada org deve ter
+// subdomínio/remetente próprio + reply-to da org, para não compartilhar reputação.
+// Quando isso existir, ler o remetente da config da org (não do env global).
 const DEFAULT_FROM = "Flow Leads <onboarding@resend.dev>";
 
 const SELECT =
@@ -42,6 +43,12 @@ Deno.serve(async (req) => {
     .eq("id", propostaId)
     .single();
   if (pErr || !prop) return json({ error: "Proposta não encontrada" }, 404);
+
+  // PORTÃO DE REVISÃO (FIX 1): nada sai sem aprovação humana. Só envia 'aprovada'.
+  // Trava no SERVIDOR — mesmo que a UI mande um rascunho, aqui é recusado. Se já
+  // foi enviada, também não reenvia. O corpo enviado é o texto aprovado (prop.corpo),
+  // sem regenerar nada por cima.
+  if (prop.status !== "aprovada") return json({ ok: false, reason: "nao_aprovada" });
 
   // E-mail do lead (o enrich da Fase 1 preenche quando acha) + opt-out.
   const { data: lead } = await supabase

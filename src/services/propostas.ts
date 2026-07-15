@@ -6,7 +6,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Proposta } from "@/types";
 
-// Linha do banco + nome do lead via join.
+// Linha do banco + nome/e-mail do lead via join.
 type Row = {
   id: string;
   lead_id: string;
@@ -15,24 +15,27 @@ type Row = {
   valor: number | null;
   status: Proposta["status"];
   criada_em: string;
+  aprovada_em: string | null;
   enviada_em: string | null;
   respondida_em: string | null;
-  leads?: { business_name: string } | null;
+  leads?: { business_name: string; email: string | null } | null;
 };
 
 const SELECT =
-  "id, lead_id, assunto, corpo, valor, status, criada_em, enviada_em, respondida_em, leads(business_name)";
+  "id, lead_id, assunto, corpo, valor, status, criada_em, aprovada_em, enviada_em, respondida_em, leads(business_name, email)";
 
 function toProposta(r: Row): Proposta {
   return {
     id: r.id,
     lead_id: r.lead_id,
     lead_nome: r.leads?.business_name ?? "—",
+    lead_email: r.leads?.email ?? null,
     assunto: r.assunto,
     corpo: r.corpo,
     valor: r.valor,
     status: r.status,
     criada_em: r.criada_em,
+    aprovada_em: r.aprovada_em,
     enviada_em: r.enviada_em,
     respondida_em: r.respondida_em,
   };
@@ -199,7 +202,7 @@ export async function gerarProposta(leadId: string): Promise<Proposta> {
   return toProposta(nova as unknown as Row);
 }
 
-/** Salva a edição de uma proposta (assunto, corpo, valor). */
+/** Salva a edição de uma proposta (assunto, corpo, valor). Mantém 'rascunho'. */
 export async function salvarProposta(proposta: Proposta): Promise<Proposta> {
   const { data, error } = await supabase
     .from("propostas")
@@ -211,11 +214,49 @@ export async function salvarProposta(proposta: Proposta): Promise<Proposta> {
   return toProposta(data as unknown as Row);
 }
 
+/** PORTÃO DE REVISÃO (FIX 1) — grava o texto final editado à mão E aprova para
+ * envio numa tacada só (rascunho → aprovada). O texto salvo aqui é EXATAMENTE o
+ * que sai no e-mail: o send-proposal não regenera nada por cima. Só quem está em
+ * 'rascunho' pode ser aprovado. */
+export async function aprovarProposta(proposta: Proposta): Promise<Proposta> {
+  const { data, error } = await supabase
+    .from("propostas")
+    .update({
+      assunto: proposta.assunto,
+      corpo: proposta.corpo,
+      valor: proposta.valor,
+      status: "aprovada",
+      aprovada_em: new Date().toISOString(),
+    })
+    .eq("id", proposta.id)
+    .eq("status", "rascunho") // só aprova a partir de rascunho
+    .select(SELECT)
+    .single();
+  if (error || !data)
+    throw new Error(error?.message ?? "Falha ao aprovar (a proposta já saiu de rascunho?)");
+  return toProposta(data as unknown as Row);
+}
+
+/** Reabre uma proposta aprovada para editar de novo (aprovada → rascunho). Zera a
+ * aprovação: o usuário terá que revisar e aprovar novamente antes de enviar. */
+export async function reabrirProposta(proposta: Proposta): Promise<Proposta> {
+  const { data, error } = await supabase
+    .from("propostas")
+    .update({ status: "rascunho", aprovada_em: null })
+    .eq("id", proposta.id)
+    .eq("status", "aprovada")
+    .select(SELECT)
+    .single();
+  if (error || !data) throw new Error(error?.message ?? "Falha ao reabrir");
+  return toProposta(data as unknown as Row);
+}
+
 /** Resultado do envio: sucesso (proposta atualizada), lead sem e-mail (a UI cai
  * no "copiar") ou lead em opt-out (não envia). Falha real do Resend é lançada
  * como erro (não vira sucesso). */
 export type EnviarResult =
-  { ok: true; proposta: Proposta } | { ok: false; reason: "sem_email" | "opt_out" | "teto_dia" };
+  | { ok: true; proposta: Proposta }
+  | { ok: false; reason: "sem_email" | "opt_out" | "teto_dia" | "nao_aprovada" };
 
 /** Status da rampa de aquecimento do e-mail (teto do dia / restante). */
 export type RampaStatus = {
@@ -250,6 +291,7 @@ export async function enviarProposta(id: string): Promise<EnviarResult> {
   if (d?.reason === "sem_email") return { ok: false, reason: "sem_email" };
   if (d?.reason === "opt_out") return { ok: false, reason: "opt_out" };
   if (d?.reason === "teto_dia") return { ok: false, reason: "teto_dia" };
+  if (d?.reason === "nao_aprovada") return { ok: false, reason: "nao_aprovada" };
   if (d?.error) throw new Error(d.error);
   if (!d?.proposta) throw new Error("Resposta inválida do envio");
   return { ok: true, proposta: toProposta(d.proposta as Row) };

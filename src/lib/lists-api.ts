@@ -13,6 +13,8 @@ export type LeadListComStats = LeadList & {
   leads_atuais: number;
   gold_count: number;
   enriched_atuais: number;
+  /** Leads da lista em 'proposta_enviada' — pool elegível ao follow-up automático. */
+  proposta_enviada_atuais: number;
 };
 
 async function getUserId(): Promise<string> {
@@ -76,22 +78,41 @@ export async function listarListas(): Promise<LeadListComStats[]> {
   if (e1) throw e1;
   if (e2) throw e2;
 
-  const stats = new Map<string, { total: number; gold: number; enriched: number }>();
+  const stats = new Map<string, { total: number; gold: number; enriched: number; prop: number }>();
   for (const l of leads ?? []) {
     const lid = (l as { list_id: string | null }).list_id;
     if (!lid) continue;
-    const s = stats.get(lid) ?? { total: 0, gold: 0, enriched: 0 };
+    const s = stats.get(lid) ?? { total: 0, gold: 0, enriched: 0, prop: 0 };
     s.total += 1;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((l as any).score_breakdown?.is_gold) s.gold += 1;
-    if ((l as { status: string }).status !== "new") s.enriched += 1;
+    const status = (l as { status: string }).status;
+    if (status !== "new") s.enriched += 1;
+    if (status === "proposta_enviada") s.prop += 1;
     stats.set(lid, s);
   }
 
   return (listas ?? []).map((ll) => {
-    const s = stats.get(ll.id) ?? { total: 0, gold: 0, enriched: 0 };
-    return { ...ll, leads_atuais: s.total, gold_count: s.gold, enriched_atuais: s.enriched };
+    const s = stats.get(ll.id) ?? { total: 0, gold: 0, enriched: 0, prop: 0 };
+    return {
+      ...ll,
+      leads_atuais: s.total,
+      gold_count: s.gold,
+      enriched_atuais: s.enriched,
+      proposta_enviada_atuais: s.prop,
+    };
   });
+}
+
+/** FIX 2 — liga/desliga o follow-up automático de uma lista (opt-in por lista).
+ * Default é DESLIGADO; só o dono liga (RLS por user_id). O cron só processa listas
+ * ligadas. */
+export async function setFollowUpAtivo(listId: string, ativo: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("lead_lists")
+    .update({ follow_up_ativo: ativo })
+    .eq("id", listId);
+  if (error) throw error;
 }
 
 export async function renomearLista(id: string, name: string): Promise<void> {

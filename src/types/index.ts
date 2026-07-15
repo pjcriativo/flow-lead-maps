@@ -11,8 +11,9 @@ export type Lead = Database["public"]["Tables"]["leads"]["Row"];
 /* FASE 2 — Proposta                                                          */
 /* -------------------------------------------------------------------------- */
 
-/** Status de uma proposta comercial. */
-export type PropostaStatus = "rascunho" | "enviada" | "respondida";
+/** Status de uma proposta comercial. Portão de revisão (FIX 1): a proposta nasce
+ * 'rascunho', o humano revisa/edita e 'aprova', e SÓ então pode ser 'enviada'. */
+export type PropostaStatus = "rascunho" | "aprovada" | "enviada" | "respondida";
 
 /** Proposta enviada a um lead. */
 export interface Proposta {
@@ -20,6 +21,8 @@ export interface Proposta {
   lead_id: string;
   /** Nome do negócio, denormalizado para exibir sem join. */
   lead_nome: string;
+  /** E-mail do lead (destinatário) — mostrado na revisão. Null = sem e-mail. */
+  lead_email: string | null;
   assunto: string;
   /** Corpo do e-mail (rapport + motivo do site ruim; sem preço na 1ª abordagem). */
   corpo: string;
@@ -28,6 +31,8 @@ export interface Proposta {
   status: PropostaStatus;
   /** ISO datetime. */
   criada_em: string;
+  /** ISO datetime — quando o humano aprovou para envio (portão de revisão). */
+  aprovada_em: string | null;
   enviada_em: string | null;
   respondida_em: string | null;
 }
