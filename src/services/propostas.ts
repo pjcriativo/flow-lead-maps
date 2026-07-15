@@ -62,6 +62,17 @@ export async function listarPropostasPorLead(leadId: string): Promise<Proposta[]
   return (data ?? []).map((r) => toProposta(r as unknown as Row));
 }
 
+/** Lista as propostas de uma campanha (para a revisão em lote). */
+export async function listarPropostasPorCampanha(campanhaId: string): Promise<Proposta[]> {
+  const { data, error } = await supabase
+    .from("propostas")
+    .select(SELECT)
+    .eq("campanha_id", campanhaId)
+    .order("criada_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => toProposta(r as unknown as Row));
+}
+
 /** Lead elegível para proposta: tem site publicado ATIVO e ainda sem proposta. */
 export type LeadCandidato = {
   lead_id: string;
@@ -148,8 +159,9 @@ function montarCorpo(
   ].join("\n");
 }
 
-/** Gera uma proposta (rascunho) a partir de um lead COM site publicado. */
-export async function gerarProposta(leadId: string): Promise<Proposta> {
+/** Gera uma proposta (rascunho) a partir de um lead COM site publicado. Se
+ * `campanhaId` for passado, já nasce vinculada à campanha (usado no lote). */
+export async function gerarProposta(leadId: string, campanhaId?: string): Promise<Proposta> {
   const { data: lead, error: lErr } = await supabase
     .from("leads")
     .select("id, business_name, rating, review_count, score_breakdown")
@@ -195,6 +207,7 @@ export async function gerarProposta(leadId: string): Promise<Proposta> {
       corpo,
       valor: null,
       status: "rascunho",
+      campanha_id: campanhaId ?? null,
     })
     .select(SELECT)
     .single();

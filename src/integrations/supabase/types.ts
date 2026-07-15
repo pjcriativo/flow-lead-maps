@@ -249,6 +249,7 @@ export type Database = {
           follow_up_enviado_em: string | null;
           follow_up_count: number;
           follow_up_message_id: string | null;
+          campanha_id: string | null;
         };
         Insert: {
           id?: string;
@@ -268,6 +269,7 @@ export type Database = {
           follow_up_enviado_em?: string | null;
           follow_up_count?: number;
           follow_up_message_id?: string | null;
+          campanha_id?: string | null;
         };
         Update: {
           id?: string;
@@ -287,6 +289,34 @@ export type Database = {
           follow_up_enviado_em?: string | null;
           follow_up_count?: number;
           follow_up_message_id?: string | null;
+          campanha_id?: string | null;
+        };
+        Relationships: [];
+      };
+      campanhas: {
+        Row: {
+          id: string;
+          user_id: string;
+          list_id: string | null;
+          nome: string;
+          status: string;
+          criada_em: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          list_id?: string | null;
+          nome: string;
+          status?: string;
+          criada_em?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          list_id?: string | null;
+          nome?: string;
+          status?: string;
+          criada_em?: string;
         };
         Relationships: [];
       };

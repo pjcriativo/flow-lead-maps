@@ -71,7 +71,7 @@ const STATUS_STYLE: Record<PropostaStatus, string> = {
   respondida: "bg-green-100 text-green-800",
 };
 
-function StatusPill({ status }: { status: PropostaStatus }) {
+export function StatusPill({ status }: { status: PropostaStatus }) {
   return (
     <span
       className={cn(
@@ -472,7 +472,7 @@ function GerarPropostaDialog({
  * Enquanto aprovada, o texto fica TRAVADO (é exatamente o que sai); para mexer, o
  * usuário "Reabre para editar". O envio (send-proposal) recusa qualquer não-aprovada.
  */
-function RevisarPropostaDialog({
+export function RevisarPropostaDialog({
   proposta,
   onClose,
   onChange,

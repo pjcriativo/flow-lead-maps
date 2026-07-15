@@ -37,6 +37,26 @@ export interface Proposta {
   respondida_em: string | null;
 }
 
+/** Campanha — agrupa a abordagem de uma LISTA num lote revisável. Nasce de uma
+ * lead_list e reúne as propostas geradas para os leads elegíveis dela. */
+export type CampanhaStatus = "ativa" | "concluida";
+
+export interface Campanha {
+  id: string;
+  /** Lista de origem (null se a lista foi excluída — a campanha permanece). */
+  list_id: string | null;
+  nome: string;
+  status: CampanhaStatus;
+  /** ISO datetime. */
+  criada_em: string;
+  /** Contagens das propostas da campanha (para o progresso na tela). */
+  total: number;
+  rascunho: number;
+  aprovada: number;
+  enviada: number;
+  respondida: number;
+}
+
 /** Status de um contrato. */
 export type ContratoStatus = "rascunho" | "gerado" | "assinado" | "cancelado";
 

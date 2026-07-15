@@ -18,6 +18,7 @@ import {
   XCircle,
   LogOut,
   MessageCircle,
+  Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ import { RedesignSection } from "@/components/redesign/RedesignSection";
 import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
 import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
+import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -79,26 +81,30 @@ type Section =
   | "pipeline"
   | "leads"
   | "propostas"
+  | "campanhas"
   | "whatsapp"
   | "contratos"
   | "financeiro"
   | "redesign"
   | "publicar"
+  // "sheets" (Google Sheets) segue no código como DEPRECATED — fora da navegação
+  // (o dono não usa). A seção ainda renderiza p/ não quebrar o callback de OAuth.
   | "sheets"
   | "settings";
 
+// "Google Sheets" saiu da sidebar (deprecated). No lugar entrou "Campanhas".
 const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
   { id: "listas", label: "Minhas Listas", Icon: FolderOpen },
   { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
   { id: "leads", label: "Meus Leads", Icon: Users },
   { id: "propostas", label: "Propostas", Icon: FileText },
+  { id: "campanhas", label: "Campanhas", Icon: Megaphone },
   { id: "whatsapp", label: "WhatsApp", Icon: MessageCircle },
   { id: "contratos", label: "Contratos", Icon: ScrollText },
   { id: "financeiro", label: "Financeiro", Icon: Wallet },
   { id: "redesign", label: "Redesign", Icon: Wand2 },
   { id: "publicar", label: "Publicar", Icon: Rocket },
-  { id: "sheets", label: "Google Sheets", Icon: SheetIcon },
   { id: "settings", label: "Configurações", Icon: SettingsIcon },
 ];
 
@@ -205,6 +211,7 @@ function Dashboard() {
           />
         )}
         {section === "propostas" && <PropostasSection />}
+        {section === "campanhas" && <CampanhasSection />}
         {section === "whatsapp" && <WhatsAppSection />}
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
@@ -215,6 +222,8 @@ function Dashboard() {
           />
         )}
         {section === "publicar" && <PublicarSection />}
+        {/* DEPRECATED: Google Sheets saiu da sidebar. Render mantido só para não
+            quebrar o callback de OAuth (?sheets_connected=true). Remover em passo à parte. */}
         {section === "sheets" && (
           <SheetsSection
             sheetUrl={sheetUrl}
