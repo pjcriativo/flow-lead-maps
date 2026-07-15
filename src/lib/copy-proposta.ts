@@ -195,7 +195,10 @@ function corpoComum(d: DadosCopy): string {
     "",
     d.link,
     "",
-    "Se fizer sentido, responde este e-mail que eu explico como funciona. Se não for o momento, sem problema — não insisto.",
+    // "— não insisto" foi cortado (decisão do dono): o follow-up D+3 insiste, então a frase
+    // contradizia a premissa de honestidade da copy. Quem promete não escrever mais é o
+    // follow-up ("responde só 'não' que eu não escrevo mais") — e essa promessa a máquina cumpre.
+    "Se fizer sentido, responde este e-mail que eu explico como funciona. Se não for o momento, sem problema.",
     "",
     d.remetente,
   ].join("\n");
