@@ -59,6 +59,7 @@ import {
   renomearCampanha,
   excluirCampanha,
   listarCampanhaLeadsView,
+  leadTemMotivoClaro,
   redesignProntoDoLead,
   atualizarCampanhaLead,
   descartarCampanhaLead,
@@ -77,6 +78,7 @@ const ESTADO_STYLE: Record<CampanhaLeadEstado, string> = {
   aprovado: "bg-green-100 text-green-800",
   descartado: "bg-secondary text-muted-foreground line-through",
   erro: "bg-red-50 text-red-700",
+  sem_motivo: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
 };
 const ESTADO_LABEL: Record<CampanhaLeadEstado, string> = {
   pendente: "Pendente",
@@ -85,6 +87,7 @@ const ESTADO_LABEL: Record<CampanhaLeadEstado, string> = {
   aprovado: "Aprovado",
   descartado: "Descartado",
   erro: "Erro",
+  sem_motivo: "Sem motivo claro",
 };
 
 function EstadoPill({ estado, enviada }: { estado: CampanhaLeadEstado; enviada?: boolean }) {
@@ -411,7 +414,15 @@ function CriarCampanhaDialog({
 }
 
 /* -------------------- Revisão em lote (ETAPA 1: preparar sob demanda) -------------------- */
-type Progresso = { feito: number; total: number; reusados: number; gerados: number; erros: number };
+type Progresso = {
+  feito: number;
+  total: number;
+  reusados: number;
+  gerados: number;
+  erros: number;
+  /** Barrados pelo portão: sem motivo classificável → sem proposta e sem gastar IA. */
+  semMotivo: number;
+};
 
 function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: () => void }) {
   const [view, setView] = useState<CampanhaLeadView[]>([]);
@@ -488,12 +499,31 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
   const prepararLeads = async (alvos: CampanhaLeadView[]) => {
     if (!alvos.length || preparando) return;
     setPreparando(true);
-    const acc: Progresso = { feito: 0, total: alvos.length, reusados: 0, gerados: 0, erros: 0 };
+    const acc: Progresso = {
+      feito: 0,
+      total: alvos.length,
+      reusados: 0,
+      gerados: 0,
+      erros: 0,
+      semMotivo: 0,
+    };
     setProgresso({ ...acc });
     for (const v of alvos) {
       patchRow(v.id, { estado: "gerando", erro: null });
       try {
         await atualizarCampanhaLead(v.id, { estado: "gerando", erro: null });
+
+        // PORTÃO "SEM MOTIVO CLARO" — vem ANTES do redesign de propósito: o redesign custa IA,
+        // e não faz sentido queimar IA num lead que não vai receber e-mail nenhum.
+        if (!(await leadTemMotivoClaro(v.lead_id))) {
+          await atualizarCampanhaLead(v.id, { estado: "sem_motivo", erro: null });
+          patchRow(v.id, { estado: "sem_motivo", erro: null });
+          acc.feito += 1;
+          acc.semMotivo += 1;
+          setProgresso({ ...acc });
+          continue;
+        }
+
         let redesignId: string | null = null;
         let reused = false;
         if (v.tem_redesign_pronto) {
@@ -534,6 +564,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
     setSel(new Set());
     toast.success(
       `Preparados ${acc.gerados + acc.reusados}/${acc.total} (${acc.reusados} reusados` +
+        (acc.semMotivo ? `, ${acc.semMotivo} sem motivo claro` : "") +
         (acc.erros ? `, ${acc.erros} erro` : "") +
         ").",
     );

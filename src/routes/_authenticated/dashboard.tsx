@@ -45,6 +45,8 @@ import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
 import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
+import { lerNomeRemetente, salvarNomeRemetente } from "@/services/perfil";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -543,12 +545,70 @@ function SheetsSection({
 
 /* -------------------- Configurações -------------------- */
 function SettingsSection() {
+  const [nome, setNome] = useState("");
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setNome(await lerNomeRemetente());
+      } finally {
+        setCarregando(false);
+      }
+    })();
+  }, []);
+
+  const salvar = async () => {
+    setSalvando(true);
+    try {
+      await salvarNomeRemetente(nome);
+      toast.success("Nome salvo — é ele que assina os seus e-mails.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="text-sm text-muted-foreground">Preferências do app.</p>
       </div>
+
+      {/* Assinatura dos e-mails ({remetente} da proposta e do follow-up). Sem isto a
+          geração da proposta para: assinar com um nome inventado seria pior. */}
+      <div className="space-y-3 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div>
+          <Label htmlFor="remetente" className="text-sm font-medium">
+            Seu nome (assina os e-mails)
+          </Label>
+          <div className="text-xs text-muted-foreground">
+            Vai no fim da proposta e do follow-up. É um nome pessoal — quem recebe responde pra uma
+            pessoa, não pra uma empresa.
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            id="remetente"
+            placeholder={carregando ? "Carregando..." : "Ex.: Marcos Pereira"}
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            disabled={carregando}
+          />
+          <Button onClick={salvar} disabled={salvando || carregando || !nome.trim()}>
+            {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+          </Button>
+        </div>
+        {!carregando && !nome.trim() && (
+          <p className="text-xs text-amber-700">
+            Enquanto estiver vazio, a geração de propostas fica bloqueada.
+          </p>
+        )}
+      </div>
+
       <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between rounded-md border border-border p-3">
           <div>

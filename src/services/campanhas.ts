@@ -6,6 +6,7 @@
 // Mantém intactos: portão da proposta, envio em lote, rampa por org.
 import { supabase } from "@/integrations/supabase/client";
 import type { Campanha, CampanhaLeadView, Proposta } from "@/types";
+import { classificarMotivo } from "@/lib/copy-proposta";
 import {
   injetarLinkPrevia,
   enviarProposta,
@@ -221,6 +222,21 @@ export async function redesignProntoDoLead(leadId: string): Promise<string | nul
     .limit(1)
     .maybeSingle();
   return (data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * PORTÃO DA COPY: o lead tem um {motivo} classificável no score_breakdown?
+ * Chamado ANTES de gerar o redesign (que custa IA) — barrar depois seria pagar por um lead
+ * que nunca receberia e-mail. false → o lead vira 'sem_motivo' e o dono decide.
+ */
+export async function leadTemMotivoClaro(leadId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("score_breakdown")
+    .eq("id", leadId)
+    .single();
+  if (error || !data) return false;
+  return classificarMotivo((data as { score_breakdown: unknown }).score_breakdown) !== null;
 }
 
 /** Atualiza estado/vínculos de um campanha_lead (patch parcial). */

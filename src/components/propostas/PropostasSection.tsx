@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -494,6 +495,9 @@ export function RevisarPropostaDialog({
   const [busy, setBusy] = useState<null | "salvar" | "melhorar" | "aprovar" | "reabrir" | "enviar">(
     null,
   );
+  // DESLIGADO por padrão (decisão do dono): a copy aprovada é deliberada; a IA só entra se
+  // o usuário pedir. Não persiste — cada revisão recomeça desligada, de propósito.
+  const [iaLigada, setIaLigada] = useState(false);
 
   const editavel = prop.status === "rascunho";
   const aprovada = prop.status === "aprovada";
@@ -634,7 +638,26 @@ export function RevisarPropostaDialog({
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="corpo">Mensagem</Label>
               <div className="flex items-center gap-1.5">
+                {/* "Melhorar com IA" é OPCIONAL e nasce DESLIGADO: a copy é deliberada e a IA
+                    tende a achatá-la de volta pro genérico. Quem quiser, liga conscientemente. */}
                 {editavel && (
+                  <>
+                    <Switch
+                      id="usar-ia"
+                      checked={iaLigada}
+                      onCheckedChange={setIaLigada}
+                      disabled={busy !== null}
+                    />
+                    <Label
+                      htmlFor="usar-ia"
+                      className="cursor-pointer text-xs text-muted-foreground"
+                      title="A copy já é a aprovada. A IA só lapida — e pode achatar o tom."
+                    >
+                      Usar IA
+                    </Label>
+                  </>
+                )}
+                {editavel && iaLigada && (
                   <Button
                     type="button"
                     size="sm"

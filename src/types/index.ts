@@ -59,9 +59,12 @@ export interface Campanha {
   erro: number;
 }
 
-/** Estado de um lead dentro de uma campanha (pipeline do portão do site). */
+/** Estado de um lead dentro de uma campanha (pipeline do portão do site).
+ * `sem_motivo`: o score_breakdown não permite classificar o {motivo} da copy (lead antigo sem
+ * os sinais, ou site no ar e ok) → não há proposta honesta a escrever; o dono decide. Não é
+ * 'erro' (nada falhou) nem 'descartado' (isso é decisão dele). */
 export type CampanhaLeadEstado =
-  "pendente" | "gerando" | "rascunho" | "aprovado" | "descartado" | "erro";
+  "pendente" | "gerando" | "rascunho" | "aprovado" | "descartado" | "erro" | "sem_motivo";
 
 /** Linha da revisão em lote: o lead na campanha + o que já foi preparado para ele. */
 export interface CampanhaLeadView {

@@ -128,6 +128,25 @@ export type Database = {
         };
         Relationships: [];
       };
+      // Só os campos que o app usa. `full_name` = {remetente} que assina os e-mails
+      // (ver src/services/perfil.ts). RLS: SELECT/UPDATE do próprio; sem INSERT (a linha
+      // nasce do trigger on_auth_user_created) — por isso Insert não é exposto aqui.
+      profiles: {
+        Row: {
+          id: string;
+          email: string | null;
+          full_name: string | null;
+          company_name: string | null;
+          updated_at: string | null;
+        };
+        Insert: never;
+        Update: {
+          full_name?: string | null;
+          company_name?: string | null;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       lead_lists: {
         Row: {
           id: string;

@@ -1,10 +1,16 @@
 // Camada de serviço — Propostas (Fase 2) LIGADA ao Supabase (RLS pela sessão).
-// A copy é montada por TEMPLATE LOCAL (grátis) com dados REAIS do lead: elogio
-// das avaliações do Google + motivo do site ruim (score_breakdown da Fase 1) +
-// link do site JÁ PUBLICADO (Fase 4) como prévia. NÃO gera site novo, SEM preço
-// na 1ª abordagem. "Melhorar com IA" é opcional (edge melhorar-proposta).
+// A copy é a APROVADA PELO DONO (src/lib/copy-proposta.ts): template + variáveis reais do
+// lead, sem IA. Abertura A (com nota/avaliações) ou B (sem nota) + {motivo} classificado do
+// score_breakdown (Fase 1) + link do site (Fase 4). Sem preço, 1 link só, saída fácil.
+// "Melhorar com IA" é opcional e DESLIGADO por padrão (a IA achata a copy deliberada).
 import { supabase } from "@/integrations/supabase/client";
 import type { Proposta } from "@/types";
+import {
+  ASSUNTO_PROPOSTA,
+  classificarMotivo,
+  montarCorpoProposta,
+  type DadosCopy,
+} from "@/lib/copy-proposta";
 
 // Linha do banco + nome/e-mail do lead via join.
 type Row = {
@@ -118,45 +124,62 @@ export async function listarLeadsParaProposta(): Promise<LeadCandidato[]> {
 }
 
 // ---- Montagem da copy (template local, grátis) ----
-function motivoDoLead(scoreBreakdown: unknown): string {
-  const m = (scoreBreakdown as { motivo?: unknown } | null)?.motivo;
-  if (typeof m === "string" && m.trim())
-    return m
-      .trim()
-      .replace(/\.$/, "")
-      .replace(/^[A-ZÀ-Ú]/, (c) => c.toLowerCase());
-  return "não passa a credibilidade que a sua reputação merece e não facilita o contato pelo celular";
+
+/** Campos do lead que a copy consome. Um só lugar pra manter o select em sincronia. */
+const CAMPOS_COPY = "id, business_name, rating, review_count, category, city, score_breakdown";
+
+type LeadCopy = {
+  business_name: string;
+  rating: number | string | null;
+  review_count: number | null;
+  category: string | null;
+  city: string | null;
+  score_breakdown: unknown;
+};
+
+/**
+ * {remetente} = nome PESSOAL do dono (profiles.full_name). Nunca hardcoded: se não estiver
+ * configurado, a geração PARA com um erro acionável — melhor barrar do que assinar o e-mail
+ * de outra pessoa com um nome inventado.
+ */
+async function remetenteDaOrg(userId: string): Promise<string> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  const nome = ((data as { full_name: string | null } | null)?.full_name ?? "").trim();
+  if (!nome)
+    throw new Error(
+      "Configure o seu nome em Configurações — ele assina os e-mails da proposta e do follow-up.",
+    );
+  return nome;
 }
 
-function elogio(nome: string, rating: number | null, reviews: number | null): string {
-  const nota = rating != null ? rating.toFixed(1).replace(".", ",") : "";
-  if (rating != null && reviews)
-    return `Encontrei a ${nome} no Google e reparei na ótima reputação de vocês — nota ${nota} com ${reviews.toLocaleString("pt-BR")} avaliações de clientes reais.`;
-  if (rating != null)
-    return `Encontrei a ${nome} no Google e reparei na ótima reputação de vocês — nota ${nota}.`;
-  return `Encontrei a ${nome} no Google e vi que vocês têm uma presença sólida e clientes fiéis.`;
+/** Erro do portão "sem motivo claro" — quem chama distingue isto de falha real. */
+export class SemMotivoClaroError extends Error {
+  constructor(nome: string) {
+    super(
+      `Sem motivo claro para abordar ${nome}: o score não permite classificar (site no ar e ok, ou lead antigo sem os sinais). Não dá pra escrever a proposta sem inventar um problema.`,
+    );
+    this.name = "SemMotivoClaroError";
+  }
 }
 
-function montarCorpo(
-  nome: string,
-  motivo: string,
-  siteUrl: string,
-  rating: number | null,
-  reviews: number | null,
-): string {
-  return [
-    elogio(nome, rating, reviews),
-    "",
-    `Justamente por isso me chamou atenção que o site atual ${motivo}. Hoje boa parte dos clientes decide pelo celular, e um site assim faz perder contato que já estava quase fechado.`,
-    "",
-    "Eu refiz a página de vocês com foco em contato pelo WhatsApp e visual moderno. Fiz uma prévia, sem compromisso, pra você ver como fica:",
-    siteUrl,
-    "",
-    "Se fizer sentido, respondo aqui mesmo e a gente ajusta o que você quiser.",
-    "",
-    "Um abraço,",
-    "Equipe Flow Leads",
-  ].join("\n");
+/** Monta assunto+corpo do lead. Lança SemMotivoClaroError quando não há motivo honesto. */
+function copyDoLead(lead: LeadCopy, link: string, remetente: string) {
+  const motivo = classificarMotivo(lead.score_breakdown);
+  if (!motivo) throw new SemMotivoClaroError(lead.business_name);
+  const dados: DadosCopy = {
+    nome_negocio: lead.business_name,
+    nota: lead.rating != null ? Number(lead.rating) : null,
+    n_avaliacoes: lead.review_count ?? null,
+    categoria: lead.category,
+    cidade: lead.city,
+    link,
+    remetente,
+  };
+  return { assunto: ASSUNTO_PROPOSTA, corpo: montarCorpoProposta(dados, motivo) };
 }
 
 /** Gera uma proposta (rascunho) a partir de um lead COM site publicado. Se
@@ -164,7 +187,7 @@ function montarCorpo(
 export async function gerarProposta(leadId: string, campanhaId?: string): Promise<Proposta> {
   const { data: lead, error: lErr } = await supabase
     .from("leads")
-    .select("id, business_name, rating, review_count, score_breakdown")
+    .select(CAMPOS_COPY)
     .eq("id", leadId)
     .single();
   if (lErr || !lead) throw new Error("Lead não encontrado");
@@ -185,17 +208,13 @@ export async function gerarProposta(leadId: string, campanhaId?: string): Promis
       "Este lead ainda não tem um site publicado — publique a prévia antes de gerar a proposta.",
     );
 
-  const nome = lead.business_name as string;
-  const rating = lead.rating != null ? Number(lead.rating) : null;
-  const reviews = (lead.review_count as number | null) ?? null;
-  const motivo = motivoDoLead(lead.score_breakdown);
-  const siteUrl = (site as { url_publica: string }).url_publica;
-  const corpo = montarCorpo(nome, motivo, siteUrl, rating, reviews);
-  const assunto = `Uma versão muito melhor do site — ${nome}`.slice(0, 78);
-
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) throw new Error("Não autenticado");
+
+  const siteUrl = (site as { url_publica: string }).url_publica;
+  const remetente = await remetenteDaOrg(userId);
+  const { assunto, corpo } = copyDoLead(lead as unknown as LeadCopy, siteUrl, remetente);
 
   const { data: nova, error: iErr } = await supabase
     .from("propostas")
@@ -228,21 +247,21 @@ export async function gerarPropostaRascunhoSemSite(
 ): Promise<Proposta> {
   const { data: lead, error: lErr } = await supabase
     .from("leads")
-    .select("id, business_name, rating, review_count, score_breakdown")
+    .select(CAMPOS_COPY)
     .eq("id", leadId)
     .single();
   if (lErr || !lead) throw new Error("Lead não encontrado");
 
-  const nome = lead.business_name as string;
-  const rating = lead.rating != null ? Number(lead.rating) : null;
-  const reviews = (lead.review_count as number | null) ?? null;
-  const motivo = motivoDoLead(lead.score_breakdown);
-  const corpo = montarCorpo(nome, motivo, PLACEHOLDER_LINK_PREVIA, rating, reviews);
-  const assunto = `Uma versão muito melhor do site — ${nome}`.slice(0, 78);
-
   const { data: userRes } = await supabase.auth.getUser();
   const userId = userRes.user?.id;
   if (!userId) throw new Error("Não autenticado");
+
+  const remetente = await remetenteDaOrg(userId);
+  const { assunto, corpo } = copyDoLead(
+    lead as unknown as LeadCopy,
+    PLACEHOLDER_LINK_PREVIA,
+    remetente,
+  );
 
   const { data: nova, error: iErr } = await supabase
     .from("propostas")

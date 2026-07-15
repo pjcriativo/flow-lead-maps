@@ -21,15 +21,46 @@ const DEFAULT_FROM = "Flow Leads <onboarding@resend.dev>";
 const DIAS = 3;
 const BATCH = 1000; // teto de segurança de candidatos lidos por rodada
 
-function followUpCorpo(nome: string, url: string, optout: string): string {
+// COPY APROVADA PELO DONO (follow-up D+3). Espelha src/lib/copy-proposta.ts — este runtime é
+// Deno e não importa de src/. Se mudar lá, mude aqui.
+//
+// {dias_restantes} sai de sites_publicados.expira_em — é ELE que tira a página do ar
+// (publicacao.core.ts recusa servir depois dessa data). O expira_em do redesign PODE DIVERGIR
+// (visto em produção: site 15 dias x redesign 13); prometer a data do redesign faria a copy
+// mentir justo na frase que existe pra ser honesta. Sem data → "em alguns dias": nunca chutar.
+function frasePrazo(dias: number | null): string {
+  const quando =
+    dias != null && dias > 0 ? `em ${dias} ${dias === 1 ? "dia" : "dias"}` : "em alguns dias";
+  return `Um aviso prático: eu tiro essa página do ar ${quando}. Não é pressão de venda — é que eu não deixo prévia hospedada por tempo indeterminado.`;
+}
+
+function diasAte(expiraEm: string | null, agora: Date): number | null {
+  if (!expiraEm) return null;
+  const t = Date.parse(expiraEm);
+  if (Number.isNaN(t)) return null;
+  const d = Math.ceil((t - agora.getTime()) / 86400000);
+  return d > 0 ? d : null;
+}
+
+function followUpCorpo(
+  nome: string,
+  url: string,
+  dias: number | null,
+  remetente: string,
+  optout: string,
+): string {
   return [
-    `Oi! Passando só pra garantir que você viu a prévia que preparei do novo site${nome ? " da " + nome : ""}:`,
+    `${nome}, imagino que a rotina não deixe muito tempo pra e-mail.`,
+    "",
+    "Deixo o link de novo, caso tenha passado batido — é a página de vocês refeita, no ar:",
+    "",
     url,
     "",
-    "Fiz pensando em facilitar o contato pelo WhatsApp e passar mais credibilidade. Se fizer sentido, é só responder aqui que a gente ajusta o que você quiser — sem compromisso.",
+    frasePrazo(dias),
     "",
-    "Um abraço,",
-    "Equipe Flow Leads",
+    'Se não for o momento, responde só "não" que eu não escrevo mais.',
+    "",
+    remetente,
     "",
     "—",
     `Se não quiser mais receber estes e-mails, cancele aqui: ${optout}`,
@@ -75,7 +106,7 @@ Deno.serve(async (req) => {
   const { data: cands, error: qErr } = await admin
     .from("propostas")
     .select(
-      "id, user_id, lead_id, corpo, assunto, enviada_em, leads!inner(id, email, business_name, status, email_opt_out, opt_out_token, list_id, lead_lists!inner(id, follow_up_ativo))",
+      "id, user_id, lead_id, site_id, corpo, assunto, enviada_em, leads!inner(id, email, business_name, status, email_opt_out, opt_out_token, list_id, lead_lists!inner(id, follow_up_ativo))",
     )
     .eq("status", "enviada")
     .eq("follow_up_count", 0)
@@ -102,7 +133,50 @@ Deno.serve(async (req) => {
     return rest;
   }
 
-  const itens: Array<{ lead_id: string; org: string; nome: string; message_id: string }> = [];
+  // {dias_restantes} de cada proposta: expira_em do SITE PUBLICADO (é ele que tira a página
+  // do ar). Uma consulta só pros sites da rodada — não N+1 dentro do loop.
+  const siteIds = [
+    ...new Set(
+      ((cands ?? []) as Array<{ site_id: string | null }>)
+        .map((c) => c.site_id)
+        .filter((x): x is string => !!x),
+    ),
+  ];
+  const expiraPorSite = new Map<string, string>();
+  if (siteIds.length) {
+    const { data: sites } = await admin
+      .from("sites_publicados")
+      .select("id, expira_em, arquivos_removidos")
+      .in("id", siteIds);
+    for (const s of (sites ?? []) as Array<{
+      id: string;
+      expira_em: string;
+      arquivos_removidos: boolean;
+    }>) {
+      // Site já retirado do ar → sem prazo a prometer (cai em "em alguns dias").
+      if (!s.arquivos_removidos) expiraPorSite.set(s.id, s.expira_em);
+    }
+  }
+
+  // {remetente} por org (profiles.full_name). Sem nome configurado, o follow-up NÃO sai:
+  // assinar com nome inventado é pior do que tentar de novo amanhã.
+  const remetentePorOrg = new Map<string, string>();
+  const orgIds = [...new Set(((cands ?? []) as Array<{ user_id: string }>).map((c) => c.user_id))];
+  if (orgIds.length) {
+    const { data: profs } = await admin.from("profiles").select("id, full_name").in("id", orgIds);
+    for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+      const n = (p.full_name ?? "").trim();
+      if (n) remetentePorOrg.set(p.id, n);
+    }
+  }
+
+  const itens: Array<{
+    lead_id: string;
+    org: string;
+    nome: string;
+    message_id: string;
+    dias_restantes: number | null;
+  }> = [];
   const falhas: Array<{ lead_id: string; motivo: string }> = [];
   const leadsFeitos = new Set<string>();
   let enviadosRodada = 0;
@@ -111,6 +185,7 @@ Deno.serve(async (req) => {
     id: string;
     user_id: string;
     lead_id: string;
+    site_id: string | null;
     corpo: string;
     assunto: string;
     leads: {
@@ -141,10 +216,22 @@ Deno.serve(async (req) => {
     }
     const optout = `${funcsBase}/opt-out?lead=${lead.id}&t=${token}`;
     const url = c.corpo.match(/https?:\/\/\S+/)?.[0] ?? "";
-    const assunto = c.assunto?.startsWith("Re:")
+
+    // Sem nome do remetente configurado → não manda (tenta amanhã, já configurado).
+    const remetente = remetentePorOrg.get(c.user_id);
+    if (!remetente) {
+      falhas.push({
+        lead_id: c.lead_id,
+        motivo: "Sem nome do remetente (Configurações) — o e-mail não pode ser assinado.",
+      });
+      continue;
+    }
+
+    const dias = diasAte(c.site_id ? (expiraPorSite.get(c.site_id) ?? null) : null, agora);
+    const assunto = /^re:/i.test(c.assunto ?? "")
       ? c.assunto
       : `Re: ${c.assunto ?? "sua nova página"}`;
-    const corpo = followUpCorpo(lead.business_name ?? "", url, optout);
+    const corpo = followUpCorpo(lead.business_name ?? "", url, dias, remetente, optout);
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -177,6 +264,7 @@ Deno.serve(async (req) => {
       org: c.user_id,
       nome: lead.business_name ?? "",
       message_id: data.id,
+      dias_restantes: dias,
     });
   }
 
