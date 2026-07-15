@@ -1,7 +1,9 @@
 // Fase 1 — Kanban/Pipeline: colunas por status; arrastar um card SALVA o novo
-// status no banco (leads.status) via updateLeadStatus.
-import { useEffect, useState } from "react";
-import { Loader2, RefreshCw, GripVertical, Send } from "lucide-react";
+// status no banco (leads.status) via updateLeadStatus. Board com scroll HORIZONTAL
+// (todas as colunas alcançáveis) + scroll VERTICAL por coluna + paginação por coluna
+// (não trava com centenas de cards) + auto-scroll ao arrastar perto da borda.
+import { useEffect, useRef, useState } from "react";
+import { Loader2, RefreshCw, GripVertical, Send, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +18,8 @@ import {
 import { listarLeadIdsComFollowUp } from "@/services/propostas";
 import { ScoreBadge, WhatsCell, EmailCell } from "./leads-shared";
 
+const LIMITE_INICIAL = 25; // cards renderizados por coluna antes do "ver mais"
+
 export function PipelineSection() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +27,8 @@ export function PipelineSection() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const [followupIds, setFollowupIds] = useState<Set<string>>(new Set());
+  const [limites, setLimites] = useState<Record<string, number>>({});
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -63,6 +69,24 @@ export function PipelineSection() {
     }
   };
 
+  // Auto-scroll horizontal quando o card sendo arrastado chega perto da borda do board
+  // (o drag nativo HTML5 não faz isso sozinho — sem ele, colunas fora da tela ficam inalcançáveis).
+  const onBoardDragOver = (e: React.DragEvent) => {
+    const el = boardRef.current;
+    if (!el || !dragId) return;
+    const r = el.getBoundingClientRect();
+    const margem = 90;
+    if (e.clientX < r.left + margem) el.scrollLeft -= 22;
+    else if (e.clientX > r.right - margem) el.scrollLeft += 22;
+  };
+
+  const limiteDe = (status: string) => limites[status] ?? LIMITE_INICIAL;
+  const verMais = (status: string, total: number) =>
+    setLimites((m) => ({
+      ...m,
+      [status]: Math.min((m[status] ?? LIMITE_INICIAL) + LIMITE_INICIAL, total),
+    }));
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
@@ -72,7 +96,7 @@ export function PipelineSection() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-4">
+    <div className="flex h-full w-full min-w-0 flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Pipeline</h1>
@@ -91,9 +115,17 @@ export function PipelineSection() {
         </div>
       )}
 
-      <div className="flex gap-3 overflow-x-auto pb-4">
+      {/* min-w-0 nos ancestrais faz o overflow-x-auto funcionar de verdade; altura
+          limitada faz cada coluna rolar por dentro (não a página inteira). */}
+      <div
+        ref={boardRef}
+        onDragOver={onBoardDragOver}
+        className="flex h-[calc(100dvh-12rem)] min-w-0 gap-3 overflow-x-auto overflow-y-hidden pb-3"
+      >
         {LEAD_STATUSES.map((status) => {
           const items = leads.filter((l) => l.status === status);
+          const limite = limiteDe(status);
+          const visiveis = items.slice(0, limite);
           return (
             <div
               key={status}
@@ -114,8 +146,8 @@ export function PipelineSection() {
                   {items.length}
                 </span>
               </div>
-              <div className="flex min-h-[120px] flex-1 flex-col gap-2 p-2">
-                {items.map((l) => (
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+                {visiveis.map((l) => (
                   <div
                     key={l.id}
                     draggable
@@ -130,12 +162,12 @@ export function PipelineSection() {
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold leading-tight text-foreground">
+                      <span className="line-clamp-2 text-sm font-semibold leading-tight text-foreground">
                         {l.business_name}
                       </span>
                       <ScoreBadge lead={l} />
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
+                    <div className="mt-1 truncate text-xs text-muted-foreground">
                       {l.city}
                       {l.state ? `/${l.state}` : ""}
                     </div>
@@ -150,9 +182,17 @@ export function PipelineSection() {
                       <WhatsCell lead={l} />
                       <EmailCell lead={l} />
                     </div>
-                    <GripVertical className="mt-1 h-3.5 w-3.5 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" />
+                    <GripVertical className="mt-1 h-3.5 w-3.5 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing" />
                   </div>
                 ))}
+                {items.length > limite && (
+                  <button
+                    onClick={() => verMais(status, items.length)}
+                    className="flex items-center justify-center gap-1 rounded-lg border border-dashed border-border py-2 text-xs font-medium text-muted-foreground hover:bg-secondary/40"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" /> Ver mais {items.length - limite}
+                  </button>
+                )}
                 {items.length === 0 && (
                   <div className="rounded-lg border border-dashed border-border/60 py-6 text-center text-xs text-muted-foreground">
                     vazio
