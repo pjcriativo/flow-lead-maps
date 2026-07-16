@@ -46,3 +46,14 @@ export function varianteHero(seed: string, nicho: TemplateId): HeroId {
   const permitidas = PERMITIDAS[nicho] ?? PERMITIDAS["servico-local"];
   return permitidas[hashSemente(seed) % permitidas.length];
 }
+
+/**
+ * Variante (0|1|2) de uma SEÇÃO, escolhida pela mesma semente do hero, mas com SALT por seção
+ * (`seed:secao`) para que cada seção escolha de forma INDEPENDENTE — 3 variantes × 4 seções dão
+ * 3⁴ = 81 composições, não 3. A ESTRUTURA é independente do nicho (o clima entra por CSS por
+ * cima), então são 12 estruturas servindo os 2 climas. Determinístico: mesmo lead = mesmo site.
+ */
+export type SecaoId = "servicos" | "prova" | "sobre" | "contato";
+export function varianteSecao(seed: string, secao: SecaoId): 0 | 1 | 2 {
+  return (hashSemente(seed + ":" + secao) % 3) as 0 | 1 | 2;
+}

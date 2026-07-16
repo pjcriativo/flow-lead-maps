@@ -72,6 +72,11 @@ export type SiteData = {
   // composição por blocos: semente estável do lead + variante de hero escolhida
   seed: string;
   heroVar: HeroId;
+  // Variante (0|1|2) de cada seção — escolhida por semente com salt por seção (81 composições).
+  servVar: 0 | 1 | 2;
+  provaVar: 0 | 1 | 2;
+  sobreVar: 0 | 1 | 2;
+  contatoVar: 0 | 1 | 2;
 
   /** Crédito do rodapé (profiles.site_credito). null = SEM crédito — o default.
    *  NUNCA cita a plataforma: o lead é prospect da agência, não cliente do Flow Leads. */

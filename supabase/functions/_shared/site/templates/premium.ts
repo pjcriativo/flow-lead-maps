@@ -8,6 +8,7 @@ import { esc } from "../dados.ts";
 import { icone } from "../icones.ts";
 import { head, waFloat, estrelas, fmtNota, fmtReviews, ctaHref, scriptAnim } from "../comuns.ts";
 import { heroBloco } from "./heros.ts";
+import { blocoServicos } from "./sec_servicos.ts";
 
 export type NichoCfg = {
   /**
@@ -322,11 +323,9 @@ export function templatePremium(d: SiteData, cfg: NichoCfg): string {
     ? `<div class="trust"><div class="wrap"><div class="grid" style="grid-template-columns:repeat(${trustItems.length},1fr)">${trustItems.join("")}</div></div></div>`
     : "";
 
-  const gClasse = d.servicos.length === 4 ? " s4" : d.servicos.length === 2 ? " s2" : "";
-  const servicos = d.servicos.length
-    ? `<section id="servicos"><div class="wrap"><div class="sec-head reveal"><span class="kicker">${icone(cfg.brandIcon)} ${esc(cfg.servKicker)}</span><h2>${esc(cfg.servTitulo)}</h2><p>${esc(cfg.servSub)}</p></div>
-<div class="servicos${gClasse}">${d.servicos.map((s, i) => `<div class="card reveal"${rev(i % 3)}><div class="ic">${icone(s.icone)}</div><h3>${esc(s.titulo)}</h3><p>${esc(s.descricao)}</p></div>`).join("")}</div></div></section>`
-    : "";
+  // SERVIÇOS — bloco da variante escolhida por semente (d.servVar). css/cssEscuro acumulados.
+  const svSec = blocoServicos(d, cfg);
+  const servicos = svSec.html;
 
   const dif = d.diferenciais.length
     ? `<section class="dif"><div class="wrap"><div class="sec-head reveal"><span class="kicker">${icone("award")} ${esc(cfg.difKicker)}</span><h2>${esc(cfg.difTitulo)}</h2></div>
@@ -412,7 +411,11 @@ ${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmb
 
   // Corpo CLARO (saúde/estética) OU ESCURO-PREMIUM (profissional): o segundo
   // layeriza o tema escuro por cima da estrutura — saúde nunca é afetada.
-  const bodyCss = cfg.clima === "escuro-premium" ? CSS + CSS_ESCURO : CSS;
+  // CSS das SEÇÕES variáveis: base sempre; override escuro só no clima escuro-premium.
+  const escuro = cfg.clima === "escuro-premium";
+  const secCss = svSec.css;
+  const secCssEscuro = escuro ? svSec.cssEscuro : "";
+  const bodyCss = (escuro ? CSS + CSS_ESCURO : CSS) + secCss + secCssEscuro;
   return `${head(d, "", bodyCss + hero.css)}
 <body>
 <header class="top"><div class="wrap bar">

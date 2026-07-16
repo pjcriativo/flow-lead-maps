@@ -7,6 +7,7 @@ import type { SiteData, Cores, TemplateId, Servico, Depoimento, HeroId } from ".
 import { firstBrWhatsapp } from "../phone.ts";
 import { resolverFotoSet } from "./imagens.ts";
 import { categoriaLabel } from "./nicho.ts";
+import { varianteSecao } from "./variantes.ts";
 
 /** Escapa texto para inserir com segurança no HTML. */
 export function esc(s: unknown): string {
@@ -127,7 +128,17 @@ export function montarSiteData(
   nicho: TemplateId,
   depoimentos: Depoimento[] = [],
   fotosOverride?: FotosOverride,
-  bloco?: { seed: string; heroVar: HeroId },
+  bloco?: {
+    seed: string;
+    heroVar: HeroId;
+    // Override de variante (só preview/prova local; produção não passa).
+    force?: Partial<{
+      servVar: 0 | 1 | 2;
+      provaVar: 0 | 1 | 2;
+      sobreVar: 0 | 1 | 2;
+      contatoVar: 0 | 1 | 2;
+    }>;
+  },
   creditoRodape?: string | null,
 ): SiteData {
   const whatsapp = firstBrWhatsapp(mp.whatsapp) ?? firstBrWhatsapp(mp.telefone);
@@ -182,6 +193,12 @@ export function montarSiteData(
     depoimentos: (depoimentos ?? []).filter((d) => d.text && d.text.length >= 15).slice(0, 6),
     seed: bloco?.seed ?? mp.nome,
     heroVar: bloco?.heroVar ?? "A",
+    // Variantes de seção: da mesma semente, com salt por seção (independentes → 81 composições).
+    // force.* só é usado no preview/prova local (produção não passa).
+    servVar: bloco?.force?.servVar ?? (bloco ? varianteSecao(bloco.seed, "servicos") : 0),
+    provaVar: bloco?.force?.provaVar ?? (bloco ? varianteSecao(bloco.seed, "prova") : 0),
+    sobreVar: bloco?.force?.sobreVar ?? (bloco ? varianteSecao(bloco.seed, "sobre") : 0),
+    contatoVar: bloco?.force?.contatoVar ?? (bloco ? varianteSecao(bloco.seed, "contato") : 0),
     creditoRodape: (creditoRodape ?? "").trim() || null,
   };
 }
