@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Pencil,
   FileText,
+  FilePlus,
   Wand2,
   Send,
   Clock,
@@ -116,32 +117,40 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
     setData(await carregarDetalheLead(lead.id));
   };
 
-  // "Gerar site" no modal — reusa o MESMO serviço da campanha (gerarRedesign). Nasce RASCUNHO
-  // e NÃO publica (o portão de publicação segue na aprovação, na aba Campanhas/Publicar).
-  // Se o lead JÁ TEM site, a edge o RASPA (10-40s) — por isso o toast.loading: sem feedback
-  // persistente o dono acha que travou. E se o site for ilegível, AVISA que caiu no fallback
-  // (gerou com os dados do Google) em vez de fingir sucesso.
-  const gerarSite = async () => {
+  // Gera o site do lead. Nasce RASCUNHO e NÃO publica (o portão segue na aprovação).
+  // DOIS modos, escolhidos pelo dono quando o lead JÁ TEM site:
+  //   redesign  → raspa o site atual e o refaz melhor (a edge lê o site — 10-40s).
+  //   novoDoZero → ignora o site atual, cria um site novo só com os dados do Google.
+  // Sem feedback persistente (toast.loading) o dono acha que travou; e se o site for
+  // ilegível no modo redesign, AVISA que caiu no fallback em vez de fingir sucesso.
+  const gerar = async (novoDoZero: boolean) => {
     setGerando("site");
     const tid = toast.loading(
-      lead.website
-        ? "Gerando o site... leio o site atual de vocês antes (pode levar até ~40s)."
-        : "Gerando o site... (pode levar até ~40s).",
+      novoDoZero
+        ? "Criando um site NOVO do zero... (pode levar até ~40s)."
+        : "Refazendo a partir do site atual de vocês... leio o site antes (pode levar até ~40s).",
     );
     try {
-      const { usage } = await gerarRedesign(lead.id);
+      const { usage } = await gerarRedesign(lead.id, { novoDoZero });
       await recarregar();
-      const caiuNoFallback =
-        !usage.servicosReais || usage.conteudoLegivel === false || usage.fallback;
-      if (caiuNoFallback) {
+      // No modo redesign, avisa se não conseguiu ler o site (caiu no fallback). No modo "novo"
+      // o fallback pra dados do Google é o esperado — não é um aviso, é o próprio modo.
+      const avisarFallback =
+        !novoDoZero && (usage.conteudoLegivel === false || !usage.servicosReais || usage.fallback);
+      if (avisarFallback) {
         toast.warning(
           usage.conteudoLegivel === false
-            ? "Site gerado com os dados do Google — não consegui ler o site atual (ilegível/legado). Revise os serviços na prévia."
-            : "Site gerado com serviços genéricos do nicho — não deu pra extrair as áreas reais. Revise a prévia.",
+            ? "Feito com os dados do Google — não consegui ler o site atual (ilegível/legado). Revise os serviços na prévia."
+            : "Feito com serviços genéricos do nicho — não deu pra extrair as áreas reais do site. Revise a prévia.",
           { id: tid, duration: 8000 },
         );
       } else {
-        toast.success("Site gerado — revise a prévia abaixo.", { id: tid });
+        toast.success(
+          novoDoZero
+            ? "Site novo gerado — revise a prévia abaixo."
+            : "Redesign gerado — revise a prévia abaixo.",
+          { id: tid },
+        );
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao gerar o site", { id: tid });
@@ -331,17 +340,52 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
                       <p className="text-sm text-muted-foreground">
                         Nenhum redesign ainda para este lead.
                       </p>
-                      <Button size="sm" onClick={gerarSite} disabled={gerando !== null}>
-                        {gerando === "site" ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" /> Gerando site...
-                          </>
-                        ) : (
-                          <>
-                            <Wand2 className="h-4 w-4" /> Gerar site
-                          </>
-                        )}
-                      </Button>
+                      {lead.website ? (
+                        // Lead JÁ TEM site → o dono escolhe: refazer a partir do atual (redesign)
+                        // ou criar um site novo do zero (dados do Google).
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => gerar(false)}
+                              disabled={gerando !== null}
+                            >
+                              {gerando === "site" ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Wand2 className="h-4 w-4" />
+                              )}
+                              Redesign do site atual
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => gerar(true)}
+                              disabled={gerando !== null}
+                            >
+                              <FilePlus className="h-4 w-4" /> Gerar site novo
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            <b className="text-foreground">Redesign</b>: parte do site atual e o
+                            refaz melhor. <b className="text-foreground">Novo</b>: cria do zero com
+                            os dados do Google, sem olhar o site atual.
+                          </p>
+                        </div>
+                      ) : (
+                        // Sem site → não há o que "refazer"; só criar do zero.
+                        <Button size="sm" onClick={() => gerar(true)} disabled={gerando !== null}>
+                          {gerando === "site" ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" /> Gerando site...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="h-4 w-4" /> Gerar site
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </section>

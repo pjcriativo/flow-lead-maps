@@ -29,8 +29,13 @@ Deno.serve(async (req) => {
   const userId = userData.user.id;
 
   let leadId: string | undefined;
+  // ignorarSite: gera um site NOVO do zero (só dados do Google), sem raspar o site atual.
+  // Ausente/false = REDESIGN a partir do site existente (comportamento padrão).
+  let ignorarSite = false;
   try {
-    leadId = (await req.json())?.lead_id;
+    const body = await req.json();
+    leadId = body?.lead_id;
+    ignorarSite = !!body?.ignorar_site;
   } catch {
     return json({ error: "Body inválido" }, 400);
   }
@@ -61,8 +66,11 @@ Deno.serve(async (req) => {
 
   try {
     // 1. Matéria-prima (site atual) + DEPOIMENTOS reais do Google (Apify), em paralelo.
+    // ignorarSite → NÃO raspa o site atual (gera do zero, como se não houvesse site).
+    const raspar = lead.website && !ignorarSite;
+    if (ignorarSite) log("modo: site NOVO do zero (ignora o site atual)");
     const [siteC, coleta] = await Promise.all([
-      lead.website ? coletarConteudoSite(lead.website) : Promise.resolve(null),
+      raspar ? coletarConteudoSite(lead.website) : Promise.resolve(null),
       coletarReviews(lead.place_id, { maxReviews: 8, maxImages: 6, log }),
     ]);
 

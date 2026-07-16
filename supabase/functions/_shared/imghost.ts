@@ -68,24 +68,65 @@ function sizedUrl(u: string, w: number): string {
   }
 }
 
+// Teto de bytes por imagem. sizedUrl só reduz Google/Unsplash — a imagem do SITE do lead
+// (qualquer outro host) vem no tamanho original. Sem este teto, uma foto de 20-30 MB era
+// baixada inteira e Image.decode estourava a memória da edge (WORKER_RESOURCE_LIMIT), fazendo
+// o "gerar site" falhar pra QUALQUER lead com imagem grande no site. Lê em streaming e aborta
+// ao passar do teto, então nem chega a carregar a imagem gigante na memória.
+const MAX_IMG_BYTES = 8_000_000;
+
 async function baixar(u: string, ms = 9000): Promise<Uint8Array | null> {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
   try {
-    const c = new AbortController();
-    const t = setTimeout(() => c.abort(), ms);
     const r = await fetch(u, { signal: c.signal });
-    clearTimeout(t);
-    if (!r.ok) return null;
-    const b = new Uint8Array(await r.arrayBuffer());
-    return b.length > 3000 ? b : null;
+    if (!r.ok || !r.body) return null;
+    // Content-Length grande → nem baixa.
+    const cl = Number(r.headers.get("content-length") || 0);
+    if (cl && cl > MAX_IMG_BYTES) {
+      await r.body.cancel().catch(() => {});
+      return null;
+    }
+    // Streaming com teto: aborta a leitura se passar do limite (não materializa a imagem toda).
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    const reader = r.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_IMG_BYTES) {
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      chunks.push(value);
+    }
+    if (total <= 3000) return null;
+    const b = new Uint8Array(total);
+    let off = 0;
+    for (const ch of chunks) {
+      b.set(ch, off);
+      off += ch.length;
+    }
+    return b;
   } catch {
     return null;
+  } finally {
+    clearTimeout(t);
   }
 }
 
 type Analise = { url: string; bytes: Uint8Array; w: number; h: number; brilho: number };
 
+// A análise é baixada em ~260px; se ainda vier grande, o host ignorou o resize (imagem cheia).
+// Image.decode explode um bitmap RGBA cru na memória — um JPEG de 2MB pode virar 90MB de bitmap
+// e estourar a edge. Acima deste teto, pula a análise (a imagem simplesmente não vira hero —
+// cai nas fotos curadas do nicho). Protege a memória sem derrubar a geração.
+const MAX_DECODE_BYTES = 2_500_000;
+
 async function analisar(url: string, bytes: Uint8Array): Promise<Analise | null> {
   try {
+    if (bytes.length > MAX_DECODE_BYTES) return null;
     const img = await Image.decode(bytes);
     const w = img.width;
     const h = img.height;
