@@ -7,7 +7,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { coletarConteudoSite } from "../_shared/materiaprima.ts";
 import { coletarReviews } from "../_shared/reviews.ts";
-import { getProviderChain, type MateriaPrima, type ConteudoIA } from "../_shared/ai/index.ts";
+import {
+  getProviderChain,
+  sanearRegistros,
+  type MateriaPrima,
+  type ConteudoIA,
+} from "../_shared/ai/index.ts";
 import { detectarNicho, heroNicho } from "../_shared/site/nicho.ts";
 import { varianteHero } from "../_shared/site/variantes.ts";
 import { montarHtml } from "../_shared/site/montar.ts";
@@ -102,20 +107,34 @@ Deno.serve(async (req) => {
       legivel: siteC?.legivel ?? false,
     };
 
-    // 2. Salva os depoimentos reais vinculados ao lead (substitui os anteriores).
+    // 2. PROVA SOCIAL — só entra review POSITIVA real. Limiar: nota >= 4.
+    //    Justificativa: 4-5 estrelas = cliente satisfeito (prova social legítima);
+    //    1-3 = reclamação/experiência mista e NUNCA vira depoimento (mandar isso pro
+    //    dono queima o lead); sem nota = não dá pra confirmar que é positiva → fica de
+    //    fora ("sem dado, na dúvida, fora"). Se sobrar 0, a seção se OMITE (sec_prova)
+    //    ou mostra só a nota real — nunca completa com negativa nem inventa.
+    const MIN_ESTRELAS = 4;
+    const reviewsPositivas = coleta.reviews.filter(
+      (r) => typeof r.rating === "number" && r.rating >= MIN_ESTRELAS,
+    );
+    log(
+      `reviews: ${coleta.reviews.length} coletadas → ${reviewsPositivas.length} positivas (>=${MIN_ESTRELAS}★) publicáveis`,
+    );
     // photo=null de propósito: os avatares do Google (lh3) expiram/bloqueiam — o
     // template usa a inicial do nome. Nenhuma URL lh3 vai pro site final.
-    const depoimentos: Depoimento[] = coleta.reviews.map((r) => ({
+    const depoimentos: Depoimento[] = reviewsPositivas.map((r) => ({
       author: r.author,
       photo: null,
       rating: r.rating,
       text: r.text,
       when: r.when,
     }));
-    if (depoimentos.length) {
+    // lead_reviews guarda SÓ as publicáveis (positivas) — nunca uma negativa fica no
+    // acervo do site pronta pra vazar numa republicação.
+    if (reviewsPositivas.length) {
       await supabase.from("lead_reviews").delete().eq("lead_id", leadId);
       await supabase.from("lead_reviews").insert(
-        coleta.reviews.map((r) => ({
+        reviewsPositivas.map((r) => ({
           user_id: userId,
           lead_id: leadId,
           author_name: r.author,
@@ -183,7 +202,12 @@ Deno.serve(async (req) => {
       ),
     ]);
 
-    const conteudo: ConteudoIA = ai.conteudo;
+    // GARANTIA anti-fraude: remove qualquer registro profissional (CRO/CRM/OAB/CNPJ...)
+    // cujo número não esteja no texto extraído do lead — mesmo que a IA tenha inventado.
+    const san = sanearRegistros(ai.conteudo, mp.textos ?? "");
+    if (san.removidos.length) log(`registros inventados removidos: ${san.removidos.join(" | ")}`);
+    const conteudo: ConteudoIA = san.conteudo;
+    const registrosRemovidos = san.removidos;
     const modelo = ai.modelo;
     const provider = ai.provider;
     const inTok = ai.inputTokens;
@@ -272,6 +296,9 @@ Deno.serve(async (req) => {
         custoUsd: custoTotal,
         fallback: usouFallback,
         depoimentos: depoimentos.length,
+        reviewsColetadas: coleta.reviews.length,
+        reviewsPositivas: reviewsPositivas.length,
+        registrosRemovidos,
         servicos: conteudo.servicos.length,
         servicosReais,
         heroNicho: heroNicho(mp.categoria, nicho),

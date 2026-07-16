@@ -9,6 +9,7 @@ export const SYSTEM = `Você é um COPYWRITER e diretor de conteúdo sênior, es
 
 REGRAS:
 1. NUNCA invente fatos: nada de anos de experiência, prêmios, números, endereços, preços ou depoimentos que não estejam nos dados. Se não sabe, não afirme.
+1b. PROIBIDO EMITIR REGISTRO PROFISSIONAL: nunca escreva número de CRO, CRM, OAB, CRC, CREA, CRF, CRP, CRECI, CNPJ, CPF ou qualquer registro/inscrição regulada — a MENOS que o número apareça LITERALMENTE no "texto_do_site_atual". Registro é dado verificável e regulado; inventar um é fraude. Na dúvida, não cite nenhum registro nem "responsável técnico".
 2. Seja ESPECÍFICO do negócio: use a categoria, a cidade e (quando houver) o TEXTO REAL do site atual. PROIBIDO clichê genérico ("sorrisos que transformam", "qualidade e compromisso", "bem-vindo ao nosso site").
 2b. ADAPTE o vocabulário ao RAMO. Ex.: advocacia/jurídico fala de causa, defesa, direitos, cliente, consultoria, áreas de atuação — NUNCA "paciente", "tratamento", "sorriso", "bem-estar". Não vaze vocabulário de saúde num negócio que não é de saúde.
 3. Prova social: use a NOTA do Google e o nº de avaliações no hero/sobre — é o ativo mais forte.
@@ -97,6 +98,86 @@ export function sanear(raw: unknown): ConteudoIA {
     cta: String(o.cta ?? "").trim() || "Fale conosco",
     servicosReais: o.servicos_reais === true || o.servicosReais === true,
   };
+}
+
+// ===== GARANTIA anti-fraude de REGISTROS PROFISSIONAIS =====
+// O prompt pede pra IA não inventar CRO/CRM/OAB/CNPJ..., mas LLM alucina. Esta camada
+// é a garantia: remove do conteúdo qualquer registro cujo NÚMERO não apareça no texto
+// extraído do lead. Se estiver na fonte (dado real do site), mantém. Erra pro lado de
+// REMOVER (na dúvida, fora) — melhor perder um registro real do que publicar um falso.
+const REG_SIGLAS =
+  "CRO|CRM|OAB|CRC|CREA|CRF|CRP|CRECI|CRQ|CRMV|COREN|CRN|CRB|CRA|CAU|CNPJ|CPF|CNAE|NIRE";
+const REG_RE = new RegExp(
+  `\\b(?:${REG_SIGLAS})\\b(?:\\s*[./-]?\\s*[A-Z]{2})?[\\s:.ºn°/-]*(\\d[\\d.\\-/ ]{2,}\\d)`,
+  "gi",
+);
+
+/** Números (só dígitos) que aparecem como TOKEN no texto-fonte extraído. */
+function numerosDaFonte(fonte: string): Set<string> {
+  const set = new Set<string>();
+  for (const t of fonte.match(/\d[\d.\-/ ]{2,}\d/g) ?? []) set.add(t.replace(/\D/g, ""));
+  return set;
+}
+
+// Abreviações comuns pt-BR: o ponto delas NÃO encerra frase (senão "Dr. Fulano —
+// CRO 999" quebraria em "...Dr." e deixaria um fragmento pendurado ao remover).
+const ABREV = /\b(Dr|Dra|Sr|Sra|Srta|Profa?|Exm[oa]|Ltda|Me|Sto|Sta|Av|Pça|nº|no)\./gi;
+const PONTO = ""; // marcador temporário do ponto de abreviação
+
+/** Remove as FRASES que citam um registro cujo número NÃO está na fonte. */
+function limparRegistros(
+  txt: string,
+  fonteNums: Set<string>,
+): { txt: string; removidos: string[] } {
+  if (!txt) return { txt, removidos: [] };
+  const removidos: string[] = [];
+  const marc = txt.replace(ABREV, (m) => m.slice(0, -1) + PONTO);
+  const frases = marc.split(/(?<=[.!?…])\s+/);
+  const mantidas = frases.filter((fr) => {
+    let inventado = false;
+    for (const m of fr.matchAll(REG_RE)) {
+      const num = (m[1] ?? "").replace(/\D/g, "");
+      if (num && !fonteNums.has(num)) {
+        inventado = true;
+        removidos.push(m[0].replace(new RegExp(PONTO, "g"), ".").trim());
+      }
+    }
+    return !inventado;
+  });
+  return {
+    txt: mantidas
+      .join(" ")
+      .replace(new RegExp(PONTO, "g"), ".")
+      .replace(/\s{2,}/g, " ")
+      .trim(),
+    removidos,
+  };
+}
+
+/**
+ * Passa o conteúdo pela garantia: registro profissional só sobrevive se o número
+ * estiver no texto extraído do lead. Devolve o conteúdo limpo + a lista do que caiu.
+ */
+export function sanearRegistros(
+  c: ConteudoIA,
+  fonte: string,
+): { conteudo: ConteudoIA; removidos: string[] } {
+  const nums = numerosDaFonte(fonte || "");
+  const removidos: string[] = [];
+  const limpa = (t: string) => {
+    const r = limparRegistros(t, nums);
+    removidos.push(...r.removidos);
+    return r.txt;
+  };
+  const conteudo: ConteudoIA = {
+    ...c,
+    subheadline: limpa(c.subheadline),
+    sobre: limpa(c.sobre),
+    servicos: c.servicos.map((s) => ({ ...s, descricao: limpa(s.descricao) })),
+    diferenciais: c.diferenciais.map((s) => ({ ...s, descricao: limpa(s.descricao) })),
+    faq: c.faq.map((f) => ({ ...f, resposta: limpa(f.resposta) })),
+  };
+  return { conteudo, removidos };
 }
 
 /** Extrai o primeiro objeto JSON de um texto (tolera markdown/cercas). */

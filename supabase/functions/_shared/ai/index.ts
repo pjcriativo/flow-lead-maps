@@ -21,6 +21,8 @@ export function getProviderChain(): ProvedorNomeado[] {
   return [claude, openai];
 }
 
+export { sanearRegistros } from "./prompt.ts";
+
 export type {
   MateriaPrima,
   ConteudoIA,
