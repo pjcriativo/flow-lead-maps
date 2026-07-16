@@ -34,6 +34,9 @@ import {
   getBreakdown,
 } from "./leads-shared";
 import { EditorRedesign } from "@/components/redesign/RedesignSection";
+import { toast } from "sonner";
+import { gerarRedesign } from "@/services/redesign";
+import { gerarProposta, SemMotivoClaroError } from "@/services/propostas";
 import {
   carregarDetalheLead,
   type LeadDetalheData,
@@ -95,6 +98,7 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [editorAberto, setEditorAberto] = useState<Redesign | null>(null);
+  const [gerando, setGerando] = useState<null | "site" | "proposta">(null);
 
   useEffect(() => {
     let vivo = true;
@@ -107,6 +111,47 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
       vivo = false;
     };
   }, [lead.id]);
+
+  const recarregar = async () => {
+    setData(await carregarDetalheLead(lead.id));
+  };
+
+  // "Gerar site" no modal — reusa o MESMO serviço da campanha (gerarRedesign). Nasce RASCUNHO
+  // e NÃO publica (o portão de publicação segue na aprovação, na aba Campanhas/Publicar).
+  const gerarSite = async () => {
+    setGerando("site");
+    try {
+      await gerarRedesign(lead.id);
+      await recarregar();
+      toast.success("Site gerado — revise a prévia abaixo.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar o site");
+    } finally {
+      setGerando(null);
+    }
+  };
+
+  // "Gerar proposta" só aparece quando há site PUBLICADO (gerarProposta usa a URL pública como
+  // link). Nasce rascunho. Erros dos portões (sem motivo claro / sem nome do remetente) viram
+  // mensagem clara, não genérica.
+  const gerarPropostaLead = async () => {
+    setGerando("proposta");
+    try {
+      await gerarProposta(lead.id);
+      await recarregar();
+      toast.success("Proposta gerada (rascunho) — revise antes de enviar.");
+    } catch (e) {
+      const msg =
+        e instanceof SemMotivoClaroError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "Falha ao gerar a proposta";
+      toast.error(msg);
+    } finally {
+      setGerando(null);
+    }
+  };
 
   const bd = getBreakdown(lead);
   const previewHtml = data?.redesign?.html_editado ?? data?.redesign?.html_gerado ?? null;
@@ -263,9 +308,22 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
                       </div>
                     </div>
                   ) : (
-                    <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                      Nenhum redesign ainda para este lead.
-                    </p>
+                    <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-border px-3 py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum redesign ainda para este lead.
+                      </p>
+                      <Button size="sm" onClick={gerarSite} disabled={gerando !== null}>
+                        {gerando === "site" ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" /> Gerando site...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 className="h-4 w-4" /> Gerar site
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   )}
                 </section>
 
@@ -281,9 +339,37 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
                       ))}
                     </div>
                   ) : (
-                    <p className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                      Nenhuma proposta gerada para este lead ainda.
-                    </p>
+                    <div className="flex flex-col items-start gap-2 rounded-lg border border-dashed border-border px-3 py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Nenhuma proposta gerada para este lead ainda.
+                      </p>
+                      {data?.site ? (
+                        <>
+                          <Button size="sm" onClick={gerarPropostaLead} disabled={gerando !== null}>
+                            {gerando === "proposta" ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" /> Gerando proposta...
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="h-4 w-4" /> Gerar proposta
+                              </>
+                            )}
+                          </Button>
+                          {!lead.email && (
+                            <p className="text-xs text-amber-700">
+                              Este lead não tem e-mail — a proposta nasce como rascunho, mas o envio
+                              por e-mail fica bloqueado até haver um endereço.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Publique a prévia do site primeiro (aba Publicar) — a proposta usa o link
+                          público.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </section>
 

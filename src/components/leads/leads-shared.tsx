@@ -166,7 +166,13 @@ export function ScoreBreakdownCard({ lead, bd }: { lead: Lead; bd: ScoreBreakdow
       {bd?.motivo && <p className="text-xs text-muted-foreground">{bd.motivo}</p>}
       {moderno && (
         <div className="space-y-1 border-t border-border pt-2 text-xs">
-          <Sinal ok={!bd!.has_website} label="Sem site próprio" />
+          {/* score.ts zera has_website quando o site está FORA DO AR — então !has_website
+              sozinho diria "Sem site próprio" para quem TEM site (só morto). O rótulo tem de
+              distinguir: site cadastrado que não abre ≠ ausência de site. A pontuação não muda. */}
+          <Sinal
+            ok={!bd!.has_website}
+            label={bd!.site_fora_do_ar ? "Site fora do ar" : "Sem site próprio"}
+          />
           {bd!.has_website && <Sinal ok={bd!.bad_site} label="Site fraco/datado" />}
           <Sinal ok={bd!.has_whatsapp} label="WhatsApp p/ abordagem" />
           <Sinal ok={bd!.has_instagram} label="Tem Instagram" />
