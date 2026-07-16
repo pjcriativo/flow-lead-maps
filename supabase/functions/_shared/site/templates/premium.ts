@@ -10,6 +10,7 @@ import { head, waFloat, estrelas, fmtNota, fmtReviews, ctaHref, scriptAnim } fro
 import { heroBloco } from "./heros.ts";
 import { blocoServicos } from "./sec_servicos.ts";
 import { blocoProva } from "./sec_prova.ts";
+import { blocoSobre } from "./sec_sobre.ts";
 
 export type NichoCfg = {
   /**
@@ -333,22 +334,9 @@ export function templatePremium(d: SiteData, cfg: NichoCfg): string {
 <div class="grid">${d.diferenciais.map((s, i) => `<div class="row reveal"${rev(i % 2)}><div class="ic">${icone(s.icone)}</div><div><h3>${esc(s.titulo)}</h3><p>${esc(s.descricao)}</p></div></div>`).join("")}</div></div></section>`
     : "";
 
-  // NÚMEROS do "sobre" — só quando há nota (senão omite; nada inventado).
-  const nums = temNota
-    ? [
-        `<div class="num"><b>${nota}</b><span>nota no Google</span></div>`,
-        d.reviews ? `<div class="num"><b>${revs}</b><span>avaliações</span></div>` : "",
-        d.rating! >= 4.7 ? `<div class="num"><b>Top</b><span>referência local</span></div>` : "",
-      ].join("")
-    : "";
-
-  const sobre = d.sobre
-    ? `<section id="sobre" class="sobre"><div class="wrap"><div class="grid">
-<div class="art reveal"><div class="foto"><img src="${esc(d.fotoSobre)}" alt="${esc(d.nome)}" loading="lazy"></div>${temNota ? `<div class="badge"><b>${nota}</b><small>${revs ? revs + " avaliações" : "Google"}</small></div>` : ""}</div>
-<div class="reveal"${rev(1)}><span class="kicker">${icone(cfg.sobreIcon)} ${esc(cfg.sobreKicker)}</span><h2>${esc(d.nome)}</h2><p>${esc(d.sobre)}</p>${nums ? `<div class="nums">${nums}</div>` : ""}
-<a class="btn btn-p" style="margin-top:26px" href="${esc(cta)}" target="_blank" rel="noopener">${icone("message-circle")} ${esc(d.cta)}</a></div>
-</div></div></section>`
-    : "";
+  // SOBRE — bloco da variante escolhida (d.sobreVar). Foto ≠ hero + números só com nota real.
+  const sbSec = blocoSobre(d, cfg);
+  const sobre = sbSec.html;
 
   const galeria =
     d.fotos.length >= 3
@@ -406,8 +394,8 @@ ${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmb
   // layeriza o tema escuro por cima da estrutura — saúde nunca é afetada.
   // CSS das SEÇÕES variáveis: base sempre; override escuro só no clima escuro-premium.
   const escuro = cfg.clima === "escuro-premium";
-  const secCss = svSec.css + pvSec.css;
-  const secCssEscuro = escuro ? svSec.cssEscuro + pvSec.cssEscuro : "";
+  const secCss = svSec.css + pvSec.css + sbSec.css;
+  const secCssEscuro = escuro ? svSec.cssEscuro + pvSec.cssEscuro + sbSec.cssEscuro : "";
   const bodyCss = (escuro ? CSS + CSS_ESCURO : CSS) + secCss + secCssEscuro;
   return `${head(d, "", bodyCss + hero.css)}
 <body>
