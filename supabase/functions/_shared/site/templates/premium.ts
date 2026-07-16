@@ -9,6 +9,7 @@ import { icone } from "../icones.ts";
 import { head, waFloat, estrelas, fmtNota, fmtReviews, ctaHref, scriptAnim } from "../comuns.ts";
 import { heroBloco } from "./heros.ts";
 import { blocoServicos } from "./sec_servicos.ts";
+import { blocoProva } from "./sec_prova.ts";
 
 export type NichoCfg = {
   /**
@@ -361,17 +362,9 @@ export function templatePremium(d: SiteData, cfg: NichoCfg): string {
           .join("")}</div></div></section>`
       : "";
 
-  const inicial = (n: string | null) => (n ? n.trim().charAt(0).toUpperCase() : "★");
-  const depo = d.depoimentos.length
-    ? `<section class="depo"><div class="wrap"><div class="sec-head reveal"><span class="kicker">${icone("message-circle")} ${esc(cfg.depoKicker)}</span><h2>${esc(cfg.depoTitulo)}</h2><p>${esc(cfg.depoSub)}</p></div>
-<div class="depos">${d.depoimentos
-        .slice(0, 6)
-        .map(
-          (r, i) =>
-            `<div class="d reveal"${rev(i % 3)}>${r.rating != null ? estrelas(r.rating, 16) : ""}<p class="q">"${esc(r.text.length > 240 ? r.text.slice(0, 237) + "…" : r.text)}"</p><div class="who">${r.photo ? `<img class="av" src="${esc(r.photo)}" alt="${esc(r.author ?? "")}" loading="lazy">` : `<span class="av">${esc(inicial(r.author))}</span>`}<div><b>${esc(r.author ?? "Cliente")}</b><span class="gsel">${icone("check-circle")} via Google${r.when ? " · " + esc(r.when) : ""}</span></div></div></div>`,
-        )
-        .join("")}</div></div></section>`
-    : "";
+  // PROVA SOCIAL — bloco da variante escolhida (d.provaVar). Respeita "sem dado, sem invenção".
+  const pvSec = blocoProva(d, cfg);
+  const depo = pvSec.html;
 
   const faq = d.faq.length
     ? `<section id="faq" class="faq"><div class="wrap"><div class="sec-head reveal"><span class="kicker">${icone("message-circle")} ${esc(cfg.faqKicker)}</span><h2>${esc(cfg.faqTitulo)}</h2></div>
@@ -413,8 +406,8 @@ ${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmb
   // layeriza o tema escuro por cima da estrutura — saúde nunca é afetada.
   // CSS das SEÇÕES variáveis: base sempre; override escuro só no clima escuro-premium.
   const escuro = cfg.clima === "escuro-premium";
-  const secCss = svSec.css;
-  const secCssEscuro = escuro ? svSec.cssEscuro : "";
+  const secCss = svSec.css + pvSec.css;
+  const secCssEscuro = escuro ? svSec.cssEscuro + pvSec.cssEscuro : "";
   const bodyCss = (escuro ? CSS + CSS_ESCURO : CSS) + secCss + secCssEscuro;
   return `${head(d, "", bodyCss + hero.css)}
 <body>
