@@ -5,6 +5,8 @@
 // no nosso Storage). REGRA: nunca hero escuro/amador; galeria só com fotos reais.
 import { Image } from "https://deno.land/x/imagescript@1.3.0/mod.ts";
 import { hashSemente } from "./site/variantes.ts";
+import { imagensFallback } from "./site/imagens.ts";
+import type { TemplateId } from "./site/tipos.ts";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DB = any;
 
@@ -165,6 +167,8 @@ export async function resolverImagens(
   nicho: string,
   candidatos: string[],
   log: (m: string) => void = () => {},
+  seed = "",
+  templateNicho: TemplateId = "servico-local",
 ): Promise<FotosResolvidas> {
   const rehost = async (bytes: Uint8Array, nome: string): Promise<string> => {
     const path = `${redesignId}/${nome}.jpg`;
@@ -221,15 +225,25 @@ export async function resolverImagens(
     );
   }
 
-  // Sobre: uma foto real (fora as da galeria/hero); senão, curado do nicho.
+  // Sobre: só uma foto REAL claramente "de cena" (paisagem + clara, como a régua do
+  // hero) — assim uma selfie/retrato de usuário do Google (portrait/escuro) NÃO entra
+  // na seção Sobre. Sem foto de cena decente → ambiente CURADO do nicho (nunca clip-art,
+  // nunca a selfie). Nunca repete hero nem galeria.
   const usadas = new Set([heroPick, ...galPick].filter(Boolean));
-  const sobrePick = restantes.find((a) => !usadas.has(a)) ?? (galPick.length ? galPick[0] : null);
+  const sobrePick =
+    restantes.find((a) => !usadas.has(a) && a.w >= a.h * 1.15 && a.brilho >= 0.45) ?? null;
   let sobre: string;
   if (sobrePick) {
     const full = (await baixar(sizedUrl(sobrePick.url, 1200))) ?? sobrePick.bytes;
     sobre = await rehost(full, "sobre");
   } else {
-    sobre = heroCurado(baseUrl, nicho, 1);
+    // Sem foto de cena real → banco TEMÁTICO do nicho (ambiente/equipe reais, dental/office),
+    // escolhido pela SEMENTE (varia por lead) e re-hospedado no NOSSO Storage. Só cai no hero
+    // curado se o download falhar. Nunca clip-art, nunca selfie.
+    const banco = imagensFallback(templateNicho);
+    const idx = seed ? hashSemente(seed + ":sobre") % banco.length : 1;
+    const b = await baixar(sizedUrl(banco[idx], 1200));
+    sobre = b ? await rehost(b, "sobre") : heroCurado(baseUrl, nicho, 1);
   }
 
   // CTA final (atrás de gradiente forte): curado do nicho, sempre limpo.

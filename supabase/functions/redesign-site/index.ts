@@ -165,6 +165,10 @@ Deno.serve(async (req) => {
       };
     };
 
+    // SEMENTE estável do lead (place_id; senão uuid). Definida ANTES das imagens para o
+    // fallback do Sobre variar por lead (banco temático do nicho re-hospedado).
+    const seed: string = lead.place_id || lead.id;
+
     const [ai, fotos] = await Promise.all([
       gerarConteudo(),
       resolverImagens(
@@ -174,6 +178,8 @@ Deno.serve(async (req) => {
         heroNicho(mp.categoria, nicho),
         imagens,
         log,
+        seed,
+        nicho,
       ),
     ]);
 
@@ -189,8 +195,7 @@ Deno.serve(async (req) => {
     // SEMENTE estável do lead (place_id do Google; senão o uuid do lead). NUNCA o
     // redesign_id — regenerar o mesmo lead tem que dar SEMPRE a mesma variante.
     // A variante usa o nicho ESTÁVEL (categoria do banco, sem textos do scrape,
-    // que oscilam) — mesma chamada feita dentro de montarHtml.
-    const seed: string = lead.place_id || lead.id;
+    // que oscilam) — mesma chamada feita dentro de montarHtml. (seed já definido acima.)
     const heroVar = varianteHero(seed, detectarNicho(mp.categoria, ""));
 
     // HERO de clima ESCURO (profissional): usa imagem EDITORIAL do banco premium
