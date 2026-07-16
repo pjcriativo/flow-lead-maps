@@ -31,17 +31,27 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import {
   fetchLeads,
   updateLead,
   deleteLead,
+  deleteLeads,
+  updateLeadsStatus,
   enrichLead,
   LEAD_STATUSES,
   STATUS_LABELS,
   type Lead,
 } from "@/lib/leads-api";
+import { gerarRedesign } from "@/services/redesign";
 import { listarLeadIdsComRedesign } from "@/services/redesign";
-import { listarListas, type LeadListComStats } from "@/lib/lists-api";
+import {
+  listarListas,
+  adicionarLeadsALista,
+  criarListaDeLeads,
+  type LeadListComStats,
+} from "@/lib/lists-api";
 import {
   ScoreBadge,
   ScoreLegend,
@@ -72,6 +82,9 @@ export function LeadsManager({
   const [editing, setEditing] = useState<Lead | null>(null);
   const [detalhe, setDetalhe] = useState<Lead | null>(null);
   const [pagina, setPagina] = useState(1);
+  // Seleção em massa: ids marcados + a ação em andamento (trava a barra e mostra spinner).
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [acaoMassa, setAcaoMassa] = useState<null | "lista" | "status" | "excluir" | "site">(null);
 
   // Clique na linha abre o detalhe (ignora cliques nos botões/links de ação da linha).
   const abrirDetalhe = (e: React.MouseEvent, lead: Lead) => {
@@ -115,7 +128,8 @@ export function LeadsManager({
         (l.category ?? "").toLowerCase().includes(term)
       );
     });
-  }, [leads, q, statusFilter]);
+    // listFilter estava fora das deps — o filtro de lista não recalculava. Corrigido.
+  }, [leads, q, statusFilter, listFilter]);
 
   const ordenados = useMemo(() => [...filtered].sort((a, b) => b.score - a.score), [filtered]);
   useEffect(() => {
@@ -124,6 +138,35 @@ export function LeadsManager({
   const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
   const paginaEfetiva = Math.min(pagina, totalPaginas);
   const paginados = paginar(ordenados, paginaEfetiva);
+
+  // Seleção opera sobre o conjunto FILTRADO (o que o dono vê), não só a página atual —
+  // "selecionar todos" com um filtro de lista aplicado seleciona a lista inteira.
+  const idsFiltrados = useMemo(() => ordenados.map((l) => l.id), [ordenados]);
+  const selNaVista = idsFiltrados.filter((id) => sel.has(id)).length;
+  const todosSelecionados = idsFiltrados.length > 0 && selNaVista === idsFiltrados.length;
+  const algunsSelecionados = selNaVista > 0 && !todosSelecionados;
+
+  const toggleUm = (id: string) =>
+    setSel((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const toggleTodos = () =>
+    setSel((prev) => {
+      const n = new Set(prev);
+      if (todosSelecionados) idsFiltrados.forEach((id) => n.delete(id));
+      else idsFiltrados.forEach((id) => n.add(id));
+      return n;
+    });
+  const limparSel = () => setSel(new Set());
+  // Filtro mudou → limpa a seleção (evita agir sobre leads que saíram da vista).
+  useEffect(() => {
+    setSel(new Set());
+  }, [q, statusFilter, listFilter]);
+
+  const leadsSelecionados = () => leads.filter((l) => sel.has(l.id));
 
   const handleEnrich = async (lead: Lead) => {
     setEnrichingId(lead.id);
@@ -152,6 +195,118 @@ export function LeadsManager({
     } catch (e) {
       setLeads(prev);
       toast.error(`Falha ao excluir: ${e instanceof Error ? e.message : "erro"}`);
+    }
+  };
+
+  // ---- Ações em MASSA ----
+  const excluirEmMassa = async () => {
+    const ids = [...sel];
+    if (!ids.length) return;
+    if (!confirm(`Excluir ${ids.length} lead(s)? Esta ação não pode ser desfeita.`)) return;
+    setAcaoMassa("excluir");
+    const prev = leads;
+    setLeads((p) => p.filter((l) => !sel.has(l.id)));
+    limparSel();
+    try {
+      await deleteLeads(ids);
+      toast.success(`${ids.length} lead(s) excluído(s).`);
+    } catch (e) {
+      setLeads(prev);
+      toast.error(`Falha ao excluir: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      setAcaoMassa(null);
+    }
+  };
+
+  const mudarStatusEmMassa = async (status: string) => {
+    const ids = [...sel];
+    if (!ids.length) return;
+    setAcaoMassa("status");
+    try {
+      await updateLeadsStatus(ids, status);
+      setLeads((prev) => prev.map((l) => (sel.has(l.id) ? { ...l, status } : l)));
+      toast.success(`${ids.length} lead(s) → "${STATUS_LABELS[status] ?? status}".`);
+      limparSel();
+    } catch (e) {
+      toast.error(`Falha ao mudar status: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      setAcaoMassa(null);
+    }
+  };
+
+  const adicionarAListaEmMassa = async (listId: string) => {
+    const ids = [...sel];
+    if (!ids.length) return;
+    setAcaoMassa("lista");
+    try {
+      await adicionarLeadsALista(listId, ids);
+      setLeads((prev) => prev.map((l) => (sel.has(l.id) ? { ...l, list_id: listId } : l)));
+      const nome = listas.find((x) => x.id === listId)?.name ?? "a lista";
+      toast.success(`${ids.length} lead(s) adicionado(s) a "${nome}".`);
+      limparSel();
+      listarListas()
+        .then(setListas)
+        .catch(() => {});
+    } catch (e) {
+      toast.error(`Falha ao adicionar à lista: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      setAcaoMassa(null);
+    }
+  };
+
+  const criarListaEmMassa = async () => {
+    const selecionados = leadsSelecionados();
+    if (!selecionados.length) return;
+    const nome = prompt(`Nome da nova lista (${selecionados.length} leads):`, "");
+    if (nome == null) return; // cancelou
+    setAcaoMassa("lista");
+    try {
+      const lista = await criarListaDeLeads(nome, selecionados);
+      setLeads((prev) => prev.map((l) => (sel.has(l.id) ? { ...l, list_id: lista.id } : l)));
+      toast.success(`Lista "${lista.name}" criada com ${selecionados.length} lead(s).`);
+      limparSel();
+      listarListas()
+        .then(setListas)
+        .catch(() => {});
+    } catch (e) {
+      toast.error(`Falha ao criar a lista: ${e instanceof Error ? e.message : "erro"}`);
+    } finally {
+      setAcaoMassa(null);
+    }
+  };
+
+  // Gerar site em massa: cada geração é uma chamada de IA BLOQUEANTE (10–40s). Roda em série,
+  // com progresso, e não deixa a UI achar que travou. Custa IA — confirma antes.
+  const gerarSiteEmMassa = async () => {
+    const ids = [...sel];
+    if (!ids.length) return;
+    if (
+      !confirm(
+        `Gerar site para ${ids.length} lead(s)? Cada geração usa IA (custo real) e leva alguns segundos. Os sites nascem como rascunho, sem publicar.`,
+      )
+    )
+      return;
+    setAcaoMassa("site");
+    let ok = 0;
+    let falhou = 0;
+    try {
+      for (const id of ids) {
+        try {
+          await gerarRedesign(id);
+          ok += 1;
+        } catch {
+          falhou += 1;
+        }
+        toast.message(`Gerando sites... ${ok + falhou}/${ids.length}`, { id: "gerar-massa" });
+      }
+      setRedesignLeadIds(await listarLeadIdsComRedesign().catch(() => redesignLeadIds));
+      toast.success(`Sites gerados: ${ok}/${ids.length}${falhou ? ` (${falhou} falharam)` : ""}.`, {
+        id: "gerar-massa",
+      });
+      limparSel();
+    } finally {
+      // finally: sem isto, uma exceção inesperada deixaria a barra travada (acaoMassa preso).
+      setAcaoMassa(null);
     }
   };
 
@@ -274,10 +429,105 @@ export function LeadsManager({
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+          {/* Barra de AÇÕES EM MASSA — aparece quando há seleção. */}
+          {sel.size > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-4 py-2.5">
+              <span className="text-sm font-medium">{sel.size} selecionado(s)</span>
+              <div className="mx-1 h-4 w-px bg-border" />
+
+              {/* Adicionar à lista (existentes + nova) */}
+              <Select
+                value=""
+                onValueChange={(v) =>
+                  v === "__nova__" ? criarListaEmMassa() : adicionarAListaEmMassa(v)
+                }
+                disabled={acaoMassa !== null}
+              >
+                <SelectTrigger className="h-8 w-[190px]" aria-label="Adicionar à lista">
+                  <SelectValue
+                    placeholder={acaoMassa === "lista" ? "Adicionando..." : "Adicionar à lista"}
+                  />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  <SelectItem value="__nova__">+ Nova lista...</SelectItem>
+                  {listas.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name} ({l.leads_atuais})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Mudar status */}
+              <Select value="" onValueChange={mudarStatusEmMassa} disabled={acaoMassa !== null}>
+                <SelectTrigger className="h-8 w-[160px]" aria-label="Mudar status">
+                  <SelectValue
+                    placeholder={acaoMassa === "status" ? "Alterando..." : "Mudar status"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEAD_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {STATUS_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Gerar site (custa IA) */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={gerarSiteEmMassa}
+                disabled={acaoMassa !== null}
+                title="Gerar redesign para os selecionados (cada um custa IA; nasce rascunho)"
+              >
+                {acaoMassa === "site" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="h-4 w-4" />
+                )}
+                Gerar site ({sel.size})
+              </Button>
+
+              {/* Excluir */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={excluirEmMassa}
+                disabled={acaoMassa !== null}
+                className="text-destructive hover:text-destructive"
+              >
+                {acaoMassa === "excluir" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Excluir ({sel.size})
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={limparSel}
+                disabled={acaoMassa !== null}
+                className="ml-auto"
+              >
+                Limpar seleção
+              </Button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-[15px]">
               <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
+                  <th className="px-4 py-3">
+                    <Checkbox
+                      checked={todosSelecionados || (algunsSelecionados && "indeterminate")}
+                      onCheckedChange={toggleTodos}
+                      aria-label="Selecionar todos os leads filtrados"
+                    />
+                  </th>
                   {[
                     "Score",
                     "Empresa",
@@ -306,8 +556,18 @@ export function LeadsManager({
                   <tr
                     key={l.id}
                     onClick={(e) => abrirDetalhe(e, l)}
-                    className="cursor-pointer border-t border-border hover:bg-secondary/30"
+                    className={cn(
+                      "cursor-pointer border-t border-border hover:bg-secondary/30",
+                      sel.has(l.id) && "bg-primary/5",
+                    )}
                   >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={sel.has(l.id)}
+                        onCheckedChange={() => toggleUm(l.id)}
+                        aria-label={`Selecionar ${l.business_name}`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <ScoreBadge lead={l} />
                     </td>

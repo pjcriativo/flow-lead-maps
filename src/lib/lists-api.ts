@@ -120,6 +120,41 @@ export async function renomearLista(id: string, name: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Vincula leads a uma lista EXISTENTE (seleção em massa). Como list_id é único por lead, um
+ * lead que já estava em outra lista é MOVIDO — não fica em duas. */
+export async function adicionarLeadsALista(listId: string, leadIds: string[]): Promise<void> {
+  if (!leadIds.length) return;
+  const { error } = await supabase.from("leads").update({ list_id: listId }).in("id", leadIds);
+  if (error) throw error;
+}
+
+/** Cria uma lista NOVA a partir de leads selecionados. Deriva nicho/cidade/uf do 1º lead só
+ * para preencher os campos da lista (não afeta os leads). */
+export async function criarListaDeLeads(name: string, leads: Lead[]): Promise<LeadList> {
+  const user_id = await getUserId();
+  const base = leads[0];
+  const { data: lista, error } = await supabase
+    .from("lead_lists")
+    .insert({
+      user_id,
+      name: name.trim() || nomeAutoLista(base?.category ?? "", base?.city ?? "", base?.state ?? ""),
+      niche: base?.category || "—",
+      city: base?.city || "—",
+      uf: base?.state || null,
+      fonte: "manual",
+      radius: 0,
+      total_leads: leads.length,
+    })
+    .select()
+    .single();
+  if (error || !lista) throw new Error(error?.message ?? "Falha ao criar a lista");
+  await adicionarLeadsALista(
+    lista.id,
+    leads.map((l) => l.id),
+  );
+  return lista;
+}
+
 /** Exclui a lista. Os leads vinculados são apagados junto (FK on delete cascade). */
 export async function excluirLista(id: string): Promise<void> {
   const { error } = await supabase.from("lead_lists").delete().eq("id", id);

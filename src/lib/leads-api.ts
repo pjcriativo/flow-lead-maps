@@ -188,6 +188,22 @@ export async function deleteLead(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Ações em MASSA (seleção em Meus Leads). RLS garante que só toca os leads do dono. */
+export async function deleteLeads(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await supabase.from("leads").delete().in("id", ids);
+  if (error) throw error;
+}
+
+export async function updateLeadsStatus(ids: string[], status: string): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await supabase
+    .from("leads")
+    .update({ status, updated_at: new Date().toISOString() })
+    .in("id", ids);
+  if (error) throw error;
+}
+
 export const LEAD_STATUSES = [
   "new",
   "enriched",
