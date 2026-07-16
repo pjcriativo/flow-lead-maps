@@ -11,6 +11,7 @@ import { heroBloco } from "./heros.ts";
 import { blocoServicos } from "./sec_servicos.ts";
 import { blocoProva } from "./sec_prova.ts";
 import { blocoSobre } from "./sec_sobre.ts";
+import { blocoContato } from "./sec_contato.ts";
 
 export type NichoCfg = {
   /**
@@ -359,18 +360,9 @@ export function templatePremium(d: SiteData, cfg: NichoCfg): string {
 <div class="reveal">${d.faq.map((f) => `<div class="faq-item"><button type="button">${esc(f.pergunta)}<span class="sig"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></button><div class="ans"><p style="padding-top:2px">${esc(f.resposta)}</p></div></div>`).join("")}</div></div></section>`
     : "";
 
-  const local_sec =
-    d.endereco || d.mapEmbedUrl
-      ? `<section id="contato" class="local"><div class="wrap"><div class="sec-head reveal"><span class="kicker">${icone("map-pin")} ${esc(cfg.localKicker)}</span><h2>${esc(cfg.localTitulo)}</h2></div>
-<div class="grid"><div class="info reveal">
-${d.endereco ? `<div class="linha"><div class="ic">${icone("map-pin")}</div><div><strong>Endereço</strong><br>${esc(d.endereco)}${d.mapsUrl ? `<br><a href="${esc(d.mapsUrl)}" target="_blank" rel="noopener" style="color:var(--primaria);font-weight:600">Como chegar →</a>` : ""}</div></div>` : ""}
-${d.telefone ? `<div class="linha"><div class="ic">${icone("phone")}</div><div><strong>Telefone</strong><br>${esc(d.telefone)}</div></div>` : ""}
-${d.whatsappUrl ? `<div class="linha"><div class="ic">${icone("message-circle")}</div><div><strong>WhatsApp</strong><br><a href="${esc(d.whatsappUrl)}" target="_blank" rel="noopener" style="color:var(--primaria);font-weight:600">Chamar agora →</a></div></div>` : ""}
-<a class="btn btn-p" style="margin-top:8px;align-self:flex-start" href="${esc(cta)}" target="_blank" rel="noopener">${icone("message-circle")} ${esc(d.cta)}</a>
-</div>
-${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmbedUrl)}" loading="lazy" title="Mapa" referrerpolicy="no-referrer-when-downgrade"></iframe></div>` : ""}
-</div></div></section>`
-      : "";
+  // CONTATO — bloco da variante escolhida (d.contatoVar). Mantém WhatsApp/tel/mapa reais.
+  const ctSec = blocoContato(d, cfg);
+  const local_sec = ctSec.html;
 
   const social = [
     d.instagram
@@ -394,8 +386,10 @@ ${d.mapEmbedUrl ? `<div class="mapa reveal"${rev(1)}><iframe src="${esc(d.mapEmb
   // layeriza o tema escuro por cima da estrutura — saúde nunca é afetada.
   // CSS das SEÇÕES variáveis: base sempre; override escuro só no clima escuro-premium.
   const escuro = cfg.clima === "escuro-premium";
-  const secCss = svSec.css + pvSec.css + sbSec.css;
-  const secCssEscuro = escuro ? svSec.cssEscuro + pvSec.cssEscuro + sbSec.cssEscuro : "";
+  const secCss = svSec.css + pvSec.css + sbSec.css + ctSec.css;
+  const secCssEscuro = escuro
+    ? svSec.cssEscuro + pvSec.cssEscuro + sbSec.cssEscuro + ctSec.cssEscuro
+    : "";
   const bodyCss = (escuro ? CSS + CSS_ESCURO : CSS) + secCss + secCssEscuro;
   return `${head(d, "", bodyCss + hero.css)}
 <body>
