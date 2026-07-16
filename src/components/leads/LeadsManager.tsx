@@ -289,20 +289,27 @@ export function LeadsManager({
     setAcaoMassa("site");
     let ok = 0;
     let falhou = 0;
+    let fallback = 0; // gerados, mas com dados do Google (site ilegível/genérico)
     try {
       for (const id of ids) {
         try {
-          await gerarRedesign(id);
+          const { usage } = await gerarRedesign(id);
           ok += 1;
+          if (!usage.servicosReais || usage.conteudoLegivel === false || usage.fallback)
+            fallback += 1;
         } catch {
           falhou += 1;
         }
         toast.message(`Gerando sites... ${ok + falhou}/${ids.length}`, { id: "gerar-massa" });
       }
       setRedesignLeadIds(await listarLeadIdsComRedesign().catch(() => redesignLeadIds));
-      toast.success(`Sites gerados: ${ok}/${ids.length}${falhou ? ` (${falhou} falharam)` : ""}.`, {
-        id: "gerar-massa",
-      });
+      // Avisa quando algum caiu no fallback — não finge que todos saíram do site real.
+      const detalhe =
+        (falhou ? ` (${falhou} falharam)` : "") +
+        (fallback ? ` · ${fallback} com dados do Google (site ilegível)` : "");
+      const msg = `Sites gerados: ${ok}/${ids.length}${detalhe}.`;
+      if (falhou || fallback) toast.warning(msg, { id: "gerar-massa", duration: 8000 });
+      else toast.success(msg, { id: "gerar-massa" });
       limparSel();
     } finally {
       // finally: sem isto, uma exceção inesperada deixaria a barra travada (acaoMassa preso).

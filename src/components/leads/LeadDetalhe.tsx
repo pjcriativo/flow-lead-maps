@@ -118,14 +118,33 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
 
   // "Gerar site" no modal — reusa o MESMO serviço da campanha (gerarRedesign). Nasce RASCUNHO
   // e NÃO publica (o portão de publicação segue na aprovação, na aba Campanhas/Publicar).
+  // Se o lead JÁ TEM site, a edge o RASPA (10-40s) — por isso o toast.loading: sem feedback
+  // persistente o dono acha que travou. E se o site for ilegível, AVISA que caiu no fallback
+  // (gerou com os dados do Google) em vez de fingir sucesso.
   const gerarSite = async () => {
     setGerando("site");
+    const tid = toast.loading(
+      lead.website
+        ? "Gerando o site... leio o site atual de vocês antes (pode levar até ~40s)."
+        : "Gerando o site... (pode levar até ~40s).",
+    );
     try {
-      await gerarRedesign(lead.id);
+      const { usage } = await gerarRedesign(lead.id);
       await recarregar();
-      toast.success("Site gerado — revise a prévia abaixo.");
+      const caiuNoFallback =
+        !usage.servicosReais || usage.conteudoLegivel === false || usage.fallback;
+      if (caiuNoFallback) {
+        toast.warning(
+          usage.conteudoLegivel === false
+            ? "Site gerado com os dados do Google — não consegui ler o site atual (ilegível/legado). Revise os serviços na prévia."
+            : "Site gerado com serviços genéricos do nicho — não deu pra extrair as áreas reais. Revise a prévia.",
+          { id: tid, duration: 8000 },
+        );
+      } else {
+        toast.success("Site gerado — revise a prévia abaixo.", { id: tid });
+      }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar o site");
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar o site", { id: tid });
     } finally {
       setGerando(null);
     }
