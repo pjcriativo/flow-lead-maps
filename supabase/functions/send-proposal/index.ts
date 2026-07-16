@@ -6,6 +6,7 @@
 // (a UI cai no "copiar"). Falha do Resend → { ok:false, error } (NÃO marca enviada).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { montarFrom } from "../_shared/remetente.ts";
 
 // Identidade do remetente. EMAIL_FROM é GLOBAL hoje (uma reputação de domínio p/
 // todas as orgs). TODO (blueprint — identidade de envio por org): cada org deve ter
@@ -76,12 +77,11 @@ Deno.serve(async (req) => {
   // (O From continua no domínio VERIFICADO: trocá-lo pelo e-mail do usuário seria spoofing.)
   const { data: perfil } = await supabase
     .from("profiles")
-    .select("reply_to_email")
+    .select("reply_to_email, full_name")
     .eq("id", userData.user.id)
     .maybeSingle();
-  const replyTo = (
-    (perfil as { reply_to_email: string | null } | null)?.reply_to_email ?? ""
-  ).trim();
+  const p = perfil as { reply_to_email: string | null; full_name: string | null } | null;
+  const replyTo = (p?.reply_to_email ?? "").trim();
   if (!replyTo)
     return json({
       ok: false,
@@ -90,12 +90,23 @@ Deno.serve(async (req) => {
         'Cadastre o "E-mail para respostas" em Configurações antes de enviar — sem ele, a resposta do lead chega numa caixa que você não lê.',
     });
 
+  // From com o NOME PESSOAL da org (o lead não pode ver a marca da plataforma na caixa
+  // dele). O DOMÍNIO continua o verificado — só o nome de exibição muda.
+  const fromPessoal = montarFrom(from, p?.full_name);
+  if (!fromPessoal)
+    return json({
+      ok: false,
+      reason: "sem_remetente",
+      error:
+        'Cadastre o "Seu nome" em Configurações antes de enviar — é ele que aparece como remetente e assina a mensagem.',
+    });
+
   // Envia pelo Resend (corpo em texto puro — menos "cara de spam").
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from,
+      from: fromPessoal,
       to: [email],
       reply_to: replyTo,
       subject: prop.assunto,

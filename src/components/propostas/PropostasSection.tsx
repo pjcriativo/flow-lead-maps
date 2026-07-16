@@ -156,7 +156,9 @@ export function PropostasSection() {
           );
           return false;
         }
-        if (r.reason === "sem_reply_to") {
+        // Config da ORG (nome do remetente / e-mail de respostas): o servidor manda a
+        // mensagem pronta dizendo o que fazer.
+        if (r.reason === "sem_reply_to" || r.reason === "sem_remetente") {
           toast.error(
             r.error ?? 'Cadastre o "E-mail para respostas" em Configurações antes de enviar.',
             { duration: 8000 },

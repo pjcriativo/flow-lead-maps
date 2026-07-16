@@ -72,4 +72,8 @@ export type SiteData = {
   // composição por blocos: semente estável do lead + variante de hero escolhida
   seed: string;
   heroVar: HeroId;
+
+  /** Crédito do rodapé (profiles.site_credito). null = SEM crédito — o default.
+   *  NUNCA cita a plataforma: o lead é prospect da agência, não cliente do Flow Leads. */
+  creditoRodape: string | null;
 };

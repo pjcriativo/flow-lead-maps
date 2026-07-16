@@ -633,9 +633,10 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
           sem_email: `"${p.lead_nome}" não tem e-mail.`,
           sem_reply_to:
             r.error ?? 'Cadastre o "E-mail para respostas" em Configurações antes de enviar.',
+          sem_remetente: r.error ?? 'Cadastre o "Seu nome" em Configurações antes de enviar.',
         };
         toast.warning(msg[r.reason] ?? "Não foi possível enviar.", {
-          duration: r.reason === "sem_reply_to" ? 8000 : undefined,
+          duration: ["sem_reply_to", "sem_remetente"].includes(r.reason) ? 8000 : undefined,
         });
         if (r.reason === "teto_dia") setRampa(await statusRampa());
         return false;

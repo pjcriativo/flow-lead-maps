@@ -145,7 +145,7 @@ ${local_sec}
 <div class="fbrand">${esc(d.nome)}</div>
 <div>${esc(d.categoriaLabel)}${d.endereco ? " · " + esc(d.endereco) : ""}</div>
 ${social ? `<div class="fsoc">${social}</div>` : ""}
-<small>© ${esc(d.nome)}. Site desenvolvido com Flow Leads.</small>
+<small>© ${esc(d.nome)}.${d.creditoRodape ? " " + esc(d.creditoRodape) : ""}</small>
 </div></footer>
 ${waFloat(d)}
 </body></html>`;

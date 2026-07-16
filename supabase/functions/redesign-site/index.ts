@@ -193,7 +193,16 @@ Deno.serve(async (req) => {
       if (editorial) fotos.hero = editorial;
     }
 
-    const html = montarHtml(mp, conteudo, nicho, depoimentos, fotos, seed);
+    // Crédito do rodapé DA ORG (profiles.site_credito). Default: NULL = rodapé sem crédito
+    // nenhum — o que chega no lead não carrega a marca da plataforma.
+    const { data: perfil } = await supabase
+      .from("profiles")
+      .select("site_credito")
+      .eq("id", userId)
+      .maybeSingle();
+    const creditoRodape = (perfil as { site_credito: string | null } | null)?.site_credito ?? null;
+
+    const html = montarHtml(mp, conteudo, nicho, depoimentos, fotos, seed, creditoRodape);
     if (!html || html.length < 800) throw new Error("Falha ao montar o HTML do template");
 
     const custoTotal = custoIa + coleta.custoUsd;

@@ -18,12 +18,22 @@ export function montarHtml(
   fotos?: FotosOverride,
   /** Semente ESTÁVEL do lead (place_id ?? lead_id). Define a variante de hero. */
   seed?: string,
+  /** Crédito do rodapé da ORG (profiles.site_credito). null/undefined = sem crédito. */
+  creditoRodape?: string | null,
 ): string {
   const s = seed || mp.nome; // fallback: nome (estável o suficiente p/ preview local)
   // Variante escolhida com o nicho ESTÁVEL (só categoria — nunca o scrape do
   // site, que oscila e mudaria a variante entre regenerações do mesmo lead).
   const heroVar = varianteHero(s, detectarNicho(mp.categoria, ""));
-  const d = montarSiteData(mp, conteudo, nicho, depoimentos, fotos, { seed: s, heroVar });
+  const d = montarSiteData(
+    mp,
+    conteudo,
+    nicho,
+    depoimentos,
+    fotos,
+    { seed: s, heroVar },
+    creditoRodape ?? null,
+  );
   switch (nicho) {
     case "saude":
       return templateSaude(d);

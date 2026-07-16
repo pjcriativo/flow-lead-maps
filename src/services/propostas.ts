@@ -344,7 +344,8 @@ export type EnviarResult =
   | { ok: true; proposta: Proposta }
   | {
       ok: false;
-      reason: "sem_email" | "opt_out" | "teto_dia" | "nao_aprovada" | "sem_reply_to";
+      reason:
+        "sem_email" | "opt_out" | "teto_dia" | "nao_aprovada" | "sem_reply_to" | "sem_remetente";
       /** Mensagem pronta do servidor (o caso sem_reply_to explica o que fazer). */
       error?: string;
     };
@@ -385,6 +386,8 @@ export async function enviarProposta(id: string): Promise<EnviarResult> {
   if (d?.reason === "nao_aprovada") return { ok: false, reason: "nao_aprovada" };
   // Sem Reply-To cadastrado: o servidor manda a mensagem pronta (diz o que fazer).
   if (d?.reason === "sem_reply_to") return { ok: false, reason: "sem_reply_to", error: d.error };
+  // Sem "Seu nome": o From sairia sem nome pessoal (ou com nome de ferramenta) — barra.
+  if (d?.reason === "sem_remetente") return { ok: false, reason: "sem_remetente", error: d.error };
   if (d?.error) throw new Error(d.error);
   if (!d?.proposta) throw new Error("Resposta inválida do envio");
   return { ok: true, proposta: toProposta(d.proposta as Row) };

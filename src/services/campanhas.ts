@@ -421,7 +421,7 @@ export async function enviarAprovadasDaCampanha(campanhaId: string): Promise<Env
       } else if (res.reason === "teto_dia") {
         r.teto_dia += 1;
         break; // teto do dia da org — o resto sai amanhã
-      } else if (res.reason === "sem_reply_to") {
+      } else if (res.reason === "sem_reply_to" || res.reason === "sem_remetente") {
         // Config da ORG, não do lead: sem Reply-To NENHUMA proposta sai. Insistir lead a
         // lead só produziria N erros iguais — para na hora.
         r.sem_reply_to += 1;

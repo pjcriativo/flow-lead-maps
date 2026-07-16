@@ -16,6 +16,7 @@
 // orgs compartilham a reputação do domínio). Próximo: subdomínio/reply-to por org.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { json } from "../_shared/cors.ts";
+import { montarFrom } from "../_shared/remetente.ts";
 
 const DEFAULT_FROM = "Flow Leads <onboarding@resend.dev>";
 const DIAS = 3;
@@ -253,12 +254,29 @@ Deno.serve(async (req) => {
     const assunto = /^re:/i.test(c.assunto ?? "")
       ? c.assunto
       : `Re: ${c.assunto ?? "sua nova página"}`;
+    // From com o NOME PESSOAL da org — o lead não vê a marca da plataforma na caixa dele.
+    // O domínio continua o verificado. `remetente` já foi validado acima (sem nome, não envia).
+    const fromPessoal = montarFrom(from, remetente);
+    if (!fromPessoal) {
+      falhas.push({
+        lead_id: c.lead_id,
+        motivo: "Sem nome do remetente — From não pôde ser montado.",
+      });
+      continue;
+    }
+
     const corpo = followUpCorpo(lead.business_name ?? "", url, dias, remetente, optout);
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [email], reply_to: replyTo, subject: assunto, text: corpo }),
+      body: JSON.stringify({
+        from: fromPessoal,
+        to: [email],
+        reply_to: replyTo,
+        subject: assunto,
+        text: corpo,
+      }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await res.json().catch(() => ({}));

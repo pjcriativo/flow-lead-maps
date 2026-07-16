@@ -128,6 +128,7 @@ export function montarSiteData(
   depoimentos: Depoimento[] = [],
   fotosOverride?: FotosOverride,
   bloco?: { seed: string; heroVar: HeroId },
+  creditoRodape?: string | null,
 ): SiteData {
   const whatsapp = firstBrWhatsapp(mp.whatsapp) ?? firstBrWhatsapp(mp.telefone);
   const whatsappUrl = whatsapp
@@ -181,5 +182,6 @@ export function montarSiteData(
     depoimentos: (depoimentos ?? []).filter((d) => d.text && d.text.length >= 15).slice(0, 6),
     seed: bloco?.seed ?? mp.nome,
     heroVar: bloco?.heroVar ?? "A",
+    creditoRodape: (creditoRodape ?? "").trim() || null,
   };
 }

@@ -446,7 +446,7 @@ ${local_sec}
 <div><h4>Navegação</h4>${servicos ? `<a href="#servicos">${esc(cfg.navServicos)}</a>` : ""}${sobre ? '<a href="#sobre">Sobre</a>' : ""}${faq ? '<a href="#faq">Dúvidas</a>' : ""}<a href="#contato">Contato</a></div>
 <div><h4>Contato</h4>${d.telefone ? `<a href="${esc(d.telUrl ?? "#")}">${esc(d.telefone)}</a>` : ""}${d.whatsappUrl ? `<a href="${esc(d.whatsappUrl)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}${d.mapsUrl ? `<a href="${esc(d.mapsUrl)}" target="_blank" rel="noopener">Como chegar</a>` : ""}</div>
 </div>
-<div class="fbot">© <span id="__ano">2026</span> ${esc(d.nome)}. Site desenvolvido com Flow Leads.</div>
+<div class="fbot">© <span id="__ano">2026</span> ${esc(d.nome)}.${d.creditoRodape ? " " + esc(d.creditoRodape) : ""}</div>
 </div></footer>
 ${waFloat(d)}
 ${scriptAnim()}
