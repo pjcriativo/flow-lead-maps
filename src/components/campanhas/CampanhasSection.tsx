@@ -786,6 +786,13 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
                 )}
                 Gerar site + proposta ({sel.size})
               </Button>
+              {/* Sem esta dica o botão fica desabilitado e o dono acha que a tela não funciona.
+                  Só aparece quando HÁ o que selecionar e nada está marcado. */}
+              {!preparando && sel.size === 0 && selecionaveis.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  Selecione os leads (caixas à esquerda) para gerar.
+                </span>
+              )}
               <Button
                 size="sm"
                 variant="outline"
