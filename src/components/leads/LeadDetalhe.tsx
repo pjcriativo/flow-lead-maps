@@ -25,6 +25,7 @@ import { formatData, formatDataHora } from "@/lib/format";
 import { CANAL_LABEL, STATUS_LABELS, type Lead, type LeadStatus } from "@/lib/leads-api";
 import type { Redesign } from "@/types";
 import { RegistrarContatoBotao } from "./ContatoDialog";
+import { MarcarPerdaBotao } from "./PerdaDialog";
 import {
   StatusBadge,
   ScoreBadge,
@@ -237,6 +238,13 @@ export function LeadDetalhe({
                 lead={leadView}
                 onRegistrado={(novoStatus, quando) => {
                   aplicarPatch({ status: novoStatus, last_contacted_at: quando });
+                  recarregar();
+                }}
+              />
+              <MarcarPerdaBotao
+                lead={leadView}
+                onConfirmado={(patch) => {
+                  aplicarPatch(patch);
                   recarregar();
                 }}
               />

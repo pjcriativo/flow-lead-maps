@@ -19,6 +19,7 @@ import { listarLeadIdsComFollowUp } from "@/services/propostas";
 import { ScoreBadge, WhatsCell, EmailCell } from "./leads-shared";
 import { LeadDetalhe } from "./LeadDetalhe";
 import { RegistrarContatoBotao } from "./ContatoDialog";
+import { PerdaDialog } from "./PerdaDialog";
 
 const LIMITE_INICIAL = 25; // cards renderizados por coluna antes do "ver mais"
 
@@ -31,6 +32,9 @@ export function PipelineSection() {
   const [followupIds, setFollowupIds] = useState<Set<string>>(new Set());
   const [limites, setLimites] = useState<Record<string, number>>({});
   const [detalhe, setDetalhe] = useState<Lead | null>(null);
+  const [perdaAlvo, setPerdaAlvo] = useState<{ lead: Lead; status: "lost" | "nurture" } | null>(
+    null,
+  );
   const boardRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -58,6 +62,13 @@ export function PipelineSection() {
     if (!id) return;
     const lead = leads.find((l) => l.id === id);
     if (!lead || lead.status === status) return;
+
+    // Perdido/Nutrição pedem MOTIVO estruturado — não commita o move direto: abre o diálogo,
+    // que grava status + motivo juntos e depois move o card.
+    if (status === "lost" || status === "nurture") {
+      setPerdaAlvo({ lead, status });
+      return;
+    }
 
     const prevStatus = lead.status;
     // otimista
@@ -233,6 +244,20 @@ export function PipelineSection() {
 
       {detalhe && (
         <LeadDetalhe lead={detalhe} onClose={() => setDetalhe(null)} onLeadChange={patchLead} />
+      )}
+
+      {perdaAlvo && (
+        <PerdaDialog
+          lead={perdaAlvo.lead}
+          alvoStatus={perdaAlvo.status}
+          open
+          onOpenChange={(o) => !o && setPerdaAlvo(null)}
+          onConfirmado={(patch) => {
+            patchLead(perdaAlvo.lead.id, patch);
+            setPerdaAlvo(null);
+          }}
+          onCancelar={() => setPerdaAlvo(null)}
+        />
       )}
     </div>
   );
