@@ -666,7 +666,7 @@ export async function instanciaConversaDaOrg(
 export async function definirWebhookInstancia(
   token: string,
   webhookUrl: string,
-  eventos: string[] = ["Message"],
+  eventos: string[] = ["MESSAGE"], // Evolution GO usa nomes MAIÚSCULOS (MESSAGE/CONNECTION/QRCODE)
 ): Promise<{ ok: boolean; status: number; body?: string }> {
   const r = await fetch(`${waBase()}/instance/connect`, {
     method: "POST",

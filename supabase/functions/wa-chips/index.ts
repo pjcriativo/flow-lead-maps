@@ -152,7 +152,8 @@ Deno.serve(async (req) => {
     if (!inst) return json({ ok: false, error: "Chip não encontrado." });
     const secret = Deno.env.get("WA_WEBHOOK_SECRET") ?? "";
     const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/wa-webhook?k=${secret}`;
-    const r = await definirWebhookInstancia(inst.token, url, ["Message"]);
+    const eventos = Array.isArray(b?.eventos) && b.eventos.length ? b.eventos : ["MESSAGE"];
+    const r = await definirWebhookInstancia(inst.token, url, eventos);
     return json({ ok: r.ok, status: r.status, detalhe: r.body });
   }
 
