@@ -204,6 +204,73 @@ export async function updateLeadsStatus(ids: string[], status: string): Promise<
   if (error) throw error;
 }
 
+// ===== Contato MANUAL (WhatsApp/telefone/e-mail/presencial) =====
+export const CANAIS_CONTATO = [
+  { valor: "whatsapp", label: "WhatsApp" },
+  { valor: "telefone", label: "Telefone" },
+  { valor: "email", label: "E-mail" },
+  { valor: "presencial", label: "Presencial" },
+  { valor: "outro", label: "Outro" },
+] as const;
+export type CanalContato = (typeof CANAIS_CONTATO)[number]["valor"];
+export const CANAL_LABEL: Record<string, string> = Object.fromEntries(
+  CANAIS_CONTATO.map((c) => [c.valor, c.label]),
+);
+
+export type Contato = {
+  id: string;
+  lead_id: string;
+  canal: string;
+  anotacao: string | null;
+  contatado_em: string;
+};
+
+// Estágios adiantados: registrar contato NÃO deve regredir um lead já mais à frente.
+const ESTAGIOS_ADIANTADOS = new Set(["proposta_enviada", "responded", "meeting", "won"]);
+
+/** Novo status após um contato manual, sem regredir quem já passou de "contatado". */
+export function statusAposContato(statusAtual: string): LeadStatus {
+  return ESTAGIOS_ADIANTADOS.has(statusAtual) ? (statusAtual as LeadStatus) : "contacted";
+}
+
+/**
+ * Registra um contato MANUAL: grava no histórico (lead_contatos → linha do tempo) e move o
+ * lead para "Contatado" (sem regredir um lead já mais adiantado). NÃO cria proposta nem seta
+ * "proposta_enviada" — por isso o follow-up automático (que exige proposta enviada) NUNCA é
+ * disparado por um contato manual. user_id do contato = auth.uid() (default da coluna + RLS).
+ */
+export async function registrarContato(
+  leadId: string,
+  entrada: { canal: CanalContato; anotacao?: string; contatado_em?: string; statusAtual: string },
+): Promise<{ novoStatus: LeadStatus; quando: string }> {
+  const quando = entrada.contatado_em ?? new Date().toISOString();
+  const { error: insErr } = await supabase.from("lead_contatos").insert({
+    lead_id: leadId,
+    canal: entrada.canal,
+    anotacao: entrada.anotacao?.trim() || null,
+    contatado_em: quando,
+  });
+  if (insErr) throw insErr;
+  const novoStatus = statusAposContato(entrada.statusAtual);
+  const { error: upErr } = await supabase
+    .from("leads")
+    .update({ status: novoStatus, last_contacted_at: quando, updated_at: new Date().toISOString() })
+    .eq("id", leadId);
+  if (upErr) throw upErr;
+  return { novoStatus, quando };
+}
+
+/** Histórico de contatos manuais de um lead (mais recente primeiro). */
+export async function listarContatos(leadId: string): Promise<Contato[]> {
+  const { data, error } = await supabase
+    .from("lead_contatos")
+    .select("id, lead_id, canal, anotacao, contatado_em")
+    .eq("lead_id", leadId)
+    .order("contatado_em", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export const LEAD_STATUSES = [
   "new",
   "enriched",

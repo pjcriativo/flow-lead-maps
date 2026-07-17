@@ -30,10 +30,18 @@ export type SiteResumo = {
   expira_em: string;
 };
 
+export type ContatoDetalhe = {
+  id: string;
+  canal: string;
+  anotacao: string | null;
+  contatado_em: string;
+};
+
 export type LeadDetalheData = {
   redesign: Redesign | null;
   site: SiteResumo | null;
   propostas: PropostaDetalhe[];
+  contatos: ContatoDetalhe[];
 };
 
 const PROP_SELECT =
@@ -42,7 +50,7 @@ const PROP_SELECT =
 /** Carrega tudo do detalhe de um lead (proposta real + redesign + site). */
 export async function carregarDetalheLead(leadId: string): Promise<LeadDetalheData> {
   const nowIso = new Date().toISOString();
-  const [propRes, redRes, siteRes] = await Promise.all([
+  const [propRes, redRes, siteRes, contatosRes] = await Promise.all([
     supabase
       .from("propostas")
       .select(PROP_SELECT)
@@ -63,8 +71,14 @@ export async function carregarDetalheLead(leadId: string): Promise<LeadDetalheDa
       .gt("expira_em", nowIso)
       .order("publicado_em", { ascending: false })
       .limit(1),
+    supabase
+      .from("lead_contatos")
+      .select("id, canal, anotacao, contatado_em")
+      .eq("lead_id", leadId)
+      .order("contatado_em", { ascending: false }),
   ]);
   if (propRes.error) throw propRes.error;
+  if (contatosRes.error) throw contatosRes.error;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rd = redRes.data?.[0] as any;
@@ -76,5 +90,6 @@ export async function carregarDetalheLead(leadId: string): Promise<LeadDetalheDa
     redesign,
     site: (siteRes.data?.[0] as SiteResumo | undefined) ?? null,
     propostas: (propRes.data ?? []) as unknown as PropostaDetalhe[],
+    contatos: (contatosRes.data ?? []) as ContatoDetalhe[],
   };
 }

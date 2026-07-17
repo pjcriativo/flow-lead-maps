@@ -18,6 +18,7 @@ import {
 import { listarLeadIdsComFollowUp } from "@/services/propostas";
 import { ScoreBadge, WhatsCell, EmailCell } from "./leads-shared";
 import { LeadDetalhe } from "./LeadDetalhe";
+import { RegistrarContatoBotao } from "./ContatoDialog";
 
 const LIMITE_INICIAL = 25; // cards renderizados por coluna antes do "ver mais"
 
@@ -95,6 +96,10 @@ export function PipelineSection() {
     if ((e.target as HTMLElement).closest("a,button")) return;
     setDetalhe(lead);
   };
+
+  // Aplica uma mudança de lead na lista (usado por registrar contato / ações do modal).
+  const patchLead = (id: string, patch: Partial<Lead>) =>
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
 
   if (loading) {
     return (
@@ -194,7 +199,17 @@ export function PipelineSection() {
                       <WhatsCell lead={l} />
                       <EmailCell lead={l} />
                     </div>
-                    <GripVertical className="mt-1 h-3.5 w-3.5 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing" />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <RegistrarContatoBotao
+                        lead={l}
+                        variant="ghost"
+                        size="sm"
+                        onRegistrado={(s, q) =>
+                          patchLead(l.id, { status: s, last_contacted_at: q })
+                        }
+                      />
+                      <GripVertical className="h-3.5 w-3.5 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing" />
+                    </div>
                   </div>
                 ))}
                 {items.length > limite && (
@@ -216,7 +231,9 @@ export function PipelineSection() {
         })}
       </div>
 
-      {detalhe && <LeadDetalhe lead={detalhe} onClose={() => setDetalhe(null)} />}
+      {detalhe && (
+        <LeadDetalhe lead={detalhe} onClose={() => setDetalhe(null)} onLeadChange={patchLead} />
+      )}
     </div>
   );
 }

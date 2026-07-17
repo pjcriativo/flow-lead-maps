@@ -42,6 +42,9 @@ export type Database = {
           latitude: number | null;
           longitude: number | null;
           notes: string | null;
+          motivo_perda: string | null;
+          motivo_perda_nota: string | null;
+          perda_em: string | null;
           created_at: string;
           updated_at: string;
           email_opt_out: boolean;
@@ -81,6 +84,9 @@ export type Database = {
           latitude?: number | null;
           longitude?: number | null;
           notes?: string | null;
+          motivo_perda?: string | null;
+          motivo_perda_nota?: string | null;
+          perda_em?: string | null;
           created_at?: string;
           updated_at?: string;
           email_opt_out?: boolean;
@@ -120,6 +126,9 @@ export type Database = {
           latitude?: number | null;
           longitude?: number | null;
           notes?: string | null;
+          motivo_perda?: string | null;
+          motivo_perda_nota?: string | null;
+          perda_em?: string | null;
           created_at?: string;
           updated_at?: string;
           email_opt_out?: boolean;
@@ -249,6 +258,36 @@ export type Database = {
           gerado_em?: string | null;
           updated_at?: string;
           expira_em?: string | null;
+        };
+        Relationships: [];
+      };
+      lead_contatos: {
+        Row: {
+          id: string;
+          user_id: string;
+          lead_id: string;
+          canal: string;
+          anotacao: string | null;
+          contatado_em: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          lead_id: string;
+          canal: string;
+          anotacao?: string | null;
+          contatado_em?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          lead_id?: string;
+          canal?: string;
+          anotacao?: string | null;
+          contatado_em?: string;
+          created_at?: string;
         };
         Relationships: [];
       };

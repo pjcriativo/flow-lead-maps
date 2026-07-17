@@ -22,8 +22,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatData, formatDataHora } from "@/lib/format";
-import type { Lead } from "@/lib/leads-api";
+import { CANAL_LABEL, STATUS_LABELS, type Lead, type LeadStatus } from "@/lib/leads-api";
 import type { Redesign } from "@/types";
+import { RegistrarContatoBotao } from "./ContatoDialog";
 import {
   StatusBadge,
   ScoreBadge,
@@ -73,12 +74,12 @@ function Campo({
   );
 }
 
-type EventoLT = { quando: string; texto: string };
+type EventoLT = { quando: string; texto: string; tipo?: "contato" | "perda" };
 
 function montarTimeline(lead: Lead, d: LeadDetalheData): EventoLT[] {
   const ev: EventoLT[] = [];
-  const push = (q: string | null | undefined, t: string) => {
-    if (q) ev.push({ quando: q, texto: t });
+  const push = (q: string | null | undefined, t: string, tipo?: EventoLT["tipo"]) => {
+    if (q) ev.push({ quando: q, texto: t, tipo });
   };
   push(lead.created_at, "Lead capturado na busca");
   push(lead.enriched_at, "Enriquecido (dados de contato)");
@@ -90,20 +91,45 @@ function montarTimeline(lead: Lead, d: LeadDetalheData): EventoLT[] {
     push(p.enviada_em, "Proposta enviada por e-mail");
     push(p.follow_up_enviado_em, "Follow-up enviado");
   }
-  push(lead.last_contacted_at, "Último contato registrado");
+  // Histórico de contatos MANUAIS (vários ao longo do tempo), não só o último.
+  for (const c of d.contatos) {
+    const canal = CANAL_LABEL[c.canal] ?? c.canal;
+    push(c.contatado_em, `Contato por ${canal}${c.anotacao ? " — " + c.anotacao : ""}`, "contato");
+  }
+  // Marcação de perda/nutrição com o motivo estruturado.
+  if (lead.perda_em && lead.motivo_perda) {
+    const rot = STATUS_LABELS[lead.status] ?? "Perdido";
+    push(
+      lead.perda_em,
+      `${rot}: ${lead.motivo_perda}${lead.motivo_perda_nota ? " — " + lead.motivo_perda_nota : ""}`,
+      "perda",
+    );
+  }
   return ev.sort((a, b) => new Date(a.quando).getTime() - new Date(b.quando).getTime());
 }
 
-export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void }) {
+export function LeadDetalhe({
+  lead,
+  onClose,
+  onLeadChange,
+}: {
+  lead: Lead;
+  onClose: () => void;
+  onLeadChange?: (leadId: string, patch: Partial<Lead>) => void;
+}) {
   const [data, setData] = useState<LeadDetalheData | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [editorAberto, setEditorAberto] = useState<Redesign | null>(null);
   const [gerando, setGerando] = useState<null | "site" | "proposta">(null);
+  // Reflete mudanças feitas no próprio modal (status/perda) sem refetch do lead prop.
+  const [patchLocal, setPatchLocal] = useState<Partial<Lead>>({});
+  const leadView = { ...lead, ...patchLocal };
 
   useEffect(() => {
     let vivo = true;
     setLoading(true);
+    setPatchLocal({});
     carregarDetalheLead(lead.id)
       .then((d) => vivo && setData(d))
       .catch((e) => vivo && setErro(e instanceof Error ? e.message : "Falha ao carregar o detalhe"))
@@ -112,6 +138,12 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
       vivo = false;
     };
   }, [lead.id]);
+
+  // Aplica uma mudança do lead vinda de uma ação do modal: reflete no modal e avisa o pai.
+  const aplicarPatch = (patch: Partial<Lead>) => {
+    setPatchLocal((p) => ({ ...p, ...patch }));
+    onLeadChange?.(lead.id, patch);
+  };
 
   const recarregar = async () => {
     setData(await carregarDetalheLead(lead.id));
@@ -183,7 +215,7 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
 
   const bd = getBreakdown(lead);
   const previewHtml = data?.redesign?.html_editado ?? data?.redesign?.html_gerado ?? null;
-  const timeline = data ? montarTimeline(lead, data) : [];
+  const timeline = data ? montarTimeline(leadView, data) : [];
 
   return (
     <>
@@ -193,12 +225,22 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
             <DialogTitle className="flex flex-wrap items-center gap-2 pr-6">
               <Building2 className="h-4 w-4 text-primary" />
               <span className="mr-1">{lead.business_name}</span>
-              <StatusBadge status={lead.status} />
+              <StatusBadge status={leadView.status} />
               <ScoreBadge lead={lead} />
             </DialogTitle>
           </DialogHeader>
 
           <div className="max-h-[calc(92vh-4.5rem)] space-y-5 overflow-y-auto px-5 py-4">
+            {/* Ações do lead */}
+            <div className="flex flex-wrap items-center gap-2">
+              <RegistrarContatoBotao
+                lead={leadView}
+                onRegistrado={(novoStatus, quando) => {
+                  aplicarPatch({ status: novoStatus, last_contacted_at: quando });
+                  recarregar();
+                }}
+              />
+            </div>
             {/* Dados de contato */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Campo icon={Building2} label="Categoria">
@@ -445,7 +487,16 @@ export function LeadDetalhe({ lead, onClose }: { lead: Lead; onClose: () => void
                     <ol className="space-y-2 border-l border-border pl-4">
                       {timeline.map((e, i) => (
                         <li key={i} className="relative text-sm">
-                          <span className="absolute -left-[1.32rem] top-1 h-2 w-2 rounded-full bg-primary" />
+                          <span
+                            className={cn(
+                              "absolute -left-[1.32rem] top-1 h-2 w-2 rounded-full",
+                              e.tipo === "contato"
+                                ? "bg-emerald-500"
+                                : e.tipo === "perda"
+                                  ? "bg-rose-500"
+                                  : "bg-primary",
+                            )}
+                          />
                           <span className="text-foreground">{e.texto}</span>
                           <span className="ml-2 text-xs text-muted-foreground">
                             {formatDataHora(e.quando)}

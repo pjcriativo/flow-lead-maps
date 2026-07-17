@@ -669,7 +669,15 @@ export function LeadsManager({
         />
       )}
 
-      {detalhe && <LeadDetalhe lead={detalhe} onClose={() => setDetalhe(null)} />}
+      {detalhe && (
+        <LeadDetalhe
+          lead={detalhe}
+          onClose={() => setDetalhe(null)}
+          onLeadChange={(id, patch) =>
+            setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+          }
+        />
+      )}
     </div>
   );
 }
