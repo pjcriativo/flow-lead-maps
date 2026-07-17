@@ -50,7 +50,7 @@ const STATUS_UI: Record<string, { label: string; cls: string }> = {
   erro: { label: "Erro", cls: "bg-rose-100 text-rose-800 border-rose-500/40" },
 };
 
-export function ChipsManager() {
+export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
   const [chips, setChips] = useState<WaChip[]>([]);
   const [alertas, setAlertas] = useState<WaAlerta[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -71,12 +71,13 @@ export function ChipsManager() {
       const [cs, al] = await Promise.all([listarChips(), listarAlertas().catch(() => [])]);
       setChips(cs);
       setAlertas(al);
+      onMudou?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao listar os chips");
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [onMudou]);
 
   useEffect(() => {
     carregar();

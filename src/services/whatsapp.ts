@@ -159,6 +159,181 @@ export async function enviarCampanhaLeadWa(campanha_lead_id: string): Promise<Wa
   return data as WaCampEnvio;
 }
 
+// ===== Scripts (mensagens/mídias salvas) =====
+export type WaScript = {
+  id: string;
+  nome: string;
+  tipo: "texto" | "imagem" | "video" | "arquivo" | string;
+  mensagem: string | null;
+  media_url: string | null;
+  criado_em: string;
+};
+
+export async function listarScripts(): Promise<WaScript[]> {
+  const { data, error } = await supabase
+    .from("wa_scripts")
+    .select("id, nome, tipo, mensagem, media_url, criado_em")
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as WaScript[];
+}
+
+export async function criarScript(s: {
+  nome: string;
+  tipo: WaScript["tipo"];
+  mensagem?: string;
+  media_url?: string;
+}): Promise<void> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Não autenticado");
+  const { error } = await supabase.from("wa_scripts").insert({
+    user_id: u.user.id,
+    nome: s.nome.trim(),
+    tipo: s.tipo,
+    mensagem: s.mensagem ?? null,
+    media_url: s.media_url ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function excluirScript(id: string): Promise<void> {
+  const { error } = await supabase.from("wa_scripts").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ===== Conversas (bate-papo) =====
+export type WaMensagem = {
+  id: string;
+  numero: string;
+  direcao: "in" | "out" | string;
+  tipo: string;
+  texto: string | null;
+  media_url: string | null;
+  lida: boolean;
+  criado_em: string;
+  nome_contato: string | null;
+};
+
+export type WaConversa = {
+  numero: string;
+  nome_contato: string | null;
+  ultima: string | null;
+  ultima_em: string;
+  nao_lidas: number;
+};
+
+/** Lista as conversas (uma por número), com a última mensagem e não-lidas. */
+export async function listarConversas(): Promise<WaConversa[]> {
+  const { data, error } = await supabase
+    .from("wa_mensagens")
+    .select("numero, nome_contato, direcao, texto, lida, criado_em")
+    .order("criado_em", { ascending: false })
+    .limit(3000);
+  if (error) throw error;
+  const porNumero = new Map<string, WaConversa>();
+  for (const m of (data ?? []) as Array<{
+    numero: string;
+    nome_contato: string | null;
+    direcao: string;
+    texto: string | null;
+    lida: boolean;
+    criado_em: string;
+  }>) {
+    const cur = porNumero.get(m.numero);
+    if (!cur) {
+      porNumero.set(m.numero, {
+        numero: m.numero,
+        nome_contato: m.nome_contato,
+        ultima: m.texto,
+        ultima_em: m.criado_em,
+        nao_lidas: m.direcao === "in" && !m.lida ? 1 : 0,
+      });
+    } else {
+      if (m.direcao === "in" && !m.lida) cur.nao_lidas += 1;
+      if (!cur.nome_contato && m.nome_contato) cur.nome_contato = m.nome_contato;
+    }
+  }
+  return [...porNumero.values()];
+}
+
+/** Mensagens de uma conversa (por número), em ordem cronológica. */
+export async function listarMensagens(numero: string): Promise<WaMensagem[]> {
+  const { data, error } = await supabase
+    .from("wa_mensagens")
+    .select("id, numero, direcao, tipo, texto, media_url, lida, criado_em, nome_contato")
+    .eq("numero", numero)
+    .order("criado_em", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WaMensagem[];
+}
+
+/** Marca as mensagens recebidas de um número como lidas. */
+export async function marcarConversaLida(numero: string): Promise<void> {
+  await supabase
+    .from("wa_mensagens")
+    .update({ lida: true })
+    .eq("numero", numero)
+    .eq("direcao", "in")
+    .eq("lida", false);
+}
+
+/** Responde uma conversa (envia pelo chip da org via edge + grava a saída). */
+export async function responderConversa(
+  numero: string,
+  texto: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await supabase.functions.invoke("wa-responder", {
+    body: { numero, texto },
+  });
+  if (error) throw error;
+  return data as { ok: boolean; error?: string };
+}
+
+/** Limpa o histórico de conversas da org (aba WhatsApp). Devolve quantas removeu. */
+export async function limparConversas(): Promise<number> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Não autenticado");
+  const { data, error } = await supabase
+    .from("wa_mensagens")
+    .delete()
+    .eq("user_id", u.user.id)
+    .select("id");
+  if (error) throw error;
+  return (data ?? []).length;
+}
+
+// ===== Painel (dashboard estilo S-zap): números do topo + status de conexão =====
+export type WaEstatisticas = {
+  leadsComWhatsapp: number;
+  totalLeads: number;
+  campanhasEnviadas: number;
+  conversas: number;
+  conectado: boolean;
+};
+
+export async function estatisticasWa(): Promise<WaEstatisticas> {
+  const [leadsWa, total, envios, msgs, chips] = await Promise.all([
+    supabase.from("leads").select("id", { count: "exact", head: true }).not("whatsapp", "is", null),
+    supabase.from("leads").select("id", { count: "exact", head: true }),
+    supabase.from("wa_envios").select("campanha_id"),
+    supabase.from("wa_mensagens").select("numero").limit(5000),
+    listarChips().catch(() => [] as WaChip[]),
+  ]);
+  const campanhas = new Set(
+    (envios.data ?? [])
+      .map((r) => (r as { campanha_id: string | null }).campanha_id)
+      .filter(Boolean),
+  ).size;
+  const conversas = new Set((msgs.data ?? []).map((r) => (r as { numero: string }).numero)).size;
+  return {
+    leadsComWhatsapp: leadsWa.count ?? 0,
+    totalLeads: total.count ?? 0,
+    campanhasEnviadas: campanhas,
+    conversas,
+    conectado: chips.some((c) => c.status === "conectado"),
+  };
+}
+
 // ===== Histórico da campanha (ETAPA 4.3): data, enviados, qual chip usou, quantos responderam =====
 export type WaHistorico = {
   enviados: number;

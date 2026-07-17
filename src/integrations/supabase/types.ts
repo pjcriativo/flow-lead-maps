@@ -414,6 +414,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      wa_scripts: {
+        Row: {
+          id: string;
+          user_id: string;
+          nome: string;
+          tipo: string;
+          mensagem: string | null;
+          media_url: string | null;
+          criado_em: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          nome: string;
+          tipo?: string;
+          mensagem?: string | null;
+          media_url?: string | null;
+          criado_em?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          nome?: string;
+          tipo?: string;
+          mensagem?: string | null;
+          media_url?: string | null;
+          criado_em?: string;
+        };
+        Relationships: [];
+      };
+      wa_mensagens: {
+        Row: {
+          id: string;
+          user_id: string;
+          instancia_id: string | null;
+          numero: string;
+          lead_id: string | null;
+          nome_contato: string | null;
+          direcao: string;
+          tipo: string;
+          texto: string | null;
+          media_url: string | null;
+          externo_id: string | null;
+          lida: boolean;
+          criado_em: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          instancia_id?: string | null;
+          numero: string;
+          lead_id?: string | null;
+          nome_contato?: string | null;
+          direcao: string;
+          tipo?: string;
+          texto?: string | null;
+          media_url?: string | null;
+          externo_id?: string | null;
+          lida?: boolean;
+          criado_em?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          instancia_id?: string | null;
+          numero?: string;
+          lead_id?: string | null;
+          nome_contato?: string | null;
+          direcao?: string;
+          tipo?: string;
+          texto?: string | null;
+          media_url?: string | null;
+          externo_id?: string | null;
+          lida?: boolean;
+          criado_em?: string;
+        };
+        Relationships: [];
+      };
       wa_envios: {
         Row: {
           id: string;
