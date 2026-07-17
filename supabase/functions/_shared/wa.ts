@@ -399,3 +399,162 @@ export async function atualizarChip(
     .eq("user_id", userId);
   return !error;
 }
+
+/* ---------------- ETAPA 3: saúde (ban) + rotação + graduação + alertas ---------------- */
+
+// CRITÉRIO (confirmado pelo diagnóstico 3.1):
+//  - LoggedIn é o sinal de "chip autenticado/usável". Connected é ENGANOSO (fica true até num
+//    chip nunca pareado). Uma queda de rede derruba Connected mas NÃO remove o device JID do
+//    store → LoggedIn segue true → NÃO queima.
+//  - LoggedIn=false ⟺ sem device JID no store = deslogado/banido (send falha com "the store
+//    doesn't contain a device JID"). Um único LoggedIn=false pode ser re-auth transitório —
+//    por isso só queima após LIMITE checagens SEGUIDAS. Zera ao voltar LoggedIn=true.
+export const LIMITE_QUEIMA = 3; // checagens seguidas com LoggedIn=false p/ queimar
+export const JANELA_CHECAGEM_MS = 60_000; // ≥60s entre checagens que contam (idempotência)
+
+/** Núcleo PURO do critério: dado LoggedIn e o contador atual, devolve novo contador e se queima. */
+export function decidirSaude(
+  loggedIn: boolean,
+  falhasAtuais: number,
+  limite = LIMITE_QUEIMA,
+): { falhas: number; queima: boolean } {
+  if (loggedIn) return { falhas: 0, queima: false }; // sessão viva → zera, nunca queima
+  const falhas = falhasAtuais + 1;
+  return { falhas, queima: falhas >= limite }; // LoggedIn=false sustentado → queima
+}
+
+export type ResultadoChecagem = {
+  resultado: "sadio" | "suspeito" | "queimou" | "pulado" | "erro";
+  falhas?: number;
+  loggedIn?: boolean;
+};
+
+/**
+ * Aplica a decisão de saúde a partir de uma observação de LoggedIn e PERSISTE. Idempotente por
+ * janela: duas checagens em <60s não contam duas vezes; chip já 'queimada' é pulado (não re-queima).
+ */
+export async function registrarChecagem(
+  admin: Admin,
+  userId: string,
+  chipId: string,
+  loggedIn: boolean,
+): Promise<ResultadoChecagem> {
+  const { data: row } = await admin
+    .from("wa_instancias")
+    .select("status, falhas_login, ultima_checagem_em")
+    .eq("id", chipId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!row) return { resultado: "erro" };
+  if (row.status === "queimada") return { resultado: "pulado", falhas: row.falhas_login };
+  if (
+    row.ultima_checagem_em &&
+    Date.now() - new Date(row.ultima_checagem_em).getTime() < JANELA_CHECAGEM_MS
+  )
+    return { resultado: "pulado", falhas: row.falhas_login };
+
+  const { falhas, queima } = decidirSaude(loggedIn, row.falhas_login ?? 0);
+  const patch: Record<string, unknown> = {
+    falhas_login: falhas,
+    ultima_checagem_em: new Date().toISOString(),
+    atualizado_em: new Date().toISOString(),
+  };
+  if (queima) patch.status = "queimada";
+  else if (loggedIn) patch.status = "conectado";
+  await admin.from("wa_instancias").update(patch).eq("id", chipId).eq("user_id", userId);
+  return {
+    resultado: queima ? "queimou" : loggedIn ? "sadio" : "suspeito",
+    falhas,
+    loggedIn,
+  };
+}
+
+/** Checagem COMPLETA de um chip: lê o status ao vivo na Evolution e aplica registrarChecagem. */
+export async function checarSaudeChip(
+  admin: Admin,
+  userId: string,
+  chipId: string,
+): Promise<ResultadoChecagem> {
+  const inst = await instanciaDaOrgComToken(admin, userId, chipId);
+  if (!inst) return { resultado: "erro" };
+  const st = await statusInstancia(inst.token);
+  return registrarChecagem(admin, userId, chipId, !!st?.loggedIn);
+}
+
+/** Aviso VISÍVEL ao dono (a UI lê wa_alertas e mostra). Insert só via edge (service_role). */
+export async function alertar(
+  admin: Admin,
+  userId: string,
+  tipo: string,
+  mensagem: string,
+): Promise<void> {
+  await admin.from("wa_alertas").insert({ user_id: userId, tipo, mensagem });
+}
+
+/**
+ * ROTAÇÃO: marca o chip como 'queimada' (idempotente) e assume o PRÓXIMO chip de disparo
+ * conectado (proximaInstanciaDisparo já exclui 'conversa' e não-conectados → NUNCA recruta o
+ * flowleads nem o próprio queimado). Sem próximo → pausa e avisa. Avisa o dono nos dois casos.
+ */
+export async function rotacionarDisparo(
+  admin: Admin,
+  userId: string,
+  chipQueimadoId: string,
+): Promise<{ proximo: WaInstanciaOrg | null; alerta: string }> {
+  await admin
+    .from("wa_instancias")
+    .update({ status: "queimada", atualizado_em: new Date().toISOString() })
+    .eq("id", chipQueimadoId)
+    .eq("user_id", userId);
+  const proximo = await proximaInstanciaDisparo(admin, userId);
+  if (proximo) {
+    const alerta = `Chip queimado — disparo assumido pelo próximo chip (${proximo.numero ?? proximo.nome}).`;
+    await alertar(admin, userId, "rotacao", alerta);
+    return { proximo, alerta };
+  }
+  const alerta =
+    "Chip queimado e NÃO há outro chip de disparo conectado — disparo PAUSADO. Conecte um chip novo.";
+  await alertar(admin, userId, "sem_chip", alerta);
+  return { proximo: null, alerta };
+}
+
+/**
+ * GRADUAÇÃO: o chip que mandou pro lead (wa_envios) vira 'conversa' e sai do disparo. Chamada
+ * quando o lead é movido pra "Respondeu" (e, depois, pelo webhook de recebimento — MESMA função).
+ * Idempotente: sem envio registrado ou chip já 'conversa' → no-op.
+ */
+export async function graduarChipDoLead(
+  admin: Admin,
+  userId: string,
+  leadId: string,
+): Promise<{ graduou: boolean; chip?: string }> {
+  const { data: env } = await admin
+    .from("wa_envios")
+    .select("instancia_id")
+    .eq("lead_id", leadId)
+    .eq("user_id", userId)
+    .order("enviado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!env) return { graduou: false };
+  const { data: chip } = await admin
+    .from("wa_instancias")
+    .select("id, nome, numero, funcao")
+    .eq("id", env.instancia_id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!chip || chip.funcao === "conversa")
+    return { graduou: false, chip: chip?.numero ?? chip?.nome };
+  await admin
+    .from("wa_instancias")
+    .update({ funcao: "conversa", atualizado_em: new Date().toISOString() })
+    .eq("id", chip.id)
+    .eq("user_id", userId);
+  await alertar(
+    admin,
+    userId,
+    "graduacao",
+    `Chip ${chip.numero ?? chip.nome} graduou para CONVERSA (o lead respondeu) — saiu do disparo.`,
+  );
+  return { graduou: true, chip: chip.numero ?? chip.nome };
+}

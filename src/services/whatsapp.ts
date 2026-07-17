@@ -83,6 +83,47 @@ export async function marcarChip(
   return waChips<{ ok: boolean; error?: string }>({ acao: "marcar", instancia_id, ...patch });
 }
 
+/** Checa a saúde de um chip ao vivo (ETAPA 3): se queimou, já rotaciona pro próximo + avisa. */
+export async function checarChip(instancia_id: string) {
+  return waChips<{
+    resultado: "sadio" | "suspeito" | "queimou" | "pulado" | "erro";
+    falhas?: number;
+    loggedIn?: boolean;
+    rotacao?: { proximo: string | null; alerta: string };
+  }>({ acao: "checar", instancia_id });
+}
+
+/** Graduação: o chip que mandou pro lead vira 'conversa' (gancho: lead move p/ Respondeu). */
+export async function graduarLeadWa(lead_id: string) {
+  return waChips<{ graduou: boolean; chip?: string }>({ acao: "graduar_lead", lead_id });
+}
+
+// ===== Alertas visíveis (wa_alertas) — lidos direto por RLS (SELECT/UPDATE do dono) =====
+export type WaAlerta = {
+  id: string;
+  tipo: string;
+  mensagem: string;
+  lido: boolean;
+  criado_em: string;
+};
+
+/** Alertas não lidos da org (chip queimado, rotação, sem chip, graduação). */
+export async function listarAlertas(): Promise<WaAlerta[]> {
+  const { data, error } = await supabase
+    .from("wa_alertas")
+    .select("id, tipo, mensagem, lido, criado_em")
+    .eq("lido", false)
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as WaAlerta[];
+}
+
+/** Marca um alerta como lido (dispensar). */
+export async function marcarAlertaLido(id: string): Promise<void> {
+  const { error } = await supabase.from("wa_alertas").update({ lido: true }).eq("id", id);
+  if (error) throw error;
+}
+
 export type WaEnvio = { ok: boolean; para?: string; error?: string };
 
 /** Envia 1 mensagem de teste para um número (DDI+DDD). Erro real da Evolution. */

@@ -34,8 +34,13 @@ import {
   qrChip,
   statusChip,
   marcarChip,
+  checarChip,
+  listarAlertas,
+  marcarAlertaLido,
   type WaChip,
+  type WaAlerta,
 } from "@/services/whatsapp";
+import { AlertTriangle, X, Activity } from "lucide-react";
 
 const STATUS_UI: Record<string, { label: string; cls: string }> = {
   conectado: { label: "Conectado", cls: "bg-green-100 text-green-800 border-green-500/40" },
@@ -47,8 +52,10 @@ const STATUS_UI: Record<string, { label: string; cls: string }> = {
 
 export function ChipsManager() {
   const [chips, setChips] = useState<WaChip[]>([]);
+  const [alertas, setAlertas] = useState<WaAlerta[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [conectando, setConectando] = useState(false);
+  const [verificando, setVerificando] = useState<string | null>(null);
   const [dialog, setDialog] = useState(false);
   // fluxo de conexão de um chip
   const [novoFuncao, setNovoFuncao] = useState<"disparo" | "conversa">("disparo");
@@ -61,7 +68,9 @@ export function ChipsManager() {
 
   const carregar = useCallback(async () => {
     try {
-      setChips(await listarChips());
+      const [cs, al] = await Promise.all([listarChips(), listarAlertas().catch(() => [])]);
+      setChips(cs);
+      setAlertas(al);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao listar os chips");
     } finally {
@@ -146,6 +155,30 @@ export function ChipsManager() {
     }
   };
 
+  // Verifica a saúde do chip ao vivo (ETAPA 3): se queimou, o servidor já rotaciona + avisa.
+  const verificar = async (chip: WaChip) => {
+    setVerificando(chip.id);
+    try {
+      const r = await checarChip(chip.id);
+      if (r.resultado === "queimou")
+        toast.error(r.rotacao?.alerta ?? "Chip queimado — disparo rotacionado.");
+      else if (r.resultado === "suspeito")
+        toast.warning(`Chip sem sessão (${r.falhas}/3). Se persistir, será queimado.`);
+      else if (r.resultado === "sadio") toast.success("Chip saudável (conectado).");
+      else toast.info("Checagem recente — aguarde ~1 min entre verificações.");
+      carregar();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao verificar");
+    } finally {
+      setVerificando(null);
+    }
+  };
+
+  const dispensarAlerta = async (id: string) => {
+    setAlertas((a) => a.filter((x) => x.id !== id));
+    marcarAlertaLido(id).catch(() => carregar());
+  };
+
   const trocarOrdem = async (chip: WaChip, delta: number) => {
     const disparo = chips.filter((c) => c.funcao === "disparo");
     const i = disparo.findIndex((c) => c.id === chip.id);
@@ -167,6 +200,24 @@ export function ChipsManager() {
 
   return (
     <div className="space-y-4">
+      {/* Alertas visíveis (chip queimado, rotação, sem chip, graduação) */}
+      {alertas.map((a) => (
+        <div
+          key={a.id}
+          className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span className="flex-1">{a.mensagem}</span>
+          <button
+            onClick={() => dispensarAlerta(a.id)}
+            className="shrink-0 text-amber-700 hover:text-amber-900"
+            title="Dispensar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+
       <div className="flex items-center justify-between">
         <div>
           <div className="font-medium">Chips (números)</div>
@@ -278,6 +329,19 @@ export function ChipsManager() {
                     </>
                   )}
                 </Button>
+
+                {/* verificar saúde ao vivo (ETAPA 3) — só faz sentido em chip de disparo ativo */}
+                {c.funcao === "disparo" && c.status !== "queimada" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={verificando === c.id}
+                    onClick={() => verificar(c)}
+                  >
+                    <Activity className="h-3.5 w-3.5" />{" "}
+                    {verificando === c.id ? "Verificando…" : "Verificar saúde"}
+                  </Button>
+                )}
 
                 {/* marcar/desmarcar queimado */}
                 {c.status === "queimada" ? (

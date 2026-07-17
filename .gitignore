@@ -32,3 +32,5 @@ referenciaprospector-plugin/
 
 # Supabase CLI (artefatos locais transitórios)
 supabase/.temp/
+
+.vercel

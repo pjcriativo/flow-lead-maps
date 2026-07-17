@@ -16,6 +16,7 @@ import {
   type LeadStatus,
 } from "@/lib/leads-api";
 import { listarLeadIdsComFollowUp } from "@/services/propostas";
+import { graduarLeadWa } from "@/services/whatsapp";
 import { ScoreBadge, WhatsCell, EmailCell } from "./leads-shared";
 import { LeadDetalhe } from "./LeadDetalhe";
 import { RegistrarContatoBotao } from "./ContatoDialog";
@@ -78,6 +79,15 @@ export function PipelineSection() {
     try {
       await updateLeadStatus(id, status);
       toast.success(`"${lead.business_name}" → ${STATUS_LABELS[status]}`);
+      // ETAPA 3.4 GRADUAÇÃO: lead respondeu → o chip que mandou pra ele vira 'conversa'.
+      // Ponte manual (o webhook futuro chamará a MESMA função). Silencioso se não houve envio WA.
+      if (status === "responded") {
+        graduarLeadWa(id)
+          .then((g) => {
+            if (g.graduou) toast.success("Chip que abriu esse lead graduou para conversa.");
+          })
+          .catch(() => {});
+      }
     } catch (e) {
       // reverte
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status: prevStatus } : l)));

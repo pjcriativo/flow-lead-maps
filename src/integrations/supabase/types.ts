@@ -261,6 +261,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      wa_alertas: {
+        Row: {
+          id: string;
+          user_id: string;
+          tipo: string;
+          mensagem: string;
+          lido: boolean;
+          criado_em: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          tipo: string;
+          mensagem: string;
+          lido?: boolean;
+          criado_em?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          tipo?: string;
+          mensagem?: string;
+          lido?: boolean;
+          criado_em?: string;
+        };
+        Relationships: [];
+      };
       lead_contatos: {
         Row: {
           id: string;

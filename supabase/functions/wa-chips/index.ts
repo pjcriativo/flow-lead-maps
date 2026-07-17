@@ -25,6 +25,9 @@ import {
   sincronizarInstancia,
   pairInstancia,
   qrInstancia,
+  checarSaudeChip,
+  rotacionarDisparo,
+  graduarChipDoLead,
 } from "../_shared/wa.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -115,6 +118,37 @@ Deno.serve(async (req) => {
       ordem: typeof b?.ordem === "number" ? b.ordem : undefined,
     });
     return json({ ok });
+  }
+
+  // ETAPA 3: checa a saúde do chip ao vivo; se QUEIMOU, já rotaciona pro próximo + avisa.
+  if (acao === "checar") {
+    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
+    if (!inst) return json({ resultado: "erro", error: "Chip não encontrado." });
+    const r = await checarSaudeChip(admin, userId, instanciaId);
+    if (r.resultado === "queimou") {
+      const rot = await rotacionarDisparo(admin, userId, instanciaId);
+      return json({ ...r, rotacao: { proximo: rot.proximo?.id ?? null, alerta: rot.alerta } });
+    }
+    return json(r);
+  }
+
+  // ETAPA 3: rotação explícita (o motor de disparo chama quando confirma um chip queimado).
+  if (acao === "rotacionar") {
+    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
+    if (!inst) return json({ error: "Chip não encontrado." });
+    const rot = await rotacionarDisparo(admin, userId, instanciaId);
+    return json({
+      proximo: rot.proximo?.id ?? null,
+      numero: rot.proximo?.numero ?? null,
+      alerta: rot.alerta,
+    });
+  }
+
+  // ETAPA 3.4: graduação — o chip que mandou pro lead vira 'conversa'. Gancho do pipeline.
+  if (acao === "graduar_lead") {
+    const leadId = String(b?.lead_id || "");
+    if (!leadId) return json({ graduou: false });
+    return json(await graduarChipDoLead(admin, userId, leadId));
   }
 
   return json({ error: "Ação desconhecida." }, 400);
