@@ -19,6 +19,7 @@ import {
   LogOut,
   MessageCircle,
   Megaphone,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,7 @@ import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
 import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
+import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { lerPerfilEmail, salvarNomeRemetente, salvarReplyTo, emailValido } from "@/services/perfil";
 import { toast } from "sonner";
 
@@ -85,6 +87,7 @@ type Section =
   | "propostas"
   | "campanhas"
   | "whatsapp"
+  | "automacao"
   | "contratos"
   | "financeiro"
   | "redesign"
@@ -103,6 +106,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "propostas", label: "Propostas", Icon: FileText },
   { id: "campanhas", label: "Campanhas", Icon: Megaphone },
   { id: "whatsapp", label: "WhatsApp", Icon: MessageCircle },
+  { id: "automacao", label: "Automação", Icon: Bot },
   { id: "contratos", label: "Contratos", Icon: ScrollText },
   { id: "financeiro", label: "Financeiro", Icon: Wallet },
   { id: "redesign", label: "Redesign", Icon: Wand2 },
@@ -215,6 +219,7 @@ function Dashboard() {
         {section === "propostas" && <PropostasSection />}
         {section === "campanhas" && <CampanhasSection />}
         {section === "whatsapp" && <WhatsAppSection />}
+        {section === "automacao" && <AutomacaoSection onRevisar={() => setSection("campanhas")} />}
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
         {section === "redesign" && (

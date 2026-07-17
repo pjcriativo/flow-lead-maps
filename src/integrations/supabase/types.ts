@@ -143,6 +143,96 @@ export type Database = {
         };
         Relationships: [];
       };
+      automacao_receitas: {
+        Row: {
+          id: string;
+          user_id: string;
+          nome: string;
+          ativa: boolean;
+          nicho: string;
+          cidade: string;
+          uf: string | null;
+          fonte: string;
+          score_minimo: number;
+          exigir_contato: boolean;
+          canal: string;
+          wa_config: Json | null;
+          leads_por_rodada: number;
+          frequencia: string;
+          max_leads_rodada: number;
+          max_leads_mes: number;
+          max_usd_rodada: number;
+          max_usd_mes: number;
+          custo_lead_usd: number;
+          mes_ref: string | null;
+          leads_mes: number;
+          gasto_mes_usd: number;
+          ultima_rodada_em: string | null;
+          criada_em: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          nome: string;
+          ativa?: boolean;
+          nicho: string;
+          cidade: string;
+          uf?: string | null;
+          fonte?: string;
+          score_minimo?: number;
+          exigir_contato?: boolean;
+          canal?: string;
+          wa_config?: Json | null;
+          leads_por_rodada?: number;
+          frequencia?: string;
+          max_leads_rodada?: number;
+          max_leads_mes?: number;
+          max_usd_rodada?: number;
+          max_usd_mes?: number;
+          custo_lead_usd?: number;
+          mes_ref?: string | null;
+          leads_mes?: number;
+          gasto_mes_usd?: number;
+          ultima_rodada_em?: string | null;
+          criada_em?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["automacao_receitas"]["Insert"]>;
+        Relationships: [];
+      };
+      automacao_rodadas: {
+        Row: {
+          id: string;
+          user_id: string;
+          receita_id: string;
+          iniciada_em: string;
+          concluida_em: string | null;
+          leads_buscados: number;
+          leads_qualificados: number;
+          leads_descartados: number;
+          leads_preparados: number;
+          custo_usd: number;
+          campanha_id: string | null;
+          status: string;
+          detalhe: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          receita_id: string;
+          iniciada_em?: string;
+          concluida_em?: string | null;
+          leads_buscados?: number;
+          leads_qualificados?: number;
+          leads_descartados?: number;
+          leads_preparados?: number;
+          custo_usd?: number;
+          campanha_id?: string | null;
+          status?: string;
+          detalhe?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["automacao_rodadas"]["Insert"]>;
+        Relationships: [];
+      };
       // Só os campos que o app usa. `full_name` = {remetente} que assina os e-mails
       // (ver src/services/perfil.ts). RLS: SELECT/UPDATE do próprio; sem INSERT (a linha
       // nasce do trigger on_auth_user_created) — por isso Insert não é exposto aqui.
