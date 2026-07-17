@@ -142,8 +142,9 @@ export function AutomacaoSection({ onRevisar }: { onRevisar?: () => void }) {
         <span>
           O robô gasta dinheiro sozinho (Apify + IA por site). Cada receita tem{" "}
           <b>teto por rodada e por mês</b> (leads e US$) — ao bater, ele para e avisa, nunca estoura
-          calado. O agendamento automático fica <b>desligado</b> até você ligar; por ora é{" "}
-          <b>Rodar agora</b>.
+          calado. O agendamento automático nasce <b>desligado</b>: ligue o <b>Agendamento</b> na
+          receita e o robô roda sozinho (diária/semanal) respeitando os tetos — ou use{" "}
+          <b>Rodar agora</b> pra disparar na hora.
         </span>
       </div>
 
