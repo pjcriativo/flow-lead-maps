@@ -98,6 +98,14 @@ export async function graduarLeadWa(lead_id: string) {
   return waChips<{ graduou: boolean; chip?: string }>({ acao: "graduar_lead", lead_id });
 }
 
+/** Ativa o RECEBIMENTO de mensagens num chip (seta o webhook na Evolution). O dono aciona. */
+export async function ativarRecebimentoChip(instancia_id: string) {
+  return waChips<{ ok: boolean; status?: number; detalhe?: string; error?: string }>({
+    acao: "ativar_recebimento",
+    instancia_id,
+  });
+}
+
 // ===== Alertas visíveis (wa_alertas) — lidos direto por RLS (SELECT/UPDATE do dono) =====
 export type WaAlerta = {
   id: string;

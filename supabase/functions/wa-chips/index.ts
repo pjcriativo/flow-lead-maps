@@ -28,6 +28,7 @@ import {
   checarSaudeChip,
   rotacionarDisparo,
   graduarChipDoLead,
+  definirWebhookInstancia,
 } from "../_shared/wa.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -142,6 +143,17 @@ Deno.serve(async (req) => {
       numero: rot.proximo?.numero ?? null,
       alerta: rot.alerta,
     });
+  }
+
+  // CONVERSAS: ativa o RECEBIMENTO neste chip (seta o webhook na Evolution). O dono aciona
+  // explicitamente — não tocamos em chip nenhum sem consentimento.
+  if (acao === "ativar_recebimento") {
+    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
+    if (!inst) return json({ ok: false, error: "Chip não encontrado." });
+    const secret = Deno.env.get("WA_WEBHOOK_SECRET") ?? "";
+    const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/wa-webhook?k=${secret}`;
+    const r = await definirWebhookInstancia(inst.token, url, ["Message"]);
+    return json({ ok: r.ok, status: r.status, detalhe: r.body });
   }
 
   // ETAPA 3.4: graduação — o chip que mandou pro lead vira 'conversa'. Gancho do pipeline.

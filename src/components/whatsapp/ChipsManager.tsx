@@ -37,10 +37,11 @@ import {
   checarChip,
   listarAlertas,
   marcarAlertaLido,
+  ativarRecebimentoChip,
   type WaChip,
   type WaAlerta,
 } from "@/services/whatsapp";
-import { AlertTriangle, X, Activity } from "lucide-react";
+import { AlertTriangle, X, Activity, Inbox } from "lucide-react";
 
 const STATUS_UI: Record<string, { label: string; cls: string }> = {
   conectado: { label: "Conectado", cls: "bg-green-100 text-green-800 border-green-500/40" },
@@ -56,6 +57,7 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
   const [carregando, setCarregando] = useState(true);
   const [conectando, setConectando] = useState(false);
   const [verificando, setVerificando] = useState<string | null>(null);
+  const [ativando, setAtivando] = useState<string | null>(null);
   const [dialog, setDialog] = useState(false);
   // fluxo de conexão de um chip
   const [novoFuncao, setNovoFuncao] = useState<"disparo" | "conversa">("disparo");
@@ -172,6 +174,20 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
       toast.error(e instanceof Error ? e.message : "Falha ao verificar");
     } finally {
       setVerificando(null);
+    }
+  };
+
+  // Ativa o recebimento (webhook) no chip de conversa — as respostas dos leads caem em Conversas.
+  const ativarRecebimento = async (chip: WaChip) => {
+    setAtivando(chip.id);
+    try {
+      const r = await ativarRecebimentoChip(chip.id);
+      if (r.ok) toast.success("Recebimento ativado — as respostas caem na aba Conversas.");
+      else toast.error(r.error ?? `Falha ao ativar (${r.status ?? ""}).`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao ativar recebimento");
+    } finally {
+      setAtivando(null);
     }
   };
 
@@ -341,6 +357,20 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
                   >
                     <Activity className="h-3.5 w-3.5" />{" "}
                     {verificando === c.id ? "Verificando…" : "Verificar saúde"}
+                  </Button>
+                )}
+
+                {/* ativar recebimento (Conversas) — só em chip de conversa conectado */}
+                {c.funcao === "conversa" && c.status === "conectado" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={ativando === c.id}
+                    title="Configura o webhook para as respostas dos leads caírem na aba Conversas"
+                    onClick={() => ativarRecebimento(c)}
+                  >
+                    <Inbox className="h-3.5 w-3.5" />{" "}
+                    {ativando === c.id ? "Ativando…" : "Ativar recebimento"}
                   </Button>
                 )}
 

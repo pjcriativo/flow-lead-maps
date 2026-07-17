@@ -642,6 +642,41 @@ export async function enviarTextoInstancia(
   return { ok: true, data };
 }
 
+/** Chip de CONVERSA conectado da org (com token) — quem responde no bate-papo. flowleads é o
+ * padrão. Fallback: qualquer instância da org resolvida. */
+export async function instanciaConversaDaOrg(
+  admin: Admin,
+  userId: string,
+): Promise<WaInstanciaOrg | null> {
+  const { data: row } = await admin
+    .from("wa_instancias")
+    .select("id, nome, numero, status, funcao")
+    .eq("user_id", userId)
+    .eq("funcao", "conversa")
+    .eq("status", "conectado")
+    .order("ordem", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (row) return await garantirTokenDaLinha(admin, row);
+  return await resolverInstanciaDaOrg(admin, userId, false);
+}
+
+/** Configura o webhook de RECEBIMENTO numa instância (POST /instance/connect com o token dela).
+ * Evolution GO guarda webhookUrl + subscribe (eventos). NÃO re-pareia (mantém a sessão viva). */
+export async function definirWebhookInstancia(
+  token: string,
+  webhookUrl: string,
+  eventos: string[] = ["Message"],
+): Promise<{ ok: boolean; status: number; body?: string }> {
+  const r = await fetch(`${waBase()}/instance/connect`, {
+    method: "POST",
+    headers: { apikey: token, "Content-Type": "application/json" },
+    body: JSON.stringify({ webhookUrl, subscribe: eventos, immediate: false }),
+  });
+  const body = await r.text().catch(() => "");
+  return { ok: r.ok, status: r.status, body: body.slice(0, 300) };
+}
+
 /** Registra o envio (base da graduação, do histórico e do revezamento). */
 export async function registrarEnvio(
   admin: Admin,
