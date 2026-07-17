@@ -98,8 +98,9 @@ function montarTimeline(lead: Lead, d: LeadDetalheData): EventoLT[] {
     const canal = CANAL_LABEL[c.canal] ?? c.canal;
     push(c.contatado_em, `Contato por ${canal}${c.anotacao ? " — " + c.anotacao : ""}`, "contato");
   }
-  // Marcação de perda/nutrição com o motivo estruturado.
-  if (lead.perda_em && lead.motivo_perda) {
+  // Marcação de perda/nutrição — só quando o lead AINDA está fora do funil (se foi reengajado,
+  // os campos de perda são limpos; este guard evita rótulo errado num caso de borda).
+  if (lead.perda_em && lead.motivo_perda && (lead.status === "lost" || lead.status === "nurture")) {
     const rot = STATUS_LABELS[lead.status] ?? "Perdido";
     push(
       lead.perda_em,
@@ -237,8 +238,8 @@ export function LeadDetalhe({
             <div className="flex flex-wrap items-center gap-2">
               <RegistrarContatoBotao
                 lead={leadView}
-                onRegistrado={(novoStatus, quando) => {
-                  aplicarPatch({ status: novoStatus, last_contacted_at: quando });
+                onRegistrado={(patch) => {
+                  aplicarPatch(patch);
                   recarregar();
                 }}
               />

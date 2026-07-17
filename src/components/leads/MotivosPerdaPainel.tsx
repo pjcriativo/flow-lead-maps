@@ -29,33 +29,32 @@ export function MotivosPerdaPainel({ recarregarSinal }: { recarregarSinal?: numb
 
   return (
     <div className="rounded-xl border border-border bg-secondary/20">
-      <button
-        onClick={() => setAberto((a) => !a)}
-        className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
-      >
-        {aberto ? (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        )}
-        <TrendingDown className="h-4 w-4 text-rose-500" />
-        <span className="text-sm font-semibold">Aprendizado — motivos de perda</span>
-        <span className="rounded-full bg-secondary px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
-          {total}
-        </span>
-        <RefreshCw
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            e.stopPropagation();
-            carregar();
-          }}
-          className={cn(
-            "ml-auto h-3.5 w-3.5 text-muted-foreground hover:text-foreground",
-            carregando && "animate-spin",
+      <div className="flex w-full items-center gap-2 px-4 py-2.5">
+        <button
+          type="button"
+          onClick={() => setAberto((a) => !a)}
+          className="flex flex-1 items-center gap-2 text-left"
+        >
+          {aberto ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           )}
-        />
-      </button>
+          <TrendingDown className="h-4 w-4 text-rose-500" />
+          <span className="text-sm font-semibold">Aprendizado — motivos de perda</span>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
+            {total}
+          </span>
+        </button>
+        <button
+          type="button"
+          aria-label="Recarregar contagem"
+          onClick={carregar}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", carregando && "animate-spin")} />
+        </button>
+      </div>
 
       {aberto && (
         <div className="border-t border-border px-4 py-3">

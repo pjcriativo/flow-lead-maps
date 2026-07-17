@@ -225,39 +225,32 @@ export type Contato = {
   contatado_em: string;
 };
 
-// Estágios adiantados: registrar contato NÃO deve regredir um lead já mais à frente.
-const ESTAGIOS_ADIANTADOS = new Set(["proposta_enviada", "responded", "meeting", "won"]);
-
-/** Novo status após um contato manual, sem regredir quem já passou de "contatado". */
-export function statusAposContato(statusAtual: string): LeadStatus {
-  return ESTAGIOS_ADIANTADOS.has(statusAtual) ? (statusAtual as LeadStatus) : "contacted";
-}
-
 /**
- * Registra um contato MANUAL: grava no histórico (lead_contatos → linha do tempo) e move o
- * lead para "Contatado" (sem regredir um lead já mais adiantado). NÃO cria proposta nem seta
- * "proposta_enviada" — por isso o follow-up automático (que exige proposta enviada) NUNCA é
- * disparado por um contato manual. user_id do contato = auth.uid() (default da coluna + RLS).
+ * Registra um contato MANUAL de forma ATÔMICA (RPC registrar_contato_manual): insere no
+ * histórico (lead_contatos → linha do tempo) E atualiza o lead na MESMA transação — move para
+ * "Contatado" sem regredir quem já está adiantado (proposta_enviada+) e, se reengajou um lead
+ * de lost/nurture, LIMPA o motivo de perda (o painel não conta mais quem voltou ao funil).
+ * NÃO cria proposta nem seta "proposta_enviada" — o follow-up automático (que exige proposta
+ * enviada) NUNCA é disparado por um contato manual.
  */
 export async function registrarContato(
   leadId: string,
-  entrada: { canal: CanalContato; anotacao?: string; contatado_em?: string; statusAtual: string },
-): Promise<{ novoStatus: LeadStatus; quando: string }> {
+  entrada: { canal: CanalContato; anotacao?: string; contatado_em?: string },
+): Promise<{ novoStatus: LeadStatus; quando: string; perdaLimpa: boolean }> {
   const quando = entrada.contatado_em ?? new Date().toISOString();
-  const { error: insErr } = await supabase.from("lead_contatos").insert({
-    lead_id: leadId,
-    canal: entrada.canal,
-    anotacao: entrada.anotacao?.trim() || null,
-    contatado_em: quando,
+  const { data, error } = await supabase.rpc("registrar_contato_manual", {
+    p_lead_id: leadId,
+    p_canal: entrada.canal,
+    p_anotacao: entrada.anotacao ?? null,
+    p_contatado_em: quando,
   });
-  if (insErr) throw insErr;
-  const novoStatus = statusAposContato(entrada.statusAtual);
-  const { error: upErr } = await supabase
-    .from("leads")
-    .update({ status: novoStatus, last_contacted_at: quando, updated_at: new Date().toISOString() })
-    .eq("id", leadId);
-  if (upErr) throw upErr;
-  return { novoStatus, quando };
+  if (error) throw error;
+  const novoStatus = ((data as string) || "contacted") as LeadStatus;
+  return {
+    novoStatus,
+    quando,
+    perdaLimpa: novoStatus !== "lost" && novoStatus !== "nurture",
+  };
 }
 
 /** Histórico de contatos manuais de um lead (mais recente primeiro). */
@@ -309,11 +302,16 @@ export async function registrarPerda(
   if (error) throw error;
 }
 
-/** Contagem por motivo de perda (painel de aprendizado). RLS já limita aos leads do dono. */
+/**
+ * Contagem por motivo de perda (painel de aprendizado). Conta SÓ quem está de fato fora do
+ * funil (status lost/nurture) — se um lead foi reengajado, não conta mais, ainda que o campo
+ * antigo persista. RLS já limita aos leads do dono.
+ */
 export async function contarMotivosPerda(): Promise<{ motivo: string; total: number }[]> {
   const { data, error } = await supabase
     .from("leads")
     .select("motivo_perda")
+    .in("status", STATUS_PERDA)
     .not("motivo_perda", "is", null);
   if (error) throw error;
   const cont = new Map<string, number>();

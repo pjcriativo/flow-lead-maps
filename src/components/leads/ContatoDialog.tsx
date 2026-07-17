@@ -45,7 +45,7 @@ export function RegistrarContatoBotao({
   label = "Registrar contato",
 }: {
   lead: Lead;
-  onRegistrado?: (novoStatus: LeadStatus, quando: string) => void;
+  onRegistrado?: (patch: Partial<Lead>, novoStatus: LeadStatus) => void;
   variant?: "outline" | "secondary" | "ghost" | "default";
   size?: "sm" | "default";
   full?: boolean;
@@ -68,19 +68,29 @@ export function RegistrarContatoBotao({
   const salvar = async () => {
     setSalvando(true);
     try {
-      const { novoStatus, quando: q } = await registrarContato(lead.id, {
+      // data inválida/vazia → cai para agora (o banco também tem default)
+      const d = quando ? new Date(quando) : new Date();
+      const iso = isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      const {
+        novoStatus,
+        quando: q,
+        perdaLimpa,
+      } = await registrarContato(lead.id, {
         canal,
         anotacao,
-        contatado_em: new Date(quando).toISOString(),
-        statusAtual: lead.status,
+        contatado_em: iso,
       });
+      // Reengajou um lead perdido → reflete a limpeza do motivo na lista/modal também.
+      const patch: Partial<Lead> = { status: novoStatus, last_contacted_at: q };
+      if (perdaLimpa)
+        Object.assign(patch, { motivo_perda: null, motivo_perda_nota: null, perda_em: null });
       setOpen(false);
       toast.success(
         novoStatus === "contacted"
           ? "Contato registrado — lead movido para Contatado."
           : `Contato registrado — status mantido em ${STATUS_LABELS[novoStatus] ?? novoStatus}.`,
       );
-      onRegistrado?.(novoStatus, q);
+      onRegistrado?.(patch, novoStatus);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao registrar o contato");
     } finally {

@@ -225,9 +225,7 @@ export function PipelineSection() {
                           variant="ghost"
                           size="sm"
                           label="Contato"
-                          onRegistrado={(s, q) =>
-                            patchLead(l.id, { status: s, last_contacted_at: q })
-                          }
+                          onRegistrado={(patch) => patchLead(l.id, patch)}
                         />
                         <NotaBotao lead={l} onSalvo={(notes) => patchLead(l.id, { notes })} />
                       </div>

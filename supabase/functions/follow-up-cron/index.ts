@@ -104,10 +104,10 @@ Deno.serve(async (req) => {
   // Candidatos: proposta ENVIADA há 3+ dias, sem follow-up, cujo LEAD segue em
   // 'proposta_enviada' (não saiu), sem opt-out, com e-mail, E cuja LISTA tem o
   // follow-up LIGADO (leads.lead_lists.follow_up_ativo). Mais antigo primeiro.
-  const { data: cands, error: qErr } = await admin
+  const { data: candsRaw, error: qErr } = await admin
     .from("propostas")
     .select(
-      "id, user_id, lead_id, site_id, corpo, assunto, enviada_em, leads!inner(id, email, business_name, status, email_opt_out, opt_out_token, list_id, lead_lists!inner(id, follow_up_ativo))",
+      "id, user_id, lead_id, site_id, corpo, assunto, enviada_em, leads!inner(id, email, business_name, status, email_opt_out, opt_out_token, list_id, last_contacted_at, lead_lists!inner(id, follow_up_ativo))",
     )
     .eq("status", "enviada")
     .eq("follow_up_count", 0)
@@ -119,6 +119,16 @@ Deno.serve(async (req) => {
     .order("enviada_em", { ascending: true })
     .limit(BATCH);
   if (qErr) return json({ error: qErr.message }, 500);
+
+  // CONTATO MANUAL depois do envio = o humano assumiu → NÃO dispara o follow-up automático
+  // (o follow-up é seu). Comparação por-linha (last_contacted_at vs enviada_em) que o filtro
+  // do PostgREST não faz. Assim, registrar um contato manual num lead que já tem proposta
+  // enviada PAUSA o follow-up pendente daquela proposta.
+  const cands = (candsRaw ?? []).filter((c) => {
+    const lc = (c.leads as { last_contacted_at?: string | null } | null)?.last_contacted_at;
+    return !lc || new Date(lc).getTime() <= new Date(c.enviada_em as string).getTime();
+  });
+  const suprimidosPorContato = (candsRaw ?? []).length - cands.length;
 
   // Teto do dia POR ORG (rampa da própria org). Cache p/ não repetir a rpc; decrementa
   // localmente a cada envio (o count do dia inclui proposta+follow-up somados da org).
@@ -312,7 +322,8 @@ Deno.serve(async (req) => {
     ok: true,
     agora: agora.toISOString(),
     d3_corte: d3,
-    candidatos: (cands ?? []).length,
+    candidatos: cands.length,
+    suprimidos_por_contato_manual: suprimidosPorContato,
     enviados: itens.length,
     itens,
     falhas,

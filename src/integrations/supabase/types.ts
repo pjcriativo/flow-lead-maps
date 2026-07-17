@@ -477,6 +477,15 @@ export type Database = {
           restante: number;
         }[];
       };
+      registrar_contato_manual: {
+        Args: {
+          p_lead_id: string;
+          p_canal: string;
+          p_anotacao: string | null;
+          p_contatado_em: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       [_ in never]: never;
