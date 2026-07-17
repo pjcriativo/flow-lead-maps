@@ -159,6 +159,69 @@ export async function enviarCampanhaLeadWa(campanha_lead_id: string): Promise<Wa
   return data as WaCampEnvio;
 }
 
+// ===== Histórico da campanha (ETAPA 4.3): data, enviados, qual chip usou, quantos responderam =====
+export type WaHistorico = {
+  enviados: number;
+  responderam: number;
+  primeiro: string | null;
+  ultimo: string | null;
+  chips: { instancia_id: string; numero: string; enviados: number }[];
+};
+
+/** Enviados por campanha (batch) — para os cards da lista mostrarem o real (wa_envios). */
+export async function enviadosPorCampanhaWa(
+  campanhaIds: string[],
+): Promise<Record<string, number>> {
+  if (campanhaIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("wa_envios")
+    .select("campanha_id")
+    .in("campanha_id", campanhaIds);
+  if (error) throw error;
+  const m: Record<string, number> = {};
+  for (const r of (data ?? []) as { campanha_id: string | null }[])
+    if (r.campanha_id) m[r.campanha_id] = (m[r.campanha_id] ?? 0) + 1;
+  return m;
+}
+
+/** Estatísticas de uma campanha de WhatsApp já realizada (lê o ledger wa_envios). */
+export async function historicoCampanhaWa(campanhaId: string): Promise<WaHistorico> {
+  const { data: envios, error } = await supabase
+    .from("wa_envios")
+    .select("lead_id, instancia_id, enviado_em")
+    .eq("campanha_id", campanhaId)
+    .order("enviado_em", { ascending: true });
+  if (error) throw error;
+  const rows = (envios ?? []) as { lead_id: string; instancia_id: string; enviado_em: string }[];
+  if (rows.length === 0)
+    return { enviados: 0, responderam: 0, primeiro: null, ultimo: null, chips: [] };
+
+  // qual chip usou (número via listarChips — o cliente não lê wa_instancias direto).
+  const chipsOrg = await listarChips().catch(() => [] as WaChip[]);
+  const numById = new Map(chipsOrg.map((c) => [c.id, c.numero ?? c.nome]));
+  const porChip = new Map<string, number>();
+  for (const r of rows) porChip.set(r.instancia_id, (porChip.get(r.instancia_id) ?? 0) + 1);
+
+  // quantos responderam: leads desta campanha que hoje estão em 'responded'/'meeting'.
+  const leadIds = [...new Set(rows.map((r) => r.lead_id))];
+  const { data: leads } = await supabase
+    .from("leads")
+    .select("id, status")
+    .in("id", leadIds)
+    .in("status", ["responded", "meeting"]);
+  return {
+    enviados: rows.length,
+    responderam: (leads ?? []).length,
+    primeiro: rows[0].enviado_em,
+    ultimo: rows[rows.length - 1].enviado_em,
+    chips: [...porChip.entries()].map(([instancia_id, enviados]) => ({
+      instancia_id,
+      numero: numById.get(instancia_id) ?? "—",
+      enviados,
+    })),
+  };
+}
+
 export type WaEnvio = { ok: boolean; para?: string; error?: string };
 
 /** Envia 1 mensagem de teste para um número (DDI+DDD). Erro real da Evolution. */

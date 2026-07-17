@@ -51,7 +51,14 @@ import {
   reabrirCampanha,
   type WaCampanhaLead,
 } from "@/services/campanhas";
-import { listarChips, enviarCampanhaLeadWa, WA_MOTIVO_LABEL } from "@/services/whatsapp";
+import {
+  listarChips,
+  enviarCampanhaLeadWa,
+  WA_MOTIVO_LABEL,
+  historicoCampanhaWa,
+  enviadosPorCampanhaWa,
+  type WaHistorico,
+} from "@/services/whatsapp";
 import {
   resolverVariaveis,
   escolherVariacao,
@@ -93,13 +100,16 @@ const PRONTOS_PARA_ENVIO = (l: WaCampanhaLead) =>
 
 export function WaCampanhas() {
   const [campanhas, setCampanhas] = useState<Campanha[]>([]);
+  const [enviadosMap, setEnviadosMap] = useState<Record<string, number>>({});
   const [carregando, setCarregando] = useState(true);
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [dialogNova, setDialogNova] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
-      setCampanhas(await listarCampanhas("whatsapp"));
+      const cs = await listarCampanhas("whatsapp");
+      setCampanhas(cs);
+      setEnviadosMap(await enviadosPorCampanhaWa(cs.map((c) => c.id)).catch(() => ({})));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao listar campanhas");
     } finally {
@@ -176,7 +186,9 @@ export function WaCampanhas() {
                 <Chip>{c.total} leads</Chip>
                 {c.pendente > 0 && <Chip>{c.pendente} pendentes</Chip>}
                 {c.aprovado > 0 && <Chip tone="emerald">{c.aprovado} prontos</Chip>}
-                {c.enviado > 0 && <Chip tone="violet">{c.enviado} enviados</Chip>}
+                {(enviadosMap[c.id] ?? 0) > 0 && (
+                  <Chip tone="violet">{enviadosMap[c.id]} enviados</Chip>
+                )}
               </div>
             </button>
           ))}
@@ -323,18 +335,21 @@ function WaCampanhaTrabalho({ campanha, onVoltar }: { campanha: Campanha; onVolt
   const [temChipDisparo, setTemChipDisparo] = useState<boolean | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [progresso, setProgresso] = useState<{ feito: number; total: number } | null>(null);
+  const [hist, setHist] = useState<WaHistorico | null>(null);
   const cancelar = useRef(false);
   const concluida = campanha.status !== "ativa";
 
   const carregar = useCallback(async () => {
     try {
-      const [ls, config, chips] = await Promise.all([
+      const [ls, config, chips, h] = await Promise.all([
         listarCampanhaLeadsWaView(campanha.id),
         obterWaConfig(campanha.id),
         listarChips(),
+        historicoCampanhaWa(campanha.id).catch(() => null),
       ]);
       setLeads(ls);
       setCfg(config);
+      setHist(h);
       setTemChipDisparo(chips.some((c) => c.funcao === "disparo" && c.status === "conectado"));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao carregar");
@@ -547,6 +562,27 @@ function WaCampanhaTrabalho({ campanha, onVoltar }: { campanha: Campanha; onVolt
             Nenhum <b>chip de disparo</b> conectado — o envio está bloqueado. Conecte um chip na aba{" "}
             <b>Conexão</b>. (O flowleads é de <b>conversa</b> e nunca dispara a frio.)
           </span>
+        </div>
+      )}
+
+      {/* HISTÓRICO (ETAPA 4.3) — data, enviados, qual chip usou, quantos responderam */}
+      {hist && hist.enviados > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+          <span className="font-medium">Realizado:</span>
+          <Chip tone="violet">{hist.enviados} enviados</Chip>
+          <Chip tone="emerald">{hist.responderam} responderam</Chip>
+          {hist.chips.map((c) => (
+            <Chip key={c.instancia_id}>
+              chip {c.numero}: {c.enviados}
+            </Chip>
+          ))}
+          {hist.ultimo && (
+            <span className="text-xs text-muted-foreground">
+              {hist.primeiro && hist.primeiro !== hist.ultimo
+                ? `de ${formatData(hist.primeiro)} a ${formatData(hist.ultimo)}`
+                : `em ${formatData(hist.ultimo)}`}
+            </span>
+          )}
         </div>
       )}
 
