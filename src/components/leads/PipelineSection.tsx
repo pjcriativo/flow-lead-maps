@@ -20,6 +20,7 @@ import { ScoreBadge, WhatsCell, EmailCell } from "./leads-shared";
 import { LeadDetalhe } from "./LeadDetalhe";
 import { RegistrarContatoBotao } from "./ContatoDialog";
 import { PerdaDialog } from "./PerdaDialog";
+import { MotivosPerdaPainel } from "./MotivosPerdaPainel";
 
 const LIMITE_INICIAL = 25; // cards renderizados por coluna antes do "ver mais"
 
@@ -108,9 +109,13 @@ export function PipelineSection() {
     setDetalhe(lead);
   };
 
-  // Aplica uma mudança de lead na lista (usado por registrar contato / ações do modal).
-  const patchLead = (id: string, patch: Partial<Lead>) =>
+  const [perdaSinal, setPerdaSinal] = useState(0);
+  // Aplica uma mudança de lead na lista (registrar contato / perda / ações do modal).
+  // Se a mudança incluir motivo de perda, sinaliza o painel de aprendizado a recarregar.
+  const patchLead = (id: string, patch: Partial<Lead>) => {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    if ("motivo_perda" in patch) setPerdaSinal((s) => s + 1);
+  };
 
   if (loading) {
     return (
@@ -140,12 +145,14 @@ export function PipelineSection() {
         </div>
       )}
 
+      <MotivosPerdaPainel recarregarSinal={perdaSinal} />
+
       {/* min-w-0 nos ancestrais faz o overflow-x-auto funcionar de verdade; altura
           limitada faz cada coluna rolar por dentro (não a página inteira). */}
       <div
         ref={boardRef}
         onDragOver={onBoardDragOver}
-        className="flex h-[calc(100dvh-12rem)] min-w-0 gap-3 overflow-x-auto overflow-y-hidden pb-3"
+        className="flex h-[calc(100dvh-15rem)] min-w-0 gap-3 overflow-x-auto overflow-y-hidden pb-3"
       >
         {LEAD_STATUSES.map((status) => {
           const items = leads.filter((l) => l.status === status);
