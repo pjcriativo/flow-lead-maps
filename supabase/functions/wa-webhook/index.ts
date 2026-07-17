@@ -34,15 +34,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const url = new URL(req.url);
   const k = url.searchParams.get("k");
-  if (!k || k !== Deno.env.get("WA_WEBHOOK_SECRET")) return json({ ok: false }, 401);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let body: any = {};
-  try {
-    body = await req.json();
-  } catch {
-    return json({ ok: true, ignored: "no-body" });
-  }
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -50,8 +41,19 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
 
-  // Log leve do formato do 1º evento real (Supabase logs) — ajuda a ajustar o parser se preciso.
-  console.log("wa-webhook payload keys:", Object.keys(body || {}).join(","));
+  // anti-spoof: o secret vai na PRÓPRIA URL (?k=...) — é o que a Evolution guarda e chama de volta.
+  // (Ela não manda header nenhum; header não serviria.) POST sem o ?k certo é rejeitado.
+  if (!k || k !== Deno.env.get("WA_WEBHOOK_SECRET")) return json({ ok: false }, 401);
+
+  const raw = await req.text().catch(() => "");
+  if (!raw) return json({ ok: true, ignored: "no-body" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let body: any = {};
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return json({ ok: true, ignored: "nao-json" });
+  }
 
   const data = body.data ?? body.Data ?? body;
   const info = data.Info ?? data.info ?? data.key ?? data;
@@ -74,6 +76,14 @@ Deno.serve(async (req) => {
       "",
   );
   const numero = soDigitos(chatJid);
+
+  // SÓ conversas 1-a-1 com um número (@s.whatsapp.net). Grupos (@g.us), newsletters
+  // (@newsletter), status/broadcast e listas ficam de fora — não são leads.
+  const ehGrupo =
+    Boolean(pick(info, ["IsGroup", "isGroup"])) ||
+    /@g\.us|@broadcast|@newsletter|status@/i.test(chatJid) ||
+    !/@s\.whatsapp\.net$/i.test(chatJid);
+  if (ehGrupo) return json({ ok: true, ignored: "nao-individual" });
 
   const texto = String(
     pick(data, [
