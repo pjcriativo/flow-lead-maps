@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
   const { data: lead } = await admin
     .from("leads")
     .select(
-      "id, business_name, city, category, phone, whatsapp, rating, review_count, score_breakdown, email_opt_out",
+      "id, business_name, city, bairro, category, phone, whatsapp, rating, review_count, score_breakdown, email_opt_out",
     )
     .eq("id", cl.lead_id)
     .eq("user_id", userId)
@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
   const dados = {
     business_name: lead.business_name,
     city: lead.city,
+    bairro: lead.bairro,
     category: lead.category,
     phone: lead.phone,
     whatsapp: lead.whatsapp,

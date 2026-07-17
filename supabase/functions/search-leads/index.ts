@@ -14,6 +14,7 @@ import { searchPlaces } from "../_shared/providers/places.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
 import { firstBrWhatsapp } from "../_shared/phone.ts";
+import { extrairBairro } from "../../../src/lib/bairro.ts";
 import { geocodeCidade } from "../_shared/geocode.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
@@ -169,6 +170,7 @@ Deno.serve(async (req) => {
             place_id: p.source_id,
             business_name: p.name,
             address: p.address,
+            bairro: extrairBairro(p.address),
             city: cidade,
             state: uf || null,
             phone: p.phone,

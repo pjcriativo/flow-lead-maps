@@ -20,6 +20,8 @@ import {
   History,
   RefreshCw,
   Save,
+  Sparkles,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,8 @@ import {
 import {
   listarCampanhas,
   criarCampanhaWaDaSelecao,
+  adicionarLeadsCampanha,
+  salvarWaConfig,
   listarCampanhaLeadsWaView,
   prepararCampanhaLead,
   aprovarCampanhaLead,
@@ -65,6 +69,7 @@ import {
   WA_INTERVALO_MIN_ABS,
   WA_INTERVALO_MAX_ABS,
   type WaVariacao,
+  type WaCampanhaConfig,
 } from "@/lib/wa-copy";
 
 type TabKey = "todos" | "qualificados" | "em_contato" | "ativos";
@@ -109,7 +114,7 @@ function passaTab(l: WaLeadCompose, tab: TabKey): boolean {
   }
 }
 
-export function WaCampanhas() {
+export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
   const [leads, setLeads] = useState<WaLeadCompose[]>([]);
   const [scripts, setScripts] = useState<WaScript[]>([]);
   const [realizadas, setRealizadas] = useState<(Campanha & { enviados: number })[]>([]);
@@ -119,6 +124,7 @@ export function WaCampanhas() {
   const [tab, setTab] = useState<TabKey>("todos");
   const [fSegmento, setFSegmento] = useState("__todas");
   const [fCidade, setFCidade] = useState("__todas");
+  const [fBairro, setFBairro] = useState("__todas");
   const [limite, setLimite] = useState(0);
   const [sel, setSel] = useState<Set<string>>(new Set());
 
@@ -129,10 +135,15 @@ export function WaCampanhas() {
   const [variar, setVariar] = useState(true);
 
   const [disparando, setDisparando] = useState(false);
+  const [ocupado, setOcupado] = useState<"preparar" | "aprovar" | "disparar" | null>(null);
   const [progresso, setProgresso] = useState<{ feito: number; total: number; fase: string } | null>(
     null,
   );
   const cancelar = useRef(false);
+  // PORTÃO (EXCEÇÃO 2): campanha de trabalho + estado de cada lead nela.
+  // rascunho = preparado (site+msg) · aprovado = publicado (link pronto) · enviado.
+  const [campanhaTrab, setCampanhaTrab] = useState<string | null>(null);
+  const [estados, setEstados] = useState<Record<string, { clId: string; estado: string }>>({});
 
   const carregar = useCallback(async () => {
     try {
@@ -169,16 +180,28 @@ export function WaCampanhas() {
     () => [...new Set(leads.map((l) => l.city).filter((c): c is string => !!c))].sort(),
     [leads],
   );
+  const bairros = useMemo(
+    () => [...new Set(leads.map((l) => l.bairro).filter((b): b is string => !!b))].sort(),
+    [leads],
+  );
   const filtrados = useMemo(() => {
     let r = leads.filter((l) => passaTab(l, tab));
     if (fSegmento !== "__todas") r = r.filter((l) => l.category === fSegmento);
     if (fCidade !== "__todas") r = r.filter((l) => l.city === fCidade);
+    if (fBairro !== "__todas") r = r.filter((l) => l.bairro === fBairro);
     if (limite > 0) r = r.slice(0, limite);
     return r;
-  }, [leads, tab, fSegmento, fCidade, limite]);
+  }, [leads, tab, fSegmento, fCidade, fBairro, limite]);
 
   const selArr = filtrados.filter((l) => sel.has(l.id));
-  const aEnviar = (selArr.length ? selArr : filtrados).filter((l) => !l.enviado);
+  const estadoDe = (id: string) => estados[id]?.estado;
+  // PORTÃO: "A enviar" = leads APROVADOS (link publicado) ainda não enviados.
+  const aprovadosProntos = filtrados.filter((l) => estadoDe(l.id) === "aprovado" && !l.enviado);
+  const aPreparar = selArr.filter((l) => !estadoDe(l.id) && !l.enviado);
+  const aAprovar = selArr.length
+    ? selArr.filter((l) => estadoDe(l.id) === "rascunho")
+    : filtrados.filter((l) => estadoDe(l.id) === "rascunho");
+  const aEnviar = aprovadosProntos;
   const jaEnviados = leads.filter((l) => l.enviado).length;
   const variacoesAtivas = variacoes.filter((v) => v.ativa);
 
@@ -201,6 +224,22 @@ export function WaCampanhas() {
 
   const setVariacao = (id: string, patch: Partial<WaVariacao>) =>
     setVariacoes((vs) => vs.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+
+  // Variáveis inserem no CURSOR da última variação focada (não copiam pro clipboard).
+  const focoRef = useRef<{ id: string; start: number }>({ id: "", start: 0 });
+  const marcarFoco = (id: string, el: HTMLTextAreaElement) => {
+    focoRef.current = { id, start: el.selectionStart ?? el.value.length };
+  };
+  const inserirVariavel = (token: string) => {
+    const f = focoRef.current;
+    const alvo = variacoes.find((v) => v.id === f.id) ?? variacoes[0];
+    if (!alvo) return;
+    const pos = Math.min(alvo.id === f.id ? f.start : alvo.texto.length, alvo.texto.length);
+    const ins = `{{${token}}}`;
+    const novo = alvo.texto.slice(0, pos) + ins + alvo.texto.slice(pos);
+    setVariacao(alvo.id, { texto: novo });
+    focoRef.current = { id: alvo.id, start: pos + ins.length };
+  };
 
   const salvarComoScript = async () => {
     const principal = variacoes[0];
@@ -234,7 +273,114 @@ export function WaCampanhas() {
   };
 
   const leadPreview = selArr[0] ?? filtrados[0] ?? null;
+  const cfgAtual = (): WaCampanhaConfig => ({
+    intervalo_min: intervaloMin,
+    intervalo_max: intervaloMax,
+    variacoes,
+  });
 
+  // PORTÃO passo 1 — PREPARAR: gera o site (rascunho) dos selecionados. Cria a campanha de
+  // trabalho na 1ª vez; nas seguintes, só adiciona os novos leads.
+  const preparar = async () => {
+    const alvos = aPreparar;
+    if (!alvos.length) {
+      toast.error("Selecione leads ainda não preparados.");
+      return;
+    }
+    setOcupado("preparar");
+    setProgresso({ feito: 0, total: alvos.length, fase: "criando campanha" });
+    try {
+      let campId = campanhaTrab;
+      if (!campId) {
+        const { campanha_id } = await criarCampanhaWaDaSelecao(
+          nome,
+          alvos.map((l) => l.id),
+          cfgAtual(),
+        );
+        campId = campanha_id;
+        setCampanhaTrab(campId);
+      } else {
+        await salvarWaConfig(campId, cfgAtual());
+        await adicionarLeadsCampanha(
+          campId,
+          alvos.map((l) => l.id),
+        );
+      }
+      const cls = await listarCampanhaLeadsWaView(campId);
+      const alvoIds = new Set(alvos.map((l) => l.id));
+      const pendentes = cls.filter((c) => alvoIds.has(c.lead_id) && c.estado !== "aprovado");
+      const novo = { ...estados };
+      let semMotivo = 0;
+      for (let i = 0; i < pendentes.length; i++) {
+        const cl = pendentes[i];
+        setProgresso({ feito: i, total: pendentes.length, fase: `preparando ${cl.lead_nome}` });
+        try {
+          const r = await prepararCampanhaLead(cl, campId);
+          novo[cl.lead_id] = { clId: cl.id, estado: r.estado };
+          if (r.estado === "sem_motivo") semMotivo++;
+        } catch {
+          novo[cl.lead_id] = { clId: cl.id, estado: "erro" };
+        }
+        setEstados({ ...novo });
+        setProgresso({ feito: i + 1, total: pendentes.length, fase: "" });
+      }
+      toast.success(
+        `Preparados ${pendentes.length - semMotivo}/${pendentes.length}.` +
+          (semMotivo ? ` ${semMotivo} sem motivo claro (não recebem).` : ""),
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao preparar");
+    } finally {
+      setOcupado(null);
+      setProgresso(null);
+    }
+  };
+
+  // PORTÃO passo 2 — APROVAR: publica o site (gera o link) dos rascunhos. Só depois disso dispara.
+  const aprovar = async () => {
+    if (!campanhaTrab) {
+      toast.error("Prepare os leads primeiro.");
+      return;
+    }
+    setOcupado("aprovar");
+    try {
+      const cls = await listarCampanhaLeadsWaView(campanhaTrab);
+      const selIds = selArr.length ? new Set(selArr.map((l) => l.id)) : null;
+      const rascunhos = cls.filter(
+        (c) => c.estado === "rascunho" && c.proposta && (!selIds || selIds.has(c.lead_id)),
+      );
+      if (!rascunhos.length) {
+        toast.error("Nada em rascunho para aprovar (prepare primeiro).");
+        return;
+      }
+      setProgresso({ feito: 0, total: rascunhos.length, fase: "publicando" });
+      const novo = { ...estados };
+      let ok = 0;
+      for (let i = 0; i < rascunhos.length; i++) {
+        const cl = rascunhos[i];
+        setProgresso({ feito: i, total: rascunhos.length, fase: `publicando ${cl.lead_nome}` });
+        try {
+          await aprovarCampanhaLead(cl.id, cl.proposta!);
+          novo[cl.lead_id] = { clId: cl.id, estado: "aprovado" };
+          ok++;
+        } catch {
+          /* mantém rascunho */
+        }
+        setEstados({ ...novo });
+        setProgresso({ feito: i + 1, total: rascunhos.length, fase: "" });
+      }
+      toast.success(
+        `Aprovados e publicados ${ok}/${rascunhos.length}. Link pronto — pode disparar.`,
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao aprovar");
+    } finally {
+      setOcupado(null);
+      setProgresso(null);
+    }
+  };
+
+  // PORTÃO passo 3 — DISPARAR: só age sobre APROVADOS (link pronto). Explica se não há nenhum.
   const disparar = async () => {
     if (!temChipDisparo) {
       toast.error("Conecte um chip de disparo na aba WhatsApp.");
@@ -244,52 +390,41 @@ export function WaCampanhas() {
       toast.error("Ative ao menos uma variação da mensagem.");
       return;
     }
-    const alvos = aEnviar;
-    if (alvos.length === 0) {
-      toast.error("Selecione leads (com WhatsApp e ainda não enviados).");
+    if (!campanhaTrab || aprovadosProntos.length === 0) {
+      const rasc = filtrados.filter((l) => estadoDe(l.id) === "rascunho").length;
+      toast.error(
+        `Nada aprovado para disparar (Aprovados: 0).` +
+          (rasc
+            ? ` Você tem ${rasc} em rascunho — clique em Aprovar para publicar o link.`
+            : ` Selecione leads, clique em Preparar e depois Aprovar.`),
+      );
       return;
     }
+    const alvos = aprovadosProntos;
     setDisparando(true);
+    setOcupado("disparar");
     cancelar.current = false;
-    setProgresso({ feito: 0, total: alvos.length, fase: "criando campanha" });
+    setProgresso({ feito: 0, total: alvos.length, fase: "" });
     let ok = 0;
     const motivos: Record<string, number> = {};
     try {
-      const { campanha_id } = await criarCampanhaWaDaSelecao(
-        nome,
-        alvos.map((l) => l.id),
-        {
-          intervalo_min: intervaloMin,
-          intervalo_max: intervaloMax,
-          variacoes,
-        },
-      );
-      const cls = await listarCampanhaLeadsWaView(campanha_id);
-      for (let i = 0; i < cls.length; i++) {
+      for (let i = 0; i < alvos.length; i++) {
         if (cancelar.current) break;
-        const cl = cls[i];
-        setProgresso({ feito: i, total: cls.length, fase: `preparando ${cl.lead_nome}` });
-        const r = await prepararCampanhaLead(cl, campanha_id);
-        if (r.estado === "sem_motivo") {
-          motivos["sem_motivo"] = (motivos["sem_motivo"] ?? 0) + 1;
-        } else if (r.estado === "rascunho" && r.proposta) {
-          setProgresso({ feito: i, total: cls.length, fase: `publicando ${cl.lead_nome}` });
-          await aprovarCampanhaLead(cl.id, r.proposta);
-          setProgresso({ feito: i, total: cls.length, fase: `enviando ${cl.lead_nome}` });
-          const env = await enviarCampanhaLeadWa(cl.id);
-          if (env.ok) ok++;
-          else {
-            motivos[env.reason ?? "erro"] = (motivos[env.reason ?? "erro"] ?? 0) + 1;
-            if (env.reason === "sem_chip") {
-              toast.error("Sem chip de disparo — disparo pausado.");
-              break;
-            }
-          }
+        const st = estados[alvos[i].id];
+        setProgresso({ feito: i, total: alvos.length, fase: `enviando ${alvos[i].business_name}` });
+        const env = await enviarCampanhaLeadWa(st.clId);
+        if (env.ok) {
+          ok++;
+          setEstados((e) => ({ ...e, [alvos[i].id]: { ...st, estado: "enviado" } }));
         } else {
-          motivos["erro"] = (motivos["erro"] ?? 0) + 1;
+          motivos[env.reason ?? "erro"] = (motivos[env.reason ?? "erro"] ?? 0) + 1;
+          if (env.reason === "sem_chip") {
+            toast.error("Sem chip de disparo — disparo pausado.");
+            break;
+          }
         }
-        setProgresso({ feito: i + 1, total: cls.length, fase: "" });
-        if (i < cls.length - 1 && !cancelar.current) await sleep(intervaloMs());
+        setProgresso({ feito: i + 1, total: alvos.length, fase: "" });
+        if (i < alvos.length - 1 && !cancelar.current) await sleep(intervaloMs());
       }
       const resumo = Object.entries(motivos)
         .map(([k, n]) => `${n} ${WA_MOTIVO_LABEL[k] ?? k}`)
@@ -299,6 +434,7 @@ export function WaCampanhas() {
       toast.error(e instanceof Error ? e.message : "Falha no disparo");
     } finally {
       setDisparando(false);
+      setOcupado(null);
       setProgresso(null);
       setSel(new Set());
       carregar();
@@ -319,6 +455,11 @@ export function WaCampanhas() {
               <div>Conecte um chip de disparo antes de disparar campanhas.</div>
             </div>
           </div>
+          {onConectar && (
+            <Button variant="outline" size="sm" onClick={onConectar}>
+              Conectar
+            </Button>
+          )}
         </div>
       )}
 
@@ -390,7 +531,19 @@ export function WaCampanhas() {
                 </Select>
               </Campo>
               <Campo label="Bairro">
-                <Input disabled placeholder="não coletado neste app" className="h-9" />
+                <Select value={fBairro} onValueChange={setFBairro} disabled={bairros.length === 0}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={bairros.length ? "Todo bairro" : "—"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__todas">Todo bairro</SelectItem>
+                    {bairros.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Campo>
               <Campo label="Limite de leads (0 = sem limite)">
                 <Input
@@ -435,7 +588,8 @@ export function WaCampanhas() {
             ) : filtrados.length === 0 ? (
               <div className="flex flex-col items-center gap-1 py-12 text-center text-sm text-muted-foreground">
                 <Users className="h-7 w-7 text-muted-foreground/40" />
-                Nenhum lead encontrado com os filtros aplicados
+                <div>Nenhum lead encontrado com os filtros aplicados</div>
+                <div className="text-xs">Ajuste os filtros ou busque leads primeiro</div>
               </div>
             ) : (
               <div className="max-h-[520px] overflow-y-auto">
@@ -448,18 +602,57 @@ export function WaCampanhas() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{l.business_name}</div>
                       <div className="truncate text-xs text-muted-foreground">
-                        {[l.category, l.city].filter(Boolean).join(" · ") || "—"}
+                        {[l.category, l.bairro, l.city].filter(Boolean).join(" · ") || "—"}
                       </div>
                     </div>
-                    {l.enviado && (
-                      <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[11px] text-violet-800">
-                        enviado
-                      </span>
-                    )}
+                    <BadgeEstado enviado={l.enviado} estado={estadoDe(l.id)} />
                   </label>
                 ))}
               </div>
             )}
+          </div>
+
+          {/* PORTÃO (EXCEÇÃO 2): preparar → aprovar (publica o link) → só então dispara */}
+          <div className="rounded-2xl border bg-card p-3">
+            <div className="mb-2 text-[11px] text-muted-foreground">
+              Fluxo: <b>Preparar</b> (gera o site) → <b>Aprovar</b> (publica o link) →{" "}
+              <b>Disparar</b> (envia). Nada sai sem aprovar.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={preparar}
+                disabled={!!ocupado || aPreparar.length === 0}
+                title={aPreparar.length === 0 ? "Selecione leads ainda não preparados" : ""}
+              >
+                {ocupado === "preparar" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Preparar ({aPreparar.length})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={aprovar}
+                disabled={!!ocupado || aAprovar.length === 0}
+                title={aAprovar.length === 0 ? "Prepare leads primeiro (nada em rascunho)" : ""}
+              >
+                {ocupado === "aprovar" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                Aprovar ({aAprovar.length})
+              </Button>
+              {progresso && (
+                <span className="flex items-center text-xs text-muted-foreground">
+                  {progresso.feito}/{progresso.total} {progresso.fase}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -547,10 +740,9 @@ export function WaCampanhas() {
               {WA_TOKENS.map((t) => (
                 <button
                   key={t}
-                  onClick={() => {
-                    navigator.clipboard?.writeText(`{{${t}}}`);
-                    toast.success(`{{${t}}} copiado`);
-                  }}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => inserirVariavel(t)}
                   className="rounded-md border bg-muted/40 px-1.5 py-0.5 font-mono text-xs hover:bg-accent"
                 >
                   {`{{${t}}}`}
@@ -558,8 +750,8 @@ export function WaCampanhas() {
               ))}
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              {"{{bairro}}"} fica vazio (não coletamos bairro). {"{{nota}}"} só entra para quem tem
-              nota real ≥ 4,5 — nunca inventa.
+              {"{{bairro}}"} vem do endereço (~73% dos leads têm); fica vazio quando não dá pra
+              extrair. {"{{nota}}"} só entra para quem tem nota real ≥ 4,5 — nunca inventa.
             </p>
           </div>
 
@@ -613,7 +805,14 @@ export function WaCampanhas() {
                   </div>
                   <Textarea
                     value={v.texto}
-                    onChange={(e) => setVariacao(v.id, { texto: e.target.value })}
+                    onChange={(e) => {
+                      setVariacao(v.id, { texto: e.target.value });
+                      marcarFoco(v.id, e.currentTarget);
+                    }}
+                    onFocus={(e) => marcarFoco(v.id, e.currentTarget)}
+                    onClick={(e) => marcarFoco(v.id, e.currentTarget)}
+                    onKeyUp={(e) => marcarFoco(v.id, e.currentTarget)}
+                    onSelect={(e) => marcarFoco(v.id, e.currentTarget)}
                     rows={3}
                     className="text-sm"
                   />
@@ -716,7 +915,14 @@ export function WaCampanhas() {
             <Button
               className="flex-1 bg-emerald-600 font-semibold hover:bg-emerald-700"
               onClick={disparar}
-              disabled={disparando || semChip}
+              disabled={disparando || semChip || aprovadosProntos.length === 0}
+              title={
+                semChip
+                  ? "Conecte um chip de disparo na aba WhatsApp"
+                  : aprovadosProntos.length === 0
+                    ? "Prepare e aprove os leads primeiro — só disparo o que já foi aprovado"
+                    : "Envia os leads aprovados com intervalo entre as mensagens"
+              }
             >
               {disparando ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -731,6 +937,14 @@ export function WaCampanhas() {
               </Button>
             )}
           </div>
+          {/* o botão desabilitado se explica (EXCEÇÃO 2 — portão) */}
+          {!disparando && (semChip || aprovadosProntos.length === 0) && (
+            <p className="text-center text-[11px] text-amber-700">
+              {semChip
+                ? "Conecte um chip de disparo (aba WhatsApp) para poder disparar."
+                : `Nada aprovado ainda (aprovados: 0). Selecione leads → Preparar → Aprovar → Disparar.`}
+            </p>
+          )}
         </div>
       </div>
 
@@ -769,6 +983,21 @@ export function WaCampanhas() {
   );
 }
 
+function BadgeEstado({ enviado, estado }: { enviado: boolean; estado?: string }) {
+  if (enviado || estado === "enviado")
+    return <Tag cls="bg-violet-100 text-violet-800">enviado</Tag>;
+  if (estado === "aprovado") return <Tag cls="bg-emerald-100 text-emerald-800">aprovado</Tag>;
+  if (estado === "rascunho") return <Tag cls="bg-amber-100 text-amber-800">preparado</Tag>;
+  if (estado === "sem_motivo") return <Tag cls="bg-muted text-muted-foreground">sem motivo</Tag>;
+  if (estado === "erro") return <Tag cls="bg-rose-100 text-rose-800">erro</Tag>;
+  return null;
+}
+function Tag({ cls, children }: { cls: string; children: React.ReactNode }) {
+  return (
+    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px]", cls)}>{children}</span>
+  );
+}
+
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
@@ -782,6 +1011,7 @@ function PreviewMensagem({ variacoes, lead }: { variacoes: WaVariacao[]; lead: W
   const dados = {
     business_name: lead.business_name,
     city: lead.city,
+    bairro: lead.bairro,
     category: lead.category,
     whatsapp: lead.whatsapp,
     rating: lead.rating,

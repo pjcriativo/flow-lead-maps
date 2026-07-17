@@ -213,6 +213,26 @@ export async function criarCampanhaWaDaSelecao(
   return { campanha_id: camp.id };
 }
 
+/** Adiciona leads a uma campanha existente (campanha de trabalho), ignorando os que já estão
+ * nela (unique campanha_id+lead_id). Usado quando o dono prepara mais leads na mesma tela. */
+export async function adicionarLeadsCampanha(campanhaId: string, leadIds: string[]): Promise<void> {
+  if (leadIds.length === 0) return;
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) throw new Error("Não autenticado");
+  const linhas = leadIds.map((lead_id) => ({
+    campanha_id: campanhaId,
+    lead_id,
+    user_id: userId,
+    estado: "pendente",
+  }));
+  // upsert ignorando conflito (lead já na campanha)
+  const { error } = await supabase
+    .from("campanha_leads")
+    .upsert(linhas, { onConflict: "campanha_id,lead_id", ignoreDuplicates: true });
+  if (error) throw error;
+}
+
 /** Lê a config de WhatsApp de uma campanha (variações + intervalo). Preenche defaults se faltar. */
 export async function obterWaConfig(campanhaId: string): Promise<WaCampanhaConfig> {
   const { data, error } = await supabase

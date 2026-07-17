@@ -173,6 +173,7 @@ export type WaLeadCompose = {
   business_name: string;
   whatsapp: string;
   city: string | null;
+  bairro: string | null;
   category: string | null;
   lead_status: string;
   score: number | null;
@@ -188,7 +189,7 @@ export async function listarLeadsWaCompose(): Promise<WaLeadCompose[]> {
     supabase
       .from("leads")
       .select(
-        "id, business_name, whatsapp, city, category, status, score, rating, review_count, score_breakdown",
+        "id, business_name, whatsapp, city, bairro, category, status, score, rating, review_count, score_breakdown",
       )
       .not("whatsapp", "is", null)
       .limit(3000),
@@ -202,6 +203,7 @@ export async function listarLeadsWaCompose(): Promise<WaLeadCompose[]> {
     business_name: l.business_name,
     whatsapp: l.whatsapp,
     city: l.city,
+    bairro: l.bairro,
     category: l.category,
     lead_status: l.status,
     score: l.score,

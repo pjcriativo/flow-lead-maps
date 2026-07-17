@@ -115,7 +115,7 @@ export function WhatsAppSection() {
         />
       )}
       {aba === "whatsapp" && <AbaWhatsApp onMudou={checarConexao} />}
-      {aba === "campanhas" && <WaCampanhas />}
+      {aba === "campanhas" && <WaCampanhas onConectar={() => setAba("whatsapp")} />}
       {aba === "conversas" && <WaConversas />}
       {aba === "scripts" && <WaScripts />}
     </div>

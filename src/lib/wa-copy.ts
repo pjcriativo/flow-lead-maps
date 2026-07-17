@@ -9,6 +9,7 @@ export const NOTA_MINIMA_WA = NOTA_MINIMA_ABERTURA_A; // mesmo piso 4,5 da abert
 export type WaLeadDados = {
   business_name: string;
   city?: string | null;
+  bairro?: string | null;
   category?: string | null;
   phone?: string | null;
   whatsapp?: string | null;
@@ -55,7 +56,7 @@ export function resolverVariaveis(texto: string, d: WaLeadDados): string {
     nome: d.business_name ?? "",
     cidade: d.city ?? "",
     categoria: d.category ?? "",
-    bairro: "", // Flow Leads não coleta bairro (só city/state) — token resolve vazio
+    bairro: d.bairro ?? "", // extraído do endereço (parser); vazio quando não dá pra extrair
     telefone: d.phone ?? d.whatsapp ?? "",
     nota: d.rating != null ? String(d.rating).replace(".", ",") : "",
     n_avaliacoes: d.review_count != null ? String(d.review_count) : "",
