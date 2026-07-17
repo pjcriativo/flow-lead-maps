@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { enviarTesteWhatsapp } from "@/services/whatsapp";
 import { ChipsManager } from "./ChipsManager";
+import { WaCampanhas } from "./WaCampanhas";
 
 function EnviarTeste() {
   const [numero, setNumero] = useState("");
@@ -109,7 +110,7 @@ export function WhatsAppSection() {
         </TabsContent>
 
         <TabsContent value="campanhas" className="pt-4">
-          <EmBreve titulo="Campanha de WhatsApp (reusa o motor de campanhas, canal='whatsapp')" />
+          <WaCampanhas />
         </TabsContent>
 
         <TabsContent value="conversas" className="pt-4">

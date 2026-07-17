@@ -13,8 +13,10 @@ import {
   enviarProposta,
   salvarProposta,
   listarPropostasPorCampanha,
+  gerarPropostaRascunhoSemSite,
 } from "@/services/propostas";
 import { publicarSite } from "@/services/publicacao";
+import { gerarRedesign } from "@/services/redesign";
 
 type CampanhaRow = {
   id: string;
@@ -293,6 +295,52 @@ export async function listarCampanhaLeadsView(campanhaId: string): Promise<Campa
   });
 }
 
+/** Lead da campanha de WhatsApp: a view base + os campos do lead que a tela WA usa
+ * (tabs por status do pipeline, filtros por cidade/categoria, preview das variáveis) + se já
+ * recebeu WhatsApp nesta campanha. REUSA listarCampanhaLeadsView (estado/url_publica/proposta). */
+export type WaCampanhaLead = CampanhaLeadView & {
+  whatsapp: string | null;
+  city: string | null;
+  category: string | null;
+  lead_status: string;
+  score: number | null;
+  rating: number | null;
+  review_count: number | null;
+  score_breakdown: unknown;
+  enviado: boolean;
+};
+
+export async function listarCampanhaLeadsWaView(campanhaId: string): Promise<WaCampanhaLead[]> {
+  const base = await listarCampanhaLeadsView(campanhaId);
+  if (base.length === 0) return [];
+  const leadIds = base.map((b) => b.lead_id);
+  const [{ data: leads, error: lErr }, enviados] = await Promise.all([
+    supabase
+      .from("leads")
+      .select("id, whatsapp, city, category, status, score, rating, review_count, score_breakdown")
+      .in("id", leadIds),
+    leadsEnviadosWa(campanhaId),
+  ]);
+  if (lErr) throw lErr;
+  const byId = new Map((leads ?? []).map((l) => [(l as { id: string }).id, l]));
+  return base.map((b) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const l = byId.get(b.lead_id) as any;
+    return {
+      ...b,
+      whatsapp: l?.whatsapp ?? null,
+      city: l?.city ?? null,
+      category: l?.category ?? null,
+      lead_status: l?.status ?? "new",
+      score: l?.score ?? null,
+      rating: l?.rating ?? null,
+      review_count: l?.review_count ?? null,
+      score_breakdown: l?.score_breakdown ?? null,
+      enviado: enviados.has(b.lead_id),
+    };
+  });
+}
+
 /** Conclui a campanha (status='concluida'). NÃO apaga nada — leads 'pendente' ficam
  * intactos; a UI apenas trava as ações. Reabrir volta para 'ativa'. */
 export async function concluirCampanha(id: string): Promise<void> {
@@ -350,6 +398,57 @@ export async function atualizarCampanhaLead(
     .update({ ...patch, atualizado_em: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+}
+
+/** Resultado de preparar UM lead da campanha (sob demanda). */
+export type PreparaResultado = {
+  estado: "rascunho" | "sem_motivo" | "erro";
+  redesign_id?: string;
+  proposta_id?: string;
+  proposta?: Proposta;
+  reusado?: boolean;
+  erro?: string;
+};
+
+/**
+ * PREPARAR UM lead (a REGRA de preparo, uma fonte só — usada pela campanha de e-mail E de
+ * WhatsApp). Ordem que importa: portão "sem motivo claro" vem ANTES do redesign (o redesign
+ * custa IA; não se queima IA num lead que não recebe nada). Reusa redesign pronto quando há.
+ * Não decide nada de canal — só produz o rascunho + o redesign, que a APROVAÇÃO publica.
+ */
+export async function prepararCampanhaLead(
+  v: Pick<CampanhaLeadView, "id" | "lead_id" | "tem_redesign_pronto">,
+  campanhaId: string,
+): Promise<PreparaResultado> {
+  await atualizarCampanhaLead(v.id, { estado: "gerando", erro: null });
+  if (!(await leadTemMotivoClaro(v.lead_id))) {
+    await atualizarCampanhaLead(v.id, { estado: "sem_motivo", erro: null });
+    return { estado: "sem_motivo" };
+  }
+  let redesignId: string | null = null;
+  let reusado = false;
+  if (v.tem_redesign_pronto) {
+    redesignId = await redesignProntoDoLead(v.lead_id);
+    reusado = !!redesignId;
+  }
+  if (!redesignId) {
+    const r = await gerarRedesign(v.lead_id);
+    redesignId = r.redesign.id;
+  }
+  const prop = await gerarPropostaRascunhoSemSite(v.lead_id, campanhaId);
+  await atualizarCampanhaLead(v.id, {
+    estado: "rascunho",
+    redesign_id: redesignId,
+    proposta_id: prop.id,
+    erro: null,
+  });
+  return {
+    estado: "rascunho",
+    redesign_id: redesignId,
+    proposta_id: prop.id,
+    proposta: prop,
+    reusado,
+  };
 }
 
 /** Descarta um lead da campanha (com motivo). Apaga a proposta rascunho (barata);

@@ -44,12 +44,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatData } from "@/lib/format";
 import type { Campanha, CampanhaLeadView, CampanhaLeadEstado, Proposta, Redesign } from "@/types";
-import {
-  statusRampa,
-  gerarPropostaRascunhoSemSite,
-  enviarProposta,
-  type RampaStatus,
-} from "@/services/propostas";
+import { statusRampa, enviarProposta, type RampaStatus } from "@/services/propostas";
 import { gerarRedesign, obterRedesign } from "@/services/redesign";
 import { EditorRedesign } from "@/components/redesign/RedesignSection";
 import { RevisarPropostaDialog } from "@/components/propostas/PropostasSection";
@@ -59,8 +54,7 @@ import {
   renomearCampanha,
   excluirCampanha,
   listarCampanhaLeadsView,
-  leadTemMotivoClaro,
-  redesignProntoDoLead,
+  prepararCampanhaLead,
   atualizarCampanhaLead,
   descartarCampanhaLead,
   aprovarCampanhaLead,
@@ -511,45 +505,25 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
     for (const v of alvos) {
       patchRow(v.id, { estado: "gerando", erro: null });
       try {
-        await atualizarCampanhaLead(v.id, { estado: "gerando", erro: null });
-
-        // PORTÃO "SEM MOTIVO CLARO" — vem ANTES do redesign de propósito: o redesign custa IA,
-        // e não faz sentido queimar IA num lead que não vai receber e-mail nenhum.
-        if (!(await leadTemMotivoClaro(v.lead_id))) {
-          await atualizarCampanhaLead(v.id, { estado: "sem_motivo", erro: null });
+        // REGRA de preparo (portão sem-motivo antes do redesign, reuso de redesign pronto) vive
+        // no serviço prepararCampanhaLead — uma fonte só, compartilhada com a campanha de WhatsApp.
+        const r = await prepararCampanhaLead(v, campanha.id);
+        if (r.estado === "sem_motivo") {
           patchRow(v.id, { estado: "sem_motivo", erro: null });
           acc.feito += 1;
           acc.semMotivo += 1;
           setProgresso({ ...acc });
           continue;
         }
-
-        let redesignId: string | null = null;
-        let reused = false;
-        if (v.tem_redesign_pronto) {
-          redesignId = await redesignProntoDoLead(v.lead_id);
-          reused = !!redesignId;
-        }
-        if (!redesignId) {
-          const r = await gerarRedesign(v.lead_id);
-          redesignId = r.redesign.id;
-        }
-        const prop = await gerarPropostaRascunhoSemSite(v.lead_id, campanha.id);
-        await atualizarCampanhaLead(v.id, {
-          estado: "rascunho",
-          redesign_id: redesignId,
-          proposta_id: prop.id,
-          erro: null,
-        });
         patchRow(v.id, {
           estado: "rascunho",
-          redesign_id: redesignId,
-          proposta_id: prop.id,
-          proposta: prop,
+          redesign_id: r.redesign_id,
+          proposta_id: r.proposta_id,
+          proposta: r.proposta,
           tem_redesign_pronto: true,
         });
         acc.feito += 1;
-        if (reused) acc.reusados += 1;
+        if (r.reusado) acc.reusados += 1;
         else acc.gerados += 1;
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Falha ao preparar";
