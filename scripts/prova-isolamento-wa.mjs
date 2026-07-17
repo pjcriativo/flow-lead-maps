@@ -118,12 +118,15 @@ const edge = async (fn, jwt, body) => {
   });
   return { status: r.status, body: await r.json().catch(() => ({})) };
 };
+// N chips por org: pega a PRIMÁRIA (mais antiga) — o isolamento vale para qualquer instância.
 const linhaWa = async (uid) =>
   (
     await admin
       .from("wa_instancias")
       .select("id, nome, numero, status")
       .eq("user_id", uid)
+      .order("criada_em", { ascending: true })
+      .limit(1)
       .maybeSingle()
   ).data;
 
@@ -183,6 +186,49 @@ for (const forja of [
     JSON.stringify(r.body).slice(0, 160),
   );
 }
+
+console.log("\n### 2b — wa-chips: forjar o id da instância do alvo (N chips)");
+const statusForjado = await edge("wa-chips", jwtAtac, { acao: "status", instancia_id: rowAlvo.id });
+check(
+  "wa-chips status com id do alvo → NEGADO (não vaza numero/status do alvo)",
+  !vazou(JSON.stringify(statusForjado.body)) && statusForjado.body?.numero !== rowAlvo.numero,
+  JSON.stringify(statusForjado.body).slice(0, 140),
+);
+const marcarForjado = await edge("wa-chips", jwtAtac, {
+  acao: "marcar",
+  instancia_id: rowAlvo.id,
+  status: "queimada",
+  funcao: "disparo",
+});
+check(
+  "wa-chips marcar 'queimada' no chip do alvo → NEGADO",
+  marcarForjado.body?.ok !== true,
+  JSON.stringify(marcarForjado.body).slice(0, 140),
+);
+const pearForjado = await edge("wa-chips", jwtAtac, {
+  acao: "parear",
+  instancia_id: rowAlvo.id,
+  phone: "5541988887777",
+});
+check(
+  "wa-chips parear o chip do alvo → NEGADO (não recria a sessão do alvo)",
+  !vazou(JSON.stringify(pearForjado.body)) && pearForjado.body?.status !== "code",
+  JSON.stringify(pearForjado.body).slice(0, 140),
+);
+const listaAtac = await edge("wa-chips", jwtAtac, { acao: "listar" });
+check(
+  "wa-chips listar → atacante só vê os PRÓPRIOS chips",
+  (listaAtac.body?.chips ?? []).every((c) => c.nome !== NOME_ALVO) &&
+    !vazou(JSON.stringify(listaAtac.body)),
+  JSON.stringify(listaAtac.body).slice(0, 140),
+);
+// o chip do alvo NÃO foi marcado queimada pelo ataque
+const alvoDepoisMarcar = await linhaWa(ALVO);
+check(
+  "status do chip do alvo permanece intacto após o marcar forjado",
+  alvoDepoisMarcar.status === rowAlvo.status,
+  `status=${alvoDepoisMarcar.status}`,
+);
 
 console.log("\n### 3 — ler a instância/token do alvo (e o próprio token) via RLS");
 const { data: verAlvo } = await cliAtac.from("wa_instancias").select("*").eq("user_id", ALVO);

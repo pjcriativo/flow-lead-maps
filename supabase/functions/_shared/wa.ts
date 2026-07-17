@@ -36,6 +36,17 @@ export type WaInstanciaOrg = {
   token: string;
   numero: string | null;
   status: string;
+  funcao?: string;
+};
+
+/** Linha da instância (sem token) — para listar os chips da org na UI. */
+export type WaChip = {
+  id: string;
+  nome: string;
+  numero: string | null;
+  status: string;
+  funcao: string;
+  ordem: number;
 };
 
 /* ----------------------- gerência na Evolution (key global) ----------------------- */
@@ -85,6 +96,50 @@ async function criarNaEvolution(nome: string): Promise<string | null> {
  *   re-parear, a conexão viva é preservada.
  * - Org sem linha e criarSeFaltar: cria uma instância NOVA (nome gerado e ARMAZENADO).
  */
+/**
+ * Garante o token de UMA linha de wa_instancias (já resolvida e escopada ao dono): usa o token
+ * gravado; senão adota o que existe na Evolution pelo NOME (legado, sem re-parear); senão recria
+ * na Evolution com o mesmo nome. Devolve a instância com token, ou null.
+ * eslint-disable-next-line @typescript-eslint/no-explicit-any */
+async function garantirTokenDaLinha(
+  admin: Admin,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  row: any,
+): Promise<WaInstanciaOrg | null> {
+  const { data: tk } = await admin
+    .from("wa_instancia_tokens")
+    .select("token")
+    .eq("instancia_id", row.id)
+    .maybeSingle();
+  if (tk?.token)
+    return {
+      id: row.id,
+      nome: row.nome,
+      token: tk.token,
+      numero: row.numero,
+      status: row.status,
+      funcao: row.funcao,
+    };
+
+  let token = await tokenNaEvolution(row.nome);
+  let numero: string | null = row.numero;
+  let status: string = row.status;
+  if (!token) {
+    token = await criarNaEvolution(row.nome);
+    if (!token) return null;
+    numero = null;
+    status = "desconectado";
+    await admin
+      .from("wa_instancias")
+      .update({ numero: null, status, atualizado_em: new Date().toISOString() })
+      .eq("id", row.id);
+  }
+  await admin
+    .from("wa_instancia_tokens")
+    .upsert({ instancia_id: row.id, token, atualizado_em: new Date().toISOString() });
+  return { id: row.id, nome: row.nome, token, numero, status, funcao: row.funcao };
+}
+
 export async function resolverInstanciaDaOrg(
   admin: Admin,
   userId: string,
@@ -92,47 +147,16 @@ export async function resolverInstanciaDaOrg(
 ): Promise<WaInstanciaOrg | null> {
   if (!waBase() || !waGlobalKey()) return null;
 
+  // N chips por org: a resolução "genérica" (sem id) devolve a PRIMÁRIA (mais antiga).
   const { data: row } = await admin
     .from("wa_instancias")
-    .select("id, nome, numero, status")
+    .select("id, nome, numero, status, funcao")
     .eq("user_id", userId)
+    .order("criada_em", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
-  if (row) {
-    const { data: tk } = await admin
-      .from("wa_instancia_tokens")
-      .select("token")
-      .eq("instancia_id", row.id)
-      .maybeSingle();
-    if (tk?.token)
-      return {
-        id: row.id,
-        nome: row.nome,
-        token: tk.token,
-        numero: row.numero,
-        status: row.status,
-      };
-
-    // Token ainda não gravado → adota o que já existe na Evolution (legado), sem re-parear.
-    let token = await tokenNaEvolution(row.nome);
-    let numero: string | null = row.numero;
-    let status: string = row.status;
-    if (!token) {
-      // A instância sumiu do servidor → recria com o MESMO nome armazenado.
-      token = await criarNaEvolution(row.nome);
-      if (!token) return null;
-      numero = null;
-      status = "desconectado";
-      await admin
-        .from("wa_instancias")
-        .update({ numero: null, status, atualizado_em: new Date().toISOString() })
-        .eq("id", row.id);
-    }
-    await admin
-      .from("wa_instancia_tokens")
-      .upsert({ instancia_id: row.id, token, atualizado_em: new Date().toISOString() });
-    return { id: row.id, nome: row.nome, token, numero, status };
-  }
+  if (row) return await garantirTokenDaLinha(admin, row);
 
   if (!criarSeFaltar) return null;
 
@@ -231,4 +255,147 @@ export async function qrInstancia(token: string): Promise<string | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const qj: any = await q.json().catch(() => ({}));
   return qj?.data?.Qrcode || null;
+}
+
+/* ------------------------------ N CHIPS por org ------------------------------ */
+
+/** Lista os chips DA ORG (sem token) — para a UI. Ordena por função, ordem, idade. */
+export async function listarInstanciasDaOrg(admin: Admin, userId: string): Promise<WaChip[]> {
+  const { data } = await admin
+    .from("wa_instancias")
+    .select("id, nome, numero, status, funcao, ordem")
+    .eq("user_id", userId)
+    .order("funcao", { ascending: true })
+    .order("ordem", { ascending: true })
+    .order("criada_em", { ascending: true });
+  return (data ?? []) as WaChip[];
+}
+
+/**
+ * Resolve UM chip pelo id — SÓ se for do próprio dono (ISOLAMENTO: `.eq("user_id", userId)`).
+ * id forjado de outra org → null. Devolve com token (adota/recria o token se preciso).
+ */
+export async function instanciaDaOrgComToken(
+  admin: Admin,
+  userId: string,
+  id: string,
+): Promise<WaInstanciaOrg | null> {
+  if (!id) return null;
+  const { data: row } = await admin
+    .from("wa_instancias")
+    .select("id, nome, numero, status, funcao")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!row) return null;
+  return await garantirTokenDaLinha(admin, row);
+}
+
+/** Cria um chip NOVO para a org (Evolution + linha + token). ordem = próxima da fila. */
+export async function criarInstanciaDaOrg(
+  admin: Admin,
+  userId: string,
+  funcao = "disparo",
+): Promise<WaInstanciaOrg | null> {
+  if (!waBase() || !waGlobalKey()) return null;
+  const nome = `org-${userId.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 4)}`;
+  const token = await criarNaEvolution(nome);
+  if (!token) return null;
+  const { data: ult } = await admin
+    .from("wa_instancias")
+    .select("ordem")
+    .eq("user_id", userId)
+    .order("ordem", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const ordem = (ult?.ordem ?? -1) + 1;
+  const { data: nova, error } = await admin
+    .from("wa_instancias")
+    .insert({
+      user_id: userId,
+      nome,
+      status: "desconectado",
+      funcao: funcao === "conversa" ? "conversa" : "disparo",
+      ordem,
+    })
+    .select("id, nome, numero, status, funcao")
+    .single();
+  if (error || !nova) return null;
+  await admin.from("wa_instancia_tokens").insert({ instancia_id: nova.id, token });
+  return {
+    id: nova.id,
+    nome: nova.nome,
+    token,
+    numero: null,
+    status: "desconectado",
+    funcao: nova.funcao,
+  };
+}
+
+/** RECRIA a sessão Evolution de UM chip do dono (re-parear), escopado ao user_id. */
+export async function recriarInstanciaPorId(
+  admin: Admin,
+  userId: string,
+  id: string,
+): Promise<WaInstanciaOrg | null> {
+  const atual = await instanciaDaOrgComToken(admin, userId, id);
+  if (!atual) return null;
+  const evoId = await idNaEvolution(atual.nome);
+  if (evoId)
+    await fetch(`${waBase()}/instance/delete/${evoId}`, {
+      method: "DELETE",
+      headers: { apikey: waGlobalKey() },
+    }).catch(() => {});
+  const token = await criarNaEvolution(atual.nome);
+  if (!token) return null;
+  const agora = new Date().toISOString();
+  await admin
+    .from("wa_instancia_tokens")
+    .upsert({ instancia_id: atual.id, token, atualizado_em: agora });
+  await admin
+    .from("wa_instancias")
+    .update({ status: "aguardando", numero: null, atualizado_em: agora })
+    .eq("id", atual.id)
+    .eq("user_id", userId);
+  return { id: atual.id, nome: atual.nome, token, numero: null, status: "aguardando" };
+}
+
+/** Próximo chip de DISPARO da org: funcao='disparo' + status='conectado', por ordem. */
+export async function proximaInstanciaDisparo(
+  admin: Admin,
+  userId: string,
+): Promise<WaInstanciaOrg | null> {
+  const { data: row } = await admin
+    .from("wa_instancias")
+    .select("id, nome, numero, status, funcao")
+    .eq("user_id", userId)
+    .eq("funcao", "disparo")
+    .eq("status", "conectado")
+    .order("ordem", { ascending: true })
+    .order("criada_em", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!row) return null;
+  return await garantirTokenDaLinha(admin, row);
+}
+
+const STATUS_VALIDOS = ["desconectado", "aguardando", "conectado", "erro", "queimada"];
+
+/** Atualiza função/status/ordem de UM chip do dono (marcar queimado, graduar, reordenar). */
+export async function atualizarChip(
+  admin: Admin,
+  userId: string,
+  id: string,
+  patch: { funcao?: string; status?: string; ordem?: number },
+): Promise<boolean> {
+  const set: Record<string, unknown> = { atualizado_em: new Date().toISOString() };
+  if (patch.funcao === "disparo" || patch.funcao === "conversa") set.funcao = patch.funcao;
+  if (patch.status && STATUS_VALIDOS.includes(patch.status)) set.status = patch.status;
+  if (typeof patch.ordem === "number" && patch.ordem >= 0) set.ordem = patch.ordem;
+  const { error } = await admin
+    .from("wa_instancias")
+    .update(set)
+    .eq("id", id)
+    .eq("user_id", userId);
+  return !error;
 }
