@@ -26,6 +26,7 @@ import { CANAL_LABEL, STATUS_LABELS, type Lead, type LeadStatus } from "@/lib/le
 import type { Redesign } from "@/types";
 import { RegistrarContatoBotao } from "./ContatoDialog";
 import { MarcarPerdaBotao } from "./PerdaDialog";
+import { NotaBotao } from "./NotaPopover";
 import {
   StatusBadge,
   ScoreBadge,
@@ -248,6 +249,7 @@ export function LeadDetalhe({
                   recarregar();
                 }}
               />
+              <NotaBotao lead={leadView} onSalvo={(notes) => aplicarPatch({ notes })} />
             </div>
             {/* Dados de contato */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

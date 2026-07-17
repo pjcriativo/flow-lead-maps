@@ -42,12 +42,14 @@ export function RegistrarContatoBotao({
   variant = "outline",
   size = "sm",
   full = false,
+  label = "Registrar contato",
 }: {
   lead: Lead;
   onRegistrado?: (novoStatus: LeadStatus, quando: string) => void;
   variant?: "outline" | "secondary" | "ghost" | "default";
   size?: "sm" | "default";
   full?: boolean;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [canal, setCanal] = useState<CanalContato>("whatsapp");
@@ -89,7 +91,7 @@ export function RegistrarContatoBotao({
   return (
     <>
       <Button variant={variant} size={size} onClick={abrir} className={full ? "w-full" : ""}>
-        <MessageSquarePlus className="h-4 w-4" /> Registrar contato
+        <MessageSquarePlus className="h-4 w-4" /> {label}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>

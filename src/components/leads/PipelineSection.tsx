@@ -21,6 +21,7 @@ import { LeadDetalhe } from "./LeadDetalhe";
 import { RegistrarContatoBotao } from "./ContatoDialog";
 import { PerdaDialog } from "./PerdaDialog";
 import { MotivosPerdaPainel } from "./MotivosPerdaPainel";
+import { NotaBotao } from "./NotaPopover";
 
 const LIMITE_INICIAL = 25; // cards renderizados por coluna antes do "ver mais"
 
@@ -217,16 +218,20 @@ export function PipelineSection() {
                       <WhatsCell lead={l} />
                       <EmailCell lead={l} />
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <RegistrarContatoBotao
-                        lead={l}
-                        variant="ghost"
-                        size="sm"
-                        onRegistrado={(s, q) =>
-                          patchLead(l.id, { status: s, last_contacted_at: q })
-                        }
-                      />
-                      <GripVertical className="h-3.5 w-3.5 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing" />
+                    <div className="mt-2 flex items-center justify-between gap-1">
+                      <div className="flex min-w-0 items-center gap-1">
+                        <RegistrarContatoBotao
+                          lead={l}
+                          variant="ghost"
+                          size="sm"
+                          label="Contato"
+                          onRegistrado={(s, q) =>
+                            patchLead(l.id, { status: s, last_contacted_at: q })
+                          }
+                        />
+                        <NotaBotao lead={l} onSalvo={(notes) => patchLead(l.id, { notes })} />
+                      </div>
+                      <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing" />
                     </div>
                   </div>
                 ))}
