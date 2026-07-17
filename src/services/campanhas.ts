@@ -173,6 +173,46 @@ export async function criarCampanhaWaDaLista(
   return { campanha_id: camp.id, total: leadIds.length };
 }
 
+/** Cria a campanha de WhatsApp a partir de uma SELEÇÃO de leads (tela única de disparo), com a
+ * config (variações + intervalo) já composta. Mesmo motor; sem list_id. */
+export async function criarCampanhaWaDaSelecao(
+  nome: string,
+  leadIds: string[],
+  config: WaCampanhaConfig,
+): Promise<{ campanha_id: string }> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) throw new Error("Não autenticado");
+  if (leadIds.length === 0) throw new Error("Selecione ao menos um lead.");
+
+  const { data: camp, error } = await supabase
+    .from("campanhas")
+    .insert({
+      user_id: userId,
+      list_id: null,
+      nome: nome.trim() || "Campanha WhatsApp",
+      status: "ativa",
+      canal: "whatsapp",
+      wa_config: config,
+    })
+    .select("id")
+    .single();
+  if (error || !camp) throw new Error(error?.message ?? "Falha ao criar a campanha");
+
+  const linhas = leadIds.map((lead_id) => ({
+    campanha_id: camp.id,
+    lead_id,
+    user_id: userId,
+    estado: "pendente",
+  }));
+  const { error: iErr } = await supabase.from("campanha_leads").insert(linhas);
+  if (iErr) {
+    await supabase.from("campanhas").delete().eq("id", camp.id);
+    throw new Error("Falha ao adicionar os leads: " + iErr.message);
+  }
+  return { campanha_id: camp.id };
+}
+
 /** Lê a config de WhatsApp de uma campanha (variações + intervalo). Preenche defaults se faltar. */
 export async function obterWaConfig(campanhaId: string): Promise<WaCampanhaConfig> {
   const { data, error } = await supabase

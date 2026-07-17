@@ -159,6 +159,51 @@ export async function enviarCampanhaLeadWa(campanha_lead_id: string): Promise<Wa
   return data as WaCampEnvio;
 }
 
+// ===== Compor campanha (tela única estilo S-zap): leads da org com WhatsApp =====
+export type WaLeadCompose = {
+  id: string;
+  business_name: string;
+  whatsapp: string;
+  city: string | null;
+  category: string | null;
+  lead_status: string;
+  score: number | null;
+  rating: number | null;
+  review_count: number | null;
+  score_breakdown: unknown;
+  enviado: boolean; // já recebeu WhatsApp em alguma campanha
+};
+
+/** Todos os leads da org COM WhatsApp + se já foram enviados (para os contadores/filtros). */
+export async function listarLeadsWaCompose(): Promise<WaLeadCompose[]> {
+  const [{ data: leads, error }, { data: envios }] = await Promise.all([
+    supabase
+      .from("leads")
+      .select(
+        "id, business_name, whatsapp, city, category, status, score, rating, review_count, score_breakdown",
+      )
+      .not("whatsapp", "is", null)
+      .limit(3000),
+    supabase.from("wa_envios").select("lead_id"),
+  ]);
+  if (error) throw error;
+  const enviados = new Set((envios ?? []).map((r) => (r as { lead_id: string }).lead_id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (leads ?? []).map((l: any) => ({
+    id: l.id,
+    business_name: l.business_name,
+    whatsapp: l.whatsapp,
+    city: l.city,
+    category: l.category,
+    lead_status: l.status,
+    score: l.score,
+    rating: l.rating,
+    review_count: l.review_count,
+    score_breakdown: l.score_breakdown,
+    enviado: enviados.has(l.id),
+  }));
+}
+
 // ===== Scripts (mensagens/mídias salvas) =====
 export type WaScript = {
   id: string;
