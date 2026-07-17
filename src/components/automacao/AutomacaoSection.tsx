@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { formatData } from "@/lib/format";
 import {
@@ -263,7 +264,11 @@ function ReceitaCard({
           usd
         />
       </div>
-      <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <label className="flex items-center gap-1.5">
+          <Switch checked={r.ativa} onCheckedChange={onToggleAtiva} />
+          Agendamento {r.ativa ? `ligado (${r.frequencia})` : "desligado"}
+        </label>
         <span>
           Teto/rodada: {r.leads_por_rodada} leads · US$ {r.max_usd_rodada}
         </span>
