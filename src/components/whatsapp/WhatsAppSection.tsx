@@ -92,6 +92,7 @@ export function WhatsAppSection() {
         {ABAS.map((a) => (
           <button
             key={a.key}
+            data-aba={a.key}
             onClick={() => setAba(a.key)}
             className={cn(
               "flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition",

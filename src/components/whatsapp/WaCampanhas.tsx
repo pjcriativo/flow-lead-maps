@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Sparkles,
   AlertTriangle,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -586,166 +587,210 @@ function WaCampanhaTrabalho({ campanha, onVoltar }: { campanha: Campanha; onVolt
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+      <div className="grid items-start gap-4 lg:grid-cols-[1.3fr_1fr]">
         {/* ---------------- ESQUERDA: leads ---------------- */}
-        <div className="space-y-3 rounded-lg border p-3">
-          {/* tabs */}
-          <div className="flex flex-wrap gap-1">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => {
-                  setTab(t.key);
-                  setSel(new Set());
-                }}
-                title={t.dica}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm",
-                  tab === t.key ? "bg-primary text-primary-foreground" : "hover:bg-accent",
-                )}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {/* filtros */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={fCategoria} onValueChange={setFCategoria}>
-              <SelectTrigger className="h-8 w-auto min-w-[9rem] text-xs">
-                <SelectValue placeholder="Categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__todas">Toda categoria</SelectItem>
-                {categorias.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={fCidade} onValueChange={setFCidade}>
-              <SelectTrigger className="h-8 w-auto min-w-[8rem] text-xs">
-                <SelectValue placeholder="Cidade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__todas">Toda cidade</SelectItem>
-                {cidades.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-muted-foreground">Limite</span>
-              <Input
-                type="number"
-                min={0}
-                value={limite}
-                onChange={(e) => setLimite(Math.max(0, parseInt(e.target.value) || 0))}
-                className="h-8 w-16 text-xs"
-                title="0 = sem limite"
-              />
+        <div className="space-y-4">
+          {/* TIPO DE LEAD */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Tipo de lead
             </div>
-          </div>
-
-          {/* contadores */}
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Chip tone="emerald">A enviar: {aEnviar.length}</Chip>
-            <Chip tone="violet">Já enviados: {jaEnviados}</Chip>
-            {semWhats > 0 && <Chip tone="rose">{semWhats} sem WhatsApp (fora)</Chip>}
-            <button className="ml-auto text-primary hover:underline" onClick={toggleTodos}>
-              {filtrados.every((l) => sel.has(l.id)) && filtrados.length
-                ? "Limpar seleção"
-                : "Selecionar todos"}
-            </button>
-          </div>
-
-          {/* lista */}
-          {carregando ? (
-            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
-            </div>
-          ) : filtrados.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Nenhum lead neste filtro.
-            </div>
-          ) : (
-            <div className="max-h-[460px] space-y-1 overflow-y-auto pr-1">
-              {filtrados.map((l) => (
-                <label
-                  key={l.id}
-                  className="flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-accent/40"
+            <div className="flex flex-wrap gap-2">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => {
+                    setTab(t.key);
+                    setSel(new Set());
+                  }}
+                  title={t.dica}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-sm transition",
+                    tab === t.key
+                      ? "border-emerald-500 bg-emerald-50 font-medium text-emerald-700"
+                      : "hover:bg-accent",
+                  )}
                 >
-                  <Checkbox checked={sel.has(l.id)} onCheckedChange={() => toggle(l.id)} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{l.lead_nome}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {[l.category, l.city].filter(Boolean).join(" · ") || "—"}
-                    </div>
-                  </div>
-                  <EstadoLeadBadge l={l} />
-                </label>
+                  {t.label}
+                </button>
               ))}
             </div>
-          )}
+          </div>
 
-          {/* ações */}
-          <div className="flex flex-wrap gap-2 border-t pt-3">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={preparar}
-              disabled={!!ocupado || concluida}
-            >
-              {ocupado === "preparar" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              Preparar ({selArr.filter((l) => ["pendente", "erro"].includes(l.estado)).length})
-            </Button>
-            <Button size="sm" variant="outline" onClick={aprovar} disabled={!!ocupado || concluida}>
-              {ocupado === "aprovar" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-              Aprovar ({selArr.filter((l) => l.estado === "rascunho").length})
-            </Button>
-            <Button
-              size="sm"
-              onClick={enviar}
-              disabled={!!ocupado || concluida || !temChipDisparo}
-              title={
-                !temChipDisparo
-                  ? "Conecte um chip de disparo na aba Conexão"
-                  : "Envia com intervalo entre as mensagens"
-              }
-            >
-              {ocupado === "enviar" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              Enviar ({(selArr.length ? selArr : aEnviar).filter(PRONTOS_PARA_ENVIO).length})
-            </Button>
-            {ocupado === "enviar" && (
-              <Button size="sm" variant="ghost" onClick={() => (cancelar.current = true)}>
-                Parar
+          {/* FILTROS */}
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Filtros
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Segmento</label>
+                <Select value={fCategoria} onValueChange={setFCategoria}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Todo segmento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__todas">Todo segmento</SelectItem>
+                    {categorias.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Cidade</label>
+                <Select value={fCidade} onValueChange={setFCidade}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Toda cidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__todas">Toda cidade</SelectItem>
+                    {cidades.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Bairro</label>
+                <Input
+                  disabled
+                  placeholder="não coletado neste app"
+                  title="O Flow Leads não coleta bairro (só cidade/UF)"
+                  className="h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">
+                  Limite de leads (0 = sem limite)
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={limite}
+                  onChange={(e) => setLimite(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="h-9"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de leads */}
+          <div className="space-y-3 rounded-2xl border bg-card p-4">
+            {/* contadores estilo "A enviar / Já enviados" */}
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-50/60 py-2 font-medium text-emerald-700">
+                <Send className="h-4 w-4" /> A enviar ({aEnviar.length})
+              </div>
+              <div className="flex items-center justify-center gap-2 rounded-lg border py-2 text-muted-foreground">
+                <CheckCheck className="h-4 w-4" /> Já enviados ({jaEnviados})
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={filtrados.length > 0 && filtrados.every((l) => sel.has(l.id))}
+                  onCheckedChange={toggleTodos}
+                />
+                {filtrados.length} leads
+              </label>
+              {semWhats > 0 && <Chip tone="rose">{semWhats} sem WhatsApp (fora)</Chip>}
+            </div>
+
+            {/* lista */}
+            {carregando ? (
+              <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+              </div>
+            ) : filtrados.length === 0 ? (
+              <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Nenhum lead neste filtro.
+              </div>
+            ) : (
+              <div className="max-h-[460px] space-y-1 overflow-y-auto pr-1">
+                {filtrados.map((l) => (
+                  <label
+                    key={l.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-accent/40"
+                  >
+                    <Checkbox checked={sel.has(l.id)} onCheckedChange={() => toggle(l.id)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium">{l.lead_nome}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {[l.category, l.city].filter(Boolean).join(" · ") || "—"}
+                      </div>
+                    </div>
+                    <EstadoLeadBadge l={l} />
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {/* ações */}
+            <div className="flex flex-wrap gap-2 border-t pt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={preparar}
+                disabled={!!ocupado || concluida}
+              >
+                {ocupado === "preparar" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Preparar ({selArr.filter((l) => ["pendente", "erro"].includes(l.estado)).length})
               </Button>
-            )}
-            {progresso && (
-              <span className="flex items-center text-xs text-muted-foreground">
-                {progresso.feito}/{progresso.total}
-              </span>
-            )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={aprovar}
+                disabled={!!ocupado || concluida}
+              >
+                {ocupado === "aprovar" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                Aprovar ({selArr.filter((l) => l.estado === "rascunho").length})
+              </Button>
+              <Button
+                size="sm"
+                onClick={enviar}
+                disabled={!!ocupado || concluida || !temChipDisparo}
+                title={
+                  !temChipDisparo
+                    ? "Conecte um chip de disparo na aba Conexão"
+                    : "Envia com intervalo entre as mensagens"
+                }
+              >
+                {ocupado === "enviar" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Enviar ({(selArr.length ? selArr : aEnviar).filter(PRONTOS_PARA_ENVIO).length})
+              </Button>
+              {ocupado === "enviar" && (
+                <Button size="sm" variant="ghost" onClick={() => (cancelar.current = true)}>
+                  Parar
+                </Button>
+              )}
+              {progresso && (
+                <span className="flex items-center text-xs text-muted-foreground">
+                  {progresso.feito}/{progresso.total}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* ---------------- DIREITA: mensagem ---------------- */}
-        <div className="space-y-3 rounded-lg border p-3">
+        <div className="space-y-3 rounded-2xl border bg-card p-4 lg:sticky lg:top-4">
           <div className="flex items-center gap-2 font-medium">
             <MessageSquare className="h-4 w-4" /> Mensagem
           </div>
