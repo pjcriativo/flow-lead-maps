@@ -51,6 +51,7 @@ export type Database = {
           email_opt_out: boolean;
           email_opt_out_em: string | null;
           opt_out_token: string | null;
+          sem_contato: boolean;
         };
         Insert: {
           id?: string;
@@ -94,6 +95,7 @@ export type Database = {
           email_opt_out?: boolean;
           email_opt_out_em?: string | null;
           opt_out_token?: string | null;
+          sem_contato?: boolean;
         };
         Update: {
           id?: string;
@@ -137,6 +139,7 @@ export type Database = {
           email_opt_out?: boolean;
           email_opt_out_em?: string | null;
           opt_out_token?: string | null;
+          sem_contato?: boolean;
         };
         Relationships: [];
       };

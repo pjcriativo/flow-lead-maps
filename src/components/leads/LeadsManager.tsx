@@ -78,6 +78,7 @@ export function LeadsManager({
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [listFilter, setListFilter] = useState<string>("all");
+  const [mostrarSemContato, setMostrarSemContato] = useState(false);
   const [enrichingId, setEnrichingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Lead | null>(null);
   const [detalhe, setDetalhe] = useState<Lead | null>(null);
@@ -117,6 +118,8 @@ export function LeadsManager({
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return leads.filter((l) => {
+      // Higiene: esconde "sem contato" (nem e-mail, nem WhatsApp, nem telefone) por padrão.
+      if (!mostrarSemContato && l.sem_contato) return false;
       if (statusFilter !== "all" && l.status !== statusFilter) return false;
       if (listFilter === "none" && l.list_id) return false;
       if (listFilter !== "all" && listFilter !== "none" && l.list_id !== listFilter) return false;
@@ -129,12 +132,14 @@ export function LeadsManager({
       );
     });
     // listFilter estava fora das deps — o filtro de lista não recalculava. Corrigido.
-  }, [leads, q, statusFilter, listFilter]);
+  }, [leads, q, statusFilter, listFilter, mostrarSemContato]);
+
+  const semContatoCount = useMemo(() => leads.filter((l) => l.sem_contato).length, [leads]);
 
   const ordenados = useMemo(() => [...filtered].sort((a, b) => b.score - a.score), [filtered]);
   useEffect(() => {
     setPagina(1);
-  }, [q, statusFilter, listFilter]);
+  }, [q, statusFilter, listFilter, mostrarSemContato]);
   const totalPaginas = Math.max(1, Math.ceil(ordenados.length / PAGE_SIZE));
   const paginaEfetiva = Math.min(pagina, totalPaginas);
   const paginados = paginar(ordenados, paginaEfetiva);
@@ -416,6 +421,16 @@ export function LeadsManager({
             ))}
           </SelectContent>
         </Select>
+        {semContatoCount > 0 && (
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={mostrarSemContato}
+              onChange={(e) => setMostrarSemContato(e.target.checked)}
+            />
+            Mostrar sem contato ({semContatoCount})
+          </label>
+        )}
       </div>
 
       {loading ? (

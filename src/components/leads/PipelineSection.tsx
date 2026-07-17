@@ -28,6 +28,7 @@ const LIMITE_INICIAL = 25; // cards renderizados por coluna antes do "ver mais"
 
 export function PipelineSection() {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [mostrarSemContato, setMostrarSemContato] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -145,9 +146,21 @@ export function PipelineSection() {
             Arraste um lead para mudar o status (salva na hora) · clique no card para ver o detalhe.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}>
-          <RefreshCw className="h-4 w-4" /> Atualizar
-        </Button>
+        <div className="flex items-center gap-3">
+          {leads.some((l) => l.sem_contato) && (
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={mostrarSemContato}
+                onChange={(e) => setMostrarSemContato(e.target.checked)}
+              />
+              Mostrar sem contato ({leads.filter((l) => l.sem_contato).length})
+            </label>
+          )}
+          <Button variant="outline" size="sm" onClick={load}>
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -166,7 +179,9 @@ export function PipelineSection() {
         className="flex h-[calc(100dvh-15rem)] min-w-0 gap-3 overflow-x-auto overflow-y-hidden pb-3"
       >
         {LEAD_STATUSES.map((status) => {
-          const items = leads.filter((l) => l.status === status);
+          const items = leads.filter(
+            (l) => l.status === status && (mostrarSemContato || !l.sem_contato),
+          );
           const limite = limiteDe(status);
           const visiveis = items.slice(0, limite);
           return (
