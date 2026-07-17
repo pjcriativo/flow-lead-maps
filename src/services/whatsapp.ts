@@ -124,6 +124,41 @@ export async function marcarAlertaLido(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ===== Campanha por WhatsApp (ETAPA 4) — envio de UM lead (o cliente orquestra o lote c/ jitter) =====
+export type WaCampEnvio = {
+  ok: boolean;
+  reason?: string;
+  para?: string;
+  chip?: string;
+  variacao?: string;
+  mensagem?: string;
+  error?: string;
+};
+
+/** Rótulos amigáveis dos motivos de não-envio (botão/lead que não saiu tem que se explicar). */
+export const WA_MOTIVO_LABEL: Record<string, string> = {
+  nao_aprovado: "ainda não aprovado (aprove p/ publicar o link)",
+  sem_link: "sem link publicado (aprove p/ publicar a prévia)",
+  sem_whatsapp: "lead sem WhatsApp",
+  opt_out: "lead pediu para não receber (opt-out)",
+  sem_chip: "nenhum chip de disparo conectado",
+  teto_dia: "teto diário do chip atingido",
+  ja_enviado: "já enviado nesta campanha",
+  sem_variacao: "nenhuma variação elegível",
+  envio_falhou: "falha no envio (Evolution)",
+  canal_errado: "campanha não é de WhatsApp",
+  campanha_concluida: "campanha concluída",
+};
+
+/** Envia a mensagem de campanha WhatsApp para UM campanha_lead (aprovado). */
+export async function enviarCampanhaLeadWa(campanha_lead_id: string): Promise<WaCampEnvio> {
+  const { data, error } = await supabase.functions.invoke("send-proposal-wa", {
+    body: { campanha_lead_id },
+  });
+  if (error) throw error;
+  return data as WaCampEnvio;
+}
+
 export type WaEnvio = { ok: boolean; para?: string; error?: string };
 
 /** Envia 1 mensagem de teste para um número (DDI+DDD). Erro real da Evolution. */

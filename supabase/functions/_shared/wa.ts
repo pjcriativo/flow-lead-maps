@@ -558,3 +558,108 @@ export async function graduarChipDoLead(
   );
   return { graduou: true, chip: chip.numero ?? chip.nome };
 }
+
+/* ---------------- ETAPA 4: envio de campanha por WhatsApp (motor compartilhado) ---------------- */
+
+// TETO DIÁRIO POR CHIP — diferente do e-mail (rampa por DOMÍNIO). Aqui o recurso que queima é o
+// NÚMERO, então o teto é por chip. É um BACKSTOP: a proteção principal contra ban é o intervalo
+// com jitter (vazão) + rodízio de chips + revezamento de texto. Conservador de propósito; dá pra
+// afrouxar por chip mais tarde. (Justificativa detalhada no relatório da ETAPA 4.)
+export const WA_TETO_DIARIO_CHIP = 40;
+
+/** Quantos envios ESTE chip já fez hoje (dia UTC) — consumo do teto diário por chip. */
+export async function enviosHojeDoChip(
+  admin: Admin,
+  userId: string,
+  instanciaId: string,
+): Promise<number> {
+  const inicioDia = new Date();
+  inicioDia.setUTCHours(0, 0, 0, 0);
+  const { count } = await admin
+    .from("wa_envios")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("instancia_id", instanciaId)
+    .gte("enviado_em", inicioDia.toISOString());
+  return count ?? 0;
+}
+
+/** Última variação enviada NESTA campanha — para não repetir a anterior (revezamento). */
+export async function ultimaVariacaoDaCampanha(
+  admin: Admin,
+  userId: string,
+  campanhaId: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("wa_envios")
+    .select("variacao_id")
+    .eq("user_id", userId)
+    .eq("campanha_id", campanhaId)
+    .order("enviado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.variacao_id ?? null;
+}
+
+/** Já enviamos pra este lead NESTA campanha? (idempotência do lote — não manda duas vezes.) */
+export async function jaEnviouNaCampanha(
+  admin: Admin,
+  userId: string,
+  campanhaId: string,
+  leadId: string,
+): Promise<boolean> {
+  const { data } = await admin
+    .from("wa_envios")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("campanha_id", campanhaId)
+    .eq("lead_id", leadId)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
+/** Envia texto por UMA instância (apikey = token do chip). Devolve o erro REAL da Evolution. */
+export async function enviarTextoInstancia(
+  token: string,
+  number: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string; data?: unknown }> {
+  const r = await fetch(`${waBase()}/send/text`, {
+    method: "POST",
+    headers: { apikey: token, "Content-Type": "application/json" },
+    body: JSON.stringify({ number, text }),
+  });
+  const raw = await r.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: any;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    data = { raw };
+  }
+  if (!r.ok) return { ok: false, error: data?.error ?? data?.message ?? `HTTP ${r.status}`, data };
+  return { ok: true, data };
+}
+
+/** Registra o envio (base da graduação, do histórico e do revezamento). */
+export async function registrarEnvio(
+  admin: Admin,
+  userId: string,
+  e: {
+    leadId: string;
+    instanciaId: string;
+    campanhaId: string | null;
+    variacaoId: string | null;
+    mensagem: string;
+  },
+): Promise<void> {
+  await admin.from("wa_envios").insert({
+    user_id: userId,
+    lead_id: e.leadId,
+    instancia_id: e.instanciaId,
+    campanha_id: e.campanhaId,
+    variacao_id: e.variacaoId,
+    mensagem: e.mensagem,
+  });
+}

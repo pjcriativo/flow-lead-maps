@@ -389,6 +389,8 @@ export type Database = {
           nome: string;
           status: string;
           criada_em: string;
+          canal: string;
+          wa_config: Json | null;
         };
         Insert: {
           id?: string;
@@ -397,6 +399,8 @@ export type Database = {
           nome: string;
           status?: string;
           criada_em?: string;
+          canal?: string;
+          wa_config?: Json | null;
         };
         Update: {
           id?: string;
@@ -405,6 +409,41 @@ export type Database = {
           nome?: string;
           status?: string;
           criada_em?: string;
+          canal?: string;
+          wa_config?: Json | null;
+        };
+        Relationships: [];
+      };
+      wa_envios: {
+        Row: {
+          id: string;
+          user_id: string;
+          lead_id: string;
+          instancia_id: string;
+          campanha_id: string | null;
+          enviado_em: string;
+          variacao_id: string | null;
+          mensagem: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          lead_id: string;
+          instancia_id: string;
+          campanha_id?: string | null;
+          enviado_em?: string;
+          variacao_id?: string | null;
+          mensagem?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          lead_id?: string;
+          instancia_id?: string;
+          campanha_id?: string | null;
+          enviado_em?: string;
+          variacao_id?: string | null;
+          mensagem?: string | null;
         };
         Relationships: [];
       };

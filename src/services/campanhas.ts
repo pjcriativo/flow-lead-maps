@@ -7,6 +7,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Campanha, CampanhaLeadView, Proposta } from "@/types";
 import { classificarMotivo } from "@/lib/copy-proposta";
+import { configPadraoWa, type WaCampanhaConfig } from "@/lib/wa-copy";
 import {
   injetarLinkPrevia,
   enviarProposta,
@@ -34,13 +35,15 @@ const CONTAGEM_VAZIA = {
 };
 
 /** Lista as campanhas do usuário com as contagens dos leads por estado. 'enviado' =
- * lead aprovado cuja proposta já saiu (proposta.status='enviada'). */
-export async function listarCampanhas(): Promise<Campanha[]> {
+ * lead aprovado cuja proposta já saiu (proposta.status='enviada'). Filtra por CANAL
+ * (default 'email' — preserva a tela de e-mail; a tela de WhatsApp passa 'whatsapp'). */
+export async function listarCampanhas(canal: "email" | "whatsapp" = "email"): Promise<Campanha[]> {
   const [{ data: camps, error: cErr }, { data: cls, error: clErr }, { data: props, error: pErr }] =
     await Promise.all([
       supabase
         .from("campanhas")
         .select("id, list_id, nome, status, criada_em")
+        .eq("canal", canal)
         .order("criada_em", { ascending: false }),
       supabase.from("campanha_leads").select("campanha_id, estado, proposta_id"),
       supabase.from("propostas").select("id, status").not("campanha_id", "is", null),
@@ -120,6 +123,98 @@ export async function criarCampanhaDaLista(
     throw new Error("Falha ao adicionar os leads à campanha: " + iErr.message);
   }
   return { campanha_id: camp.id, total: leadIds.length };
+}
+
+/** Cria a campanha de WhatsApp de uma lista. Mesmo motor (custo zero, só campanha_leads
+ * 'pendente'); a diferença é canal='whatsapp' + wa_config (variações + intervalo padrão). */
+export async function criarCampanhaWaDaLista(
+  listId: string,
+  nome: string,
+): Promise<{ campanha_id: string; total: number }> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const userId = userRes.user?.id;
+  if (!userId) throw new Error("Não autenticado");
+
+  const { data: leadsDaLista, error: lErr } = await supabase
+    .from("leads")
+    .select("id")
+    .eq("list_id", listId);
+  if (lErr) throw lErr;
+  const leadIds = (leadsDaLista ?? []).map((l) => (l as { id: string }).id);
+  if (leadIds.length === 0) throw new Error("Esta lista está vazia — não há leads.");
+
+  const { data: camp, error: cErr } = await supabase
+    .from("campanhas")
+    .insert({
+      user_id: userId,
+      list_id: listId,
+      nome: nome.trim() || "Campanha WhatsApp",
+      status: "ativa",
+      canal: "whatsapp",
+      wa_config: configPadraoWa(),
+    })
+    .select("id")
+    .single();
+  if (cErr || !camp) throw new Error(cErr?.message ?? "Falha ao criar a campanha");
+
+  const linhas = leadIds.map((lead_id) => ({
+    campanha_id: camp.id,
+    lead_id,
+    user_id: userId,
+    estado: "pendente",
+  }));
+  const { error: iErr } = await supabase.from("campanha_leads").insert(linhas);
+  if (iErr) {
+    await supabase.from("campanhas").delete().eq("id", camp.id);
+    throw new Error("Falha ao adicionar os leads à campanha: " + iErr.message);
+  }
+  return { campanha_id: camp.id, total: leadIds.length };
+}
+
+/** Lê a config de WhatsApp de uma campanha (variações + intervalo). Preenche defaults se faltar. */
+export async function obterWaConfig(campanhaId: string): Promise<WaCampanhaConfig> {
+  const { data, error } = await supabase
+    .from("campanhas")
+    .select("wa_config")
+    .eq("id", campanhaId)
+    .single();
+  if (error) throw error;
+  const cfg = (data?.wa_config as Partial<WaCampanhaConfig> | null) ?? {};
+  const padrao = configPadraoWa();
+  return {
+    intervalo_min: cfg.intervalo_min ?? padrao.intervalo_min,
+    intervalo_max: cfg.intervalo_max ?? padrao.intervalo_max,
+    variacoes: cfg.variacoes?.length ? cfg.variacoes : padrao.variacoes,
+  };
+}
+
+/** Salva a config de WhatsApp (variações/intervalo) da campanha. */
+export async function salvarWaConfig(campanhaId: string, cfg: WaCampanhaConfig): Promise<void> {
+  const { error } = await supabase
+    .from("campanhas")
+    .update({ wa_config: cfg })
+    .eq("id", campanhaId);
+  if (error) throw error;
+}
+
+/** Conta quantos leads já receberam WhatsApp nesta campanha (ledger wa_envios). */
+export async function contarEnviadosWa(campanhaId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("wa_envios")
+    .select("id", { count: "exact", head: true })
+    .eq("campanha_id", campanhaId);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** Ids dos leads que já receberam WhatsApp nesta campanha (p/ marcar "enviado" na lista). */
+export async function leadsEnviadosWa(campanhaId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("wa_envios")
+    .select("lead_id")
+    .eq("campanha_id", campanhaId);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => (r as { lead_id: string }).lead_id));
 }
 
 /** Carrega a revisão em lote: cada lead da campanha + o que já foi preparado
