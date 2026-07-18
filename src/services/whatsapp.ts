@@ -150,6 +150,7 @@ export const WA_MOTIVO_LABEL: Record<string, string> = {
   sem_whatsapp: "lead sem WhatsApp",
   opt_out: "lead pediu para não receber (opt-out)",
   sem_chip: "nenhum chip de disparo conectado",
+  chip_desconectado: "chip de disparo não está pareado/logado (reconecte na aba WhatsApp)",
   teto_dia: "teto diário do chip atingido",
   ja_enviado: "já enviado nesta campanha",
   sem_variacao: "nenhuma variação elegível",

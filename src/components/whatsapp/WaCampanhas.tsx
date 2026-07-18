@@ -155,7 +155,10 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
       ]);
       setLeads(ls);
       setScripts(sc);
-      setTemChipDisparo(chips.some((c) => c.funcao === "disparo" && c.status === "conectado"));
+      // 'conectado' sozinho engana (fica true num chip nunca pareado). Exige NÚMERO pareado.
+      setTemChipDisparo(
+        chips.some((c) => c.funcao === "disparo" && c.status === "conectado" && !!c.numero),
+      );
       const env = await enviadosPorCampanhaWa(camps.map((c) => c.id)).catch(
         () => ({}) as Record<string, number>,
       );
@@ -418,8 +421,11 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           setEstados((e) => ({ ...e, [alvos[i].id]: { ...st, estado: "enviado" } }));
         } else {
           motivos[env.reason ?? "erro"] = (motivos[env.reason ?? "erro"] ?? 0) + 1;
-          if (env.reason === "sem_chip") {
-            toast.error("Sem chip de disparo — disparo pausado.");
+          // sem chip real (ou chip não pareado/logado): pausa e explica o que fazer.
+          if (env.reason === "sem_chip" || env.reason === "chip_desconectado") {
+            toast.error(
+              `${WA_MOTIVO_LABEL[env.reason]} — disparo pausado. Conecte um chip de disparo na aba WhatsApp.`,
+            );
             break;
           }
         }
@@ -429,7 +435,10 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
       const resumo = Object.entries(motivos)
         .map(([k, n]) => `${n} ${WA_MOTIVO_LABEL[k] ?? k}`)
         .join(" · ");
-      toast.success(`Disparados ${ok}/${alvos.length}.` + (resumo ? ` Fora: ${resumo}.` : ""));
+      // HONESTO: só "sucesso" (verde) se ALGO saiu de verdade. 0 enviados = erro, não sucesso.
+      const msg = `Disparados ${ok}/${alvos.length}.` + (resumo ? ` Fora: ${resumo}.` : "");
+      if (ok > 0) toast.success(msg);
+      else toast.error(msg || "Nada foi enviado.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha no disparo");
     } finally {

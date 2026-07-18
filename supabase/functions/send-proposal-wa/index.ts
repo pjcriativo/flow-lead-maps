@@ -14,6 +14,7 @@ import {
   waBase,
   proximaInstanciaDisparo,
   enviarTextoInstancia,
+  statusInstancia,
   enviosHojeDoChip,
   ultimaVariacaoDaCampanha,
   jaEnviouNaCampanha,
@@ -121,9 +122,15 @@ Deno.serve(async (req) => {
   }
   if (!link) return json({ ok: false, reason: "sem_link" });
 
-  // 6) chip de disparo conectado (proximaInstanciaDisparo NUNCA devolve 'conversa'/flowleads).
+  // 6) chip de disparo conectado (proximaInstanciaDisparo NUNCA devolve 'conversa'/flowleads e
+  //    exige número pareado). Ainda assim, confirma AO VIVO na Evolution que está LOGADO (loggedIn
+  //    = pareado de verdade; 'Connected' engana). Sem isso, NÃO envia e NÃO marca — a regra é só
+  //    marcar 'enviado' quando a Evolution puder de fato entregar.
   const chip = await proximaInstanciaDisparo(admin, userId);
   if (!chip) return json({ ok: false, reason: "sem_chip" });
+  const st = await statusInstancia(chip.token);
+  if (!st?.loggedIn)
+    return json({ ok: false, reason: "chip_desconectado", chip: chip.numero ?? chip.nome });
 
   // 7) teto diário POR CHIP (backstop; a vazão real é o intervalo do cliente).
   const hoje = await enviosHojeDoChip(admin, userId, chip.id);

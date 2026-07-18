@@ -1,0 +1,102 @@
+﻿id,business_name,address,city,state,zip,category,phone,email,whatsapp,website,place_id,rating,review_count,score,status,created_at
+6163d76e-a410-41de-9f37-539b2e576025,Gilson,Rua Guilherme Ihlenfeldt,Curitiba,PR,,dentist,,,,,osm:node/4821559422,,0,0,new,2026-07-12T00:37:12.654965+00:00
+e11f1903-334b-497e-ab95-8707b7c10413,Namu Royal,"Rua Mateus Leme, 1481",Curitiba,PR,,pet,,,,,osm:node/6177562153,,0,84,new,2026-07-12T01:28:45.807651+00:00
+208a2110-c1a0-44bb-bbc5-db11ad9392b1,Agri Avícola Uberaba,,Curitiba,PR,,pet,,,,,osm:way/694282696,,0,84,new,2026-07-12T01:28:47.484138+00:00
+d9b3d2de-ce19-4f16-a8b3-c91fac9ac872,Arca de Noé,,Curitiba,PR,,veterinary,,,,,osm:node/3015080062,,0,84,new,2026-07-12T01:28:49.562196+00:00
+7ece4f66-01d9-4f6d-9a54-82668d73e9ba,Vita Cão,"Rua Murilo do Amaral Ferreira, 81 — Água Verde",Curitiba,PR,,pet,,,,,osm:way/990575417,,0,84,new,2026-07-12T01:28:48.013892+00:00
+e1f531f5-b185-4534-8fa2-8d6491a5f9c9,Pathas Reabilitação Animal,"Rua Professor João Argemiro Loyola, 393 — Seminário",Curitiba,PR,,veterinary,,,,,osm:node/6177580640,,0,84,new,2026-07-12T01:28:50.564075+00:00
+7abcaf1d-4d86-4181-8b55-7ae90690242a,iDent,Rua Barão do Serro Azul — Centro,Curitiba,PR,,dentist,,,,,osm:node/4245026078,,0,0,new,2026-07-12T00:37:11.950562+00:00
+ae277da3-8066-4975-883f-ead70e8e51f7,Odonto Centro,Rua Pedro Ivo,Curitiba,PR,,dentist,,,,,osm:node/4302457106,,0,0,new,2026-07-12T00:37:12.093067+00:00
+52819000-ad91-44d5-993a-3da0ddddc8b9,Clínica Odontológica 24H,,Curitiba,PR,,dentist,,,,,osm:node/4599659966,,0,0,new,2026-07-12T00:37:12.489631+00:00
+a470cb18-e3f8-4552-b1b8-cae9ae610a5a,Clínica Odontológica,,Curitiba,PR,,dentist,,,,,osm:node/851168615,,0,0,new,2026-07-12T00:37:11.099643+00:00
+993c0757-3681-4710-b8df-53597a905822,Parisi Advogados Associados,"Rua Campos Sales, 611",SÃO PAULO,SP,,lawyer,,,,,osm:node/4283285488,,0,84,new,2026-07-14T17:58:14.483313+00:00
+b79be1f4-f0ee-4054-8f42-044106c630e5,Dentville Ortodontia,,Curitiba,PR,,dentist,,,,,osm:node/4052717624,,0,0,new,2026-07-12T00:37:11.388068+00:00
+94effd4a-f8c6-45ef-97b9-75fb05c247cc,Bucalle Odontologia,"Avenida Vereador Toaldo Túlio, 3158",Curitiba,PR,,dentist,,,,,osm:node/3600438603,,0,0,new,2026-07-12T00:37:11.246876+00:00
+88d115f8-4271-473e-8177-04cbee038624,Doutora Larissa Carvalho,"Avenida Visconde de Guarapuava, 970",Curitiba,PR,,dentist,,,,,osm:node/6175227908,,0,0,new,2026-07-12T00:37:17.094356+00:00
+d2d7bfff-8857-437e-94b5-566e01d4dbee,Dra. Daniele Maia,"Rua Goiás, 39",Curitiba,PR,,dentist,,,,,osm:node/6186206023,,0,0,new,2026-07-12T00:37:17.242423+00:00
+930ee6fa-6847-4fe0-82c6-5fbaa07598ac,Cavassin e Boeing,,Curitiba,PR,,dentist,,,,,osm:node/6605852350,,0,0,new,2026-07-12T00:37:18.076248+00:00
+c259d3bd-c364-41f3-8f32-7bbe4a082ccf,Consultório Odontológico,"Rua Lupionópolis, 933 — Sítio Cerrado",Curitiba,PR,,dentist,,,,,osm:node/6358358493,,0,0,new,2026-07-12T00:37:17.790168+00:00
+8a6bae40-95bd-44f8-9bda-f9c7d42b37d2,Doutora Valéria Karly,"Rua Clara Polsin, 161 — Novo Mundo",Curitiba,PR,,dentist,,,,,osm:node/6359066464,,0,0,new,2026-07-12T00:37:17.935562+00:00
+4506582b-1db9-41dc-8ee1-5f52ac78cf1d,COI Consultórios Odontológicos Integrados,,Curitiba,PR,,dentist,,,,,osm:node/12121967936,,0,0,new,2026-07-12T00:37:18.943719+00:00
+bbe5de9b-9782-4d26-9fba-97ca5afae312,Verona Odontologia e Estética,"Rua Petit Carneiro, 453",Curitiba,PR,,dentist,,,,,osm:way/259220427,,0,0,new,2026-07-12T00:37:19.240484+00:00
+51564783-1ce7-4cfa-bf86-d1fa61091fac,Dra Anna Carolina Z. de pauli - Odontologia,,Curitiba,PR,,dentist,,,,,osm:way/1280404581,,0,0,new,2026-07-12T00:37:19.952204+00:00
+abefb25c-1363-4e99-b957-997d39041975,Focinho e Cia,"Avenida Vereador Toaldo Túlio, 1810",Curitiba,PR,,pet,,,,,osm:node/3600490008,,0,84,new,2026-07-12T01:28:42.267118+00:00
+8ae42220-4e2a-41fa-bcd6-33bc2c25a202,Pet Shop Paparicando,Avenida Vereador Toaldo Túlio,Curitiba,PR,,pet,,,,,osm:node/3600510005,,0,84,new,2026-07-12T01:28:42.440295+00:00
+1bcf0e4e-f7a0-42db-a738-15e93a1cd149,Koala Pet Shop,"Avenida Vereador Toaldo Túlio, 2984",Curitiba,PR,,pet,,,,,osm:node/3602519216,,0,84,new,2026-07-12T01:28:42.600945+00:00
+3c43eabd-7d4e-429b-beec-a284cc8fabf6,Pet Shop Souza,,Curitiba,PR,,pet,,,,,osm:node/4055423865,,0,84,new,2026-07-12T01:28:42.746859+00:00
+4234cee2-92ca-4922-81ac-87caeaa7262c,King & Lord,,Curitiba,PR,,pet,,,,,osm:node/4075170315,,0,84,new,2026-07-12T01:28:43.158856+00:00
+4b4172a1-011a-4920-b5cd-5e231c694bff,Aviário,,Curitiba,PR,,pet,,,,,osm:node/4411627388,,0,84,new,2026-07-12T01:28:43.863229+00:00
+b997bea2-4114-49a7-98a0-2da82222c319,Cobasi,,Curitiba,PR,,pet,,,,,osm:node/4972834480,,0,84,new,2026-07-12T01:28:44.153126+00:00
+14b9fbdb-92bd-4a74-8c45-4f861815c54d,Petz,,Curitiba,PR,,pet,,,,,osm:node/5340760768,,0,84,new,2026-07-12T01:28:44.547966+00:00
+51343d31-5e8f-4f75-9290-8dd6e135281e,Casa do Pluto,,Curitiba,PR,,pet,,,,,osm:node/6080471885,,0,84,new,2026-07-12T01:28:45.100417+00:00
+60b87047-ce98-4f29-8b20-292417f8d22c,Picuxa's,"Rua Francisco Alves Guimarães, 304",Curitiba,PR,,pet,,,,,osm:node/6173726341,,0,84,new,2026-07-12T01:28:45.382732+00:00
+8c421d56-d4af-4b6f-a933-f46e26c232dd,Bichoteca,"Rua José de Alencar, 20",Curitiba,PR,,pet,,,,,osm:node/6173726367,,0,84,new,2026-07-12T01:28:45.524186+00:00
+330b279f-dfeb-4049-ac58-afb35367f23b,Patê du Gato,"Avenida Presidente Affonso Camargo, 849",Curitiba,PR,,pet,,,,,osm:node/6173726826,,0,84,new,2026-07-12T01:28:45.664487+00:00
+7431b2a3-eab4-4526-bd89-c19782bc8145,Pet Shop Cão Social,"Rua Lange de Morretes, 318 — Jardim Social",Curitiba,PR,,pet,,,,,osm:node/6172139567,,0,84,new,2026-07-12T01:28:45.241882+00:00
+06815acc-c418-4ce7-b96e-efb5faa800e2,Petz,"Rua Mateus Leme, 1875",Curitiba,PR,,pet,,,,,osm:node/6177562166,,0,84,new,2026-07-12T01:28:45.953805+00:00
+091a40db-38be-4f7a-a495-726cc192debb,Yumi Espaço Pet,"Rua Vereador Adeodato Volpi, 140",Curitiba,PR,,pet,,,,,osm:node/6359105055,,0,84,new,2026-07-12T01:28:46.442218+00:00
+e12358c4-fd53-404b-aff9-9076a24060d9,Pet Millan Pet Shop,"Avenida Victor Ferreira do Amaral, 743",Curitiba,PR,,pet,,,,,osm:node/12814103085,,0,84,new,2026-07-12T01:28:46.733183+00:00
+f67fb682-e15c-4893-a275-ff8eeafdb46b,Pet Campo,"Avenida Comendador Franco, 5462",Curitiba,PR,,pet,,,,,osm:way/349243713,,0,84,new,2026-07-12T01:28:47.050715+00:00
+c4e30629-bd4a-4a6c-b110-ab99374a11cb,Aviário,"Rua Raposo Tavares, 698",Curitiba,PR,,pet,,,,,osm:way/544736585,,0,84,new,2026-07-12T01:28:47.189951+00:00
+38e1d3d3-40c3-45e2-893a-0492b0b12a9b,Casa do Produtor,"Avenida Vereador Toaldo Túlio, 4110 — São Braz",Curitiba,PR,,pet,,,,,osm:node/6530442162,,0,84,new,2026-07-12T01:28:46.586801+00:00
+992a9410-7215-4be9-9289-e85af6f6afb4,Hiperzoo Mercês,"Avenida Manoel Ribas, 1537 — Mercês",Curitiba,PR,,pet,,,,,osm:way/583372013,,0,84,new,2026-07-12T01:28:47.344007+00:00
+608ae669-f0bb-4038-8ff7-3da1490c1797,Agrotiba,,Curitiba,PR,,pet,,,,,osm:way/727461894,,0,84,new,2026-07-12T01:28:47.636214+00:00
+4965869e-e3df-40ce-bee0-14337c9ce7b1,Aviário Bom pra Cachorro,,Curitiba,PR,,pet,,,,,osm:way/739568116,,0,84,new,2026-07-12T01:28:47.778514+00:00
+9124e2e7-c282-474e-9454-f47f0d1e00db,Petshop lizzi's,,Curitiba,PR,,pet,,,,,osm:way/1273154318,,0,84,new,2026-07-12T01:28:48.947708+00:00
+fe033961-e3a9-427a-b281-c9b189e2e754,Yoou dog - pet shop,,Curitiba,PR,,pet,,,,,osm:way/1296681702,,0,84,new,2026-07-12T01:28:49.105608+00:00
+8588962c-e34f-440f-a964-d6309d1745d1,Clinica Veterinaria Farol,,Curitiba,PR,,veterinary,,,,,osm:node/1749098453,,0,84,new,2026-07-12T01:28:49.245149+00:00
+274a0137-9266-4e06-8062-51f8fde6046e,Animal Clinic,,Curitiba,PR,,veterinary,,,,,osm:node/2841539030,,0,84,new,2026-07-12T01:28:49.405409+00:00
+2f72e910-67c9-444f-810d-63bd8681fce7,Clínica Veterinária DoctorVet,"Rua Mateus Leme, 3312",Curitiba,PR,,veterinary,,,,,osm:node/6139444522,,0,84,new,2026-07-12T01:28:49.701076+00:00
+8b34b8aa-40e8-4dba-bedf-725e68aa0792,Pet Tutti,"Avenida Vereador Toaldo Túlio, 985",Curitiba,PR,,veterinary,,,,,osm:node/6170764228,,0,84,new,2026-07-12T01:28:49.852601+00:00
+7e6256ef-a89b-4b2f-9020-7692a3d2e6d0,Garra,"Rua Padre Germano Mayer, 319",Curitiba,PR,,veterinary,,,,,osm:node/6173725270,,0,84,new,2026-07-12T01:28:50.142371+00:00
+1501d6e5-cb07-4ec4-9c3a-b04b41e0fc7d,Vetsan,"Avenida São José, 713",Curitiba,PR,,veterinary,,,,,osm:node/6173725608,,0,84,new,2026-07-12T01:28:50.28181+00:00
+77d67db5-a6ca-4630-b6b4-2f42445bc946,Clínica Veterinária Fica Comigo,"Rua Marechal Deodoro, 1864",Curitiba,PR,,veterinary,,,,,osm:node/6175225785,,0,84,new,2026-07-12T01:28:50.425269+00:00
+6db801a4-4c13-40ab-aed1-68d090ac5b38,Pangea Zoo,"Avenida Nossa Senhora Aparecida, 49",Curitiba,PR,,veterinary,,,,,osm:node/6177580993,,0,84,new,2026-07-12T01:28:50.704311+00:00
+b1bf622b-e399-4dd2-84f0-ca6136eb3dba,S.AU.S.,"Rua Professor João Falarz, 1291",Curitiba,PR,,veterinary,,,,,osm:node/6359335189,,0,84,new,2026-07-12T01:28:50.846918+00:00
+d5500bba-89be-4a7a-aae9-d61875b0d8b8,Pet Haus,"Rua Antônio Costa, 486",Curitiba,PR,,veterinary,,,,,osm:node/6518647046,,0,84,new,2026-07-12T01:28:50.98842+00:00
+7ce6f6b3-bd3a-47ca-889f-c0d095c3fbe6,Nascimento Araújo Advogados,"R. das Bromélias - Colônia (Zona Sul), São Paulo - SP, 04895-350, Brasil",SÃO PAULO,SP,,Advogado,,,,,apify:ChIJcWl5OwA3zpQRPzbfVdRktAw,5,1,86,new,2026-07-14T17:58:58.256512+00:00
+7e6e1eb0-acaa-4a98-9ae7-9c32cccbac90,ZAH ADVOGADOS,"Estr. Ecoturística de Parelheiros, 6359 - Lj 6 - Parelheiros, São Paulo - SP, 04890-380, Brasil",SÃO PAULO,SP,,Advogado,,,,,apify:ChIJc5PdOgBJzpQRVKiBtOH0YU0,,0,84,new,2026-07-14T17:58:58.974926+00:00
+665ec3a2-1dcd-4237-894c-a1495eb3af93,Poupatempo agendamentoal,"Av. do Contôrno, s/n - Itaquera, São Paulo - SP, 08220-380, Brasil",SÃO PAULO,SP,,Serviços jurídicos,,,,,apify:ChIJ3bqvJIk1zpQRivgJIDf9U1E,3.3,4,84,new,2026-07-14T17:58:59.830957+00:00
+e02eede0-a48f-4b6c-bdd4-61144b46bac8,Luís,,Curitiba,PR,,dentist,,,,,osm:node/5179851076,,0,84,new,2026-07-14T22:22:09.902231+00:00
+4980e565-3947-4725-995b-49ca6d9297ba,iDent,"iDent, Rua Barão do Serro Azul, Centro, Curitiba - PR, 80020-180, Brasil",Curitiba,PR,,healthcare,,,,,geoapify:51d91a5b199ea248c059c5872359d16c39c0f00103f9011ef505fd000000009203056944656e74,,0,84,new,2026-07-14T22:22:13.258569+00:00
+2a3bea12-ceb4-4a95-b2d3-4e89091f0d8a,Dr. Emerson Maia,"Rua Rio Trombetas, 479",Curitiba,PR,,dentist,,,,,osm:node/11240923418,,0,84,new,2026-07-14T22:22:10.060429+00:00
+d2843249-4820-4957-ab91-1f4e24c1881e,Odonto Centro,"Odonto Centro, Rua Pedro Ivo, Centro, Curitiba - PR, 80010-120, Brasil",Curitiba,PR,,healthcare,,,,,geoapify:511db68883dfa248c059336486d73f6f39c0f00103f901124972000100000092030d4f646f6e746f2043656e74726f,,0,84,new,2026-07-14T22:22:13.665142+00:00
+7fe06376-9970-4a6d-842c-d222bec2c370,Jaques Janini,"Avenida Nova Cantareira, 2590",SÃO PAULO,SP,,beauty,,,,,osm:node/4089841642,,0,84,new,2026-07-12T02:42:35.941171+00:00
+1b53d403-4499-414f-b536-1cf551bd5943,Onodera,"Avenida Júlio de Mesquita, 939 — Cambuí",SÃO PAULO,SP,,beauty,,,,,osm:node/4205522908,,0,84,new,2026-07-12T02:42:36.251729+00:00
+02372fef-a63d-4e01-a40b-ca4dc7a12165,SR & SRA Almeida,"Avenida Jaguaré, 287A — Jaguaré",SÃO PAULO,SP,,beauty,,,,,osm:node/4823782685,,0,84,new,2026-07-12T02:42:38.634308+00:00
+bd7513c1-5dd2-43a6-8c0e-036cf2ee6ca4,Gio Laser,"Avenida Nova Cantareira, 339 — Tucuruvi",SÃO PAULO,SP,,beauty,,,,,osm:node/4089841571,,0,84,new,2026-07-12T02:42:35.801116+00:00
+c5a8bdd8-477c-46d5-a275-73de7cac5c67,Sunny Beleza & Bem Estar,"Rua Camilo, 631",SÃO PAULO,SP,,beauty,,,,,osm:node/2377154922,,0,84,new,2026-07-12T02:42:34.684909+00:00
+4a01e496-2764-44b2-9a4c-c6491896b6b1,Studio Fran´s Assis,"Avenida Conceição, 2159",SÃO PAULO,SP,,beauty,,,,,osm:node/2938280856,,0,84,new,2026-07-12T02:42:35.079657+00:00
+c55eec44-8ade-414f-a2f3-e4e4bc0cc495,Onodera,"Rua Augusta, 1987",SÃO PAULO,SP,,beauty,,,,,osm:node/3046163095,,0,84,new,2026-07-12T02:42:35.232985+00:00
+aa41fcaa-91cd-401c-81c3-7fb7c3c905f4,Tati Pinon,"Rua Voluntários da Pátria, 2607",SÃO PAULO,SP,,beauty,,,,,osm:node/3429080205,,0,84,new,2026-07-12T02:42:35.381785+00:00
+d87389f9-54f0-4931-93dd-e6846e444e52,Divina Santa,"Rua Maria Cândida, 1651",SÃO PAULO,SP,,beauty,,,,,osm:node/3573398147,,0,84,new,2026-07-12T02:42:35.662039+00:00
+c282f412-2f85-45f8-9709-575c9e17ad97,Studio Kona,"Rua Cardeal Arcoverde, 321",SÃO PAULO,SP,,beauty,,,,,osm:node/4230738241,,0,84,new,2026-07-12T02:42:36.389969+00:00
+00e3eb1c-2943-40e5-95f8-71bc30df346e,Tatuaria Zero Onze Tattoo,"Rua Inácio Pereira da Rocha, 248",SÃO PAULO,SP,,beauty,,,,,osm:node/4277045792,,0,84,new,2026-07-12T02:42:36.529058+00:00
+44d6ad73-131b-41a6-a9ef-16dce428e1a2,D`pil depilação,"Rua Maria Cândida, 1818",SÃO PAULO,SP,,beauty,,,,,osm:node/4453259937,,0,84,new,2026-07-12T02:42:36.668534+00:00
+742fbe83-fc38-4ba5-b781-a05cc2eea5a6,Pimentel Hair,"Avenida Conceição, 2245",SÃO PAULO,SP,,beauty,,,,,osm:node/4490979225,,0,84,new,2026-07-12T02:42:36.946423+00:00
+42ffdb22-8a64-4f88-92aa-b050179e39cb,Lu Cabelereira,"Avenida Conceição, 3988A",SÃO PAULO,SP,,beauty,,,,,osm:node/4538209872,,0,84,new,2026-07-12T02:42:37.224539+00:00
+a9af5f46-184b-467e-b0d8-ef9548f57cde,Das Meninas,"Rua Doutor Vieira Bueno, 358",SÃO PAULO,SP,,beauty,,,,,osm:node/4549175794,,0,84,new,2026-07-12T02:42:37.364128+00:00
+87bf4d83-fe42-431e-955e-34f7538cfde4,Miss Nail,"Rua Doutor Vieira Bueno, 193",SÃO PAULO,SP,,beauty,,,,,osm:node/4549175806,,0,84,new,2026-07-12T02:42:37.503613+00:00
+ca62f149-12d3-4b7b-a53c-a3d4184832ed,SPÉS,,SÃO PAULO,SP,,beauty,,,,,osm:node/4549175817,,0,84,new,2026-07-12T02:42:37.646424+00:00
+fbab1057-6683-413c-9dee-f4223318929d,Podologa,"Rua João de Souto Maior, 286",SÃO PAULO,SP,,beauty,,,,,osm:node/4553889503,,0,84,new,2026-07-12T02:42:37.78497+00:00
+d9e4da06-8b1a-4338-8926-a156ad6cd1a3,Armazém Di Belezza,,SÃO PAULO,SP,,beauty,,,,,osm:node/4559198082,,0,84,new,2026-07-12T02:42:37.924982+00:00
+4dff1fa9-a520-4dce-a999-e76df74a809a,Ophel,Avenida Benjamin Constant,SÃO PAULO,SP,,beauty,,,,,osm:node/4559198556,,0,84,new,2026-07-12T02:42:38.064916+00:00
+99f1dc87-20e3-446f-8bd5-261b104598d7,Fatima Cabelereiros,"Rua Afonso Arinos, 222",SÃO PAULO,SP,,beauty,,,,,osm:node/4665883183,,0,84,new,2026-07-12T02:42:38.203848+00:00
+128ab735-c4a4-49e3-bd66-844a0729e574,Sculpteur,"Rua José de Almeida, 27",SÃO PAULO,SP,,beauty,,,,,osm:node/4767950225,,0,84,new,2026-07-12T02:42:38.358434+00:00
+42f2af79-454c-4c50-92e5-3f15a626b7b3,Spa das Sobrancelhas,,SÃO PAULO,SP,,beauty,,,,,osm:node/4820995456,,0,84,new,2026-07-12T02:42:38.495527+00:00
+1aef3a74-75b4-41c6-b473-ec4c437aee6a,Johnny`s Cabelereiros,"Rua Aurora, 854",SÃO PAULO,SP,,beauty,,,,,osm:node/4845929872,,0,84,new,2026-07-12T02:42:38.773206+00:00
+36611731-97a3-4c2b-8b19-b1529f1d1b2c,ReCabeleleiro: Salão de Beleza,Rua Nova Aliança,SÃO PAULO,SP,,beauty,,,,,osm:node/4870735125,,0,84,new,2026-07-12T02:42:39.051746+00:00
+3d82e90d-e7cb-4c95-ba36-a096ea98bdd6,New Look Cabeleireiros,"Rua Cunha Horta, 45",SÃO PAULO,SP,,beauty,,,,,osm:node/4906018767,,0,84,new,2026-07-12T02:42:39.339392+00:00
+76239e62-d987-41c8-bcb5-4cf90ce86df4,Studio Haddock,"Rua Haddock Lobo, 341",SÃO PAULO,SP,,beauty,,,,,osm:node/4913151133,,0,84,new,2026-07-12T02:42:39.479744+00:00
+f800befa-4b6e-44f8-8c38-a3cfc9d127ad,Nova Arte,"Rua Fernando de Albuquerque, 33",SÃO PAULO,SP,,beauty,,,,,osm:node/4992752356,,0,84,new,2026-07-12T02:42:39.620295+00:00
+7f344ee8-6761-4283-8611-67e646c97be8,Hair Company,"Rua Haddock Lobo, 69",SÃO PAULO,SP,,beauty,,,,,osm:node/4992752385,,0,84,new,2026-07-12T02:42:39.75926+00:00
+74d20fd6-ce21-4c35-b3c8-c9ea09b52056,Espaço Hair,"Rua Bela Cintra, 693",SÃO PAULO,SP,,beauty,,,,,osm:node/4992752409,,0,84,new,2026-07-12T02:42:39.898327+00:00
+c5fade51-84d6-45e8-a5a7-6e4f9116a4e0,Estica Bio Corpo,"Rua Major Sertório, 764",SÃO PAULO,SP,,beauty,,,,,osm:node/5244279316,,0,84,new,2026-07-12T02:42:40.036802+00:00
+fce7ac87-6acd-4ba1-b1ad-66db406a2342,Você sempre pronta,"Rua Dona Antônia de Queirós, 353",SÃO PAULO,SP,,beauty,,,,,osm:node/5620365727,,0,84,new,2026-07-12T02:42:40.32896+00:00
+4e503bed-9cb6-4604-9ab7-191e6251b46f,Espaço Lazer,,SÃO PAULO,SP,,beauty,,,,,osm:node/5640014785,,0,84,new,2026-07-12T02:42:40.46874+00:00
+df7c6f6e-c38b-4b2e-901f-5679ead87e97,Studio LC cabelereiros,"Rua Arruda Alvim, 109",SÃO PAULO,SP,,beauty,,,,,osm:node/5688307575,,0,84,new,2026-07-12T02:42:40.751011+00:00
+30427ae3-9cc1-4e39-bfc5-b793e53c3569,Depilação Andressa,"Rua Artur de Azevedo, 1242",SÃO PAULO,SP,,beauty,,,,,osm:node/5812499655,,0,84,new,2026-07-12T02:42:43.30811+00:00
+74655928-89e2-42d7-a5c0-365d9d8391be,Elisa Hair,"Rua Frei Caneca, 961",SÃO PAULO,SP,,beauty,,,,,osm:node/6439744252,,0,84,new,2026-07-12T02:42:53.412844+00:00
+8b543c07-70e3-4157-9ac4-06883689dd8d,Ducharm,"Rua Tavares Cabral, 170",SÃO PAULO,SP,,beauty,,,,,osm:node/6548005925,,0,84,new,2026-07-12T02:42:53.552016+00:00
+1e97ec04-a977-4f0f-ba74-b718c9a54df2,Alan barbosa,"R. São Paulo - Parque Recreio, São Paulo - SP, 04894-000, Brasil",SÃO PAULO,SP,,Clínica odontológica,,,,,apify:ChIJHebUKVhJzpQR8SoJzCPop0U,,0,84,new,2026-07-12T03:52:56.607607+00:00
+3bda6c59-150a-457f-8a20-51776743a8b7,Royal Pet,"Rua Professor João Soares Barcelos, 2099 — Hauer",Curitiba,PR,,pet,,,,,osm:node/6358800848,,0,84,new,2026-07-12T01:28:46.299981+00:00

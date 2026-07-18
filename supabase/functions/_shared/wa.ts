@@ -371,6 +371,9 @@ export async function proximaInstanciaDisparo(
     .eq("user_id", userId)
     .eq("funcao", "disparo")
     .eq("status", "conectado")
+    // 'conectado' (Connected) é ENGANOSO: fica true até num chip NUNCA pareado (ver decidirSaude).
+    // Um chip usável tem NÚMERO pareado — sem isso, não é disparo real (evita o falso 'enviado').
+    .not("numero", "is", null)
     .order("ordem", { ascending: true })
     .order("criada_em", { ascending: true })
     .limit(1)
@@ -638,7 +641,33 @@ export async function enviarTextoInstancia(
   } catch {
     data = { raw };
   }
-  if (!r.ok) return { ok: false, error: data?.error ?? data?.message ?? `HTTP ${r.status}`, data };
+  return interpretarEnvio(r.ok, r.status, data);
+}
+
+/** Interpreta a resposta do /send/text. PURO (testável) — a Evolution GO às vezes responde
+ * HTTP 200 com erro no corpo (ex.: instância não pareada → "the store doesn't contain a device
+ * JID"). Confiar só no HTTP marca 'enviado' cego. Regra: HTTP não-ok OU corpo com erro/sucesso
+ * falso = FALHA. Exigimos um marcador de sucesso (Id/Key/status) quando a Evolution o fornece. */
+export function interpretarEnvio(
+  httpOk: boolean,
+  httpStatus: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: any,
+): { ok: boolean; error?: string; data?: unknown } {
+  if (!httpOk)
+    return { ok: false, error: data?.error ?? data?.message ?? `HTTP ${httpStatus}`, data };
+  // Erro embutido num 200: campo error/erro, success:false, status:"error", ou a msg do JID.
+  const erroCorpo =
+    data?.error ??
+    data?.erro ??
+    (data?.success === false ? data?.message || "success=false" : undefined) ??
+    (typeof data?.status === "string" && /error|fail/i.test(data.status) ? data.status : undefined);
+  if (erroCorpo) return { ok: false, error: String(erroCorpo), data };
+  const txt = JSON.stringify(data ?? {});
+  if (/doesn't contain a device jid|not logged in|not connected|disconnected/i.test(txt))
+    return { ok: false, error: "chip não pareado/deslogado na Evolution", data };
+  // Marcador de sucesso quando existir (Id/Key/message id). Se a Evolution não devolve nada
+  // identificável, aceitamos o 200 limpo (sem sinal de erro) — mas nunca um 200 com erro.
   return { ok: true, data };
 }
 
