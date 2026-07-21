@@ -67,6 +67,7 @@ async function carregarLibs() {
     export * from ${JSON.stringify(join(PROJ, "src/lib/automacao-teto.ts"))};
     export { extrairBairro } from ${JSON.stringify(join(PROJ, "src/lib/bairro.ts"))};
     export * from ${JSON.stringify(join(PROJ, "src/lib/wa-copy.ts"))};
+    export * from ${JSON.stringify(join(PROJ, "src/lib/fontes-prospeccao.ts"))};
   `,
   );
   const out = join(dir, "libs.mjs");
@@ -212,6 +213,77 @@ async function bloco1(L) {
   T(
     !L.resolverVariaveis("Nota {{nota}}", semNota).includes("undefined"),
     "variável sem dado não vira 'undefined' no texto",
+  );
+
+  console.log(" · fontes de prospecção (Maps/Instagram/LinkedIn) — UI pronta, coleta honesta");
+  T(L.FONTES.google_maps.estado === "ativa", "Google Maps é a única fonte ATIVA");
+  T(
+    L.FONTES.instagram.estado === "em_breve" && L.FONTES.linkedin.estado === "em_breve",
+    "Instagram e LinkedIn marcados 'em breve' (não fingem que buscam)",
+  );
+  T(
+    !!L.FONTES.instagram.aviso && !!L.FONTES.linkedin.aviso,
+    "as duas fontes frágeis carregam aviso honesto sobre a coleta",
+  );
+  T(!L.fonteAtiva("instagram") && !L.fonteAtiva("linkedin"), "fonteAtiva() barra as duas");
+
+  const ig = L.buscaInstagramPadrao();
+  T(L.validarInstagram(ig).ok === false, "Instagram sem termo → inválido");
+  T(L.validarInstagram({ ...ig, termo: "odonto" }).ok === true, "Instagram com hashtag → válido");
+  T(
+    L.validarInstagram({ ...ig, modo: "seguidores", termo: "@perfil ruim!" }).ok === false,
+    "@ de concorrente inválido é recusado",
+  );
+  T(
+    L.pedidoInstagram({ ...ig, termo: "#Odonto ", cidade: " Curitiba " }).termo === "Odonto",
+    "pedido do Instagram limpa # e espaços",
+  );
+
+  const li = L.buscaLinkedInPadrao();
+  T(L.validarLinkedIn(li).ok === false, "LinkedIn sem cargo → inválido");
+  T(
+    L.validarLinkedIn({ ...li, cargo: "Sócio" }).ok === false,
+    "LinkedIn só com cargo ainda é amplo demais → inválido",
+  );
+  T(
+    L.validarLinkedIn({ ...li, cargo: "Sócio", regiao: "Curitiba" }).ok === true,
+    "LinkedIn com cargo + região → válido",
+  );
+
+  // MESMO PIPELINE: cada fonte vira uma linha da MESMA tabela `leads`.
+  const leadIg = L.instagramParaLead({
+    username: "@clinicax",
+    nome: "Clínica X",
+    linkBio: "https://linktr.ee/x",
+    email: "c@x.com",
+    categoria: "Odontologia",
+  });
+  T(leadIg.place_id === "ig:clinicax", "Instagram → place_id 'ig:<user>' (dedup do mesmo jeito)");
+  T(
+    leadIg.instagram_url === "https://instagram.com/clinicax" &&
+      leadIg.business_name === "Clínica X",
+    "Instagram → colunas existentes de leads (instagram_url/business_name)",
+  );
+  T(
+    leadIg.email === "c@x.com" && leadIg.website === "https://linktr.ee/x",
+    "e-mail e link da bio mapeados",
+  );
+
+  const leadLi = L.linkedinParaLead({
+    slug: "joao-silva",
+    nome: "João Silva",
+    empresa: "Acme",
+    setor: "Odontologia",
+  });
+  T(leadLi.place_id === "li:joao-silva", "LinkedIn → place_id 'li:<slug>'");
+  T(
+    leadLi.owner_name === "João Silva" && leadLi.business_name === "Acme",
+    "LinkedIn → pessoa em owner_name, empresa em business_name",
+  );
+  T(leadIg.status === "new" && leadLi.status === "new", "ambos entram como 'new' no MESMO funil");
+  T(
+    L.CAMPOS_SEM_COLUNA.length === 2,
+    "gaps declarados sem fingir (seguidores e cargo ainda precisam de coluna)",
   );
 }
 

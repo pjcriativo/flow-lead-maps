@@ -2,8 +2,19 @@
 // mostra progresso ao vivo e a tabela de leads ordenada por score.
 import { useEffect, useRef, useState } from "react";
 import {
-  Search, Loader2, CheckCircle2, Sparkles, ChevronDown, ChevronUp, Phone, Mail,
-  MapPin, X, Globe, Instagram, Filter,
+  Search,
+  Loader2,
+  CheckCircle2,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Phone,
+  Mail,
+  MapPin,
+  X,
+  Globe,
+  Instagram,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,21 +23,48 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { posthog } from "@/lib/posthog";
 import {
-  streamSearchLeads, FONTE_LABELS, FONTES_DESATIVADAS,
-  type Lead, type SearchEvent, type FonteBusca,
+  streamSearchLeads,
+  FONTE_LABELS,
+  FONTES_DESATIVADAS,
+  type Lead,
+  type SearchEvent,
+  type FonteBusca,
+  type ScoreBreakdown,
 } from "@/lib/leads-api";
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
+import { FonteSelector, FormInstagram, FormLinkedIn } from "./FonteProspeccao";
+import {
+  buscaInstagramPadrao,
+  buscaLinkedInPadrao,
+  type FonteProspeccao,
+  type BuscaInstagram,
+  type BuscaLinkedIn,
+} from "@/lib/fontes-prospeccao";
 import { geocodeCidade } from "@/lib/geo";
 import { criarListaComLeads, nomeAutoLista } from "@/lib/lists-api";
 import {
-  ScoreBadge, ScoreLegend, StatusBadge, RatingCell, SiteCell, EmailCell, WhatsCell, MapsButton,
-  UF_LIST, Paginacao, paginar, PAGE_SIZE,
+  ScoreBadge,
+  ScoreLegend,
+  StatusBadge,
+  RatingCell,
+  SiteCell,
+  EmailCell,
+  WhatsCell,
+  MapsButton,
+  UF_LIST,
+  Paginacao,
+  paginar,
+  PAGE_SIZE,
 } from "./leads-shared";
 
 export function SearchSection({ onFinished }: { onFinished?: () => void }) {
@@ -42,6 +80,13 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [geoLoading, setGeoLoading] = useState(false);
   const [filtros, setFiltros] = useState<string[]>([]);
   const geoAbort = useRef<AbortController | null>(null);
+
+  // FONTE DE PROSPECÇÃO (de onde vem o lead) — eixo diferente de `fonte` acima, que é o
+  // PROVEDOR dos dados de lugares (osm/geoapify/apify). Só o Google Maps coleta hoje.
+  const [fonteProsp, setFonteProsp] = useState<FonteProspeccao>("google_maps");
+  const [formIg, setFormIg] = useState<BuscaInstagram>(buscaInstagramPadrao);
+  const [formLi, setFormLi] = useState<BuscaLinkedIn>(buscaLinkedInPadrao);
+  const noMaps = fonteProsp === "google_maps";
 
   // Geocodifica a cidade e centraliza o mapa/pino nela (pino automático).
   const geocodar = async (c: string, u: string) => {
@@ -68,9 +113,10 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   // Ao digitar/alterar cidade + UF, move o mapa para a cidade (debounce).
   useEffect(() => {
     if (!cidade.trim()) return;
-    const id = setTimeout(() => { void geocodar(cidade, uf); }, 700);
+    const id = setTimeout(() => {
+      void geocodar(cidade, uf);
+    }, 700);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cidade, uf]);
 
   const [running, setRunning] = useState(false);
@@ -95,11 +141,19 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const capturaOk = (l: Lead) => {
     if (filtros.length === 0) return true;
     return filtros.some((f) =>
-      f === "telefone" ? !!l.phone : f === "site" ? !!l.website : f === "instagram" ? !!l.instagram_url : false,
+      f === "telefone"
+        ? !!l.phone
+        : f === "site"
+          ? !!l.website
+          : f === "instagram"
+            ? !!l.instagram_url
+            : false,
     );
   };
   const sorted = [...leads].filter(capturaOk).sort((a, b) => b.score - a.score);
-  const goldCount = sorted.filter((l) => (l.score_breakdown as any)?.is_gold).length;
+  const goldCount = sorted.filter(
+    (l) => (l.score_breakdown as ScoreBreakdown | null)?.is_gold,
+  ).length;
   const emailCount = sorted.filter((l) => l.email).length;
 
   const [pagina, setPagina] = useState(1);
@@ -141,12 +195,19 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         }
       }
       const usarMapa = !!centro;
-      setStatus(`Buscando: ${nicho} em ${cidade}${uf ? "/" + uf : ""}${usarMapa ? ` · raio ${raio}km` : ""}...`);
+      setStatus(
+        `Buscando: ${nicho} em ${cidade}${uf ? "/" + uf : ""}${usarMapa ? ` · raio ${raio}km` : ""}...`,
+      );
       posthog.capture("search_leads_started", { nicho, cidade, uf, limite, fonte, usarMapa });
 
       await streamSearchLeads(
         {
-          nicho, cidade, uf, limite, buscarEmails, fonte,
+          nicho,
+          cidade,
+          uf,
+          limite,
+          buscarEmails,
+          fonte,
           ...(usarMapa ? { lat: centro!.lat, lng: centro!.lng, raioKm: raio } : {}),
         },
         (ev: SearchEvent) => {
@@ -184,18 +245,36 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         try {
           const nome = nomeAutoLista(nicho, cidade, uf);
           const lista = await criarListaComLeads({
-            name: nome, niche: nicho, city: cidade, uf, fonte, radius: raio, leadIds: ids,
+            name: nome,
+            niche: nicho,
+            city: cidade,
+            uf,
+            fonte,
+            radius: raio,
+            leadIds: ids,
           });
-          pushLog(`🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`);
-          posthog.capture("lead_list_created", { list_id: lista.id, total: ids.length, nicho, cidade, uf, fonte });
-        } catch (le: any) {
-          pushLog(`⚠️ Leads salvos, mas falhou ao criar a lista: ${le?.message ?? "erro"}`);
+          pushLog(
+            `🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`,
+          );
+          posthog.capture("lead_list_created", {
+            list_id: lista.id,
+            total: ids.length,
+            nicho,
+            cidade,
+            uf,
+            fonte,
+          });
+        } catch (le) {
+          const msg = le instanceof Error ? le.message : "erro";
+          pushLog(`⚠️ Leads salvos, mas falhou ao criar a lista: ${msg}`);
         }
       }
-    } catch (e: any) {
-      if (e?.name !== "AbortError") {
-        setStatus(`Erro: ${e.message}`);
-        pushLog(`ERRO: ${e.message}`);
+    } catch (e) {
+      // cancelar a busca dispara AbortError — isso não é erro pra mostrar ao dono.
+      if (!(e instanceof Error) || e.name !== "AbortError") {
+        const msg = e instanceof Error ? e.message : String(e);
+        setStatus(`Erro: ${msg}`);
+        pushLog(`ERRO: ${msg}`);
       }
     } finally {
       setRunning(false);
@@ -214,195 +293,365 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
       {/* Formulário de busca */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="grid gap-3 md:grid-cols-[1.6fr_1fr_100px_auto]">
-          <div>
-            <Label htmlFor="nicho" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Nicho</Label>
-            <Input id="nicho" placeholder="ex.: clínicas odontológicas"
-              value={nicho} onChange={(e) => setNicho(e.target.value)} disabled={running} />
-          </div>
-          <div>
-            <Label htmlFor="cidade" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Cidade</Label>
-            <Input id="cidade" placeholder="ex.: Curitiba"
-              value={cidade} onChange={(e) => setCidade(e.target.value)} disabled={running} />
-          </div>
-          <div>
-            <Label htmlFor="uf" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">UF</Label>
-            <Select value={uf} onValueChange={setUf} disabled={running}>
-              <SelectTrigger id="uf" aria-label="UF"><SelectValue placeholder="UF" /></SelectTrigger>
-              <SelectContent className="max-h-72">
-                {UF_LIST.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col justify-end">
-            {running ? (
-              <Button onClick={handleCancelar} variant="outline" className="h-10 min-w-[150px]">
-                <Loader2 className="animate-spin" /> Cancelar
-              </Button>
-            ) : (
-              <Button onClick={handleBuscar} className="h-10 min-w-[150px] bg-primary font-semibold hover:bg-primary/90">
-                <Search /> Buscar leads
-              </Button>
-            )}
-          </div>
-        </div>
+        {/* FONTE DE PROSPECÇÃO — trocar aqui troca os campos abaixo (cada fonte prospecta
+            de um jeito). Só o Google Maps coleta hoje; as outras têm a interface pronta. */}
+        <FonteSelector valor={fonteProsp} onChange={setFonteProsp} disabled={running} />
 
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="fonte" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fonte</Label>
-            <Select value={fonte} onValueChange={(v) => setFonte(v as FonteBusca)} disabled={running}>
-              <SelectTrigger id="fonte" aria-label="Fonte da busca" className="h-9 w-[240px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(Object.keys(FONTE_LABELS) as FonteBusca[]).map((f) => (
-                  <SelectItem key={f} value={f} disabled={FONTES_DESATIVADAS.includes(f)}>
-                    {FONTE_LABELS[f]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-1.5">
-            <Mail className="h-4 w-4 text-primary" />
-            <Label htmlFor="emails" className="cursor-pointer text-xs font-medium text-muted-foreground">Buscar e-mails (visita o site)</Label>
-            <Switch id="emails" checked={buscarEmails} onCheckedChange={setBuscarEmails} disabled={running} />
-          </div>
-        </div>
+        <div key={fonteProsp} className="mt-4 animate-in fade-in duration-300">
+          {fonteProsp === "instagram" && <FormInstagram valor={formIg} onChange={setFormIg} />}
+          {fonteProsp === "linkedin" && <FormLinkedIn valor={formLi} onChange={setFormLi} />}
+          {noMaps && (
+            <>
+              <div className="grid gap-3 md:grid-cols-[1.6fr_1fr_100px_auto]">
+                <div>
+                  <Label
+                    htmlFor="nicho"
+                    className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    Nicho
+                  </Label>
+                  <Input
+                    id="nicho"
+                    placeholder="ex.: clínicas odontológicas"
+                    value={nicho}
+                    onChange={(e) => setNicho(e.target.value)}
+                    disabled={running}
+                  />
+                </div>
+                <div>
+                  <Label
+                    htmlFor="cidade"
+                    className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    Cidade
+                  </Label>
+                  <Input
+                    id="cidade"
+                    placeholder="ex.: Curitiba"
+                    value={cidade}
+                    onChange={(e) => setCidade(e.target.value)}
+                    disabled={running}
+                  />
+                </div>
+                <div>
+                  <Label
+                    htmlFor="uf"
+                    className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    UF
+                  </Label>
+                  <Select value={uf} onValueChange={setUf} disabled={running}>
+                    <SelectTrigger id="uf" aria-label="UF">
+                      <SelectValue placeholder="UF" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {UF_LIST.map((u) => (
+                        <SelectItem key={u} value={u}>
+                          {u}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col justify-end">
+                  {running ? (
+                    <Button
+                      onClick={handleCancelar}
+                      variant="outline"
+                      className="h-10 min-w-[150px]"
+                    >
+                      <Loader2 className="animate-spin" /> Cancelar
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleBuscar}
+                      className="h-10 min-w-[150px] bg-primary font-semibold hover:bg-primary/90"
+                    >
+                      <Search /> Buscar leads
+                    </Button>
+                  )}
+                </div>
+              </div>
 
-        {/* Seletor de nichos por categoria (busca por texto + chips) */}
-        <div className="mt-3">
-          <NichoSelector value={nicho} onSelect={setNicho} disabled={running} />
-        </div>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label
+                    htmlFor="fonte"
+                    className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    Fonte
+                  </Label>
+                  <Select
+                    value={fonte}
+                    onValueChange={(v) => setFonte(v as FonteBusca)}
+                    disabled={running}
+                  >
+                    <SelectTrigger id="fonte" aria-label="Fonte da busca" className="h-9 w-[240px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(FONTE_LABELS) as FonteBusca[]).map((f) => (
+                        <SelectItem key={f} value={f} disabled={FONTES_DESATIVADAS.includes(f)}>
+                          {FONTE_LABELS[f]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 py-1.5">
+                  <Mail className="h-4 w-4 text-primary" />
+                  <Label
+                    htmlFor="emails"
+                    className="cursor-pointer text-xs font-medium text-muted-foreground"
+                  >
+                    Buscar e-mails (visita o site)
+                  </Label>
+                  <Switch
+                    id="emails"
+                    checked={buscarEmails}
+                    onCheckedChange={setBuscarEmails}
+                    disabled={running}
+                  />
+                </div>
+              </div>
 
-        {/* Quantidade (slider) + filtro de captura + mapa */}
-        <div className="mt-4 flex flex-wrap items-end gap-6 border-t border-border pt-4">
-          <div className="min-w-[220px] flex-1">
-            <div className="mb-1.5 flex items-center justify-between">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Quantidade</Label>
-              <span className="text-sm font-semibold tabular-nums">{limite}</span>
-            </div>
-            <Slider value={[limite]} min={10} max={200} step={5} disabled={running} onValueChange={(v) => setLimite(v[0])} />
-            <p className="mt-1 text-[11px] text-muted-foreground">máx. 200 nesta fonte (OpenStreetMap/Geoapify)</p>
-          </div>
-          <div>
-            <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Filtrar por captura</Label>
-            <ToggleGroup type="multiple" value={filtros} onValueChange={setFiltros} variant="outline" className="justify-start">
-              <ToggleGroupItem value="telefone" aria-label="Só com telefone" className="gap-1 px-3"><Phone className="h-3.5 w-3.5" /> Telefone</ToggleGroupItem>
-              <ToggleGroupItem value="site" aria-label="Só com site" className="gap-1 px-3"><Globe className="h-3.5 w-3.5" /> Site</ToggleGroupItem>
-              <ToggleGroupItem value="instagram" aria-label="Só com Instagram" className="gap-1 px-3"><Instagram className="h-3.5 w-3.5" /> Instagram</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-        </div>
+              {/* Seletor de nichos por categoria (busca por texto + chips) */}
+              <div className="mt-3">
+                <NichoSelector value={nicho} onSelect={setNicho} disabled={running} />
+              </div>
 
-        {/* Mapa: reflete a cidade digitada (pino automático) ou um clique manual. */}
-        <div className="mt-4 space-y-3 rounded-lg border border-border bg-secondary/20 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="inline-flex flex-wrap items-center gap-1.5 text-sm">
-              <MapPin className="h-4 w-4 text-primary" />
-              <span className="text-muted-foreground">Buscando em:</span>
-              <b className="text-foreground">
-                {pinManual
-                  ? "ponto marcado no mapa"
-                  : cidade.trim()
-                    ? `${cidade.trim()}${uf ? ", " + uf : ""}`
-                    : "informe a cidade ou clique no mapa"}
-              </b>
-              <span className="text-muted-foreground">· raio {raioKm} km</span>
-              {geoLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
-            </span>
-            {pinManual && (
-              <Button size="sm" variant="ghost" onClick={() => { void geocodar(cidade, uf); }}>
-                <X className="h-4 w-4" /> Voltar para a cidade
-              </Button>
-            )}
-          </div>
-          <MapaBusca pin={pin} raioKm={raioKm} onPick={(p) => { setPin(p); setPinManual(true); }} />
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Raio da busca</Label>
-              <span className="text-sm font-semibold tabular-nums">{raioKm} km</span>
-            </div>
-            <Slider value={[raioKm]} min={1} max={200} step={1} onValueChange={(v) => setRaioKm(v[0])} />
-          </div>
+              {/* Quantidade (slider) + filtro de captura + mapa */}
+              <div className="mt-4 flex flex-wrap items-end gap-6 border-t border-border pt-4">
+                <div className="min-w-[220px] flex-1">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Quantidade
+                    </Label>
+                    <span className="text-sm font-semibold tabular-nums">{limite}</span>
+                  </div>
+                  <Slider
+                    value={[limite]}
+                    min={10}
+                    max={200}
+                    step={5}
+                    disabled={running}
+                    onValueChange={(v) => setLimite(v[0])}
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    máx. 200 nesta fonte (OpenStreetMap/Geoapify)
+                  </p>
+                </div>
+                <div>
+                  <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Filtrar por captura
+                  </Label>
+                  <ToggleGroup
+                    type="multiple"
+                    value={filtros}
+                    onValueChange={setFiltros}
+                    variant="outline"
+                    className="justify-start"
+                  >
+                    <ToggleGroupItem
+                      value="telefone"
+                      aria-label="Só com telefone"
+                      className="gap-1 px-3"
+                    >
+                      <Phone className="h-3.5 w-3.5" /> Telefone
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="site" aria-label="Só com site" className="gap-1 px-3">
+                      <Globe className="h-3.5 w-3.5" /> Site
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="instagram"
+                      aria-label="Só com Instagram"
+                      className="gap-1 px-3"
+                    >
+                      <Instagram className="h-3.5 w-3.5" /> Instagram
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              </div>
+
+              {/* Mapa: reflete a cidade digitada (pino automático) ou um clique manual. */}
+              <div className="mt-4 space-y-3 rounded-lg border border-border bg-secondary/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="inline-flex flex-wrap items-center gap-1.5 text-sm">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    <span className="text-muted-foreground">Buscando em:</span>
+                    <b className="text-foreground">
+                      {pinManual
+                        ? "ponto marcado no mapa"
+                        : cidade.trim()
+                          ? `${cidade.trim()}${uf ? ", " + uf : ""}`
+                          : "informe a cidade ou clique no mapa"}
+                    </b>
+                    <span className="text-muted-foreground">· raio {raioKm} km</span>
+                    {geoLoading && (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    )}
+                  </span>
+                  {pinManual && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        void geocodar(cidade, uf);
+                      }}
+                    >
+                      <X className="h-4 w-4" /> Voltar para a cidade
+                    </Button>
+                  )}
+                </div>
+                <MapaBusca
+                  pin={pin}
+                  raioKm={raioKm}
+                  onPick={(p) => {
+                    setPin(p);
+                    setPinManual(true);
+                  }}
+                />
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Raio da busca
+                    </Label>
+                    <span className="text-sm font-semibold tabular-nums">{raioKm} km</span>
+                  </div>
+                  <Slider
+                    value={[raioKm]}
+                    min={1}
+                    max={200}
+                    step={1}
+                    onValueChange={(v) => setRaioKm(v[0])}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Resultados ao vivo */}
-      <div className="overflow-hidden rounded-2xl border-2 border-border bg-card shadow-[var(--shadow-card)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
-          <div className="flex items-center gap-3">
-            {running ? (
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-70" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+      {/* Resultados ao vivo — só na fonte que coleta de verdade (as outras não têm o que mostrar) */}
+      {noMaps && (
+        <div className="overflow-hidden rounded-2xl border-2 border-border bg-card shadow-[var(--shadow-card)]">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
+            <div className="flex items-center gap-3">
+              {running ? (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-70" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                </span>
+              ) : leads.length ? (
+                <CheckCircle2 className="h-4 w-4 text-[#16A34A]" />
+              ) : (
+                <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
+              )}
+              <span className="text-sm font-semibold">
+                {running ? "Ao vivo" : leads.length ? "Concluído" : "Pronto"}
               </span>
-            ) : leads.length ? (
-              <CheckCircle2 className="h-4 w-4 text-[#16A34A]" />
-            ) : (
-              <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
-            )}
-            <span className="text-sm font-semibold">{running ? "Ao vivo" : leads.length ? "Concluído" : "Pronto"}</span>
-            <span className="hidden max-w-[380px] truncate text-sm text-muted-foreground sm:block">{status}</span>
+              <span className="hidden max-w-[380px] truncate text-sm text-muted-foreground sm:block">
+                {status}
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <Stat n={leads.length} label="leads" />
+              <Stat n={goldCount} label="cliente-ouro" color="text-amber-600" divider />
+              <Stat n={emailCount} label="e-mails" color="text-[#16A34A]" divider />
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Stat n={leads.length} label="leads" />
-            <Stat n={goldCount} label="cliente-ouro" color="text-amber-600" divider />
-            <Stat n={emailCount} label="e-mails" color="text-[#16A34A]" divider />
-          </div>
+
+          {running && (
+            <div className="h-1 w-full overflow-hidden bg-secondary">
+              <div
+                className="h-full bg-primary transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, (progress.found / Math.max(1, progress.target)) * 100)}%`,
+                }}
+              />
+            </div>
+          )}
+
+          {/* BUG 5: filtro de captura é client-side → deixa CLARO que está filtrando. */}
+          {filtros.length > 0 && leads.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-50 px-5 py-2 text-xs text-amber-800">
+              <Filter className="h-3.5 w-3.5" />
+              <span>
+                Filtrando: mostrando <b>{sorted.length}</b> de <b>{leads.length}</b> — só leads com{" "}
+                <b>
+                  {filtros
+                    .map((f) =>
+                      f === "telefone" ? "Telefone" : f === "site" ? "Site" : "Instagram",
+                    )
+                    .join(" ou ")}
+                </b>
+              </span>
+              <button
+                type="button"
+                onClick={() => setFiltros([])}
+                className="underline underline-offset-2 hover:text-amber-900"
+              >
+                limpar filtro
+              </button>
+            </div>
+          )}
+
+          {sorted.length > 0 ? (
+            <>
+              <LiveTable leads={paginados} />
+              {sorted.length > PAGE_SIZE && (
+                <Paginacao total={sorted.length} page={paginaEfetiva} onPage={setPagina} />
+              )}
+            </>
+          ) : leads.length > 0 ? (
+            <div className="px-8 py-12 text-center text-sm text-muted-foreground">
+              Nenhum dos <b>{leads.length}</b> leads encontrados passa no filtro de captura.{" "}
+              <button
+                type="button"
+                onClick={() => setFiltros([])}
+                className="text-primary underline underline-offset-2"
+              >
+                Limpar filtro
+              </button>
+            </div>
+          ) : (
+            <EmptyState running={running} />
+          )}
         </div>
+      )}
 
-        {running && (
-          <div className="h-1 w-full overflow-hidden bg-secondary">
-            <div className="h-full bg-primary transition-all duration-500"
-              style={{ width: `${Math.min(100, (progress.found / Math.max(1, progress.target)) * 100)}%` }} />
-          </div>
-        )}
-
-        {/* BUG 5: filtro de captura é client-side → deixa CLARO que está filtrando. */}
-        {filtros.length > 0 && leads.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-amber-50 px-5 py-2 text-xs text-amber-800">
-            <Filter className="h-3.5 w-3.5" />
-            <span>
-              Filtrando: mostrando <b>{sorted.length}</b> de <b>{leads.length}</b> — só leads com{" "}
-              <b>{filtros.map((f) => (f === "telefone" ? "Telefone" : f === "site" ? "Site" : "Instagram")).join(" ou ")}</b>
-            </span>
-            <button type="button" onClick={() => setFiltros([])} className="underline underline-offset-2 hover:text-amber-900">
-              limpar filtro
-            </button>
-          </div>
-        )}
-
-        {sorted.length > 0 ? (
-          <>
-            <LiveTable leads={paginados} />
-            {sorted.length > PAGE_SIZE && (
-              <Paginacao total={sorted.length} page={paginaEfetiva} onPage={setPagina} />
-            )}
-          </>
-        ) : leads.length > 0 ? (
-          <div className="px-8 py-12 text-center text-sm text-muted-foreground">
-            Nenhum dos <b>{leads.length}</b> leads encontrados passa no filtro de captura.{" "}
-            <button type="button" onClick={() => setFiltros([])} className="text-primary underline underline-offset-2">Limpar filtro</button>
-          </div>
-        ) : (
-          <EmptyState running={running} />
-        )}
-      </div>
-
-      {(running || logs.length > 0) && <LogDrawer logs={logs} logRef={logRef} />}
+      {noMaps && (running || logs.length > 0) && <LogDrawer logs={logs} logRef={logRef} />}
 
       {/* Atribuição exigida pela licença ODbL do OpenStreetMap */}
-      <p className="px-1 text-center text-xs text-muted-foreground">
-        Dados de lugares ©{" "}
-        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
-          OpenStreetMap contributors
-        </a>{" "}
-        · Geoapify
-      </p>
+      {noMaps && (
+        <p className="px-1 text-center text-xs text-muted-foreground">
+          Dados de lugares ©{" "}
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-foreground"
+          >
+            OpenStreetMap contributors
+          </a>{" "}
+          · Geoapify
+        </p>
+      )}
     </div>
   );
 }
 
-function Stat({ n, label, color, divider }: { n: number; label: string; color?: string; divider?: boolean }) {
+function Stat({
+  n,
+  label,
+  color,
+  divider,
+}: {
+  n: number;
+  label: string;
+  color?: string;
+  divider?: boolean;
+}) {
   return (
     <div className={cn("flex items-baseline gap-1.5", divider && "border-l border-border pl-4")}>
       <span className={cn("text-2xl font-semibold tabular-nums leading-none", color)}>{n}</span>
@@ -417,9 +666,26 @@ function LiveTable({ leads }: { leads: Lead[] }) {
       <table className="w-full text-[15px]">
         <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            {["Score", "Empresa", "Nota", "Telefone", "WhatsApp", "E-mail", "Site", "Status", ""].map((h) => (
+            {[
+              "Score",
+              "Empresa",
+              "Nota",
+              "Telefone",
+              "WhatsApp",
+              "E-mail",
+              "Site",
+              "Status",
+              "",
+            ].map((h) => (
               <th key={h} className="px-4 py-3 font-medium">
-                {h === "Score" ? <span className="inline-flex items-center">Score<ScoreLegend /></span> : h}
+                {h === "Score" ? (
+                  <span className="inline-flex items-center">
+                    Score
+                    <ScoreLegend />
+                  </span>
+                ) : (
+                  h
+                )}
               </th>
             ))}
           </tr>
@@ -427,19 +693,34 @@ function LiveTable({ leads }: { leads: Lead[] }) {
         <tbody>
           {leads.map((l) => (
             <tr key={l.id} className="border-t border-border hover:bg-secondary/30">
-              <td className="px-4 py-3"><ScoreBadge lead={l} /></td>
+              <td className="px-4 py-3">
+                <ScoreBadge lead={l} />
+              </td>
               <td className="px-4 py-3 font-semibold text-foreground">{l.business_name}</td>
-              <td className="px-4 py-3"><RatingCell lead={l} /></td>
+              <td className="px-4 py-3">
+                <RatingCell lead={l} />
+              </td>
               <td className="px-4 py-3">
                 <span className="inline-flex items-center gap-1.5 text-sm">
-                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />{l.phone || "—"}
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                  {l.phone || "—"}
                 </span>
               </td>
-              <td className="px-4 py-3"><WhatsCell lead={l} /></td>
-              <td className="px-4 py-3"><EmailCell lead={l} /></td>
-              <td className="px-4 py-3"><SiteCell lead={l} /></td>
-              <td className="px-4 py-3"><StatusBadge status={l.status} /></td>
-              <td className="px-4 py-3"><MapsButton lead={l} /></td>
+              <td className="px-4 py-3">
+                <WhatsCell lead={l} />
+              </td>
+              <td className="px-4 py-3">
+                <EmailCell lead={l} />
+              </td>
+              <td className="px-4 py-3">
+                <SiteCell lead={l} />
+              </td>
+              <td className="px-4 py-3">
+                <StatusBadge status={l.status} />
+              </td>
+              <td className="px-4 py-3">
+                <MapsButton lead={l} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -468,20 +749,35 @@ function EmptyState({ running }: { running: boolean }) {
   );
 }
 
-function LogDrawer({ logs, logRef }: { logs: string[]; logRef: React.RefObject<HTMLDivElement | null> }) {
+function LogDrawer({
+  logs,
+  logRef,
+}: {
+  logs: string[];
+  logRef: React.RefObject<HTMLDivElement | null>;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between px-4 py-2.5 text-sm">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between px-4 py-2.5 text-sm"
+      >
         <span className="flex items-center gap-2 font-medium">
           <span className="h-2 w-2 rounded-full bg-[#16A34A]" />
-          Registro de atividade <span className="text-xs text-muted-foreground">({logs.length})</span>
+          Registro de atividade{" "}
+          <span className="text-xs text-muted-foreground">({logs.length})</span>
         </span>
         {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </button>
       {open && (
-        <div ref={logRef} className="h-56 overflow-auto border-t border-border bg-[oklch(0.14_0.03_260)] p-3 font-mono text-xs leading-relaxed text-[oklch(0.78_0.18_150)]">
-          {logs.map((l, i) => <div key={i}>{l}</div>)}
+        <div
+          ref={logRef}
+          className="h-56 overflow-auto border-t border-border bg-[oklch(0.14_0.03_260)] p-3 font-mono text-xs leading-relaxed text-[oklch(0.78_0.18_150)]"
+        >
+          {logs.map((l, i) => (
+            <div key={i}>{l}</div>
+          ))}
           {!logs.length && <div className="text-[oklch(0.5_0.05_150)]">Aguardando atividade…</div>}
         </div>
       )}
