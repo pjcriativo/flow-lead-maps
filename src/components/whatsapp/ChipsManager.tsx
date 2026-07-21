@@ -34,6 +34,7 @@ import {
   qrChip,
   statusChip,
   marcarChip,
+  excluirChip,
   checarChip,
   listarAlertas,
   marcarAlertaLido,
@@ -41,7 +42,8 @@ import {
   type WaChip,
   type WaAlerta,
 } from "@/services/whatsapp";
-import { AlertTriangle, X, Activity, Inbox } from "lucide-react";
+import { AlertTriangle, X, Activity, Inbox, Trash2 } from "lucide-react";
+import { ComoFunciona } from "./ComoFunciona";
 
 const STATUS_UI: Record<string, { label: string; cls: string }> = {
   conectado: { label: "Conectado", cls: "bg-green-100 text-green-800 border-green-500/40" },
@@ -58,6 +60,7 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
   const [conectando, setConectando] = useState(false);
   const [verificando, setVerificando] = useState<string | null>(null);
   const [ativando, setAtivando] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState<string | null>(null);
   const [dialog, setDialog] = useState(false);
   // fluxo de conexão de um chip
   const [novoFuncao, setNovoFuncao] = useState<"disparo" | "conversa">("disparo");
@@ -158,6 +161,43 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
     }
   };
 
+  // EXCLUIR o chip de vez. O servidor recusa se houver histórico de envios (a prova do que foi
+  // enviado sumiria junto) e pede confirmação extra se o chip tem número pareado (mata a sessão).
+  const excluir = async (chip: WaChip) => {
+    const nome = chip.numero ? `+${chip.numero}` : chip.nome;
+    if (!confirm(`Excluir o chip ${nome}? Esta ação não pode ser desfeita.`)) return;
+    setExcluindo(chip.id);
+    try {
+      let r = await excluirChip(chip.id, false);
+      if (!r.ok && r.motivo === "tem_historico") {
+        toast.error(
+          `Este chip já enviou ${r.envios} mensagem(ns). Excluir apagaria esse histórico — marque como "Queimado" para tirá-lo do rodízio sem perder a prova dos envios.`,
+        );
+        return;
+      }
+      if (!r.ok && r.motivo === "pareado_precisa_confirmar") {
+        if (
+          !confirm(
+            `ATENÇÃO: ${nome} está pareado. Excluir DESCONECTA o WhatsApp deste número e você terá que parear de novo (ler o QR/código). Confirma?`,
+          )
+        )
+          return;
+        r = await excluirChip(chip.id, true);
+      }
+      if (!r.ok) {
+        toast.error(r.motivo === "nao_encontrado" ? "Chip não encontrado." : `Falha: ${r.motivo}`);
+        return;
+      }
+      toast.success(`Chip ${nome} excluído.`);
+      carregar();
+      onMudou?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir");
+    } finally {
+      setExcluindo(null);
+    }
+  };
+
   // Verifica a saúde do chip ao vivo (ETAPA 3): se queimou, o servidor já rotaciona + avisa.
   const verificar = async (chip: WaChip) => {
     setVerificando(chip.id);
@@ -252,6 +292,52 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
           </Button>
         </div>
       </div>
+
+      <ComoFunciona
+        id="wa-chips"
+        titulo="O que cada botão faz aqui"
+        itens={[
+          {
+            termo: "Conectar chip",
+            texto:
+              "adiciona um número novo. Você escolhe se ele nasce de disparo ou de conversa e pareia por código ou QR.",
+          },
+          {
+            termo: "Disparo × Conversa",
+            texto:
+              "disparo manda mensagem fria pros leads (em rodízio, um por vez). Conversa só recebe e responde — nunca dispara frio, é o que protege o seu número principal.",
+          },
+          {
+            termo: "Virar disparo / Virar conversa",
+            texto: "troca a função do chip. Um chip que já falou com o lead vira conversa sozinho.",
+          },
+          {
+            termo: "Setas ↑ ↓",
+            texto:
+              "ordem do rodízio: o disparo #1 é usado primeiro; se ele bate o teto do dia, entra o #2.",
+          },
+          {
+            termo: "Verificar saúde",
+            texto:
+              "pergunta à Evolution se o chip ainda está logado. Se caiu de vez, ele é marcado queimado e o próximo assume automaticamente.",
+          },
+          {
+            termo: "Ativar recebimento",
+            texto:
+              "faz as respostas dos leads caírem na aba Conversas. Só aparece em chip de conversa conectado.",
+          },
+          {
+            termo: "Queimado",
+            texto:
+              "tira o chip do rodízio SEM apagar nada — o histórico de envios continua ali. Use quando o número foi bloqueado.",
+          },
+          {
+            termo: "Excluir (🗑)",
+            texto:
+              "apaga o chip de vez. Recusa se ele já enviou (o histórico sumiria junto — nesse caso use Queimado) e pede confirmação extra se o número estiver pareado.",
+          },
+        ]}
+      />
 
       {chips.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
@@ -403,6 +489,22 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
                     <Flame className="h-3.5 w-3.5" /> Queimado
                   </Button>
                 )}
+
+                {/* excluir de vez (o servidor recusa se houver histórico de envios) */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                  disabled={excluindo === c.id}
+                  title="Excluir este chip (não dá para desfazer)"
+                  onClick={() => excluir(c)}
+                >
+                  {excluindo === c.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
               </div>
             );
           })}

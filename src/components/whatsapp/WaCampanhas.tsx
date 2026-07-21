@@ -24,6 +24,7 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ComoFunciona } from "./ComoFunciona";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -119,6 +120,7 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
   const [scripts, setScripts] = useState<WaScript[]>([]);
   const [realizadas, setRealizadas] = useState<(Campanha & { enviados: number })[]>([]);
   const [temChipDisparo, setTemChipDisparo] = useState<boolean | null>(null);
+  const [numeroConversa, setNumeroConversa] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
   const [tab, setTab] = useState<TabKey>("todos");
@@ -158,6 +160,12 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
       // 'conectado' sozinho engana (fica true num chip nunca pareado). Exige NÚMERO pareado.
       setTemChipDisparo(
         chips.some((c) => c.funcao === "disparo" && c.status === "conectado" && !!c.numero),
+      );
+      // guarda o número de CONVERSA conectado — o aviso precisa dizer a verdade inteira:
+      // "seu número está conectado, mas é de conversa; falta um de DISPARO" (sem contradição).
+      setNumeroConversa(
+        chips.find((c) => c.funcao === "conversa" && c.status === "conectado" && !!c.numero)
+          ?.numero ?? null,
       );
       const env = await enviadosPorCampanhaWa(camps.map((c) => c.id)).catch(
         () => ({}) as Record<string, number>,
@@ -460,8 +468,21 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           <div className="flex items-start gap-2 text-sm text-amber-900">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <div className="font-medium">WhatsApp não conectado</div>
-              <div>Conecte um chip de disparo antes de disparar campanhas.</div>
+              <div className="font-medium">Falta um chip de DISPARO</div>
+              <div>
+                {numeroConversa ? (
+                  <>
+                    O seu <b>+{numeroConversa}</b> está conectado, mas é um chip de <b>conversa</b>{" "}
+                    — ele recebe respostas e nunca dispara a frio (é o que protege o seu número
+                    principal de bloqueio). Para disparar campanhas, conecte um{" "}
+                    <b>chip de disparo</b> (outro número) na aba WhatsApp.
+                  </>
+                ) : (
+                  <>
+                    Conecte um <b>chip de disparo</b> na aba WhatsApp antes de disparar campanhas.
+                  </>
+                )}
+              </div>
             </div>
           </div>
           {onConectar && (
@@ -471,6 +492,53 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           )}
         </div>
       )}
+
+      <ComoFunciona
+        id="wa-campanhas"
+        titulo="Como disparar sem tomar bloqueio"
+        resumo="o caminho é Preparar → Aprovar → Disparar"
+        itens={[
+          {
+            termo: "1. Selecionar",
+            texto:
+              "marque os leads da lista. Os filtros (segmento, cidade, bairro) ajudam a mirar; o limite corta o tamanho do lote.",
+          },
+          {
+            termo: "2. Preparar",
+            texto:
+              "gera o site novo e a mensagem de cada lead escolhido — vira rascunho. Ainda não sai nada.",
+          },
+          {
+            termo: "3. Aprovar",
+            texto:
+              "publica o site e cria o link real da prévia. Só depois disso o lead entra na fila de envio.",
+          },
+          {
+            termo: "4. Disparar Campanha",
+            texto:
+              "envia SÓ o que você aprovou, um por um, com o intervalo escolhido. Nada sai sem passar pelos passos acima.",
+          },
+          {
+            termo: "Variações da mensagem",
+            texto:
+              "escreva a mesma ideia de jeitos diferentes. O sistema reveza e nunca manda a mesma duas vezes seguidas — texto idêntico pra todo mundo é o que mais derruba conta.",
+          },
+          {
+            termo: "Variáveis {{...}}",
+            texto:
+              "clique numa variável para inserir no texto onde está o cursor. {{bairro}} sai vazio quando o endereço não permite extrair, e {{nota}} só entra para quem tem nota real — nunca inventa.",
+          },
+          {
+            termo: "Intervalo + Variar",
+            texto:
+              "tempo de espera entre uma mensagem e outra, com variação aleatória. Disparo com ritmo humano derruba menos chip.",
+          },
+          {
+            termo: "Salvar como script",
+            texto: "guarda esse texto (com as variações) para reusar na próxima campanha.",
+          },
+        ]}
+      />
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.35fr_1fr]">
         {/* ================= ESQUERDA ================= */}

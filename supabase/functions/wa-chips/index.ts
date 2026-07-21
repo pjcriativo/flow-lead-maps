@@ -12,12 +12,15 @@
 //   qr      {instancia_id}         -> recria a sessão do chip e devolve o QR
 //   status  {instancia_id}         -> lê o status real do chip (sincroniza numero/status)
 //   marcar  {instancia_id, funcao?, status?, ordem?} -> muda função/status/ordem (marcar queimado, graduar, reordenar)
+//   excluir {instancia_id, confirmar?}  -> APAGA o chip (recusa se tem histórico de envios;
+//                                          exige confirmar:true se tem número pareado)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import {
   waBase,
   listarInstanciasDaOrg,
   criarInstanciaDaOrg,
+  excluirInstanciaDaOrg,
   instanciaDaOrgComToken,
   recriarInstanciaPorId,
   atualizarChip,
@@ -108,6 +111,13 @@ Deno.serve(async (req) => {
       instancia_id: inst.id,
       numero: numero ?? inst.numero,
     });
+  }
+
+  // EXCLUIR o chip (irreversível). Recusa se houver histórico de envios (wa_envios é CASCADE —
+  // sumiria a prova) e exige {confirmar:true} se o chip tem número pareado (mata a sessão).
+  if (acao === "excluir") {
+    // sempre 200: o cliente precisa LER o motivo (tem_historico / pareado_precisa_confirmar).
+    return json(await excluirInstanciaDaOrg(admin, userId, instanciaId, b?.confirmar === true));
   }
 
   if (acao === "marcar") {

@@ -43,13 +43,18 @@ const ABAS: { key: Aba; label: string; icon: React.ReactNode }[] = [
 export function WhatsAppSection() {
   const [aba, setAba] = useState<Aba>("painel");
   const [conectado, setConectado] = useState<boolean | null>(null);
+  // o badge precisa dizer O QUE dá pra fazer: um número de conversa conectado NÃO habilita
+  // disparo. Dizer só "Conectado" contradizia o aviso da aba Campanhas.
+  const [temDisparo, setTemDisparo] = useState(false);
 
   const checarConexao = useCallback(async () => {
     try {
       const s = await estatisticasWa();
       setConectado(s.conectado);
+      setTemDisparo(s.temDisparo);
     } catch {
       setConectado(false);
+      setTemDisparo(false);
     }
   }, []);
   useEffect(() => {
@@ -74,16 +79,26 @@ export function WhatsAppSection() {
         <span
           className={cn(
             "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
-            conectado ? "bg-emerald-100 text-emerald-800" : "bg-muted text-muted-foreground",
+            temDisparo
+              ? "bg-emerald-100 text-emerald-800"
+              : conectado
+                ? "bg-amber-100 text-amber-800"
+                : "bg-muted text-muted-foreground",
           )}
         >
           <span
             className={cn(
               "h-2 w-2 rounded-full",
-              conectado ? "bg-emerald-500" : "bg-muted-foreground/50",
+              temDisparo ? "bg-emerald-500" : conectado ? "bg-amber-500" : "bg-muted-foreground/50",
             )}
           />
-          {conectado === null ? "…" : conectado ? "Conectado" : "Desconectado"}
+          {conectado === null
+            ? "…"
+            : temDisparo
+              ? "Pronto para disparar"
+              : conectado
+                ? "Só conversa · sem chip de disparo"
+                : "Desconectado"}
         </span>
       </div>
 

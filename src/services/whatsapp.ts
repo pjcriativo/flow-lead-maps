@@ -83,6 +83,17 @@ export async function marcarChip(
   return waChips<{ ok: boolean; error?: string }>({ acao: "marcar", instancia_id, ...patch });
 }
 
+/** EXCLUI um chip (irreversível). Recusa se o chip já enviou (histórico) e pede confirmação
+ * explícita se ele tem número pareado (excluir mata a sessão do WhatsApp). */
+export async function excluirChip(instancia_id: string, confirmar = false) {
+  return waChips<{
+    ok: boolean;
+    motivo?: "nao_encontrado" | "tem_historico" | "pareado_precisa_confirmar" | string;
+    envios?: number;
+    numero?: string | null;
+  }>({ acao: "excluir", instancia_id, confirmar });
+}
+
 /** Checa a saúde de um chip ao vivo (ETAPA 3): se queimou, já rotaciona pro próximo + avisa. */
 export async function checarChip(instancia_id: string) {
   return waChips<{
@@ -365,6 +376,10 @@ export type WaEstatisticas = {
   campanhasEnviadas: number;
   conversas: number;
   conectado: boolean;
+  /** tem chip de DISPARO pareado (só isso permite disparar campanha a frio) */
+  temDisparo: boolean;
+  /** tem chip de CONVERSA pareado (recebe respostas; nunca dispara a frio) */
+  temConversa: boolean;
 };
 
 export async function estatisticasWa(): Promise<WaEstatisticas> {
@@ -387,6 +402,11 @@ export async function estatisticasWa(): Promise<WaEstatisticas> {
     campanhasEnviadas: campanhas,
     conversas,
     conectado: chips.some((c) => c.status === "conectado"),
+    // pareado (numero) é o que vale — 'conectado' sozinho fica true até em chip nunca pareado.
+    temDisparo: chips.some((c) => c.funcao === "disparo" && c.status === "conectado" && !!c.numero),
+    temConversa: chips.some(
+      (c) => c.funcao === "conversa" && c.status === "conectado" && !!c.numero,
+    ),
   };
 }
 

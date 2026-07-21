@@ -204,6 +204,53 @@ export async function recriarInstanciaDaOrg(
   return { id: atual.id, nome: atual.nome, token, numero: null, status: "aguardando" };
 }
 
+/**
+ * EXCLUI um chip DA PRÓPRIA ORG (apaga na Evolution e remove a linha).
+ * Duas travas, porque excluir é irreversível:
+ *  1) HISTÓRICO: wa_envios tem ON DELETE CASCADE — excluir um chip que já enviou APAGARIA a prova
+ *     do que foi enviado. Nesse caso recusamos e mandamos marcar como 'queimado' (mantém o
+ *     histórico e tira o chip do rodízio).
+ *  2) PAREADO: se o chip tem número pareado, excluir MATA o pareamento na Evolution (perde a
+ *     sessão do WhatsApp). Só prossegue com confirmação explícita do dono.
+ */
+export async function excluirInstanciaDaOrg(
+  admin: Admin,
+  userId: string,
+  instanciaId: string,
+  confirmado: boolean,
+): Promise<{ ok: boolean; motivo?: string; envios?: number; numero?: string | null }> {
+  const { data: row } = await admin
+    .from("wa_instancias")
+    .select("id, nome, numero, status")
+    .eq("id", instanciaId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!row) return { ok: false, motivo: "nao_encontrado" };
+
+  const { count } = await admin
+    .from("wa_envios")
+    .select("id", { count: "exact", head: true })
+    .eq("instancia_id", row.id);
+  if ((count ?? 0) > 0) return { ok: false, motivo: "tem_historico", envios: count ?? 0 };
+
+  if (row.numero && !confirmado)
+    return { ok: false, motivo: "pareado_precisa_confirmar", numero: row.numero };
+
+  const evoId = await idNaEvolution(row.nome);
+  if (evoId)
+    await fetch(`${waBase()}/instance/delete/${evoId}`, {
+      method: "DELETE",
+      headers: { apikey: waGlobalKey() },
+    }).catch(() => {});
+
+  const { error } = await admin
+    .from("wa_instancias")
+    .delete()
+    .eq("id", row.id)
+    .eq("user_id", userId);
+  return error ? { ok: false, motivo: error.message } : { ok: true, numero: row.numero };
+}
+
 export type WaStatus = { connected: boolean; loggedIn: boolean; name: string; jid: string };
 
 /** Status da instância (GET /instance/status com o token DELA). loggedIn = pareada. */
