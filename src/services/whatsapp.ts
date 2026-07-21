@@ -483,3 +483,33 @@ export async function enviarTesteWhatsapp(numero: string, texto?: string): Promi
   if (error) throw error;
   return data as WaEnvio;
 }
+
+// ===== Coleta em redes sociais (Instagram/LinkedIn via Apify) — edge buscar-redes =====
+export type ColetaRedes = {
+  ok: boolean;
+  reason?: string;
+  motivo?: string;
+  estrategia?: string;
+  encontrados?: number;
+  inseridos?: number;
+  descartados?: number;
+  custo?: number;
+  gastoMes?: number;
+  gastoMesDepois?: number;
+  teto?: { rodada: number; mes: number };
+  estourou?: boolean;
+  detalhe?: string;
+};
+
+/** Roda a coleta REAL de uma estratégia. O servidor aplica o teto de gasto (US$/rodada e US$/mês). */
+export async function buscarRedes(
+  estrategia: string,
+  campos: Record<string, unknown>,
+  limite: number,
+): Promise<ColetaRedes> {
+  const { data, error } = await supabase.functions.invoke("buscar-redes", {
+    body: { acao: "buscar", estrategia, campos, limite },
+  });
+  if (error) throw error;
+  return data as ColetaRedes;
+}

@@ -273,6 +273,8 @@ export type Estrategia = {
   nota?: string;
   /** onde a coleta (Apify) vai plugar quando ligarmos */
   pluga: string;
+  /** true = coletor JÁ LIGADO (ator verificado + teto de gasto). As demais seguem "em breve". */
+  coleta?: boolean;
 };
 
 export const ESTRATEGIAS: Estrategia[] = [
@@ -325,6 +327,7 @@ export const ESTRATEGIAS: Estrategia[] = [
     campos: ["nicho", "cidade", "minSeguidores", "soComerciais"],
     viabilidade: "viavel",
     pluga: "Filtro NOSSO sobre os perfis coletados (bio sem link, ou link que não é site próprio).",
+    coleta: true,
   },
   {
     id: "IG-6",
@@ -344,6 +347,7 @@ export const ESTRATEGIAS: Estrategia[] = [
     campos: ["nicho", "cidade", "minSeguidores"],
     viabilidade: "viavel",
     pluga: "Cálculo NOSSO (curtidas+comentários ÷ seguidores) sobre os posts já coletados.",
+    coleta: true,
   },
   {
     id: "IG-8",
@@ -353,6 +357,7 @@ export const ESTRATEGIAS: Estrategia[] = [
     campos: ["cidade", "categoria", "soComerciais"],
     viabilidade: "viavel",
     pluga: "Filtro NOSSO por categoria do perfil comercial, sobre a coleta por local.",
+    coleta: true,
   },
   {
     id: "IG-9",
@@ -363,6 +368,7 @@ export const ESTRATEGIAS: Estrategia[] = [
     viabilidade: "viavel",
     pluga:
       "Biblioteca de Anúncios da Meta (pública) — fonte separada e mais estável que o scraper.",
+    coleta: true,
   },
   {
     id: "IG-10",
@@ -414,6 +420,7 @@ export const ESTRATEGIAS: Estrategia[] = [
     campos: ["setor", "regiao"],
     viabilidade: "viavel",
     pluga: "Empresa → site → o NOSSO enrich/score já existente decide se o site é ruim.",
+    coleta: true,
   },
   {
     id: "LI-5",

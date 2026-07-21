@@ -3,8 +3,20 @@
 // sozinha a partir disso — não existem 20 formulários hardcoded.
 // Instagram e LinkedIn ainda NÃO coletam: os campos validam e montam o pedido, mas o botão fica
 // desabilitado e se explica. Nada aqui finge que já busca.
-import { useMemo } from "react";
-import { Instagram, Linkedin, MapPin, Lock, Info, Check, AlertTriangle } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  Instagram,
+  Linkedin,
+  MapPin,
+  Lock,
+  Info,
+  Check,
+  AlertTriangle,
+  Search,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
+import { buscarRedes } from "@/services/whatsapp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -264,6 +276,36 @@ export function FormEstrategias({
   const erros = useMemo(() => validarEstrategia(atual, valores).erros, [atual, valores]);
   const pedido = useMemo(() => montarPedido(atual, valores), [atual, valores]);
   const camposOk = erros.length === 0;
+  const [rodando, setRodando] = useState(false);
+  const [resultado, setResultado] = useState<string | null>(null);
+
+  const coletar = async () => {
+    setRodando(true);
+    setResultado(null);
+    try {
+      const r = await buscarRedes(atual.id, pedido.campos, pedido.limite);
+      if (!r.ok) {
+        const msg =
+          r.reason === "teto" ? `Teto de gasto: ${r.motivo}` : `Não coletou: ${r.reason ?? "erro"}`;
+        toast.error(msg);
+        setResultado(msg);
+        return;
+      }
+      const txt =
+        `${r.inseridos} lead(s) novo(s) de ${r.encontrados} encontrado(s)` +
+        (r.descartados ? ` · ${r.descartados} descartado(s) sem contato` : "") +
+        ` · custo US$ ${(r.custo ?? 0).toFixed(4)} · gasto no mês US$ ${(r.gastoMesDepois ?? 0).toFixed(2)} de ${r.teto?.mes ?? 50}`;
+      toast.success(`${r.inseridos} lead(s) coletado(s).`);
+      setResultado(txt);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha na coleta";
+      toast.error(msg);
+      setResultado(msg);
+    } finally {
+      setRodando(false);
+    }
+  };
+
   const set = (id: CampoId, v: string | number | boolean) => onValores({ ...valores, [id]: v });
 
   return (
@@ -432,25 +474,52 @@ export function FormEstrategias({
       )}
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3">
-        <Button
-          disabled
-          className="h-10 min-w-[190px]"
-          title="A coleta desta fonte ainda não está ligada"
-        >
-          <Lock className="h-4 w-4" /> Buscar — em breve
-        </Button>
+        {atual.coleta ? (
+          <Button
+            className="h-10 min-w-[190px] font-semibold"
+            disabled={!camposOk || rodando}
+            onClick={coletar}
+            title={camposOk ? "Coleta real — respeita o teto de gasto" : "Complete os campos"}
+          >
+            {rodando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4" />
+            )}
+            {rodando ? "Buscando…" : "Buscar agora"}
+          </Button>
+        ) : (
+          <Button
+            disabled
+            className="h-10 min-w-[190px]"
+            title="A coleta desta estratégia ainda não está ligada"
+          >
+            <Lock className="h-4 w-4" /> Buscar — em breve
+          </Button>
+        )}
         <p className="text-xs text-muted-foreground">
-          {camposOk ? (
-            <>
-              Campos válidos e pedido montado. O botão está travado porque a{" "}
-              <b>coleta do {f.label} ainda não está ligada</b> — nada é buscado nem gravado por
-              enquanto.
-            </>
+          {atual.coleta ? (
+            camposOk ? (
+              <>
+                Coleta ligada nesta estratégia. Ela <b>gasta de verdade</b> e para sozinha no teto
+                (US$ 5 por busca · US$ 50 no mês).
+              </>
+            ) : (
+              <>Complete os campos acima para poder buscar.</>
+            )
           ) : (
-            <>Complete os campos acima. Mesmo completos, a coleta ainda não está ligada.</>
+            <>
+              O botão está travado porque a <b>coleta desta estratégia ainda não está ligada</b> —
+              nada é buscado nem gravado.
+            </>
           )}
         </p>
       </div>
+      {resultado && (
+        <p className="rounded-lg border border-border bg-secondary/30 p-2.5 text-[11px] text-muted-foreground">
+          {resultado}
+        </p>
+      )}
     </div>
   );
 }

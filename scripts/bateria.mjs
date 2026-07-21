@@ -68,6 +68,7 @@ async function carregarLibs() {
     export { extrairBairro } from ${JSON.stringify(join(PROJ, "src/lib/bairro.ts"))};
     export * from ${JSON.stringify(join(PROJ, "src/lib/wa-copy.ts"))};
     export * from ${JSON.stringify(join(PROJ, "src/lib/fontes-prospeccao.ts"))};
+    export * from ${JSON.stringify(join(PROJ, "src/lib/redes-teto.ts"))};
   `,
   );
   const out = join(dir, "libs.mjs");
@@ -340,6 +341,33 @@ async function bloco1(L) {
     "RASTREABILIDADE do LinkedIn",
   );
   T(leadIg.status === "new" && leadLi.status === "new", "ambos entram como 'new' no MESMO funil");
+
+  console.log(" · TETO da coleta paga em redes (Apify) — não liga sem teto");
+  T(L.TETO_RODADA_USD === 5 && L.TETO_MES_USD === 50, "teto: US$5/rodada e US$50/mês");
+  const p0 = L.planejarColeta(0, 50);
+  T(p0.podeRodar === true, "mês zerado → pode rodar");
+  T(p0.maxItens === 50, "pedido de 50 cabe no teto da rodada", String(p0.maxItens));
+  const pMuito = L.planejarColeta(0, 5000);
+  T(
+    pMuito.maxItens === 500,
+    "pedido gigante é CORTADO pelo teto da rodada (US$5/0,01)",
+    String(pMuito.maxItens),
+  );
+  T(L.planejarColeta(50, 50).podeRodar === false, "teto MENSAL batido → não roda");
+  T(L.planejarColeta(49.995, 50).podeRodar === false, "sobra que não cobre 1 item → não roda");
+  const pQuase = L.planejarColeta(48, 500);
+  T(
+    pQuase.maxItens === 200,
+    "perto do teto mensal, a rodada encolhe (US$2 restantes)",
+    String(pQuase.maxItens),
+  );
+  T(L.estourouColeta(5, 0) === true, "custo real == teto da rodada → estourou");
+  T(L.estourouColeta(1, 49.5) === true, "custo real + mês == teto mensal → estourou");
+  T(L.estourouColeta(1, 0) === false, "dentro dos dois tetos → segue");
+  T(
+    L.mesRefAtual(new Date("2026-07-15T00:00:00Z")) === "2026-07",
+    "mês de referência no formato certo",
+  );
 }
 
 // ============================ BLOCO 2 — EDGES REAIS ============================
