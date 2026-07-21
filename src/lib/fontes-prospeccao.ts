@@ -555,13 +555,8 @@ export function montarPedido(e: Estrategia, v: ValoresBusca): PedidoBusca {
  * para depois medir QUAL ESTRATÉGIA converte mais (migration 037).
  */
 
-/** Campos extras que a migration 037 adicionou em `leads` para as redes sociais. */
-export type LeadExtras = {
-  origem_fonte: FonteProspeccao | null;
-  origem_estrategia: string | null;
-  cargo: string | null;
-  seguidores: number | null;
-};
+// As colunas da migration 037 (origem_fonte, origem_estrategia, cargo, seguidores) já estão
+// nos tipos gerados do Supabase — por isso `Partial<Lead>` abaixo cobre tudo, sem tipo extra.
 
 export type PerfilInstagram = {
   username: string;
@@ -585,7 +580,7 @@ export type PessoaLinkedIn = {
 };
 
 /** Perfil do Instagram → linha de `leads` (mesmo pipeline: score → redesign → campanha). */
-export function perfilParaLead(p: PerfilInstagram, estrategia: string): Partial<Lead> & LeadExtras {
+export function perfilParaLead(p: PerfilInstagram, estrategia: string): Partial<Lead> {
   const user = p.username.trim().replace(/^@/, "");
   return {
     place_id: `ig:${user}`,
@@ -606,7 +601,7 @@ export function perfilParaLead(p: PerfilInstagram, estrategia: string): Partial<
 }
 
 /** Pessoa do LinkedIn → linha de `leads`. É B2B: a PESSOA é o lead, a empresa vira o negócio. */
-export function pessoaParaLead(p: PessoaLinkedIn, estrategia: string): Partial<Lead> & LeadExtras {
+export function pessoaParaLead(p: PessoaLinkedIn, estrategia: string): Partial<Lead> {
   const slug = p.slug.trim().replace(/^\//, "");
   return {
     place_id: `li:${slug}`,

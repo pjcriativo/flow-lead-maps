@@ -8,697 +8,1267 @@ export type Database = {
   };
   public: {
     Tables: {
-      leads: {
+      activity_log: {
         Row: {
-          id: string;
-          list_id: string | null;
-          user_id: string;
-          place_id: string | null;
-          business_name: string;
-          address: string | null;
-          bairro: string | null;
-          city: string | null;
-          state: string | null;
-          zip: string | null;
-          phone: string | null;
-          whatsapp: string | null;
-          website: string | null;
-          category: string | null;
-          rating: number | null;
-          review_count: number | null;
-          has_website: boolean | null;
-          has_photos: boolean | null;
-          has_hours: boolean | null;
-          has_phone: boolean | null;
-          email: string | null;
-          facebook_url: string | null;
-          instagram_url: string | null;
-          linkedin_url: string | null;
-          owner_name: string | null;
-          score: number;
-          score_breakdown: Json | null;
-          status: string;
-          last_contacted_at: string | null;
-          enriched_at: string | null;
-          latitude: number | null;
-          longitude: number | null;
-          notes: string | null;
-          motivo_perda: string | null;
-          motivo_perda_nota: string | null;
-          perda_em: string | null;
+          action: string;
           created_at: string;
-          updated_at: string;
-          email_opt_out: boolean;
-          email_opt_out_em: string | null;
-          opt_out_token: string | null;
-          sem_contato: boolean;
+          entity_id: string | null;
+          entity_type: string;
+          id: string;
+          metadata: Json | null;
+          user_id: string;
         };
         Insert: {
-          id?: string;
-          list_id?: string | null;
-          user_id: string;
-          place_id?: string | null;
-          business_name: string;
-          address?: string | null;
-          bairro?: string | null;
-          city?: string | null;
-          state?: string | null;
-          zip?: string | null;
-          phone?: string | null;
-          whatsapp?: string | null;
-          website?: string | null;
-          category?: string | null;
-          rating?: number | null;
-          review_count?: number | null;
-          has_website?: boolean | null;
-          has_photos?: boolean | null;
-          has_hours?: boolean | null;
-          has_phone?: boolean | null;
-          email?: string | null;
-          facebook_url?: string | null;
-          instagram_url?: string | null;
-          linkedin_url?: string | null;
-          owner_name?: string | null;
-          score?: number;
-          score_breakdown?: Json | null;
-          status?: string;
-          last_contacted_at?: string | null;
-          enriched_at?: string | null;
-          latitude?: number | null;
-          longitude?: number | null;
-          notes?: string | null;
-          motivo_perda?: string | null;
-          motivo_perda_nota?: string | null;
-          perda_em?: string | null;
+          action: string;
           created_at?: string;
-          updated_at?: string;
-          email_opt_out?: boolean;
-          email_opt_out_em?: string | null;
-          opt_out_token?: string | null;
-          sem_contato?: boolean;
+          entity_id?: string | null;
+          entity_type: string;
+          id?: string;
+          metadata?: Json | null;
+          user_id: string;
         };
         Update: {
-          id?: string;
-          list_id?: string | null;
-          user_id?: string;
-          place_id?: string | null;
-          business_name?: string;
-          address?: string | null;
-          bairro?: string | null;
-          city?: string | null;
-          state?: string | null;
-          zip?: string | null;
-          phone?: string | null;
-          whatsapp?: string | null;
-          website?: string | null;
-          category?: string | null;
-          rating?: number | null;
-          review_count?: number | null;
-          has_website?: boolean | null;
-          has_photos?: boolean | null;
-          has_hours?: boolean | null;
-          has_phone?: boolean | null;
-          email?: string | null;
-          facebook_url?: string | null;
-          instagram_url?: string | null;
-          linkedin_url?: string | null;
-          owner_name?: string | null;
-          score?: number;
-          score_breakdown?: Json | null;
-          status?: string;
-          last_contacted_at?: string | null;
-          enriched_at?: string | null;
-          latitude?: number | null;
-          longitude?: number | null;
-          notes?: string | null;
-          motivo_perda?: string | null;
-          motivo_perda_nota?: string | null;
-          perda_em?: string | null;
+          action?: string;
           created_at?: string;
-          updated_at?: string;
-          email_opt_out?: boolean;
-          email_opt_out_em?: string | null;
-          opt_out_token?: string | null;
-          sem_contato?: boolean;
+          entity_id?: string | null;
+          entity_type?: string;
+          id?: string;
+          metadata?: Json | null;
+          user_id?: string;
         };
         Relationships: [];
       };
       automacao_receitas: {
         Row: {
-          id: string;
-          user_id: string;
-          nome: string;
           ativa: boolean;
-          nicho: string;
-          cidade: string;
-          uf: string | null;
-          fonte: string;
-          score_minimo: number;
-          exigir_contato: boolean;
           canal: string;
-          wa_config: Json | null;
-          leads_por_rodada: number;
-          frequencia: string;
-          max_leads_rodada: number;
-          max_leads_mes: number;
-          max_usd_rodada: number;
-          max_usd_mes: number;
-          custo_lead_usd: number;
-          mes_ref: string | null;
-          leads_mes: number;
-          gasto_mes_usd: number;
-          ultima_rodada_em: string | null;
+          cidade: string;
           criada_em: string;
+          custo_lead_usd: number;
+          exigir_contato: boolean;
+          fonte: string;
+          frequencia: string;
+          gasto_mes_usd: number;
+          id: string;
+          leads_mes: number;
+          leads_por_rodada: number;
+          max_leads_mes: number;
+          max_leads_rodada: number;
+          max_usd_mes: number;
+          max_usd_rodada: number;
+          mes_ref: string | null;
+          nicho: string;
+          nome: string;
+          score_minimo: number;
+          uf: string | null;
+          ultima_rodada_em: string | null;
+          user_id: string;
+          wa_config: Json | null;
         };
         Insert: {
-          id?: string;
-          user_id?: string;
-          nome: string;
           ativa?: boolean;
-          nicho: string;
-          cidade: string;
-          uf?: string | null;
-          fonte?: string;
-          score_minimo?: number;
-          exigir_contato?: boolean;
           canal?: string;
-          wa_config?: Json | null;
-          leads_por_rodada?: number;
-          frequencia?: string;
-          max_leads_rodada?: number;
-          max_leads_mes?: number;
-          max_usd_rodada?: number;
-          max_usd_mes?: number;
-          custo_lead_usd?: number;
-          mes_ref?: string | null;
-          leads_mes?: number;
-          gasto_mes_usd?: number;
-          ultima_rodada_em?: string | null;
+          cidade: string;
           criada_em?: string;
+          custo_lead_usd?: number;
+          exigir_contato?: boolean;
+          fonte?: string;
+          frequencia?: string;
+          gasto_mes_usd?: number;
+          id?: string;
+          leads_mes?: number;
+          leads_por_rodada?: number;
+          max_leads_mes?: number;
+          max_leads_rodada?: number;
+          max_usd_mes?: number;
+          max_usd_rodada?: number;
+          mes_ref?: string | null;
+          nicho: string;
+          nome: string;
+          score_minimo?: number;
+          uf?: string | null;
+          ultima_rodada_em?: string | null;
+          user_id?: string;
+          wa_config?: Json | null;
         };
-        Update: Partial<Database["public"]["Tables"]["automacao_receitas"]["Insert"]>;
+        Update: {
+          ativa?: boolean;
+          canal?: string;
+          cidade?: string;
+          criada_em?: string;
+          custo_lead_usd?: number;
+          exigir_contato?: boolean;
+          fonte?: string;
+          frequencia?: string;
+          gasto_mes_usd?: number;
+          id?: string;
+          leads_mes?: number;
+          leads_por_rodada?: number;
+          max_leads_mes?: number;
+          max_leads_rodada?: number;
+          max_usd_mes?: number;
+          max_usd_rodada?: number;
+          mes_ref?: string | null;
+          nicho?: string;
+          nome?: string;
+          score_minimo?: number;
+          uf?: string | null;
+          ultima_rodada_em?: string | null;
+          user_id?: string;
+          wa_config?: Json | null;
+        };
         Relationships: [];
       };
       automacao_rodadas: {
         Row: {
-          id: string;
-          user_id: string;
-          receita_id: string;
-          iniciada_em: string;
+          campanha_id: string | null;
           concluida_em: string | null;
+          custo_usd: number;
+          detalhe: string | null;
+          id: string;
+          iniciada_em: string;
           leads_buscados: number;
-          leads_qualificados: number;
           leads_descartados: number;
           leads_preparados: number;
-          custo_usd: number;
-          campanha_id: string | null;
+          leads_qualificados: number;
+          receita_id: string;
           status: string;
-          detalhe: string | null;
+          user_id: string;
         };
         Insert: {
-          id?: string;
-          user_id?: string;
-          receita_id: string;
-          iniciada_em?: string;
+          campanha_id?: string | null;
           concluida_em?: string | null;
+          custo_usd?: number;
+          detalhe?: string | null;
+          id?: string;
+          iniciada_em?: string;
           leads_buscados?: number;
-          leads_qualificados?: number;
           leads_descartados?: number;
           leads_preparados?: number;
-          custo_usd?: number;
+          leads_qualificados?: number;
+          receita_id: string;
+          status?: string;
+          user_id?: string;
+        };
+        Update: {
           campanha_id?: string | null;
-          status?: string;
+          concluida_em?: string | null;
+          custo_usd?: number;
           detalhe?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["automacao_rodadas"]["Insert"]>;
-        Relationships: [];
-      };
-      // Só os campos que o app usa. `full_name` = {remetente} que assina os e-mails
-      // (ver src/services/perfil.ts). RLS: SELECT/UPDATE do próprio; sem INSERT (a linha
-      // nasce do trigger on_auth_user_created) — por isso Insert não é exposto aqui.
-      profiles: {
-        Row: {
-          id: string;
-          email: string | null;
-          full_name: string | null;
-          company_name: string | null;
-          /** Reply-To dos e-mails da org — onde a resposta do lead chega. NÃO é o From. */
-          reply_to_email: string | null;
-          updated_at: string | null;
-        };
-        Insert: never;
-        Update: {
-          full_name?: string | null;
-          company_name?: string | null;
-          reply_to_email?: string | null;
-          updated_at?: string | null;
-        };
-        Relationships: [];
-      };
-      lead_lists: {
-        Row: {
-          id: string;
-          user_id: string;
-          name: string;
-          description: string | null;
-          city: string;
-          niche: string;
-          radius: number;
-          total_leads: number;
-          enriched_count: number;
-          contacted_count: number;
-          created_at: string;
-          uf: string | null;
-          fonte: string | null;
-          follow_up_ativo: boolean;
-        };
-        Insert: {
           id?: string;
-          user_id: string;
-          name: string;
-          description?: string | null;
-          city: string;
-          niche: string;
-          radius?: number;
-          total_leads?: number;
-          enriched_count?: number;
-          contacted_count?: number;
-          created_at?: string;
-          uf?: string | null;
-          fonte?: string | null;
-          follow_up_ativo?: boolean;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          name?: string;
-          description?: string | null;
-          city?: string;
-          niche?: string;
-          radius?: number;
-          total_leads?: number;
-          enriched_count?: number;
-          contacted_count?: number;
-          created_at?: string;
-          uf?: string | null;
-          fonte?: string | null;
-          follow_up_ativo?: boolean;
-        };
-        Relationships: [];
-      };
-      redesigns: {
-        Row: {
-          id: string;
-          user_id: string;
-          lead_id: string;
-          site_original_url: string | null;
-          html_gerado: string | null;
-          html_editado: string | null;
-          status: string;
-          modelo: string | null;
-          custo_usd: number | null;
-          observacoes: string | null;
-          criado_em: string;
-          gerado_em: string | null;
-          updated_at: string;
-          expira_em: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          lead_id: string;
-          site_original_url?: string | null;
-          html_gerado?: string | null;
-          html_editado?: string | null;
+          iniciada_em?: string;
+          leads_buscados?: number;
+          leads_descartados?: number;
+          leads_preparados?: number;
+          leads_qualificados?: number;
+          receita_id?: string;
           status?: string;
-          modelo?: string | null;
-          custo_usd?: number | null;
-          observacoes?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "automacao_rodadas_receita_id_fkey";
+            columns: ["receita_id"];
+            isOneToOne: false;
+            referencedRelation: "automacao_receitas";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      campanha_leads: {
+        Row: {
+          atualizado_em: string;
+          campanha_id: string;
+          criado_em: string;
+          erro: string | null;
+          estado: string;
+          id: string;
+          lead_id: string;
+          motivo_descarte: string | null;
+          proposta_id: string | null;
+          redesign_id: string | null;
+          user_id: string;
+        };
+        Insert: {
+          atualizado_em?: string;
+          campanha_id: string;
           criado_em?: string;
-          gerado_em?: string | null;
-          updated_at?: string;
-          expira_em?: string | null;
+          erro?: string | null;
+          estado?: string;
+          id?: string;
+          lead_id: string;
+          motivo_descarte?: string | null;
+          proposta_id?: string | null;
+          redesign_id?: string | null;
+          user_id: string;
         };
         Update: {
+          atualizado_em?: string;
+          campanha_id?: string;
+          criado_em?: string;
+          erro?: string | null;
+          estado?: string;
           id?: string;
-          user_id?: string;
           lead_id?: string;
-          site_original_url?: string | null;
-          html_gerado?: string | null;
-          html_editado?: string | null;
+          motivo_descarte?: string | null;
+          proposta_id?: string | null;
+          redesign_id?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "campanha_leads_campanha_id_fkey";
+            columns: ["campanha_id"];
+            isOneToOne: false;
+            referencedRelation: "campanhas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campanha_leads_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campanha_leads_proposta_id_fkey";
+            columns: ["proposta_id"];
+            isOneToOne: false;
+            referencedRelation: "propostas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campanha_leads_redesign_id_fkey";
+            columns: ["redesign_id"];
+            isOneToOne: false;
+            referencedRelation: "redesigns";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      campanhas: {
+        Row: {
+          canal: string;
+          criada_em: string;
+          id: string;
+          list_id: string | null;
+          nome: string;
+          status: string;
+          user_id: string;
+          wa_config: Json | null;
+        };
+        Insert: {
+          canal?: string;
+          criada_em?: string;
+          id?: string;
+          list_id?: string | null;
+          nome: string;
           status?: string;
-          modelo?: string | null;
-          custo_usd?: number | null;
-          observacoes?: string | null;
-          criado_em?: string;
-          gerado_em?: string | null;
+          user_id: string;
+          wa_config?: Json | null;
+        };
+        Update: {
+          canal?: string;
+          criada_em?: string;
+          id?: string;
+          list_id?: string | null;
+          nome?: string;
+          status?: string;
+          user_id?: string;
+          wa_config?: Json | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "campanhas_list_id_fkey";
+            columns: ["list_id"];
+            isOneToOne: false;
+            referencedRelation: "lead_lists";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      email_config: {
+        Row: {
+          ramp_max: number;
+          ramp_start: string | null;
+          ramp_tiers: Json;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          ramp_max?: number;
+          ramp_start?: string | null;
+          ramp_tiers?: Json;
           updated_at?: string;
-          expira_em?: string | null;
+          user_id: string;
+        };
+        Update: {
+          ramp_max?: number;
+          ramp_start?: string | null;
+          ramp_tiers?: Json;
+          updated_at?: string;
+          user_id?: string;
         };
         Relationships: [];
       };
-      wa_alertas: {
+      ia_uso: {
         Row: {
-          id: string;
-          user_id: string;
-          tipo: string;
-          mensagem: string;
-          lido: boolean;
           criado_em: string;
+          funcao: string;
+          id: string;
+          modelo: string | null;
+          user_id: string;
         };
         Insert: {
-          id?: string;
-          user_id?: string;
-          tipo: string;
-          mensagem: string;
-          lido?: boolean;
           criado_em?: string;
+          funcao: string;
+          id?: string;
+          modelo?: string | null;
+          user_id: string;
         };
         Update: {
-          id?: string;
-          user_id?: string;
-          tipo?: string;
-          mensagem?: string;
-          lido?: boolean;
           criado_em?: string;
+          funcao?: string;
+          id?: string;
+          modelo?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      integrations: {
+        Row: {
+          api_key_encrypted: string | null;
+          created_at: string;
+          id: string;
+          is_connected: boolean;
+          last_synced_at: string | null;
+          name: string;
+          provider: string;
+          settings: Json | null;
+          user_id: string;
+        };
+        Insert: {
+          api_key_encrypted?: string | null;
+          created_at?: string;
+          id?: string;
+          is_connected?: boolean;
+          last_synced_at?: string | null;
+          name: string;
+          provider: string;
+          settings?: Json | null;
+          user_id: string;
+        };
+        Update: {
+          api_key_encrypted?: string | null;
+          created_at?: string;
+          id?: string;
+          is_connected?: boolean;
+          last_synced_at?: string | null;
+          name?: string;
+          provider?: string;
+          settings?: Json | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      invoices: {
+        Row: {
+          amount: number;
+          created_at: string;
+          currency: string;
+          description: string | null;
+          id: string;
+          paid_at: string | null;
+          period_end: string | null;
+          period_start: string | null;
+          status: string;
+          stripe_invoice_id: string | null;
+          user_id: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          id?: string;
+          paid_at?: string | null;
+          period_end?: string | null;
+          period_start?: string | null;
+          status?: string;
+          stripe_invoice_id?: string | null;
+          user_id: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          currency?: string;
+          description?: string | null;
+          id?: string;
+          paid_at?: string | null;
+          period_end?: string | null;
+          period_start?: string | null;
+          status?: string;
+          stripe_invoice_id?: string | null;
+          user_id?: string;
         };
         Relationships: [];
       };
       lead_contatos: {
         Row: {
-          id: string;
-          user_id: string;
-          lead_id: string;
-          canal: string;
           anotacao: string | null;
+          canal: string;
           contatado_em: string;
           created_at: string;
+          id: string;
+          lead_id: string;
+          user_id: string;
         };
         Insert: {
-          id?: string;
-          user_id?: string;
-          lead_id: string;
-          canal: string;
           anotacao?: string | null;
+          canal: string;
           contatado_em?: string;
           created_at?: string;
+          id?: string;
+          lead_id: string;
+          user_id?: string;
         };
         Update: {
-          id?: string;
-          user_id?: string;
-          lead_id?: string;
-          canal?: string;
           anotacao?: string | null;
+          canal?: string;
           contatado_em?: string;
           created_at?: string;
+          id?: string;
+          lead_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lead_contatos_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lead_lists: {
+        Row: {
+          city: string;
+          contacted_count: number;
+          created_at: string;
+          description: string | null;
+          enriched_count: number;
+          follow_up_ativo: boolean;
+          fonte: string | null;
+          id: string;
+          name: string;
+          niche: string;
+          radius: number;
+          total_leads: number;
+          uf: string | null;
+          user_id: string;
+        };
+        Insert: {
+          city: string;
+          contacted_count?: number;
+          created_at?: string;
+          description?: string | null;
+          enriched_count?: number;
+          follow_up_ativo?: boolean;
+          fonte?: string | null;
+          id?: string;
+          name: string;
+          niche: string;
+          radius?: number;
+          total_leads?: number;
+          uf?: string | null;
+          user_id: string;
+        };
+        Update: {
+          city?: string;
+          contacted_count?: number;
+          created_at?: string;
+          description?: string | null;
+          enriched_count?: number;
+          follow_up_ativo?: boolean;
+          fonte?: string | null;
+          id?: string;
+          name?: string;
+          niche?: string;
+          radius?: number;
+          total_leads?: number;
+          uf?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      lead_reviews: {
+        Row: {
+          author_name: string | null;
+          author_photo: string | null;
+          fetched_at: string;
+          id: string;
+          lead_id: string;
+          rating: number | null;
+          review_url: string | null;
+          source: string;
+          text: string | null;
+          user_id: string;
+          when_label: string | null;
+        };
+        Insert: {
+          author_name?: string | null;
+          author_photo?: string | null;
+          fetched_at?: string;
+          id?: string;
+          lead_id: string;
+          rating?: number | null;
+          review_url?: string | null;
+          source?: string;
+          text?: string | null;
+          user_id: string;
+          when_label?: string | null;
+        };
+        Update: {
+          author_name?: string | null;
+          author_photo?: string | null;
+          fetched_at?: string;
+          id?: string;
+          lead_id?: string;
+          rating?: number | null;
+          review_url?: string | null;
+          source?: string;
+          text?: string | null;
+          user_id?: string;
+          when_label?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lead_reviews_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      leads: {
+        Row: {
+          address: string | null;
+          bairro: string | null;
+          business_name: string;
+          cargo: string | null;
+          category: string | null;
+          city: string | null;
+          created_at: string;
+          email: string | null;
+          email_opt_out: boolean;
+          email_opt_out_em: string | null;
+          enriched_at: string | null;
+          facebook_url: string | null;
+          has_hours: boolean | null;
+          has_phone: boolean | null;
+          has_photos: boolean | null;
+          has_website: boolean | null;
+          id: string;
+          instagram_url: string | null;
+          last_contacted_at: string | null;
+          latitude: number | null;
+          linkedin_url: string | null;
+          list_id: string | null;
+          longitude: number | null;
+          motivo_perda: string | null;
+          motivo_perda_nota: string | null;
+          notes: string | null;
+          opt_out_token: string | null;
+          origem_estrategia: string | null;
+          origem_fonte: string | null;
+          owner_name: string | null;
+          perda_em: string | null;
+          phone: string | null;
+          place_id: string | null;
+          rating: number | null;
+          review_count: number | null;
+          score: number;
+          score_breakdown: Json | null;
+          seguidores: number | null;
+          sem_contato: boolean;
+          state: string | null;
+          status: string;
+          updated_at: string;
+          user_id: string;
+          website: string | null;
+          whatsapp: string | null;
+          zip: string | null;
+        };
+        Insert: {
+          address?: string | null;
+          bairro?: string | null;
+          business_name: string;
+          cargo?: string | null;
+          category?: string | null;
+          city?: string | null;
+          created_at?: string;
+          email?: string | null;
+          email_opt_out?: boolean;
+          email_opt_out_em?: string | null;
+          enriched_at?: string | null;
+          facebook_url?: string | null;
+          has_hours?: boolean | null;
+          has_phone?: boolean | null;
+          has_photos?: boolean | null;
+          has_website?: boolean | null;
+          id?: string;
+          instagram_url?: string | null;
+          last_contacted_at?: string | null;
+          latitude?: number | null;
+          linkedin_url?: string | null;
+          list_id?: string | null;
+          longitude?: number | null;
+          motivo_perda?: string | null;
+          motivo_perda_nota?: string | null;
+          notes?: string | null;
+          opt_out_token?: string | null;
+          origem_estrategia?: string | null;
+          origem_fonte?: string | null;
+          owner_name?: string | null;
+          perda_em?: string | null;
+          phone?: string | null;
+          place_id?: string | null;
+          rating?: number | null;
+          review_count?: number | null;
+          score?: number;
+          score_breakdown?: Json | null;
+          seguidores?: number | null;
+          sem_contato?: boolean;
+          state?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+          website?: string | null;
+          whatsapp?: string | null;
+          zip?: string | null;
+        };
+        Update: {
+          address?: string | null;
+          bairro?: string | null;
+          business_name?: string;
+          cargo?: string | null;
+          category?: string | null;
+          city?: string | null;
+          created_at?: string;
+          email?: string | null;
+          email_opt_out?: boolean;
+          email_opt_out_em?: string | null;
+          enriched_at?: string | null;
+          facebook_url?: string | null;
+          has_hours?: boolean | null;
+          has_phone?: boolean | null;
+          has_photos?: boolean | null;
+          has_website?: boolean | null;
+          id?: string;
+          instagram_url?: string | null;
+          last_contacted_at?: string | null;
+          latitude?: number | null;
+          linkedin_url?: string | null;
+          list_id?: string | null;
+          longitude?: number | null;
+          motivo_perda?: string | null;
+          motivo_perda_nota?: string | null;
+          notes?: string | null;
+          opt_out_token?: string | null;
+          origem_estrategia?: string | null;
+          origem_fonte?: string | null;
+          owner_name?: string | null;
+          perda_em?: string | null;
+          phone?: string | null;
+          place_id?: string | null;
+          rating?: number | null;
+          review_count?: number | null;
+          score?: number;
+          score_breakdown?: Json | null;
+          seguidores?: number | null;
+          sem_contato?: boolean;
+          state?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+          website?: string | null;
+          whatsapp?: string | null;
+          zip?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "leads_list_id_fkey";
+            columns: ["list_id"];
+            isOneToOne: false;
+            referencedRelation: "lead_lists";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      profiles: {
+        Row: {
+          avatar_url: string | null;
+          company_name: string | null;
+          created_at: string;
+          email: string;
+          emails_sent_monthly: number;
+          full_name: string | null;
+          id: string;
+          integration_limit: number;
+          integrations_connected: number;
+          leads_used_monthly: number;
+          monthly_email_limit: number;
+          monthly_lead_limit: number;
+          phone: string | null;
+          plan: string;
+          plan_status: string;
+          reply_to_email: string | null;
+          site_credito: string | null;
+          trial_ends_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          avatar_url?: string | null;
+          company_name?: string | null;
+          created_at?: string;
+          email: string;
+          emails_sent_monthly?: number;
+          full_name?: string | null;
+          id: string;
+          integration_limit?: number;
+          integrations_connected?: number;
+          leads_used_monthly?: number;
+          monthly_email_limit?: number;
+          monthly_lead_limit?: number;
+          phone?: string | null;
+          plan?: string;
+          plan_status?: string;
+          reply_to_email?: string | null;
+          site_credito?: string | null;
+          trial_ends_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          avatar_url?: string | null;
+          company_name?: string | null;
+          created_at?: string;
+          email?: string;
+          emails_sent_monthly?: number;
+          full_name?: string | null;
+          id?: string;
+          integration_limit?: number;
+          integrations_connected?: number;
+          leads_used_monthly?: number;
+          monthly_email_limit?: number;
+          monthly_lead_limit?: number;
+          phone?: string | null;
+          plan?: string;
+          plan_status?: string;
+          reply_to_email?: string | null;
+          site_credito?: string | null;
+          trial_ends_at?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };
       propostas: {
         Row: {
-          id: string;
-          user_id: string;
-          lead_id: string;
-          site_id: string | null;
-          assunto: string;
-          corpo: string;
-          valor: number | null;
-          status: string;
-          criada_em: string;
-          enviada_em: string | null;
-          respondida_em: string | null;
           aprovada_em: string | null;
+          assunto: string;
+          campanha_id: string | null;
+          corpo: string;
+          criada_em: string;
           email_message_id: string | null;
           email_para: string | null;
-          follow_up_enviado_em: string | null;
+          enviada_em: string | null;
           follow_up_count: number;
+          follow_up_enviado_em: string | null;
           follow_up_message_id: string | null;
-          campanha_id: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          lead_id: string;
-          site_id?: string | null;
-          assunto: string;
-          corpo: string;
-          valor?: number | null;
-          status?: string;
-          criada_em?: string;
-          enviada_em?: string | null;
-          respondida_em?: string | null;
-          aprovada_em?: string | null;
-          email_message_id?: string | null;
-          email_para?: string | null;
-          follow_up_enviado_em?: string | null;
-          follow_up_count?: number;
-          follow_up_message_id?: string | null;
-          campanha_id?: string | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          lead_id?: string;
-          site_id?: string | null;
-          assunto?: string;
-          corpo?: string;
-          valor?: number | null;
-          status?: string;
-          criada_em?: string;
-          enviada_em?: string | null;
-          respondida_em?: string | null;
-          aprovada_em?: string | null;
-          email_message_id?: string | null;
-          email_para?: string | null;
-          follow_up_enviado_em?: string | null;
-          follow_up_count?: number;
-          follow_up_message_id?: string | null;
-          campanha_id?: string | null;
-        };
-        Relationships: [];
-      };
-      campanhas: {
-        Row: {
           id: string;
-          user_id: string;
-          list_id: string | null;
-          nome: string;
+          lead_id: string;
+          respondida_em: string | null;
+          site_id: string | null;
           status: string;
-          criada_em: string;
-          canal: string;
-          wa_config: Json | null;
+          user_id: string;
+          valor: number | null;
         };
         Insert: {
-          id?: string;
-          user_id: string;
-          list_id?: string | null;
-          nome: string;
-          status?: string;
-          criada_em?: string;
-          canal?: string;
-          wa_config?: Json | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          list_id?: string | null;
-          nome?: string;
-          status?: string;
-          criada_em?: string;
-          canal?: string;
-          wa_config?: Json | null;
-        };
-        Relationships: [];
-      };
-      wa_scripts: {
-        Row: {
-          id: string;
-          user_id: string;
-          nome: string;
-          tipo: string;
-          mensagem: string | null;
-          media_url: string | null;
-          criado_em: string;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string;
-          nome: string;
-          tipo?: string;
-          mensagem?: string | null;
-          media_url?: string | null;
-          criado_em?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          nome?: string;
-          tipo?: string;
-          mensagem?: string | null;
-          media_url?: string | null;
-          criado_em?: string;
-        };
-        Relationships: [];
-      };
-      wa_mensagens: {
-        Row: {
-          id: string;
-          user_id: string;
-          instancia_id: string | null;
-          numero: string;
-          lead_id: string | null;
-          nome_contato: string | null;
-          direcao: string;
-          tipo: string;
-          texto: string | null;
-          media_url: string | null;
-          externo_id: string | null;
-          lida: boolean;
-          criado_em: string;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string;
-          instancia_id?: string | null;
-          numero: string;
-          lead_id?: string | null;
-          nome_contato?: string | null;
-          direcao: string;
-          tipo?: string;
-          texto?: string | null;
-          media_url?: string | null;
-          externo_id?: string | null;
-          lida?: boolean;
-          criado_em?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          instancia_id?: string | null;
-          numero?: string;
-          lead_id?: string | null;
-          nome_contato?: string | null;
-          direcao?: string;
-          tipo?: string;
-          texto?: string | null;
-          media_url?: string | null;
-          externo_id?: string | null;
-          lida?: boolean;
-          criado_em?: string;
-        };
-        Relationships: [];
-      };
-      wa_envios: {
-        Row: {
-          id: string;
-          user_id: string;
-          lead_id: string;
-          instancia_id: string;
-          campanha_id: string | null;
-          enviado_em: string;
-          variacao_id: string | null;
-          mensagem: string | null;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string;
-          lead_id: string;
-          instancia_id: string;
+          aprovada_em?: string | null;
+          assunto: string;
           campanha_id?: string | null;
-          enviado_em?: string;
-          variacao_id?: string | null;
-          mensagem?: string | null;
+          corpo: string;
+          criada_em?: string;
+          email_message_id?: string | null;
+          email_para?: string | null;
+          enviada_em?: string | null;
+          follow_up_count?: number;
+          follow_up_enviado_em?: string | null;
+          follow_up_message_id?: string | null;
+          id?: string;
+          lead_id: string;
+          respondida_em?: string | null;
+          site_id?: string | null;
+          status?: string;
+          user_id: string;
+          valor?: number | null;
         };
         Update: {
-          id?: string;
-          user_id?: string;
-          lead_id?: string;
-          instancia_id?: string;
+          aprovada_em?: string | null;
+          assunto?: string;
           campanha_id?: string | null;
-          enviado_em?: string;
-          variacao_id?: string | null;
-          mensagem?: string | null;
+          corpo?: string;
+          criada_em?: string;
+          email_message_id?: string | null;
+          email_para?: string | null;
+          enviada_em?: string | null;
+          follow_up_count?: number;
+          follow_up_enviado_em?: string | null;
+          follow_up_message_id?: string | null;
+          id?: string;
+          lead_id?: string;
+          respondida_em?: string | null;
+          site_id?: string | null;
+          status?: string;
+          user_id?: string;
+          valor?: number | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "propostas_campanha_id_fkey";
+            columns: ["campanha_id"];
+            isOneToOne: false;
+            referencedRelation: "campanhas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propostas_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "propostas_site_id_fkey";
+            columns: ["site_id"];
+            isOneToOne: false;
+            referencedRelation: "sites_publicados";
+            referencedColumns: ["id"];
+          },
+        ];
       };
-      campanha_leads: {
+      redesigns: {
         Row: {
-          id: string;
-          campanha_id: string;
-          lead_id: string;
-          user_id: string;
-          estado: string;
-          redesign_id: string | null;
-          proposta_id: string | null;
-          motivo_descarte: string | null;
-          erro: string | null;
           criado_em: string;
-          atualizado_em: string;
+          custo_usd: number | null;
+          expira_em: string | null;
+          gerado_em: string | null;
+          html_editado: string | null;
+          html_gerado: string | null;
+          id: string;
+          lead_id: string;
+          modelo: string | null;
+          observacoes: string | null;
+          site_original_url: string | null;
+          status: string;
+          updated_at: string;
+          user_id: string;
         };
         Insert: {
-          id?: string;
-          campanha_id: string;
-          lead_id: string;
-          user_id: string;
-          estado?: string;
-          redesign_id?: string | null;
-          proposta_id?: string | null;
-          motivo_descarte?: string | null;
-          erro?: string | null;
           criado_em?: string;
-          atualizado_em?: string;
+          custo_usd?: number | null;
+          expira_em?: string | null;
+          gerado_em?: string | null;
+          html_editado?: string | null;
+          html_gerado?: string | null;
+          id?: string;
+          lead_id: string;
+          modelo?: string | null;
+          observacoes?: string | null;
+          site_original_url?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
         };
         Update: {
-          id?: string;
-          campanha_id?: string;
-          lead_id?: string;
-          user_id?: string;
-          estado?: string;
-          redesign_id?: string | null;
-          proposta_id?: string | null;
-          motivo_descarte?: string | null;
-          erro?: string | null;
           criado_em?: string;
-          atualizado_em?: string;
+          custo_usd?: number | null;
+          expira_em?: string | null;
+          gerado_em?: string | null;
+          html_editado?: string | null;
+          html_gerado?: string | null;
+          id?: string;
+          lead_id?: string;
+          modelo?: string | null;
+          observacoes?: string | null;
+          site_original_url?: string | null;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "redesigns_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sequence_steps: {
+        Row: {
+          body: string;
+          created_at: string;
+          delay_days: number;
+          id: string;
+          sequence_id: string;
+          step_order: number;
+          subject: string;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          delay_days?: number;
+          id?: string;
+          sequence_id: string;
+          step_order: number;
+          subject: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          delay_days?: number;
+          id?: string;
+          sequence_id?: string;
+          step_order?: number;
+          subject?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sequence_steps_sequence_id_fkey";
+            columns: ["sequence_id"];
+            isOneToOne: false;
+            referencedRelation: "sequences";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sequences: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          id: string;
+          is_active: boolean;
+          name: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          is_active?: boolean;
+          name: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          id?: string;
+          is_active?: boolean;
+          name?: string;
+          user_id?: string;
         };
         Relationships: [];
       };
       sites_publicados: {
         Row: {
+          arquivos_removidos: boolean;
+          expira_em: string;
           id: string;
-          user_id: string;
           lead_id: string;
+          publicado_em: string;
           redesign_id: string;
           slug: string;
-          url_publica: string;
           status: string;
-          publicado_em: string;
-          expira_em: string;
-          arquivos_removidos: boolean;
+          url_publica: string;
+          user_id: string;
         };
         Insert: {
+          arquivos_removidos?: boolean;
+          expira_em?: string;
           id?: string;
-          user_id: string;
           lead_id: string;
+          publicado_em?: string;
           redesign_id: string;
           slug: string;
-          url_publica: string;
           status?: string;
-          publicado_em?: string;
-          expira_em?: string;
-          arquivos_removidos?: boolean;
+          url_publica: string;
+          user_id: string;
         };
         Update: {
+          arquivos_removidos?: boolean;
+          expira_em?: string;
           id?: string;
-          user_id?: string;
           lead_id?: string;
+          publicado_em?: string;
           redesign_id?: string;
           slug?: string;
-          url_publica?: string;
           status?: string;
-          publicado_em?: string;
-          expira_em?: string;
-          arquivos_removidos?: boolean;
+          url_publica?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sites_publicados_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "sites_publicados_redesign_id_fkey";
+            columns: ["redesign_id"];
+            isOneToOne: false;
+            referencedRelation: "redesigns";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_alertas: {
+        Row: {
+          criado_em: string;
+          id: string;
+          lido: boolean;
+          mensagem: string;
+          tipo: string;
+          user_id: string;
+        };
+        Insert: {
+          criado_em?: string;
+          id?: string;
+          lido?: boolean;
+          mensagem: string;
+          tipo: string;
+          user_id?: string;
+        };
+        Update: {
+          criado_em?: string;
+          id?: string;
+          lido?: boolean;
+          mensagem?: string;
+          tipo?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      wa_envios: {
+        Row: {
+          campanha_id: string | null;
+          enviado_em: string;
+          id: string;
+          instancia_id: string;
+          lead_id: string;
+          mensagem: string | null;
+          user_id: string;
+          variacao_id: string | null;
+        };
+        Insert: {
+          campanha_id?: string | null;
+          enviado_em?: string;
+          id?: string;
+          instancia_id: string;
+          lead_id: string;
+          mensagem?: string | null;
+          user_id?: string;
+          variacao_id?: string | null;
+        };
+        Update: {
+          campanha_id?: string | null;
+          enviado_em?: string;
+          id?: string;
+          instancia_id?: string;
+          lead_id?: string;
+          mensagem?: string | null;
+          user_id?: string;
+          variacao_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_envios_instancia_id_fkey";
+            columns: ["instancia_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_envios_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_instancia_tokens: {
+        Row: {
+          atualizado_em: string;
+          instancia_id: string;
+          token: string;
+        };
+        Insert: {
+          atualizado_em?: string;
+          instancia_id: string;
+          token: string;
+        };
+        Update: {
+          atualizado_em?: string;
+          instancia_id?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_instancia_tokens_instancia_id_fkey";
+            columns: ["instancia_id"];
+            isOneToOne: true;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_instancias: {
+        Row: {
+          atualizado_em: string;
+          criada_em: string;
+          falhas_login: number;
+          funcao: string;
+          id: string;
+          nome: string;
+          numero: string | null;
+          ordem: number;
+          status: string;
+          ultima_checagem_em: string | null;
+          user_id: string;
+        };
+        Insert: {
+          atualizado_em?: string;
+          criada_em?: string;
+          falhas_login?: number;
+          funcao?: string;
+          id?: string;
+          nome: string;
+          numero?: string | null;
+          ordem?: number;
+          status?: string;
+          ultima_checagem_em?: string | null;
+          user_id: string;
+        };
+        Update: {
+          atualizado_em?: string;
+          criada_em?: string;
+          falhas_login?: number;
+          funcao?: string;
+          id?: string;
+          nome?: string;
+          numero?: string | null;
+          ordem?: number;
+          status?: string;
+          ultima_checagem_em?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      wa_mensagens: {
+        Row: {
+          criado_em: string;
+          direcao: string;
+          externo_id: string | null;
+          id: string;
+          instancia_id: string | null;
+          lead_id: string | null;
+          lida: boolean;
+          media_url: string | null;
+          nome_contato: string | null;
+          numero: string;
+          texto: string | null;
+          tipo: string;
+          user_id: string;
+        };
+        Insert: {
+          criado_em?: string;
+          direcao: string;
+          externo_id?: string | null;
+          id?: string;
+          instancia_id?: string | null;
+          lead_id?: string | null;
+          lida?: boolean;
+          media_url?: string | null;
+          nome_contato?: string | null;
+          numero: string;
+          texto?: string | null;
+          tipo?: string;
+          user_id?: string;
+        };
+        Update: {
+          criado_em?: string;
+          direcao?: string;
+          externo_id?: string | null;
+          id?: string;
+          instancia_id?: string | null;
+          lead_id?: string | null;
+          lida?: boolean;
+          media_url?: string | null;
+          nome_contato?: string | null;
+          numero?: string;
+          texto?: string | null;
+          tipo?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_mensagens_instancia_id_fkey";
+            columns: ["instancia_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_mensagens_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_scripts: {
+        Row: {
+          criado_em: string;
+          id: string;
+          media_url: string | null;
+          mensagem: string | null;
+          nome: string;
+          tipo: string;
+          user_id: string;
+        };
+        Insert: {
+          criado_em?: string;
+          id?: string;
+          media_url?: string | null;
+          mensagem?: string | null;
+          nome: string;
+          tipo?: string;
+          user_id?: string;
+        };
+        Update: {
+          criado_em?: string;
+          id?: string;
+          media_url?: string | null;
+          mensagem?: string | null;
+          nome?: string;
+          tipo?: string;
+          user_id?: string;
         };
         Relationships: [];
       };
@@ -708,21 +1278,21 @@ export type Database = {
     };
     Functions: {
       email_rampa_status: {
-        Args: Record<PropertyKey, never>;
+        Args: { p_user_id?: string };
         Returns: {
           ativa: boolean;
           dia: number;
-          teto: number;
           enviados_hoje: number;
           restante: number;
+          teto: number;
         }[];
       };
       registrar_contato_manual: {
         Args: {
-          p_lead_id: string;
+          p_anotacao: string;
           p_canal: string;
-          p_anotacao: string | null;
-          p_contatado_em: string | null;
+          p_contatado_em: string;
+          p_lead_id: string;
         };
         Returns: string;
       };

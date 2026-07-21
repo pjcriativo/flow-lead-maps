@@ -241,7 +241,10 @@ export async function registrarContato(
   const { data, error } = await supabase.rpc("registrar_contato_manual", {
     p_lead_id: leadId,
     p_canal: entrada.canal,
-    p_anotacao: entrada.anotacao ?? null,
+    // `p_anotacao text` aceita NULL no Postgres (é o que gravamos quando não há anotação), mas o
+    // gerador de tipos do Supabase marca TODO argumento de função como obrigatório e não-nulo.
+    // Limitação do gerador, não do banco — o comportamento aqui continua exatamente o mesmo.
+    p_anotacao: (entrada.anotacao ?? null) as unknown as string,
     p_contatado_em: quando,
   });
   if (error) throw error;
