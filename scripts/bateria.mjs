@@ -69,6 +69,7 @@ async function carregarLibs() {
     export * from ${JSON.stringify(join(PROJ, "src/lib/wa-copy.ts"))};
     export * from ${JSON.stringify(join(PROJ, "src/lib/fontes-prospeccao.ts"))};
     export * from ${JSON.stringify(join(PROJ, "src/lib/redes-teto.ts"))};
+    export * from ${JSON.stringify(join(PROJ, "src/lib/sdr.ts"))};
   `,
   );
   const out = join(dir, "libs.mjs");
@@ -367,6 +368,59 @@ async function bloco1(L) {
   T(
     L.mesRefAtual(new Date("2026-07-15T00:00:00Z")) === "2026-07",
     "mês de referência no formato certo",
+  );
+
+  console.log(" · agente SDR — as travas que impedem responder a pessoa errada");
+  const msg = (o) => ({
+    id: "1",
+    numero: "5541999",
+    direcao: "in",
+    texto: "oi",
+    criado_em: "2026-07-20T10:00:00Z",
+    lead_id: null,
+    ...o,
+  });
+  T(
+    L.conversaElegivel([msg({ lead_id: null })], false).motivo === "sem_lead",
+    "conversa SEM lead (vida pessoal do dono) → agente NAO age",
+  );
+  T(
+    L.conversaElegivel([msg({ lead_id: "abc" })], false).elegivel === true,
+    "conversa DE LEAD com ultima mensagem do lead → elegivel",
+  );
+  T(
+    L.conversaElegivel([msg({ lead_id: "abc", direcao: "out" })], false).motivo ===
+      "ultima_e_nossa",
+    "se a ultima e nossa, a bola e do lead → nao responde sozinho",
+  );
+  T(
+    L.conversaElegivel([msg({ lead_id: "abc" })], true).motivo === "ja_tem_sugestao",
+    "ja existe rascunho pendente → nao empilha outro",
+  );
+  T(L.conversaElegivel([], false).motivo === "sem_mensagem", "sem mensagem → nada a responder");
+  T(
+    L.conversaElegivel([msg({ lead_id: "abc", texto: "   " })], false).motivo === "sem_texto",
+    "mensagem vazia → nada a responder",
+  );
+  T(L.ESTADO_INICIAL === "rascunho", "PORTAO: todo rascunho nasce aguardando aprovacao");
+  T(
+    L.alertasDePromessa("Fica R$ 500 e entrego em 3 dias, garanto").length >= 3,
+    "flagra preco + prazo + garantia inventados",
+  );
+  T(
+    L.alertasDePromessa("Oi! Posso te mostrar como ficou a pagina?").length === 0,
+    "texto sem promessa nao gera alerta falso",
+  );
+  T(L.planejarSdr(0, 0).podeRodar === true, "SDR com teto livre → pode rodar");
+  T(L.planejarSdr(1, 0).podeRodar === false, "teto DIARIO batido → para");
+  T(L.planejarSdr(0, 10).podeRodar === false, "teto MENSAL batido → para");
+  const hist = L.historicoParaPrompt([
+    msg({ id: "a", texto: "quanto custa?", criado_em: "2026-07-20T10:00:00Z" }),
+    msg({ id: "b", direcao: "out", texto: "oi!", criado_em: "2026-07-20T09:00:00Z" }),
+  ]);
+  T(
+    hist.startsWith("NÓS: oi!") && hist.includes("LEAD: quanto custa?"),
+    "historico sai em ordem cronologica",
   );
 }
 
