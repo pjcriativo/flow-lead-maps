@@ -42,13 +42,12 @@ import {
 } from "@/lib/leads-api";
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
-import { FonteSelector, FormInstagram, FormLinkedIn } from "./FonteProspeccao";
+import { FonteSelector, FormEstrategias } from "./FonteProspeccao";
 import {
-  buscaInstagramPadrao,
-  buscaLinkedInPadrao,
+  valoresPadrao,
+  estrategiasDe,
   type FonteProspeccao,
-  type BuscaInstagram,
-  type BuscaLinkedIn,
+  type ValoresBusca,
 } from "@/lib/fontes-prospeccao";
 import { geocodeCidade } from "@/lib/geo";
 import { criarListaComLeads, nomeAutoLista } from "@/lib/lists-api";
@@ -84,8 +83,12 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   // FONTE DE PROSPECÇÃO (de onde vem o lead) — eixo diferente de `fonte` acima, que é o
   // PROVEDOR dos dados de lugares (osm/geoapify/apify). Só o Google Maps coleta hoje.
   const [fonteProsp, setFonteProsp] = useState<FonteProspeccao>("google_maps");
-  const [formIg, setFormIg] = useState<BuscaInstagram>(buscaInstagramPadrao);
-  const [formLi, setFormLi] = useState<BuscaLinkedIn>(buscaLinkedInPadrao);
+  // estratégia escolhida e valores dos campos — um estado por rede (trocar de fonte não perde o
+  // que já foi preenchido na outra).
+  const [estrIg, setEstrIg] = useState<string>(() => estrategiasDe("instagram")[0].id);
+  const [estrLi, setEstrLi] = useState<string>(() => estrategiasDe("linkedin")[0].id);
+  const [valIg, setValIg] = useState<ValoresBusca>(valoresPadrao);
+  const [valLi, setValLi] = useState<ValoresBusca>(valoresPadrao);
   const noMaps = fonteProsp === "google_maps";
 
   // Geocodifica a cidade e centraliza o mapa/pino nela (pino automático).
@@ -298,8 +301,24 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         <FonteSelector valor={fonteProsp} onChange={setFonteProsp} disabled={running} />
 
         <div key={fonteProsp} className="mt-4 animate-in fade-in duration-300">
-          {fonteProsp === "instagram" && <FormInstagram valor={formIg} onChange={setFormIg} />}
-          {fonteProsp === "linkedin" && <FormLinkedIn valor={formLi} onChange={setFormLi} />}
+          {fonteProsp === "instagram" && (
+            <FormEstrategias
+              fonte="instagram"
+              estrategiaId={estrIg}
+              onEstrategia={setEstrIg}
+              valores={valIg}
+              onValores={setValIg}
+            />
+          )}
+          {fonteProsp === "linkedin" && (
+            <FormEstrategias
+              fonte="linkedin"
+              estrategiaId={estrLi}
+              onEstrategia={setEstrLi}
+              valores={valLi}
+              onValores={setValLi}
+            />
+          )}
           {noMaps && (
             <>
               <div className="grid gap-3 md:grid-cols-[1.6fr_1fr_100px_auto]">

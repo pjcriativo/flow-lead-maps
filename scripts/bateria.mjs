@@ -227,37 +227,82 @@ async function bloco1(L) {
   );
   T(!L.fonteAtiva("instagram") && !L.fonteAtiva("linkedin"), "fonteAtiva() barra as duas");
 
-  const ig = L.buscaInstagramPadrao();
-  T(L.validarInstagram(ig).ok === false, "Instagram sem termo → inválido");
-  T(L.validarInstagram({ ...ig, termo: "odonto" }).ok === true, "Instagram com hashtag → válido");
+  console.log(" · 20 estratégias de prospecção (10 por rede)");
+  const estIg = L.estrategiasDe("instagram");
+  const estLi = L.estrategiasDe("linkedin");
+  T(estIg.length === 10, `Instagram tem 10 estratégias (${estIg.length})`);
+  T(estLi.length === 10, `LinkedIn tem 10 estratégias (${estLi.length})`);
   T(
-    L.validarInstagram({ ...ig, modo: "seguidores", termo: "@perfil ruim!" }).ok === false,
+    estIg.every((e) => e.id.startsWith("IG-")) && estLi.every((e) => e.id.startsWith("LI-")),
+    "IDs padronizados (IG-n / LI-n)",
+  );
+  T(
+    L.ESTRATEGIAS.every((e) => e.titulo && e.descricao && e.pluga),
+    "toda estratégia tem título, descrição e onde a coleta pluga",
+  );
+  T(
+    new Set(L.ESTRATEGIAS.map((e) => e.id)).size === 20,
+    "20 estratégias com ID único (sem duplicata)",
+  );
+  T(
+    L.ESTRATEGIAS.filter((e) => e.viabilidade !== "viavel").every((e) => !!e.nota),
+    "toda estratégia frágil/planejada EXPLICA o porquê (não esconde)",
+  );
+  const planejadas = L.ESTRATEGIAS.filter((e) => e.viabilidade === "planejado");
+  T(
+    planejadas.length > 0,
+    `há estratégias marcadas 'planejado' (${planejadas.map((e) => e.id).join(", ")})`,
+  );
+
+  // campos por estratégia — cada uma pede o que precisa, e o motor valida
+  const ig1 = L.estrategiaPorId("IG-1");
+  T(
+    ig1.campos.includes("termo") && ig1.campos.includes("cidade"),
+    "IG-1 (hashtag local) pede hashtag + cidade",
+  );
+  T(
+    L.estrategiaPorId("IG-3").campos.includes("perfilConcorrente"),
+    "IG-3 (seguidores de concorrente) pede o @ do concorrente",
+  );
+  T(
+    L.estrategiaPorId("LI-1").campos.join() === ["cargo", "setor", "regiao"].join(),
+    "LI-1 pede cargo + setor + região",
+  );
+  T(L.estrategiaPorId("LI-6").campos.length === 0, "LI-6 (2º grau) não pede campo — é manual");
+  T(L.estrategiaPorId("LI-2").campos.includes("porte"), "LI-2 pede o porte da empresa");
+
+  const vazios = L.valoresPadrao();
+  T(L.validarEstrategia(ig1, vazios).ok === false, "IG-1 sem preencher → inválido");
+  T(
+    L.validarEstrategia(ig1, { ...vazios, termo: "odonto", cidade: "Curitiba" }).ok === true,
+    "IG-1 preenchido → válido",
+  );
+  T(
+    L.validarEstrategia(L.estrategiaPorId("IG-3"), { ...vazios, perfilConcorrente: "@ruim!!" })
+      .ok === false,
     "@ de concorrente inválido é recusado",
   );
+  T(L.validarEstrategia(L.estrategiaPorId("LI-6"), vazios).ok === true, "LI-6 sem campos → válido");
+
+  const ped = L.montarPedido(ig1, { ...vazios, termo: "#Odonto ", cidade: " Curitiba " });
+  T(ped.campos.termo === "Odonto", "pedido limpa o # e os espaços");
   T(
-    L.pedidoInstagram({ ...ig, termo: "#Odonto ", cidade: " Curitiba " }).termo === "Odonto",
-    "pedido do Instagram limpa # e espaços",
+    ped.fonte === "instagram" && ped.estrategia === "IG-1",
+    "pedido carrega a fonte e a estratégia",
   );
 
-  const li = L.buscaLinkedInPadrao();
-  T(L.validarLinkedIn(li).ok === false, "LinkedIn sem cargo → inválido");
-  T(
-    L.validarLinkedIn({ ...li, cargo: "Sócio" }).ok === false,
-    "LinkedIn só com cargo ainda é amplo demais → inválido",
+  // MESMO PIPELINE + RASTREABILIDADE
+  const leadIg = L.perfilParaLead(
+    {
+      username: "@clinicax",
+      nome: "Clínica X",
+      linkBio: "https://linktr.ee/x",
+      email: "c@x.com",
+      categoria: "Odontologia",
+      seguidores: 1234,
+    },
+    "IG-5",
   );
-  T(
-    L.validarLinkedIn({ ...li, cargo: "Sócio", regiao: "Curitiba" }).ok === true,
-    "LinkedIn com cargo + região → válido",
-  );
-
-  // MESMO PIPELINE: cada fonte vira uma linha da MESMA tabela `leads`.
-  const leadIg = L.instagramParaLead({
-    username: "@clinicax",
-    nome: "Clínica X",
-    linkBio: "https://linktr.ee/x",
-    email: "c@x.com",
-    categoria: "Odontologia",
-  });
   T(leadIg.place_id === "ig:clinicax", "Instagram → place_id 'ig:<user>' (dedup do mesmo jeito)");
   T(
     leadIg.instagram_url === "https://instagram.com/clinicax" &&
@@ -268,23 +313,33 @@ async function bloco1(L) {
     leadIg.email === "c@x.com" && leadIg.website === "https://linktr.ee/x",
     "e-mail e link da bio mapeados",
   );
+  T(
+    leadIg.origem_fonte === "instagram" && leadIg.origem_estrategia === "IG-5",
+    "RASTREABILIDADE: lead guarda fonte + estratégia",
+  );
+  T(leadIg.seguidores === 1234, "seguidores gravados em coluna própria (não em review_count)");
 
-  const leadLi = L.linkedinParaLead({
-    slug: "joao-silva",
-    nome: "João Silva",
-    empresa: "Acme",
-    setor: "Odontologia",
-  });
+  const leadLi = L.pessoaParaLead(
+    {
+      slug: "joao-silva",
+      nome: "João Silva",
+      empresa: "Acme",
+      setor: "Odontologia",
+      cargo: "Sócio",
+    },
+    "LI-1",
+  );
   T(leadLi.place_id === "li:joao-silva", "LinkedIn → place_id 'li:<slug>'");
   T(
     leadLi.owner_name === "João Silva" && leadLi.business_name === "Acme",
     "LinkedIn → pessoa em owner_name, empresa em business_name",
   );
-  T(leadIg.status === "new" && leadLi.status === "new", "ambos entram como 'new' no MESMO funil");
+  T(leadLi.cargo === "Sócio", "cargo gravado em coluna própria");
   T(
-    L.CAMPOS_SEM_COLUNA.length === 2,
-    "gaps declarados sem fingir (seguidores e cargo ainda precisam de coluna)",
+    leadLi.origem_fonte === "linkedin" && leadLi.origem_estrategia === "LI-1",
+    "RASTREABILIDADE do LinkedIn",
   );
+  T(leadIg.status === "new" && leadLi.status === "new", "ambos entram como 'new' no MESMO funil");
 }
 
 // ============================ BLOCO 2 — EDGES REAIS ============================
