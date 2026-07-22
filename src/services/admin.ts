@@ -48,6 +48,18 @@ export type CampanhaRecente = {
   status: string;
   criada_em: string;
   dono: string;
+  /** enviados ← count(wa_envios)+count(propostas 'enviada') da campanha; total ← campanha_leads */
+  total: number;
+  enviados: number;
+};
+
+/** "Platform Snapshot" — cada número ← uma query real na Edge (comentadas lá). */
+export type SnapshotPlataforma = {
+  scrape: { rodando: number; concluidas: number; paradasTeto: number; erros: number };
+  segmentos: { categoria: string; total: number }[];
+  templatesWa: number;
+  leadsAcionaveis: number;
+  aprovadosDisparo: number;
 };
 export type BuscaRecente = {
   id: string;
@@ -68,6 +80,7 @@ export type PainelAdmin = {
   leadsRecentes: LeadRecente[];
   campanhasRecentes: CampanhaRecente[];
   buscasRecentes: BuscaRecente[];
+  snapshot: SnapshotPlataforma;
 };
 
 /** Uma chamada só: a Edge valida o papel no servidor e devolve a plataforma inteira. */

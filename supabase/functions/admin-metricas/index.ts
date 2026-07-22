@@ -72,6 +72,14 @@ Deno.serve(async (req) => {
     leadsRec,
     campsRec,
     buscasRec,
+    scrapeRows,
+    categoriaRows,
+    templatesWa,
+    leadsAcionaveis,
+    aprovadosDisparo,
+    clPorCampanha,
+    enviosPorCampanha,
+    propostasEnviadas,
   ] = await Promise.all([
     contar(admin.from("leads").select("id", head)),
     admin.from("campanhas").select("status"),
@@ -107,6 +115,20 @@ Deno.serve(async (req) => {
       .select("id, user_id, fonte, estrategia, status, inseridos, custo_usd, criado_em")
       .order("criado_em", { ascending: false })
       .limit(8),
+    // Snapshot: buscas por status (ativas/concluídas/paradas no teto/erro) — livro-caixa
+    admin.from("redes_buscas").select("status"),
+    // Snapshot: segmentos = categorias reais dos leads (top N por contagem)
+    admin.from("leads").select("category").not("category", "is", null).limit(2000),
+    // Snapshot: modelos de mensagem = scripts de WhatsApp cadastrados
+    contar(admin.from("wa_scripts").select("id", head)),
+    // Snapshot: leads acionáveis = têm ao menos um canal de contato
+    contar(admin.from("leads").select("id", head).or("sem_contato.is.null,sem_contato.eq.false")),
+    // Snapshot: aprovados para disparo (portão de campanha)
+    contar(admin.from("campanha_leads").select("id", head).eq("estado", "aprovado")),
+    // Recent Campaigns: enviados x/total por campanha (real: campanha_leads + envios/propostas)
+    admin.from("campanha_leads").select("campanha_id"),
+    admin.from("wa_envios").select("campanha_id"),
+    admin.from("propostas").select("campanha_id").eq("status", "enviada"),
   ]);
 
   const campanhasStatus = new Map<string, number>();
@@ -132,8 +154,41 @@ Deno.serve(async (req) => {
     if (p) p.disparos++;
   }
 
-  const dono = (rows: Rec[] | null | undefined) =>
+  const dono = (rows: Rec[] | null | undefined): Rec[] =>
     (rows ?? []).map((r) => ({ ...r, dono: emailDe.get(String(r.user_id)) ?? "?" }));
+
+  // Snapshot: agregações leves feitas aqui (dado cru já veio das queries acima)
+  const scrape = { rodando: 0, concluidas: 0, paradasTeto: 0, erros: 0 };
+  for (const r of scrapeRows.data ?? []) {
+    if (r.status === "rodando") scrape.rodando++;
+    else if (r.status === "concluida") scrape.concluidas++;
+    else if (r.status === "parada_teto") scrape.paradasTeto++;
+    else if (r.status === "erro") scrape.erros++;
+  }
+  const porCategoria = new Map<string, number>();
+  for (const r of categoriaRows.data ?? []) {
+    const c = String(r.category).trim();
+    if (c) porCategoria.set(c, (porCategoria.get(c) ?? 0) + 1);
+  }
+  const segmentos = [...porCategoria.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([categoria, total]) => ({ categoria, total }));
+
+  const totalPorCampanha = new Map<string, number>();
+  for (const r of clPorCampanha.data ?? [])
+    totalPorCampanha.set(
+      String(r.campanha_id),
+      (totalPorCampanha.get(String(r.campanha_id)) ?? 0) + 1,
+    );
+  const enviadosPorCampanha = new Map<string, number>();
+  for (const r of [...(enviosPorCampanha.data ?? []), ...(propostasEnviadas.data ?? [])]) {
+    if (!r.campanha_id) continue;
+    enviadosPorCampanha.set(
+      String(r.campanha_id),
+      (enviadosPorCampanha.get(String(r.campanha_id)) ?? 0) + 1,
+    );
+  }
 
   return json({
     ok: true,
@@ -168,7 +223,18 @@ Deno.serve(async (req) => {
     statusCampanhas: [...campanhasStatus.entries()].map(([status, total]) => ({ status, total })),
     serie14d: [...porDia.values()],
     leadsRecentes: dono(leadsRec.data as Rec[]),
-    campanhasRecentes: dono(campsRec.data as Rec[]),
+    campanhasRecentes: dono(campsRec.data as Rec[]).map((c) => ({
+      ...c,
+      total: totalPorCampanha.get(String(c.id)) ?? 0,
+      enviados: enviadosPorCampanha.get(String(c.id)) ?? 0,
+    })),
     buscasRecentes: dono(buscasRec.data as Rec[]),
+    snapshot: {
+      scrape,
+      segmentos,
+      templatesWa,
+      leadsAcionaveis,
+      aprovadosDisparo,
+    },
   });
 });

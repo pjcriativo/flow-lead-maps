@@ -25,6 +25,8 @@ import {
   FileSearch,
   Contact,
   ArrowLeft,
+  TerminalSquare,
+  Radar,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -285,6 +287,7 @@ export function AdminPanel({ email }: { email: string }) {
   const camps = painel?.campanhasRecentes ?? [];
   const buscas = painel?.buscasRecentes ?? [];
   const usuarios = painel?.usuarios ?? [];
+  const snapshot = painel?.snapshot ?? null;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -302,6 +305,29 @@ export function AdminPanel({ email }: { email: string }) {
               API. Cada número vem de uma consulta real no servidor (papel de super admin verificado
               lá); o que ainda não tem base aparece como “Em breve”.
             </p>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <button
+                disabled
+                title="A gestão de usuários chega junto com planos/memberships."
+                className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground/70"
+              >
+                <Users className="h-3.5 w-3.5" /> Gerenciar usuários <EmBreve />
+              </button>
+              <button
+                disabled
+                title="O módulo de suporte ainda não existe."
+                className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground/70"
+              >
+                <LifeBuoy className="h-3.5 w-3.5" /> Tickets <EmBreve />
+              </button>
+              {/* ação REAL: o agendador da automação (pg_cron) vive na aba Automação do app */}
+              <a
+                href="/dashboard?secao=automacao"
+                className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/15"
+              >
+                <TerminalSquare className="h-3.5 w-3.5" /> Cron da automação
+              </a>
+            </div>
           </div>
 
           {erro && (
@@ -377,6 +403,17 @@ export function AdminPanel({ email }: { email: string }) {
               detalhe="count(profiles) — todas as orgs"
               Icon={Users}
               tom="ouro"
+            />
+            <Kpi
+              rotulo="Buscas ativas"
+              valor={snapshot ? String(snapshot.scrape.rodando) : "…"}
+              detalhe={
+                snapshot
+                  ? `${snapshot.scrape.concluidas} concluída(s) · ${snapshot.scrape.paradasTeto} parada(s) no teto · ${snapshot.scrape.erros} erro(s)`
+                  : undefined
+              }
+              Icon={Radar}
+              tom="sucesso"
             />
             {/* sem base no produto ainda → Em breve, não zero fake */}
             <KpiEmBreve
@@ -471,6 +508,81 @@ export function AdminPanel({ email }: { email: string }) {
             </div>
           </div>
 
+          {/* retrato da plataforma — sinais rápidos de CRM/mensageria/prontidão (como no
+              "Platform Snapshot" da referência), cada número de uma query real da Edge */}
+          <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+            <h2 className="font-serif text-lg">Retrato da plataforma</h2>
+            <p className="text-xs text-muted-foreground">
+              Sinais rápidos de CRM, mensageria e prontidão dos leads — todas as orgs.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-lg border border-border bg-secondary/20 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Follow-ups enviados
+                </p>
+                <p className="mt-0.5 font-serif text-xl">{kpis ? kpis.followups : "…"}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  propostas.follow_up_count (medido pela edge)
+                </p>
+              </div>
+              <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Follow-ups hoje · atrasados · próximos
+                  </p>
+                  <EmBreve />
+                </div>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">
+                  Não existe agendamento por data: o follow-up dispara por idade da proposta (edge
+                  follow-up-cron). Contadores por dia entram quando houver agenda.
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/20 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Modelos de mensagem
+                </p>
+                <p className="mt-0.5 font-serif text-xl">{snapshot ? snapshot.templatesWa : "…"}</p>
+                <p className="text-[11px] text-muted-foreground">wa_scripts cadastrados</p>
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/20 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Leads acionáveis
+                </p>
+                <p className="mt-0.5 font-serif text-xl">
+                  {snapshot ? snapshot.leadsAcionaveis : "…"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  com canal de contato (sem_contato = false)
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/20 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Aprovados p/ disparo
+                </p>
+                <p className="mt-0.5 font-serif text-xl">
+                  {snapshot ? snapshot.aprovadosDisparo : "…"}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  campanha_leads estado 'aprovado'
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/20 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Segmentos de leads
+                </p>
+                <div className="mt-1.5 space-y-1">
+                  {(snapshot?.segmentos ?? []).map((s) => (
+                    <div key={s.categoria} className="flex items-center justify-between text-xs">
+                      <span className="truncate text-muted-foreground">{s.categoria}</span>
+                      <span className="ml-2 font-serif">{s.total}</span>
+                    </div>
+                  ))}
+                  {!snapshot && <p className="text-xs text-muted-foreground">…</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* usuários — a plataforma real, org por org */}
           <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
             <div className="border-b border-border px-4 py-3">
@@ -552,6 +664,12 @@ export function AdminPanel({ email }: { email: string }) {
                         <p className="text-xs text-muted-foreground">
                           <span className="uppercase">{c.canal}</span> · {c.dono}
                         </p>
+                      </td>
+                      <td
+                        className="px-2 py-2.5 text-right text-xs tabular-nums text-muted-foreground"
+                        title="enviados / leads na campanha"
+                      >
+                        {c.enviados}/{c.total}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <BadgeStatus s={c.status} />

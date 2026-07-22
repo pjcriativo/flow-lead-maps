@@ -472,6 +472,28 @@ async function bloco2() {
       (r.body?.leadsRecentes ?? []).every((l) => !!l.dono),
     "cada lead recente vem com o DONO (email da org)",
   );
+  T(
+    !!r.body?.snapshot &&
+      typeof r.body.snapshot.leadsAcionaveis === "number" &&
+      Array.isArray(r.body.snapshot.segmentos) &&
+      r.body.snapshot.segmentos.length > 0,
+    "snapshot da plataforma: acionáveis + segmentos (categorias reais)",
+  );
+  const { count: rbGlob } = await admin
+    .from("redes_buscas")
+    .select("id", { count: "exact", head: true });
+  const sc = r.body?.snapshot?.scrape;
+  T(
+    !!sc && sc.rodando + sc.concluidas + sc.paradasTeto + sc.erros === (rbGlob ?? -1),
+    "buscas por status somam o count REAL do livro-caixa",
+    JSON.stringify(sc),
+  );
+  T(
+    (r.body?.campanhasRecentes ?? []).every(
+      (c) => typeof c.total === "number" && typeof c.enviados === "number",
+    ),
+    "campanhas recentes trazem enviados/total (x/y real)",
+  );
 
   console.log(" · portão do disparo (não envia e não marca sem chip usável)");
   const ins = async (t, row) => {

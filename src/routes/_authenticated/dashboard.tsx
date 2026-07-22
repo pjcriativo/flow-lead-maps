@@ -144,6 +144,9 @@ function Dashboard() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("sheets_connected") === "true") setSection("sheets");
+    // deep-link de seção (ex.: /dashboard?secao=automacao — usado pelo painel /admin)
+    const secao = params.get("secao");
+    if (secao && NAV.some((n) => n.id === secao)) setSection(secao as Section);
   }, []);
 
   const handleSignOut = async () => {
