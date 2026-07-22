@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Megaphone,
   Bot,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,10 +123,20 @@ function Dashboard() {
   const [sheetVerified, setSheetVerified] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [userReady, setUserReady] = useState(false);
+  const [superAdmin, setSuperAdmin] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) currentUserId = data.user.id;
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        currentUserId = data.user.id;
+        // porta do painel /admin — só aparece para quem tem o papel no banco (profiles)
+        const { data: perfil } = await supabase
+          .from("profiles")
+          .select("is_super_admin")
+          .eq("id", data.user.id)
+          .maybeSingle();
+        setSuperAdmin(perfil?.is_super_admin === true);
+      }
       setUserReady(true);
     });
   }, []);
@@ -166,6 +177,15 @@ function Dashboard() {
           ))}
         </nav>
         <div className="px-3 pb-2">
+          {superAdmin && (
+            <Link
+              to="/admin"
+              className="flex w-full items-center gap-3 rounded-md border border-gold/30 px-3 py-2 text-sm text-gold transition-colors hover:bg-sidebar-accent/60"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Painel Admin
+            </Link>
+          )}
           <button
             onClick={handleSignOut}
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"

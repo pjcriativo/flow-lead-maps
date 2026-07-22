@@ -718,6 +718,7 @@ export type Database = {
           id: string;
           integration_limit: number;
           integrations_connected: number;
+          is_super_admin: boolean;
           leads_used_monthly: number;
           monthly_email_limit: number;
           monthly_lead_limit: number;
@@ -739,6 +740,7 @@ export type Database = {
           id: string;
           integration_limit?: number;
           integrations_connected?: number;
+          is_super_admin?: boolean;
           leads_used_monthly?: number;
           monthly_email_limit?: number;
           monthly_lead_limit?: number;
@@ -760,6 +762,7 @@ export type Database = {
           id?: string;
           integration_limit?: number;
           integrations_connected?: number;
+          is_super_admin?: boolean;
           leads_used_monthly?: number;
           monthly_email_limit?: number;
           monthly_lead_limit?: number;
