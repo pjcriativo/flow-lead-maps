@@ -72,6 +72,15 @@ export type BuscaRecente = {
   dono: string;
 };
 
+export type Role = { papel: string; ativo: boolean };
+export type Staff = {
+  user_id: string;
+  papel: string;
+  email: string;
+  nome: string | null;
+  criada_em: string;
+};
+
 export type PainelAdmin = {
   kpis: AdminKpis;
   usuarios: UsuarioPlataforma[];
@@ -81,6 +90,10 @@ export type PainelAdmin = {
   campanhasRecentes: CampanhaRecente[];
   buscasRecentes: BuscaRecente[];
   snapshot: SnapshotPlataforma;
+  orgAdmin: string | null;
+  roles: Role[];
+  staffs: Staff[];
+  subscribers: null; // sem base de newsletter → "Em breve"
 };
 
 /** Uma chamada só: a Edge valida o papel no servidor e devolve a plataforma inteira. */
@@ -89,4 +102,16 @@ export async function carregarPainelAdmin(): Promise<PainelAdmin> {
   if (error) throw new Error(error.message ?? "Falha ao carregar as métricas");
   if (data?.error) throw new Error(String(data.error));
   return data as PainelAdmin;
+}
+
+/** Mutações das telas de admin (Edge admin-acoes valida super_admin no servidor). */
+export async function adminAcao(
+  acao: "role_toggle" | "staff_add" | "staff_remove" | "user_add",
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; reason?: string; detalhe?: string }> {
+  const { data, error } = await supabase.functions.invoke("admin-acoes", {
+    body: { acao, ...payload },
+  });
+  if (error) throw new Error(error.message);
+  return data as { ok: boolean; reason?: string; detalhe?: string };
 }

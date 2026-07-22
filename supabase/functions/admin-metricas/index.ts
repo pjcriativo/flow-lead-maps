@@ -49,6 +49,30 @@ Deno.serve(async (req) => {
     (usuarios ?? []).map((u: Rec) => [String(u.id), String(u.email ?? "?")]),
   );
 
+  // org do super admin (para as telas Roles/Staffs, que operam na org dele)
+  const { data: minhaOrg } = await admin
+    .from("memberships")
+    .select("org_id")
+    .eq("user_id", userData.user.id)
+    .order("criada_em", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const orgAdmin = minhaOrg?.org_id ?? null;
+
+  // Roles: papéis da org do admin com toggle real (org_papeis)
+  const { data: rolesRows } = orgAdmin
+    ? await admin.from("org_papeis").select("papel, ativo").eq("org_id", orgAdmin)
+    : { data: [] as Rec[] };
+  // Staffs: membros da org do admin (memberships + profile)
+  const { data: staffRows } = orgAdmin
+    ? await admin.from("memberships").select("user_id, papel, criada_em").eq("org_id", orgAdmin)
+    : { data: [] as Rec[] };
+  const staffIds = (staffRows ?? []).map((s: Rec) => String(s.user_id));
+  const perfisStaff = staffIds.length
+    ? await admin.from("profiles").select("id, email, full_name").in("id", staffIds)
+    : { data: [] as Rec[] };
+  const staffPerfil = new Map((perfisStaff.data ?? []).map((p: Rec) => [String(p.id), p]));
+
   const inicio14 = new Date();
   inicio14.setDate(inicio14.getDate() - 13);
   inicio14.setHours(0, 0, 0, 0);
@@ -236,5 +260,21 @@ Deno.serve(async (req) => {
       leadsAcionaveis,
       aprovadosDisparo,
     },
+    orgAdmin,
+    // tela Roles: papéis da org do admin, com o estado do toggle (org_papeis.ativo)
+    roles: (rolesRows ?? []).map((r: Rec) => ({ papel: r.papel, ativo: r.ativo })),
+    // tela Staffs: colaboradores da org do admin (nome/email/papel)
+    staffs: (staffRows ?? []).map((s: Rec) => {
+      const p = staffPerfil.get(String(s.user_id)) as Rec | undefined;
+      return {
+        user_id: s.user_id,
+        papel: s.papel,
+        email: p?.email ?? "?",
+        nome: (p?.full_name as string) ?? null,
+        criada_em: s.criada_em,
+      };
+    }),
+    // tela Subscribers: sem base de newsletter no produto → o painel mostra "Em breve"
+    subscribers: null,
   });
 });

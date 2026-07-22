@@ -45,13 +45,16 @@ import { Link } from "@tanstack/react-router";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { cn } from "@/lib/utils";
 import { carregarPainelAdmin, type PainelAdmin } from "@/services/admin";
+import { AdminRoles, AdminStaffs } from "./AdminStaffRoles";
+import { AdminAllUsers, AdminSubscribers } from "./AdminUsers";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
-const NAV: { rotulo: string; Icon: typeof LayoutDashboard; pronto?: boolean }[] = [
-  { rotulo: "Dashboard", Icon: LayoutDashboard, pronto: true },
-  { rotulo: "Staff & Roles", Icon: ShieldCheck },
-  { rotulo: "Usuários", Icon: Users },
+type TelaAdmin = "dashboard" | "staff" | "users";
+const NAV: { rotulo: string; Icon: typeof LayoutDashboard; tela?: TelaAdmin }[] = [
+  { rotulo: "Dashboard", Icon: LayoutDashboard, tela: "dashboard" },
+  { rotulo: "Staff & Roles", Icon: ShieldCheck, tela: "staff" },
+  { rotulo: "Usuários", Icon: Users, tela: "users" },
   { rotulo: "Planos", Icon: CreditCard },
   { rotulo: "Pagamentos", Icon: Wallet },
   { rotulo: "Relatórios", Icon: BarChart3 },
@@ -72,23 +75,30 @@ function EmBreve({ className }: { className?: string }) {
   );
 }
 
-function Sidebar() {
+function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmin) => void }) {
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <div className="flex h-16 items-center border-b border-sidebar-border px-4">
         <FlowLeadsLogo variant="dark" className="h-7" />
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {NAV.map(({ rotulo, Icon, pronto }) =>
-          pronto ? (
-            <div
+        {NAV.map(({ rotulo, Icon, tela: destino }) =>
+          destino ? (
+            <button
               key={rotulo}
-              aria-current="page"
-              className="flex items-center gap-2.5 rounded-lg border-l-2 border-gold bg-sidebar-accent px-3 py-2 text-sm font-semibold text-sidebar-accent-foreground"
+              type="button"
+              aria-current={tela === destino ? "page" : undefined}
+              onClick={() => onNavegar(destino)}
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                tela === destino
+                  ? "border-l-2 border-gold bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+              )}
             >
-              <Icon className="h-4 w-4 text-gold" />
+              <Icon className={cn("h-4 w-4", tela === destino && "text-gold")} />
               {rotulo}
-            </div>
+            </button>
           ) : (
             // sem base ainda → visível, mas desabilitado e dizendo o porquê
             <div
@@ -263,6 +273,12 @@ const DONUT_CORES: Record<string, string> = {
 export function AdminPanel({ email }: { email: string }) {
   const [painel, setPainel] = useState<PainelAdmin | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [tela, setTela] = useState<TelaAdmin>("dashboard");
+
+  const recarregar = () =>
+    carregarPainelAdmin()
+      .then((p) => setPainel(p))
+      .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
 
   useEffect(() => {
     let vivo = true;
@@ -289,9 +305,38 @@ export function AdminPanel({ email }: { email: string }) {
   const usuarios = painel?.usuarios ?? [];
   const snapshot = painel?.snapshot ?? null;
 
+  if (tela === "staff" || tela === "users") {
+    return (
+      <div className="flex min-h-screen bg-background text-foreground">
+        <Sidebar tela={tela} onNavegar={setTela} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Topbar email={email} />
+          <main className="mx-auto w-full max-w-[1100px] flex-1 space-y-5 p-5">
+            {erro && (
+              <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                Falha ao carregar: {erro}
+              </p>
+            )}
+            {tela === "staff" ? (
+              <>
+                <AdminRoles roles={painel?.roles ?? []} onMudou={recarregar} />
+                <AdminStaffs staffs={painel?.staffs ?? []} onMudou={recarregar} />
+              </>
+            ) : (
+              <>
+                <AdminAllUsers usuarios={painel?.usuarios ?? []} onMudou={recarregar} />
+                <AdminSubscribers />
+              </>
+            )}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <Sidebar />
+      <Sidebar tela={tela} onNavegar={setTela} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar email={email} />
         <main className="mx-auto w-full max-w-[1280px] flex-1 space-y-5 p-5">
@@ -306,12 +351,12 @@ export function AdminPanel({ email }: { email: string }) {
               lá); o que ainda não tem base aparece como “Em breve”.
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              {/* ação REAL: leva à tela de usuários da plataforma */}
               <button
-                disabled
-                title="A gestão de usuários chega junto com planos/memberships."
-                className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground/70"
+                onClick={() => setTela("users")}
+                className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/15"
               >
-                <Users className="h-3.5 w-3.5" /> Gerenciar usuários <EmBreve />
+                <Users className="h-3.5 w-3.5" /> Gerenciar usuários
               </button>
               <button
                 disabled
