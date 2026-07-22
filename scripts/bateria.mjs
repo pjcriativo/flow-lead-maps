@@ -611,6 +611,57 @@ async function bloco2() {
   r = await chamarEdge("automacao-rodar", {}, null, { "x-cron-secret": "errado" });
   T(r.status === 401, "cron com segredo ERRADO → 401");
 
+  console.log(" · teto de GERAÇÃO DE SITES (ia_site no MESMO livro-caixa) — recusa sem gastar");
+  const mesRef = new Date().toISOString().slice(0, 7); // mesmo formato de mesRefAtual (UTC)
+  const { data: fake50, error: fkErr } = await admin
+    .from("redes_buscas")
+    .insert({
+      user_id: uid,
+      fonte: "ia_site",
+      estrategia: "SITE",
+      pedido: {},
+      limite: 1,
+      custo_usd: 50,
+      status: "concluida",
+      detalhe: "[BATERIA] gasto fake para provar o teto — não é gasto real",
+      mes_ref: mesRef,
+      concluida_em: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (fkErr) throw new Error("fake ia_site: " + fkErr.message);
+  limpar.push(() => admin.from("redes_buscas").delete().eq("id", fake50.id));
+  r = await chamarEdge("redesign-site", { lead_id: lead.id }, jwt);
+  T(
+    r.body?.reason === "teto",
+    "teto do mês batido → redesign-site RECUSA sem gastar",
+    JSON.stringify(r.body).slice(0, 140),
+  );
+  T(
+    /Teto de gasto do mês atingido/.test(r.body?.error ?? ""),
+    "mensagem do teto legível para o dono (vira o erro do lote no Preparar)",
+  );
+  const { data: recusaSite } = await admin
+    .from("redes_buscas")
+    .select("id, custo_usd")
+    .eq("user_id", uid)
+    .eq("fonte", "ia_site")
+    .eq("status", "parada_teto")
+    .gte("criado_em", new Date(Date.now() - 90000).toISOString());
+  T(
+    (recusaSite ?? []).length === 1 && Number(recusaSite[0].custo_usd) === 0,
+    "recusa registrada no livro-caixa (ia_site · parada_teto · custo US$ 0)",
+    JSON.stringify(recusaSite),
+  );
+  for (const row of recusaSite ?? [])
+    limpar.push(() => admin.from("redes_buscas").delete().eq("id", row.id));
+  const { count: rdOrfao } = await admin
+    .from("redesigns")
+    .select("id", { count: "exact", head: true })
+    .eq("lead_id", lead.id)
+    .neq("id", rd.id);
+  T((rdOrfao ?? 0) === 0, "recusa NÃO deixa redesign 'gerando' órfão para trás");
+
   for (const f of limpar.reverse()) {
     try {
       await f();

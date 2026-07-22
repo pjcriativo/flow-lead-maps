@@ -19,6 +19,13 @@ import { montarHtml } from "../_shared/site/montar.ts";
 import { conteudoFallback } from "../_shared/site/fallback.ts";
 import { resolverImagens, heroPremiumUrl } from "../_shared/imghost.ts";
 import type { Depoimento } from "../_shared/site/tipos.ts";
+import {
+  planejarColeta,
+  estourouColeta,
+  TETO_RODADA_USD,
+  TETO_MES_USD,
+} from "../../../src/lib/redes-teto.ts";
+import { mesRefAtual, CUSTO_SITE_ESTIMADO_USD } from "../../../src/lib/automacao-teto.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -52,6 +59,61 @@ Deno.serve(async (req) => {
     .eq("id", leadId)
     .single();
   if (leadErr || !lead) return json({ error: "Lead não encontrado" }, 404);
+
+  // 💸 TETO DE GASTO (FASE 0 / Frente 2): gerar site custa IA + Apify. O portão fica AQUI
+  // (server-side) para valer em TODO caminho — Preparar da campanha, tela Redesign e a
+  // automação (que ainda tem o teto próprio da receita; o mais restritivo ganha).
+  // MESMO livro-caixa da coleta de redes (redes_buscas): o teto mensal de US$ 50 é GLOBAL —
+  // coleta e geração de sites disputam o mesmo orçamento, de propósito (teto separado por
+  // categoria seria furo). Nunca estoura calado: recusa AQUI, antes de gastar 1 token.
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  const mesRef = mesRefAtual(new Date());
+  const { data: doMes } = await admin
+    .from("redes_buscas")
+    .select("custo_usd")
+    .eq("user_id", userId)
+    .eq("mes_ref", mesRef);
+  const gastoMes = (doMes ?? []).reduce(
+    (s: number, r: { custo_usd: unknown }) => s + Number(r.custo_usd ?? 0),
+    0,
+  );
+  const plano = planejarColeta(gastoMes, 1, TETO_RODADA_USD, TETO_MES_USD, CUSTO_SITE_ESTIMADO_USD);
+  const registrarGasto = async (
+    status: "concluida" | "parada_teto" | "erro",
+    custoUsd: number,
+    detalhe: string | null,
+    gerou: boolean,
+  ) =>
+    await admin.from("redes_buscas").insert({
+      user_id: userId,
+      fonte: "ia_site",
+      estrategia: ignorarSite ? "SITE-NOVO" : "SITE",
+      pedido: { lead_id: leadId },
+      limite: 1,
+      custo_usd: custoUsd,
+      encontrados: gerou ? 1 : 0,
+      inseridos: gerou ? 1 : 0,
+      status,
+      detalhe,
+      mes_ref: mesRef,
+      concluida_em: new Date().toISOString(),
+    });
+  if (!plano.podeRodar) {
+    await registrarGasto("parada_teto", 0, plano.motivo ?? "teto", false);
+    // 200 + error: gerarRedesign() lança ESTA mensagem, que aparece no estado de erro do lote.
+    return json({
+      error: `Teto de gasto do mês atingido — geração de site bloqueada (${plano.motivo}). O teto zera na virada do mês.`,
+      reason: "teto",
+      gastoMes,
+      teto: { rodada: TETO_RODADA_USD, mes: TETO_MES_USD },
+    });
+  }
+  // custo já incorrido (Apify de reviews + IA) — vai pro livro-caixa MESMO se a geração falhar
+  let custoJaIncorridoUsd = 0;
 
   const { data: rd, error: rdErr } = await supabase
     .from("redesigns")
@@ -150,12 +212,7 @@ Deno.serve(async (req) => {
 
     // 3. Nicho → template.
     const nicho = detectarNicho(mp.categoria, mp.textos);
-
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { auth: { persistSession: false } },
-    );
+    custoJaIncorridoUsd = coleta.custoUsd;
 
     // 4+5 em PARALELO (economiza wall-clock): IA gera o CONTEÚDO (copy, cadeia
     // Claude→OpenAI→fallback) enquanto o imghost escolhe/curadoria/re-hospeda as
@@ -214,6 +271,7 @@ Deno.serve(async (req) => {
     const outTok = ai.outputTokens;
     const custoIa = ai.custoUsd;
     const usouFallback = ai.usouFallback;
+    custoJaIncorridoUsd = custoIa + coleta.custoUsd;
 
     // 6. Template premium monta o HTML final (design fixo, dados reais + copy + reviews).
     // SEMENTE estável do lead (place_id do Google; senão o uuid do lead). NUNCA o
@@ -282,10 +340,25 @@ Deno.serve(async (req) => {
       .single();
     if (upErr) throw new Error(upErr.message);
 
+    // 💸 registra a geração no livro-caixa com o custo REAL. Se o custo real bateu o teto,
+    // fica 'parada_teto' — e a PRÓXIMA geração é recusada pelo portão lá de cima.
+    const tetoEstourou = estourouColeta(custoTotal, gastoMes);
+    await registrarGasto(
+      tetoEstourou ? "parada_teto" : "concluida",
+      custoTotal,
+      tetoEstourou
+        ? `custo real bateu o teto — próximas gerações do mês bloqueadas (${provider}/${modelo})`
+        : `${provider}/${modelo} · ${lead.business_name}`,
+      true,
+    ).catch(() => {});
+
     return json({
       redesign: done,
       lead_nome: lead.business_name,
       usage: {
+        gastoMesDepois: gastoMes + custoTotal,
+        tetoEstourou,
+        tetoMesUsd: TETO_MES_USD,
         template: nicho,
         provider,
         modelo,
@@ -327,6 +400,8 @@ Deno.serve(async (req) => {
       .from("redesigns")
       .update({ status: "erro", observacoes: msg, updated_at: new Date().toISOString() })
       .eq("id", rd.id);
+    // gasto parcial (Apify/IA que já rodou) entra no livro-caixa mesmo em erro — sem furo.
+    await registrarGasto("erro", custoJaIncorridoUsd, msg.slice(0, 300), false).catch(() => {});
     return json({ error: msg }, 500);
   }
 });
