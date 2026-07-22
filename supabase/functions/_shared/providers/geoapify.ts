@@ -63,7 +63,23 @@ async function geocodeCidade(
   return r ? { lat: r.lat, lon: r.lon } : null;
 }
 
-function raw(feature: any, ...keys: string[]): string | null {
+// Só os campos que usamos do GeoJSON de Places da Geoapify.
+type GeoFeature = {
+  properties?: {
+    name?: string;
+    place_id?: string;
+    lat?: number;
+    lon?: number;
+    categories?: string[];
+    formatted?: string;
+    address_line2?: string;
+    website?: string;
+    contact?: { phone?: string };
+    datasource?: { raw?: Record<string, unknown> };
+  };
+};
+
+function raw(feature: GeoFeature, ...keys: string[]): string | null {
   const r = feature?.properties?.datasource?.raw ?? {};
   for (const k of keys) {
     const v = r[k];
@@ -72,7 +88,7 @@ function raw(feature: any, ...keys: string[]): string | null {
   return null;
 }
 
-function mapFeature(f: any): RawPlace | null {
+function mapFeature(f: GeoFeature): RawPlace | null {
   const p = f.properties ?? {};
   const name = p.name?.trim();
   if (!name) return null;
@@ -85,7 +101,7 @@ function mapFeature(f: any): RawPlace | null {
     category: p.categories?.[0] ?? null,
     address: p.formatted ?? p.address_line2 ?? null,
     phone: p.contact?.phone ?? raw(f, "contact:phone", "phone"),
-    website: p.website ?? p.datasource?.raw?.website ?? raw(f, "contact:website"),
+    website: p.website ?? raw(f, "website", "contact:website"),
     rating: null, // Geoapify (base OSM) não traz nota
     review_count: null,
     instagram: instagram

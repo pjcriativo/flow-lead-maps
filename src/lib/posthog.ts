@@ -56,12 +56,16 @@ export function initPostHog() {
   }) as typeof posthog.identify;
 
   if (typeof window !== "undefined") {
-    (window as any).__phDebug = (on: boolean) => {
+    const w = window as unknown as {
+      __phDebug?: (on: boolean) => void;
+      posthog?: typeof posthog;
+    };
+    w.__phDebug = (on: boolean) => {
       window.localStorage.setItem("ph_debug", on ? "1" : "0");
 
       console.log(`[PostHog] debug ${on ? "ON" : "OFF"} — reload to apply init-time flags`);
     };
-    (window as any).posthog = posthog;
+    w.posthog = posthog;
   }
 
   initialized = true;

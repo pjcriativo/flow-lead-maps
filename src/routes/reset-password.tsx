@@ -32,8 +32,8 @@ function ResetPasswordPage() {
       if (error) throw error;
       setInfo("Senha atualizada. Redirecionando...");
       setTimeout(() => navigate({ to: "/dashboard", replace: true }), 1000);
-    } catch (e: any) {
-      setError(e.message ?? "Não foi possível atualizar a senha");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível atualizar a senha");
     } finally {
       setLoading(false);
     }

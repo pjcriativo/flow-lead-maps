@@ -81,7 +81,17 @@ function buildAddress(tags: Record<string, string>): string | null {
   return partes.length ? partes.join(" — ") : null;
 }
 
-async function overpass(query: string): Promise<any> {
+// Só os campos que usamos da resposta da Overpass.
+type OverpassElement = {
+  type: string;
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat?: number; lon?: number };
+  tags?: Record<string, string>;
+};
+
+async function overpass(query: string): Promise<{ elements?: OverpassElement[] }> {
   let lastErr = "";
   for (const url of OVERPASS_URLS) {
     try {

@@ -20,7 +20,28 @@ function circulo(lat: number, lng: number, raioKm: number, pts = 24) {
   return { type: "Polygon", coordinates: [coords] };
 }
 
-function mapItem(it: any): RawPlace | null {
+// Só os campos que usamos do item do dataset do ator de Google Maps.
+type ApifyItem = {
+  title?: string;
+  placeId?: string;
+  cid?: string;
+  url?: string;
+  location?: { lat?: number; lng?: number };
+  instagrams?: string[];
+  instagram?: string;
+  facebooks?: string[];
+  facebook?: string;
+  categoryName?: string;
+  categories?: string[];
+  address?: string;
+  phoneUnformatted?: string;
+  phone?: string;
+  website?: string;
+  totalScore?: number;
+  reviewsCount?: number;
+};
+
+function mapItem(it: ApifyItem): RawPlace | null {
   const name = (it.title ?? "").trim();
   if (!name) return null;
   const id = it.placeId ?? it.cid ?? it.url ?? `${it.location?.lat},${it.location?.lng}`;
@@ -116,7 +137,7 @@ export const searchApify: ProviderSearch = async ({
   const dsRes = await fetch(
     `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=true&limit=${maxPlaces}`,
   );
-  const items: any[] = await dsRes.json().catch(() => []);
+  const items: ApifyItem[] = await dsRes.json().catch(() => []);
   log(
     `Apify: ${items.length} lugares no dataset${usd ? ` · custo do run ~US$ ${usd.toFixed(3)}` : ""}`,
   );

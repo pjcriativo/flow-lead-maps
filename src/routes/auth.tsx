@@ -61,8 +61,8 @@ function AuthPage() {
         if (error) throw error;
       }
       navigate({ to: "/dashboard", replace: true });
-    } catch (e: any) {
-      setError(e.message ?? "Falha na autenticação");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha na autenticação");
     } finally {
       setLoading(false);
     }

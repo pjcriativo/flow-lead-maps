@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
           .select("place_id")
           .eq("user_id", userId)
           .not("place_id", "is", null);
-        const seen = new Set<string>((existing ?? []).map((r: any) => r.place_id));
+        const seen = new Set<string>((existing ?? []).map((r: { place_id: string }) => r.place_id));
 
         // Fase 1: o provedor coleta candidatos normalizados (multi-query interna).
         const candidates = await provider({

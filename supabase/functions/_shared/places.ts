@@ -61,7 +61,21 @@ export function buildQueries(nicho: string, cidade: string, uf: string): string[
   return [...new Set(queries)];
 }
 
-function mapPlace(p: any): Place {
+// Só os campos que usamos da resposta da Places API (New).
+type PlaceJson = {
+  id: string;
+  displayName?: { text?: string };
+  rating?: number;
+  userRatingCount?: number;
+  formattedAddress?: string;
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  websiteUri?: string;
+  googleMapsUri?: string;
+  types?: string[];
+};
+
+function mapPlace(p: PlaceJson): Place {
   return {
     place_id: p.id,
     name: p.displayName?.text ?? "",
