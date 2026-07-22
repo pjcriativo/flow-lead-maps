@@ -33,4 +33,8 @@ referenciaprospector-plugin/
 # Supabase CLI (artefatos locais transitórios)
 supabase/.temp/
 
+# Logs temporários das rodadas de verificação (build/lint do agente)
+build-*.log
+lint-*.txt
+
 .vercel

@@ -36,3 +36,6 @@ Estado autorizado hoje (mantido pelo dono):
   sem perguntar.
 - **Execução**: seguir a skill `flow-loop` (critério de pronto objetivo,
   teto de 5 iterações, proibido fraudar verde, commit por etapa + push).
+- **Git**: TODA tarefa finalizada termina com `commit` + `push` para
+  origin/main (regra do dono, inviolável — reforçada em 2026-07-22).
+  Mensagens em português; nunca versionar `.env`.
