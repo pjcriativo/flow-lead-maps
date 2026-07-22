@@ -858,6 +858,57 @@ export type Database = {
           },
         ];
       };
+      redes_buscas: {
+        Row: {
+          concluida_em: string | null;
+          criado_em: string;
+          custo_usd: number;
+          detalhe: string | null;
+          encontrados: number;
+          estrategia: string;
+          fonte: string;
+          id: string;
+          inseridos: number;
+          limite: number;
+          mes_ref: string;
+          pedido: Json;
+          status: string;
+          user_id: string;
+        };
+        Insert: {
+          concluida_em?: string | null;
+          criado_em?: string;
+          custo_usd?: number;
+          detalhe?: string | null;
+          encontrados?: number;
+          estrategia: string;
+          fonte: string;
+          id?: string;
+          inseridos?: number;
+          limite?: number;
+          mes_ref: string;
+          pedido?: Json;
+          status?: string;
+          user_id: string;
+        };
+        Update: {
+          concluida_em?: string | null;
+          criado_em?: string;
+          custo_usd?: number;
+          detalhe?: string | null;
+          encontrados?: number;
+          estrategia?: string;
+          fonte?: string;
+          id?: string;
+          inseridos?: number;
+          limite?: number;
+          mes_ref?: string;
+          pedido?: Json;
+          status?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       redesigns: {
         Row: {
           criado_em: string;
@@ -910,6 +961,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "redesigns_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      sdr_sugestoes: {
+        Row: {
+          alertas: Json;
+          criado_em: string;
+          custo_usd: number;
+          decidido_em: string | null;
+          dia_ref: string;
+          estado: string;
+          id: string;
+          lead_id: string | null;
+          mensagem_id: string | null;
+          mes_ref: string;
+          numero: string;
+          texto: string;
+          user_id: string;
+        };
+        Insert: {
+          alertas?: Json;
+          criado_em?: string;
+          custo_usd?: number;
+          decidido_em?: string | null;
+          dia_ref: string;
+          estado?: string;
+          id?: string;
+          lead_id?: string | null;
+          mensagem_id?: string | null;
+          mes_ref: string;
+          numero: string;
+          texto: string;
+          user_id: string;
+        };
+        Update: {
+          alertas?: Json;
+          criado_em?: string;
+          custo_usd?: number;
+          decidido_em?: string | null;
+          dia_ref?: string;
+          estado?: string;
+          id?: string;
+          lead_id?: string | null;
+          mensagem_id?: string | null;
+          mes_ref?: string;
+          numero?: string;
+          texto?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "sdr_sugestoes_lead_id_fkey";
             columns: ["lead_id"];
             isOneToOne: false;
             referencedRelation: "leads";

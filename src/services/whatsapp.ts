@@ -513,3 +513,67 @@ export async function buscarRedes(
   if (error) throw error;
   return data as ColetaRedes;
 }
+
+// ===== Agente SDR: rascunhos de resposta (o agente sugere, o dono decide) =====
+export type SdrSugestao = {
+  id: string;
+  numero: string;
+  lead_id: string | null;
+  texto: string;
+  alertas: { rotulo: string; trecho: string }[];
+  estado: "rascunho" | "aprovada" | "descartada" | "enviada";
+  criado_em: string;
+};
+
+/** Rascunhos pendentes da org (o dono lê por RLS). */
+export async function listarSugestoesSdr(): Promise<SdrSugestao[]> {
+  const { data, error } = await supabase
+    .from("sdr_sugestoes")
+    .select("id, numero, lead_id, texto, alertas, estado, criado_em")
+    .eq("estado", "rascunho")
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as SdrSugestao[];
+}
+
+/** Pede ao agente para rascunhar (só conversas de LEAD; respeita o teto de IA). */
+export async function rodarSdr(limite = 3) {
+  const { data, error } = await supabase.functions.invoke("sdr-sugerir", { body: { limite } });
+  if (error) throw error;
+  return data as {
+    ok: boolean;
+    criadas?: number;
+    reason?: string;
+    motivo?: string;
+    gasto?: { dia: number; mes: number };
+    teto?: { dia: number; mes: number };
+  };
+}
+
+/** Descarta o rascunho (nada é enviado). */
+export async function descartarSugestaoSdr(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("sdr_sugestoes")
+    .update({ estado: "descartada", decidido_em: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * APROVA e envia — nesta ordem e só nesta ordem: manda pelo transporte real e SÓ marca
+ * 'enviada' se a Evolution confirmar. Se o envio falhar, o rascunho continua pendente
+ * (não marcamos enviado o que não saiu — é a mesma regra do disparo).
+ */
+export async function aprovarSugestaoSdr(
+  s: Pick<SdrSugestao, "id" | "numero">,
+  texto: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const r = await responderConversa(s.numero, texto);
+  if (!r.ok) return { ok: false, error: r.error ?? "falha no envio" };
+  const { error } = await supabase
+    .from("sdr_sugestoes")
+    .update({ estado: "enviada", texto, decidido_em: new Date().toISOString() })
+    .eq("id", s.id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

@@ -2,7 +2,18 @@
 // esquerda, thread da conversa + caixa de resposta à direita. Lê wa_mensagens (recebidas pelo
 // webhook) e responde pelo chip da org (edge wa-responder). Atualiza sozinho (polling leve).
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MessagesSquare, Send, Loader2, RefreshCw, User } from "lucide-react";
+import {
+  MessagesSquare,
+  Send,
+  Loader2,
+  RefreshCw,
+  User,
+  Sparkles,
+  Check,
+  Pencil,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +22,11 @@ import {
   listarConversas,
   listarMensagens,
   responderConversa,
+  listarSugestoesSdr,
+  rodarSdr,
+  aprovarSugestaoSdr,
+  descartarSugestaoSdr,
+  type SdrSugestao,
   marcarConversaLida,
   type WaConversa,
   type WaMensagem,
@@ -33,6 +49,67 @@ export function WaConversas() {
   const [carregando, setCarregando] = useState(true);
   const [texto, setTexto] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // rascunhos do agente SDR — ele sugere, o dono decide. Nada sai sem clique.
+  const [sugestoes, setSugestoes] = useState<SdrSugestao[]>([]);
+  const [rodandoSdr, setRodandoSdr] = useState(false);
+  const sugestaoAtiva = sugestoes.find((s) => s.numero === ativo) ?? null;
+
+  const carregarSugestoes = useCallback(() => {
+    listarSugestoesSdr()
+      .then(setSugestoes)
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    carregarSugestoes();
+  }, [carregarSugestoes]);
+
+  const pedirRascunho = async () => {
+    setRodandoSdr(true);
+    try {
+      const r = await rodarSdr(3);
+      if (!r.ok) {
+        toast.error(
+          r.reason === "teto" ? `Teto de IA: ${r.motivo}` : "Não foi possível rascunhar.",
+        );
+      } else if (!r.criadas) {
+        toast.info(
+          "Nenhum rascunho: o agente só responde conversa de LEAD que esteja esperando resposta.",
+        );
+      } else {
+        toast.success(`${r.criadas} rascunho(s) pronto(s) para revisar.`);
+        carregarSugestoes();
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao rascunhar");
+    } finally {
+      setRodandoSdr(false);
+    }
+  };
+
+  const aprovarRascunho = async () => {
+    if (!sugestaoAtiva) return;
+    setEnviando(true);
+    try {
+      const r = await aprovarSugestaoSdr(sugestaoAtiva, texto.trim() || sugestaoAtiva.texto);
+      if (!r.ok) {
+        toast.error(r.error ?? "Falha ao enviar");
+        return;
+      }
+      toast.success("Resposta enviada.");
+      setTexto("");
+      carregarSugestoes();
+      if (ativo) setMensagens(await listarMensagens(ativo));
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const descartarRascunho = async () => {
+    if (!sugestaoAtiva) return;
+    await descartarSugestaoSdr(sugestaoAtiva.id).catch(() => {});
+    toast.success("Rascunho descartado — nada foi enviado.");
+    carregarSugestoes();
+  };
   const fimRef = useRef<HTMLDivElement>(null);
 
   const carregarConversas = useCallback(async () => {
@@ -126,10 +203,32 @@ export function WaConversas() {
       {/* Lista de conversas */}
       <div className="flex flex-col border-r">
         <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
-          Conversas ({conversas.length})
-          <button onClick={carregarConversas} title="Atualizar">
-            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
-          </button>
+          <span className="flex items-center gap-1.5">
+            Conversas ({conversas.length})
+            {sugestoes.length > 0 && (
+              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                {sugestoes.length} rascunho(s)
+              </span>
+            )}
+          </span>
+          <span className="flex items-center gap-1">
+            {/* o agente só rascunha para conversa de LEAD — nunca para conversa pessoal */}
+            <button
+              onClick={pedirRascunho}
+              disabled={rodandoSdr}
+              title="Agente SDR: rascunha resposta para conversas de LEAD (não envia nada)"
+              className="rounded p-1 hover:bg-secondary disabled:opacity-50"
+            >
+              {rodandoSdr ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 text-primary" />
+              )}
+            </button>
+            <button onClick={carregarConversas} title="Atualizar">
+              <RefreshCw className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+            </button>
+          </span>
         </div>
         <div className="flex-1 overflow-y-auto">
           {conversas.map((c) => (
@@ -209,6 +308,52 @@ export function WaConversas() {
             ))}
             <div ref={fimRef} />
           </div>
+          {/* RASCUNHO DO AGENTE — ele sugere, você decide. Nada sai daqui sem clique seu. */}
+          {sugestaoAtiva && (
+            <div className="border-t border-primary/30 bg-primary/5 p-3">
+              <div className="mb-1.5 flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                <span className="text-xs font-semibold">Rascunho do agente</span>
+                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  não enviado
+                </span>
+              </div>
+              <p className="whitespace-pre-wrap rounded-lg border border-border bg-card p-2.5 text-sm">
+                {texto.trim() || sugestaoAtiva.texto}
+              </p>
+              {sugestaoAtiva.alertas?.length > 0 && (
+                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-amber-700">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  Revise antes de aprovar — o texto fala de{" "}
+                  <b>{sugestaoAtiva.alertas.map((a) => a.rotulo).join(", ")}</b>, e isso vira
+                  compromisso na sua boca.
+                </p>
+              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" onClick={aprovarRascunho} disabled={enviando}>
+                  {enviando ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                  Aprovar e enviar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTexto(sugestaoAtiva.texto)}
+                  disabled={enviando}
+                  title="Copia o rascunho para o campo abaixo para você ajustar"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Editar
+                </Button>
+                <Button size="sm" variant="ghost" onClick={descartarRascunho} disabled={enviando}>
+                  <X className="h-3.5 w-3.5" /> Descartar
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 border-t p-3">
             <Input
               value={texto}
