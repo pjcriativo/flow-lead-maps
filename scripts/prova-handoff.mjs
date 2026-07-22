@@ -157,10 +157,18 @@ try {
       /* ok */
     }
   }
+  // apaga membership + conta auth de teste (não deixar usuário de teste no banco de produção)
   for (const email of [GER, VA, VB]) {
     const { data: u } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const id = (u?.users ?? []).find((x) => x.email === email)?.id;
-    if (id) await admin.from("memberships").delete().eq("user_id", id);
+    if (!id) continue;
+    await admin.from("memberships").delete().eq("user_id", id);
+    await admin.from("leads").update({ assigned_to: null }).eq("assigned_to", id);
+    await admin
+      .from("lead_atribuicoes")
+      .delete()
+      .or(`de_user_id.eq.${id},para_user_id.eq.${id},por_user_id.eq.${id}`);
+    await admin.auth.admin.deleteUser(id).catch(() => {});
   }
 }
 console.log(`\n${pass} passaram · ${fail} falharam`);

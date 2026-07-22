@@ -101,7 +101,11 @@ try {
     "staff_add gravou a membership (papel vendedor)",
     JSON.stringify(mem),
   );
-  limpeza.push(() => admin.from("memberships").delete().eq("user_id", jAdd.user_id));
+  limpeza.push(async () => {
+    // remove membership E a conta auth de teste criada pelo staff_add
+    await admin.from("memberships").delete().eq("user_id", jAdd.user_id);
+    await admin.auth.admin.deleteUser(jAdd.user_id).catch(() => {});
+  });
 
   // staff_add num papel DESATIVADO é recusado (respeita o toggle da tela Roles)
   await chamar(jwtDono, { acao: "role_toggle", papel: "sdr", ativo: false });
