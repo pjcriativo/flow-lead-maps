@@ -1,7 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { MapPin, Mail, Download, Zap, Search, Database, ArrowRight, CheckCircle2 } from "lucide-react";
+import {
+  MapPin,
+  Mail,
+  Download,
+  Zap,
+  Search,
+  Database,
+  ArrowRight,
+  CheckCircle2,
+} from "lucide-react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -9,16 +18,28 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Flow Leads — Descubra empresas locais na hora" },
-      { name: "description", content: "Pesquise e descubra empresas locais no Google Maps em segundos. Nomes, telefones, e-mails e sites — exportados direto para Excel ou Google Sheets." },
+      {
+        name: "description",
+        content:
+          "Pesquise e descubra empresas locais no Google Maps em segundos. Nomes, telefones, e-mails e sites — exportados direto para Excel ou Google Sheets.",
+      },
       { property: "og:title", content: "Flow Leads — Descubra empresas locais na hora" },
-      { property: "og:description", content: "Pesquise e descubra empresas locais no Google Maps em um clique." },
+      {
+        property: "og:description",
+        content: "Pesquise e descubra empresas locais no Google Maps em um clique.",
+      },
       { property: "og:url", content: "https://flowleads.com.br/" },
-      { name: "twitter:title", content: "Flow Leads — Descubra empresas locais no Google Maps em segundos" },
-      { name: "twitter:description", content: "Pesquise perfis de empresas locais verificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora." },
+      {
+        name: "twitter:title",
+        content: "Flow Leads — Descubra empresas locais no Google Maps em segundos",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Pesquise perfis de empresas locais verificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora.",
+      },
     ],
-    links: [
-      { rel: "canonical", href: "https://flowleads.com.br/" },
-    ],
+    links: [{ rel: "canonical", href: "https://flowleads.com.br/" }],
   }),
   component: Index,
 });
@@ -33,12 +54,20 @@ function Index() {
             <FlowLeadsLogo className="h-9 w-auto" />
           </Link>
           <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-            <a href="#features" className="hover:text-foreground">Recursos</a>
-            <a href="#how" className="hover:text-foreground">Como funciona</a>
-            <Link to="/pricing" className="hover:text-foreground">Preços</Link>
+            <a href="#features" className="hover:text-foreground">
+              Recursos
+            </a>
+            <a href="#how" className="hover:text-foreground">
+              Como funciona
+            </a>
+            <Link to="/pricing" className="hover:text-foreground">
+              Preços
+            </Link>
           </nav>
           <Link to="/dashboard" preload="render">
-            <Button>Começar <ArrowRight /></Button>
+            <Button>
+              Começar <ArrowRight />
+            </Button>
           </Link>
         </div>
       </header>
@@ -53,11 +82,11 @@ function Index() {
             </div>
             <h1 className="text-balance text-5xl font-semibold tracking-tight md:text-6xl">
               Descubra e pesquise empresas locais no{" "}
-              <span className="text-primary">Google Maps</span>{" "}
-              em segundos.
+              <span className="text-primary">Google Maps</span> em segundos.
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-              Busque qualquer tipo de empresa em qualquer cidade. Tenha nomes, telefones, e-mails, sites e avaliações — exportados para Excel ou Google Sheets em um clique.
+              Busque qualquer tipo de empresa em qualquer cidade. Tenha nomes, telefones, e-mails,
+              sites e avaliações — exportados para Excel ou Google Sheets em um clique.
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link to="/dashboard" preload="render">
@@ -66,10 +95,14 @@ function Index() {
                 </Button>
               </Link>
               <a href="#features">
-                <Button size="lg" variant="outline" className="h-12 px-8 text-base">Ver como funciona</Button>
+                <Button size="lg" variant="outline" className="h-12 px-8 text-base">
+                  Ver como funciona
+                </Button>
               </a>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">Sem cartão de crédito · Pesquise 50 empresas por nossa conta</p>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Sem cartão de crédito · Pesquise 50 empresas por nossa conta
+            </p>
           </div>
         </div>
       </section>
@@ -78,19 +111,51 @@ function Index() {
       <section id="features" className="border-t border-border bg-card/40 py-20">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Tudo que você precisa para pesquisar mercados locais</h2>
-            <p className="mt-3 text-muted-foreground">Feito para agências, fundadores e consultores que precisam de inteligência de negócios rápido.</p>
+            <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
+              Tudo que você precisa para pesquisar mercados locais
+            </h2>
+            <p className="mt-3 text-muted-foreground">
+              Feito para agências, fundadores e consultores que precisam de inteligência de negócios
+              rápido.
+            </p>
           </div>
           <div className="mt-14 grid gap-6 md:grid-cols-3">
             {[
-              { icon: Search, title: "Busca ultra-segmentada", desc: "Filtre por tipo de empresa e cidade. Descubra de 10 a 500 perfis de empresas verificados por busca." },
-              { icon: Mail, title: "Localizador de contatos", desc: "Ative o localizador para trazer automaticamente e-mails e telefones de empresas listados publicamente." },
-              { icon: Database, title: "Acompanhamento em tempo real", desc: "Veja os perfis de empresas carregando em tempo real, com feed de atividade ao vivo e contador." },
-              { icon: Download, title: "Exportação para Excel", desc: "Exportação .xlsx em um clique, com todos os campos limpos e formatados para uso imediato." },
-              { icon: Zap, title: "Sincronização com Google Sheets", desc: "Envie os resultados direto para uma planilha do Google Sheets que sua equipe já usa — organizados e ordenados automaticamente." },
-              { icon: CheckCircle2, title: "Dados limpos e precisos", desc: "Deduplicação e validação inteligentes para manter sua pesquisa precisa e organizada." },
+              {
+                icon: Search,
+                title: "Busca ultra-segmentada",
+                desc: "Filtre por tipo de empresa e cidade. Descubra de 10 a 500 perfis de empresas verificados por busca.",
+              },
+              {
+                icon: Mail,
+                title: "Localizador de contatos",
+                desc: "Ative o localizador para trazer automaticamente e-mails e telefones de empresas listados publicamente.",
+              },
+              {
+                icon: Database,
+                title: "Acompanhamento em tempo real",
+                desc: "Veja os perfis de empresas carregando em tempo real, com feed de atividade ao vivo e contador.",
+              },
+              {
+                icon: Download,
+                title: "Exportação para Excel",
+                desc: "Exportação .xlsx em um clique, com todos os campos limpos e formatados para uso imediato.",
+              },
+              {
+                icon: Zap,
+                title: "Sincronização com Google Sheets",
+                desc: "Envie os resultados direto para uma planilha do Google Sheets que sua equipe já usa — organizados e ordenados automaticamente.",
+              },
+              {
+                icon: CheckCircle2,
+                title: "Dados limpos e precisos",
+                desc: "Deduplicação e validação inteligentes para manter sua pesquisa precisa e organizada.",
+              },
             ].map((f) => (
-              <div key={f.title} className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-elegant)]">
+              <div
+                key={f.title}
+                className="rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-elegant)]"
+              >
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <f.icon className="h-5 w-5" />
                 </div>
@@ -107,9 +172,21 @@ function Index() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="grid gap-10 md:grid-cols-3">
             {[
-              { n: "01", t: "Defina sua busca", d: "Escolha um tipo de empresa e uma cidade — ex.: clínicas odontológicas em São Paulo ou agências de marketing no Rio de Janeiro." },
-              { n: "02", t: "Clique em Gerar", d: "Veja perfis de empresas verificados carregando em tempo real, com contatos, avaliações e sites." },
-              { n: "03", t: "Exporte para onde quiser", d: "Baixe como .xlsx ou sincronize direto com seu Google Sheets conectado em um clique." },
+              {
+                n: "01",
+                t: "Defina sua busca",
+                d: "Escolha um tipo de empresa e uma cidade — ex.: clínicas odontológicas em São Paulo ou agências de marketing no Rio de Janeiro.",
+              },
+              {
+                n: "02",
+                t: "Clique em Gerar",
+                d: "Veja perfis de empresas verificados carregando em tempo real, com contatos, avaliações e sites.",
+              },
+              {
+                n: "03",
+                t: "Exporte para onde quiser",
+                d: "Baixe como .xlsx ou sincronize direto com seu Google Sheets conectado em um clique.",
+              },
             ].map((s) => (
               <div key={s.n}>
                 <div className="text-sm font-mono text-primary">{s.n}</div>
@@ -124,11 +201,19 @@ function Index() {
       {/* CTA */}
       <section id="pricing" className="px-6 pb-24">
         <div className="mx-auto max-w-5xl rounded-2xl bg-[var(--navy)] p-12 text-center text-[var(--navy-foreground)] shadow-[var(--shadow-card)]">
-          <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Comece a descobrir empresas hoje</h2>
-          <p className="mx-auto mt-3 max-w-xl text-white/70">Junte-se a milhares de agências e profissionais que pesquisam mercados locais com o Flow Leads.</p>
+          <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
+            Comece a descobrir empresas hoje
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-white/70">
+            Junte-se a milhares de agências e profissionais que pesquisam mercados locais com o Flow
+            Leads.
+          </p>
           <div className="mt-8">
             <Link to="/dashboard" preload="render">
-              <Button size="lg" className="h-12 bg-white px-8 text-base text-[var(--navy)] hover:bg-white/90">
+              <Button
+                size="lg"
+                className="h-12 bg-white px-8 text-base text-[var(--navy)] hover:bg-white/90"
+              >
                 Abrir Painel <ArrowRight />
               </Button>
             </Link>

@@ -6,7 +6,11 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { NICHOS_POR_CATEGORIA, TOTAL_NICHOS } from "@/lib/niches";
 
-const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
 
 export function NichoSelector({
   value,

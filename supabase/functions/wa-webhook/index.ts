@@ -61,8 +61,8 @@ Deno.serve(async (req) => {
   const evento = String(body.event ?? body.Event ?? body.type ?? "").toLowerCase();
   const fromMe = Boolean(
     pick(info, ["IsFromMe", "isFromMe", "fromMe"]) ??
-      pick(data, ["IsFromMe", "fromMe"]) ??
-      pick(body, ["fromMe"]),
+    pick(data, ["IsFromMe", "fromMe"]) ??
+    pick(body, ["fromMe"]),
   );
 
   const nomeInstancia = String(
@@ -97,7 +97,8 @@ Deno.serve(async (req) => {
       "text",
     ]) ?? "",
   );
-  const externoId = String(pick(info, ["ID", "Id", "id"]) ?? pick(data, ["id", "ID"]) ?? "") || null;
+  const externoId =
+    String(pick(info, ["ID", "Id", "id"]) ?? pick(data, ["id", "ID"]) ?? "") || null;
   const pushName = pick(info, ["PushName", "pushName", "notifyName"]) ?? null;
 
   // Só nos interessa MENSAGEM recebida (não a nossa própria, não evento de conexão).

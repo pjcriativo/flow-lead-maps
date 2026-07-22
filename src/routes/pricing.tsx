@@ -9,9 +9,16 @@ export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
       { title: "Preços — Flow Leads" },
-      { name: "description", content: "Preços simples e transparentes do Flow Leads. Comece grátis e faça upgrade conforme sua geração de leads cresce." },
+      {
+        name: "description",
+        content:
+          "Preços simples e transparentes do Flow Leads. Comece grátis e faça upgrade conforme sua geração de leads cresce.",
+      },
       { property: "og:title", content: "Preços do Flow Leads — Planos para todo time" },
-      { property: "og:description", content: "Teste grátis e planos Básico, Pro e Agência. Economize 20% na cobrança anual." },
+      {
+        property: "og:description",
+        content: "Teste grátis e planos Básico, Pro e Agência. Economize 20% na cobrança anual.",
+      },
       { property: "og:url", content: "https://flowleads.com.br/pricing" },
     ],
     links: [{ rel: "canonical", href: "https://flowleads.com.br/pricing" }],
@@ -47,7 +54,12 @@ const PLANS: Plan[] = [
     yearlyMonthly: "15,16",
     blurb: "Para quem está começando sozinho.",
     cta: "Começar",
-    features: ["300 leads / mês", "Exportar para Google Sheets", "Localizador de e-mail", "Suporte padrão"],
+    features: [
+      "300 leads / mês",
+      "Exportar para Google Sheets",
+      "Localizador de e-mail",
+      "Suporte padrão",
+    ],
   },
   {
     name: "Pro",
@@ -105,11 +117,17 @@ function PricingPage() {
             <FlowLeadsLogo className="h-9 w-auto" />
           </Link>
           <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-            <Link to="/" className="hover:text-foreground">Início</Link>
-            <Link to="/pricing" className="text-foreground">Preços</Link>
+            <Link to="/" className="hover:text-foreground">
+              Início
+            </Link>
+            <Link to="/pricing" className="text-foreground">
+              Preços
+            </Link>
           </nav>
           <Link to="/dashboard" preload="render">
-            <Button>Abrir App <ArrowRight /></Button>
+            <Button>
+              Abrir App <ArrowRight />
+            </Button>
           </Link>
         </div>
       </header>
@@ -142,13 +160,17 @@ function PricingPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => {
             const isFree = plan.monthly === 0;
-            const price = isFree ? "R$ 0" : yearly ? `R$ ${plan.yearlyMonthly}` : `R$ ${plan.monthly}`;
+            const price = isFree
+              ? "R$ 0"
+              : yearly
+                ? `R$ ${plan.yearlyMonthly}`
+                : `R$ ${plan.monthly}`;
             const suffix = isFree ? "" : "/mês";
             const sub = isFree
               ? "7 dias grátis"
               : yearly
-              ? `Cobrado R$ ${plan.yearly}/ano`
-              : "Cobrança mensal";
+                ? `Cobrado R$ ${plan.yearly}/ano`
+                : "Cobrança mensal";
             return (
               <div
                 key={plan.name}
@@ -172,10 +194,7 @@ function PricingPage() {
                 <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
 
                 <Link to="/dashboard" preload="render" className="mt-6">
-                  <Button
-                    className="w-full"
-                    variant={plan.popular ? "default" : "outline"}
-                  >
+                  <Button className="w-full" variant={plan.popular ? "default" : "outline"}>
                     {plan.cta}
                   </Button>
                 </Link>

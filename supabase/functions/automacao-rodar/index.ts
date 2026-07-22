@@ -18,9 +18,18 @@ import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
 import { firstBrWhatsapp } from "../_shared/phone.ts";
 import { extrairBairro } from "../../../src/lib/bairro.ts";
-import { planejarRodada, estourou, mesRefAtual, precisaZerarMes } from "../../../src/lib/automacao-teto.ts";
+import {
+  planejarRodada,
+  estourou,
+  mesRefAtual,
+  precisaZerarMes,
+} from "../../../src/lib/automacao-teto.ts";
 import { configPadraoWa } from "../../../src/lib/wa-copy.ts";
-import { classificarMotivo, montarCorpoProposta, ASSUNTO_PROPOSTA } from "../../../src/lib/copy-proposta.ts";
+import {
+  classificarMotivo,
+  montarCorpoProposta,
+  ASSUNTO_PROPOSTA,
+} from "../../../src/lib/copy-proposta.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any;
@@ -32,7 +41,10 @@ const temContatoValido = (email: string | null, whatsapp: string | null) =>
   Boolean((email && /@.+\..+/.test(email)) || whatsapp);
 
 /** Receita 'ativa' está VENCIDA para o cron? (manual nunca vence pelo cron.) */
-function estaVencida(r: { frequencia: string; ultima_rodada_em: string | null }, agora: Date): boolean {
+function estaVencida(
+  r: { frequencia: string; ultima_rodada_em: string | null },
+  agora: Date,
+): boolean {
   if (r.frequencia === "manual") return false;
   if (!r.ultima_rodada_em) return true;
   const horas = (agora.getTime() - new Date(r.ultima_rodada_em).getTime()) / 3.6e6;
@@ -148,7 +160,7 @@ async function executarRodada(admin: Admin, userId: string, authHeader: string, 
 
   for (const p of candidatos) {
     buscados++;
-    let website = p.website;
+    const website = p.website;
     let instagram = p.instagram;
     let facebook = p.facebook;
     let email: string | null = null;
@@ -250,7 +262,11 @@ async function executarRodada(admin: Admin, userId: string, authHeader: string, 
       try {
         const rr = await fetch(`${SUPA()}/functions/v1/redesign-site`, {
           method: "POST",
-          headers: { apikey: ANON(), Authorization: authHeader, "Content-Type": "application/json" },
+          headers: {
+            apikey: ANON(),
+            Authorization: authHeader,
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({ lead_id: q.leadId }),
         });
         const rj = await rr.json();
@@ -347,10 +363,7 @@ Deno.serve(async (req) => {
   const cronSecret = Deno.env.get("CRON_SECRET");
   if (cronSecret && req.headers.get("x-cron-secret") === cronSecret) {
     const agora = new Date();
-    const { data: receitas } = await admin
-      .from("automacao_receitas")
-      .select("*")
-      .eq("ativa", true);
+    const { data: receitas } = await admin.from("automacao_receitas").select("*").eq("ativa", true);
     const vencidas = (receitas ?? []).filter((r: Receita) => estaVencida(r, agora));
     const resultados: unknown[] = [];
     for (const r of vencidas) {
@@ -366,7 +379,9 @@ Deno.serve(async (req) => {
 
   // -------- MODO MANUAL (JWT do dono) --------
   const authHeader = req.headers.get("Authorization") ?? "";
-  const userClient = createClient(SUPA(), ANON(), { global: { headers: { Authorization: authHeader } } });
+  const userClient = createClient(SUPA(), ANON(), {
+    global: { headers: { Authorization: authHeader } },
+  });
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
   const userId = userData.user.id;

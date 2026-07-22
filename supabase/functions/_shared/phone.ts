@@ -45,7 +45,7 @@ export function whatsappFromLink(href: string): string | null {
     /(?:wa\.me\/|api\.whatsapp\.com\/send\?phone=|whatsapp\.com\/send\?phone=)(\+?\d[\d\s-]{7,})/i,
   );
   if (!m) return null;
-  let d = onlyDigits(m[1]);
+  const d = onlyDigits(m[1]);
   if (!d) return null;
   // já vem com 55? valida tamanho
   if (d.startsWith("55") && (d.length === 12 || d.length === 13)) return d;

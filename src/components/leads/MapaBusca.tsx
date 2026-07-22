@@ -20,7 +20,12 @@ export function MapaBusca({
 }) {
   const divRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const refs = useRef<{ L: any; map: any; marker: any; circle: any }>({ L: null, map: null, marker: null, circle: null });
+  const refs = useRef<{ L: any; map: any; marker: any; circle: any }>({
+    L: null,
+    map: null,
+    marker: null,
+    circle: null,
+  });
   const prevPinKey = useRef<string>("");
   const onPickRef = useRef(onPick);
   onPickRef.current = onPick;
@@ -56,14 +61,28 @@ export function MapaBusca({
   useEffect(() => {
     const { L, map } = refs.current;
     if (!L || !map) return;
-    if (refs.current.marker) { map.removeLayer(refs.current.marker); refs.current.marker = null; }
-    if (refs.current.circle) { map.removeLayer(refs.current.circle); refs.current.circle = null; }
+    if (refs.current.marker) {
+      map.removeLayer(refs.current.marker);
+      refs.current.marker = null;
+    }
+    if (refs.current.circle) {
+      map.removeLayer(refs.current.circle);
+      refs.current.circle = null;
+    }
     if (pin) {
       refs.current.marker = L.circleMarker([pin.lat, pin.lng], {
-        radius: 7, color: "#1e3a8a", fillColor: "#3b82f6", fillOpacity: 1, weight: 2,
+        radius: 7,
+        color: "#1e3a8a",
+        fillColor: "#3b82f6",
+        fillOpacity: 1,
+        weight: 2,
       }).addTo(map);
       refs.current.circle = L.circle([pin.lat, pin.lng], {
-        radius: raioKm * 1000, color: "#3b82f6", fillColor: "#3b82f6", fillOpacity: 0.1, weight: 1,
+        radius: raioKm * 1000,
+        color: "#3b82f6",
+        fillColor: "#3b82f6",
+        fillOpacity: 0.1,
+        weight: 1,
       }).addTo(map);
       // Enquadra a área só quando o PINO muda (cidade nova ou clique), não a cada ajuste de raio.
       const key = `${pin.lat.toFixed(5)},${pin.lng.toFixed(5)}`;

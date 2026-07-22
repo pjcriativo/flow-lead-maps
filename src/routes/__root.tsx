@@ -77,12 +77,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Flow Leads — Encontre leads no Google Maps em segundos" },
-      { name: "description", content: "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora." },
+      {
+        name: "description",
+        content:
+          "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora.",
+      },
       { name: "author", content: "Flow Leads" },
       { name: "theme-color", content: "#1a1a2e" },
       { property: "og:site_name", content: "Flow Leads" },
       { property: "og:title", content: "Flow Leads — Encontre leads no Google Maps em segundos" },
-      { property: "og:description", content: "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora." },
+      {
+        property: "og:description",
+        content:
+          "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora.",
+      },
       { property: "og:type", content: "website" },
       { property: "og:image", content: "https://flowleads.com.br/og-image.png" },
       { property: "og:image:width", content: "1200" },
@@ -90,7 +98,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@FlowLeads" },
       { name: "twitter:title", content: "Flow Leads — Encontre leads no Google Maps em segundos" },
-      { name: "twitter:description", content: "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora." },
+      {
+        name: "twitter:description",
+        content:
+          "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora.",
+      },
       { name: "twitter:image", content: "https://flowleads.com.br/og-image.png" },
     ],
     links: [
@@ -129,7 +141,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "@type": "WebSite",
           name: "Flow Leads",
           url: "https://flowleads.com.br",
-          description: "Gere leads de empresas qualificados a partir do Google Maps e exporte para Excel ou Google Sheets.",
+          description:
+            "Gere leads de empresas qualificados a partir do Google Maps e exporte para Excel ou Google Sheets.",
         }),
       },
     ],
@@ -165,7 +178,9 @@ function RootComponent() {
         posthog.identify(data.user.id, { email: data.user.email });
       }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
       if (event !== "SIGNED_OUT") queryClient.invalidateQueries();

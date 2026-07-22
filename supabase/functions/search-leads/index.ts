@@ -43,11 +43,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    global: { headers: { Authorization: authHeader } },
+  });
 
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
@@ -79,11 +77,13 @@ Deno.serve(async (req) => {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (obj: unknown) =>
-        controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+      const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
 
       try {
-        send({ type: "log", message: `Fonte: ${fonte} — ${nicho} em ${cidade}${uf ? "/" + uf : ""} (meta ${limite})` });
+        send({
+          type: "log",
+          message: `Fonte: ${fonte} — ${nicho} em ${cidade}${uf ? "/" + uf : ""} (meta ${limite})`,
+        });
 
         // Caminho padrão: sem pino, geocodifica cidade+UF (respeita a UF) e busca
         // por raio. Evita o modo-cidade do OSM, que ignora a UF.
@@ -93,9 +93,15 @@ Deno.serve(async (req) => {
             lat = g.lat;
             lng = g.lng;
             raioKm = raioKm ?? g.raioKm;
-            send({ type: "log", message: `Geocode ${cidade}/${uf}: ${g.lat.toFixed(3)},${g.lng.toFixed(3)} · raio ${raioKm}km` });
+            send({
+              type: "log",
+              message: `Geocode ${cidade}/${uf}: ${g.lat.toFixed(3)},${g.lng.toFixed(3)} · raio ${raioKm}km`,
+            });
           } else {
-            send({ type: "log", message: `Geocode falhou — usando busca por nome da cidade (a fonte pode ignorar a UF)` });
+            send({
+              type: "log",
+              message: `Geocode falhou — usando busca por nome da cidade (a fonte pode ignorar a UF)`,
+            });
           }
         }
 
@@ -135,8 +141,13 @@ Deno.serve(async (req) => {
           if (website) {
             const igm = website.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
             const fbm = website.match(/facebook\.com\/([A-Za-z0-9_.]+)/i);
-            if (igm && !instagram) { instagram = `https://instagram.com/${igm[1].replace(/\/$/, "")}`; website = null; }
-            else if (fbm && !facebook) { facebook = website; website = null; }
+            if (igm && !instagram) {
+              instagram = `https://instagram.com/${igm[1].replace(/\/$/, "")}`;
+              website = null;
+            } else if (fbm && !facebook) {
+              facebook = website;
+              website = null;
+            }
           }
           const hasWebsite = !!website;
           let email: string | null = null;

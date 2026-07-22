@@ -76,20 +76,30 @@ function AuthPage() {
         </div>
         <div className="text-center">
           <h1 className="text-2xl font-semibold tracking-tight">
-            {mode === "signin" ? "Bem-vindo de volta" : mode === "signup" ? "Crie sua conta" : "Redefina sua senha"}
+            {mode === "signin"
+              ? "Bem-vindo de volta"
+              : mode === "signup"
+                ? "Crie sua conta"
+                : "Redefina sua senha"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {mode === "signin"
               ? "Entre para acessar seu painel."
               : mode === "signup"
-              ? "Comece a encontrar leads em segundos."
-              : "Informe seu e-mail e enviaremos um link de redefinição."}
+                ? "Comece a encontrar leads em segundos."
+                : "Informe seu e-mail e enviaremos um link de redefinição."}
           </p>
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">E-mail</Label>
-            <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           {mode !== "forgot" && (
             <div className="space-y-1.5">
@@ -99,7 +109,11 @@ function AuthPage() {
                   <button
                     type="button"
                     className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => { setError(null); setInfo(null); setMode("forgot"); }}
+                    onClick={() => {
+                      setError(null);
+                      setInfo(null);
+                      setMode("forgot");
+                    }}
                   >
                     Esqueceu a senha?
                   </button>
@@ -141,10 +155,10 @@ function AuthPage() {
             {loading
               ? "Aguarde..."
               : mode === "signin"
-              ? "Entrar"
-              : mode === "signup"
-              ? "Cadastrar"
-              : "Enviar link de redefinição"}
+                ? "Entrar"
+                : mode === "signup"
+                  ? "Cadastrar"
+                  : "Enviar link de redefinição"}
           </Button>
         </form>
         <button
@@ -159,8 +173,8 @@ function AuthPage() {
           {mode === "signin"
             ? "Não tem conta? Cadastre-se"
             : mode === "signup"
-            ? "Já tem conta? Entrar"
-            : "Voltar para entrar"}
+              ? "Já tem conta? Entrar"
+              : "Voltar para entrar"}
         </button>
       </div>
     </div>

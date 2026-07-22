@@ -15,12 +15,8 @@ function debugEnabled(): boolean {
 
 function logEvent(event: string, props?: Record<string, unknown>) {
   if (!debugEnabled()) return;
-  // eslint-disable-next-line no-console
-  console.log(
-    `%c[PostHog] ${event}`,
-    "color:#7c3aed;font-weight:600",
-    props ?? {},
-  );
+
+  console.log(`%c[PostHog] ${event}`, "color:#7c3aed;font-weight:600", props ?? {});
 }
 
 export function initPostHog() {
@@ -32,12 +28,10 @@ export function initPostHog() {
     loaded: (ph) => {
       if (debugEnabled()) {
         ph.debug();
-        // eslint-disable-next-line no-console
-        console.log(
-          "%c[PostHog] debug mode ON",
-          "color:#7c3aed;font-weight:600",
-          { distinct_id: ph.get_distinct_id() },
-        );
+
+        console.log("%c[PostHog] debug mode ON", "color:#7c3aed;font-weight:600", {
+          distinct_id: ph.get_distinct_id(),
+        });
       }
     },
   });
@@ -51,7 +45,11 @@ export function initPostHog() {
   }) as typeof posthog.capture;
 
   const origIdentify = posthog.identify.bind(posthog);
-  posthog.identify = ((distinctId?: string, props?: Record<string, unknown>, ...rest: unknown[]) => {
+  posthog.identify = ((
+    distinctId?: string,
+    props?: Record<string, unknown>,
+    ...rest: unknown[]
+  ) => {
     logEvent("identify", { distinct_id: distinctId, ...props });
     // @ts-expect-error passthrough
     return origIdentify(distinctId, props, ...rest);
@@ -60,7 +58,7 @@ export function initPostHog() {
   if (typeof window !== "undefined") {
     (window as any).__phDebug = (on: boolean) => {
       window.localStorage.setItem("ph_debug", on ? "1" : "0");
-      // eslint-disable-next-line no-console
+
       console.log(`[PostHog] debug ${on ? "ON" : "OFF"} — reload to apply init-time flags`);
     };
     (window as any).posthog = posthog;

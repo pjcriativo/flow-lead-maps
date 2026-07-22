@@ -24,7 +24,17 @@ export function FlowLeadsLogo({ className, variant = "light" }: FlowLeadsLogoPro
       <rect x="10" y="8" width="5" height="20" rx="2" fill={tileFg} />
       <rect x="10" y="22" width="16" height="5" rx="2" fill={tileFg} />
       <rect x="21" y="8" width="5" height="14" rx="2" fill={accent} />
-      <text x="46" y="25" fontFamily="Georgia, serif" fontSize="22" fontWeight="400" fill={wordmark} letterSpacing="1">Flow Leads</text>
+      <text
+        x="46"
+        y="25"
+        fontFamily="Georgia, serif"
+        fontSize="22"
+        fontWeight="400"
+        fill={wordmark}
+        letterSpacing="1"
+      >
+        Flow Leads
+      </text>
     </svg>
   );
 }

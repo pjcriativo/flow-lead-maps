@@ -8,14 +8,34 @@ const delay = (ms = 350) => new Promise((r) => setTimeout(r, ms));
 
 // Modelos de exemplo (mock) para gerar contratos enquanto não há API.
 const MODELOS = [
-  { lead_id: "lead-202", nome: "Pet Shop Amigo Fiel", proposta_id: "prop-2", titulo: "Redesign de site — Amigo Fiel", valor: 1800 },
-  { lead_id: "lead-204", nome: "Contabilidade Prisma", proposta_id: null, titulo: "Site institucional — Prisma", valor: 2400 },
-  { lead_id: "lead-206", nome: "Barbearia Navalha de Ouro", proposta_id: null, titulo: "Landing page + agendamento", valor: 1500 },
+  {
+    lead_id: "lead-202",
+    nome: "Pet Shop Amigo Fiel",
+    proposta_id: "prop-2",
+    titulo: "Redesign de site — Amigo Fiel",
+    valor: 1800,
+  },
+  {
+    lead_id: "lead-204",
+    nome: "Contabilidade Prisma",
+    proposta_id: null,
+    titulo: "Site institucional — Prisma",
+    valor: 2400,
+  },
+  {
+    lead_id: "lead-206",
+    nome: "Barbearia Navalha de Ouro",
+    proposta_id: null,
+    titulo: "Landing page + agendamento",
+    valor: 1500,
+  },
 ];
 
 // Monta o HTML do contrato (template simples pt-BR). DEPOIS pode virar IA/DOCX.
 function montarContratoHtml(nome: string, valor: number, data: string): string {
-  const valorFmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
+  const valorFmt = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    valor,
+  );
   return `
     <h2>Contrato de Prestação de Serviços</h2>
     <p><strong>CONTRATADA:</strong> Flow Leads — desenvolvimento e reformulação de sites.</p>

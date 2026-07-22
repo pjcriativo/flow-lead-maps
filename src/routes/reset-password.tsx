@@ -47,7 +47,9 @@ function ResetPasswordPage() {
         </div>
         <div className="text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Defina uma nova senha</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Digite e confirme sua nova senha abaixo.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Digite e confirme sua nova senha abaixo.
+          </p>
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
