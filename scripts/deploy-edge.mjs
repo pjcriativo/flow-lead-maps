@@ -89,4 +89,6 @@ if (!up.ok) {
   process.exit(1);
 }
 const j = JSON.parse(body);
-console.log(`✔ deploy ok: ${j.slug ?? slug} · verify_jwt=${verifyJwt} · versão ${j.version ?? "?"}`);
+console.log(
+  `✔ deploy ok: ${j.slug ?? slug} · verify_jwt=${verifyJwt} · versão ${j.version ?? "?"}`,
+);
