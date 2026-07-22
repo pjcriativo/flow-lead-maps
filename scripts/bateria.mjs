@@ -436,6 +436,43 @@ async function bloco2() {
   r = await chamarEdge("wa-chips", { acao: "listar" }, null);
   T(r.status === 401, "wa-chips sem JWT → 401", String(r.status));
 
+  console.log(" · admin-metricas (painel da plataforma) — papel checado no SERVIDOR");
+  r = await chamarEdge("admin-metricas", {}, null);
+  T(r.status === 401, "admin-metricas sem JWT → 401", String(r.status));
+  {
+    const { data: lk2 } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email: "gevieskiagency@gmail.com",
+    });
+    const an2 = createClient(URL, ANON, { auth: { persistSession: false } });
+    const { data: se2 } = await an2.auth.verifyOtp({
+      token_hash: lk2.properties.hashed_token,
+      type: "magiclink",
+    });
+    r = await chamarEdge("admin-metricas", {}, se2.session.access_token);
+    T(r.status === 403, "usuário comum (não super admin) → 403", String(r.status));
+  }
+  r = await chamarEdge("admin-metricas", {}, jwt);
+  T(r.status === 200 && r.body?.ok === true, "super admin → 200 com métricas");
+  const { count: leadsGlob } = await admin
+    .from("leads")
+    .select("id", { count: "exact", head: true });
+  T(
+    r.body?.kpis?.leads === (leadsGlob ?? -1),
+    "leads do painel == count GLOBAL real (todas as orgs)",
+    `${r.body?.kpis?.leads} vs ${leadsGlob}`,
+  );
+  T(
+    (r.body?.usuarios ?? []).length >= 3,
+    "usuários da plataforma listados (>= 3 contas reais)",
+    String((r.body?.usuarios ?? []).length),
+  );
+  T(
+    (r.body?.leadsRecentes ?? []).length > 0 &&
+      (r.body?.leadsRecentes ?? []).every((l) => !!l.dono),
+    "cada lead recente vem com o DONO (email da org)",
+  );
+
   console.log(" · portão do disparo (não envia e não marca sem chip usável)");
   const ins = async (t, row) => {
     const { data, error } = await admin.from(t).insert(row).select("id").single();

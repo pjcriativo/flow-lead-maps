@@ -42,19 +42,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { cn } from "@/lib/utils";
-import {
-  carregarKpis,
-  carregarSerie14d,
-  carregarStatusCampanhas,
-  carregarLeadsRecentes,
-  carregarCampanhasRecentes,
-  carregarBuscasRecentes,
-  type AdminKpis,
-  type PontoSerie,
-  type LeadRecente,
-  type CampanhaRecente,
-  type BuscaRecente,
-} from "@/services/admin";
+import { carregarPainelAdmin, type PainelAdmin } from "@/services/admin";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
@@ -271,38 +259,32 @@ const DONUT_CORES: Record<string, string> = {
 /* ─────────────────────────── página ─────────────────────────── */
 
 export function AdminPanel({ email }: { email: string }) {
-  const [kpis, setKpis] = useState<AdminKpis | null>(null);
-  const [serie, setSerie] = useState<{ pontos: PontoSerie[]; temAlgo: boolean } | null>(null);
-  const [donut, setDonut] = useState<{ status: string; total: number }[] | null>(null);
-  const [leads, setLeads] = useState<LeadRecente[]>([]);
-  const [camps, setCamps] = useState<CampanhaRecente[]>([]);
-  const [buscas, setBuscas] = useState<BuscaRecente[]>([]);
+  const [painel, setPainel] = useState<PainelAdmin | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
-    Promise.all([
-      carregarKpis(),
-      carregarSerie14d(),
-      carregarStatusCampanhas(),
-      carregarLeadsRecentes(),
-      carregarCampanhasRecentes(),
-      carregarBuscasRecentes(),
-    ])
-      .then(([k, s, d, l, c, b]) => {
-        if (!vivo) return;
-        setKpis(k);
-        setSerie(s);
-        setDonut(d);
-        setLeads(l);
-        setCamps(c);
-        setBuscas(b);
-      })
+    carregarPainelAdmin()
+      .then((p) => vivo && setPainel(p))
       .catch((e) => vivo && setErro(e instanceof Error ? e.message : String(e)));
     return () => {
       vivo = false;
     };
   }, []);
+
+  // aliases: um estado só (a Edge devolve a plataforma inteira), o JSX segue simples
+  const kpis = painel?.kpis ?? null;
+  const serie = painel
+    ? {
+        pontos: painel.serie14d,
+        temAlgo: painel.serie14d.some((p) => p.leads > 0 || p.disparos > 0),
+      }
+    : null;
+  const donut = painel?.statusCampanhas ?? null;
+  const leads = painel?.leadsRecentes ?? [];
+  const camps = painel?.campanhasRecentes ?? [];
+  const buscas = painel?.buscasRecentes ?? [];
+  const usuarios = painel?.usuarios ?? [];
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -316,8 +298,9 @@ export function AdminPanel({ email }: { email: string }) {
             </p>
             <h1 className="mt-1 font-serif text-2xl text-foreground">Centro de comando</h1>
             <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">
-              A operação ao vivo — leads, campanhas, WhatsApp, buscas e gasto de API. Cada número
-              vem de uma consulta real; o que ainda não tem base aparece como “Em breve”.
+              A plataforma inteira, todas as orgs — leads, campanhas, WhatsApp, buscas e gasto de
+              API. Cada número vem de uma consulta real no servidor (papel de super admin verificado
+              lá); o que ainda não tem base aparece como “Em breve”.
             </p>
           </div>
 
@@ -388,12 +371,14 @@ export function AdminPanel({ email }: { email: string }) {
               Icon={CircleDollarSign}
               tom="ouro"
             />
-            {/* sem base no produto ainda → Em breve, não zero fake */}
-            <KpiEmBreve
-              rotulo="Total de usuários"
-              motivo="A plataforma tem 1 org por ora; multi-usuário entra com memberships."
+            <Kpi
+              rotulo="Usuários da plataforma"
+              valor={kpis ? String(kpis.usuarios) : "…"}
+              detalhe="count(profiles) — todas as orgs"
               Icon={Users}
+              tom="ouro"
             />
+            {/* sem base no produto ainda → Em breve, não zero fake */}
             <KpiEmBreve
               rotulo="Tickets abertos"
               motivo="Não existe módulo de suporte ainda."
@@ -427,6 +412,7 @@ export function AdminPanel({ email }: { email: string }) {
                       <Tooltip />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Line
+                        isAnimationActive={false}
                         type="monotone"
                         dataKey="leads"
                         name="Leads novos"
@@ -435,6 +421,7 @@ export function AdminPanel({ email }: { email: string }) {
                         dot={false}
                       />
                       <Line
+                        isAnimationActive={false}
                         type="monotone"
                         dataKey="disparos"
                         name="Disparos"
@@ -459,6 +446,7 @@ export function AdminPanel({ email }: { email: string }) {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
+                        isAnimationActive={false}
                         data={donut}
                         dataKey="total"
                         nameKey="status"
@@ -483,12 +471,46 @@ export function AdminPanel({ email }: { email: string }) {
             </div>
           </div>
 
+          {/* usuários — a plataforma real, org por org */}
+          <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+            <div className="border-b border-border px-4 py-3">
+              <h2 className="font-serif text-lg">Usuários da plataforma</h2>
+              <p className="text-xs text-muted-foreground">
+                Todas as contas (profiles) — e-mail, plano e desde quando.
+              </p>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {usuarios.map((u) => (
+                  <tr key={u.email} className="border-b border-border last:border-0">
+                    <td className="px-4 py-2.5 font-medium">{u.email}</td>
+                    <td className="px-4 py-2.5 text-xs uppercase text-muted-foreground">
+                      {u.plan ?? "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">
+                      desde {new Date(u.created_at).toLocaleDateString("pt-BR")}
+                    </td>
+                  </tr>
+                ))}
+                {usuarios.length === 0 && (
+                  <tr>
+                    <td className="px-4 py-6 text-center text-sm text-muted-foreground">
+                      Carregando…
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
           {/* tabelas — dado real */}
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
               <div className="border-b border-border px-4 py-3">
                 <h2 className="font-serif text-lg">Leads recentes</h2>
-                <p className="text-xs text-muted-foreground">Os últimos salvos na base.</p>
+                <p className="text-xs text-muted-foreground">
+                  Os últimos salvos — de qualquer org (o dono aparece em cada linha).
+                </p>
               </div>
               <table className="w-full text-sm">
                 <tbody>
@@ -496,7 +518,9 @@ export function AdminPanel({ email }: { email: string }) {
                     <tr key={l.id} className="border-b border-border last:border-0">
                       <td className="px-4 py-2.5">
                         <p className="font-medium">{l.business_name}</p>
-                        <p className="text-xs text-muted-foreground">{l.city ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {l.city ?? "—"} · {l.dono}
+                        </p>
                       </td>
                       <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">
                         {new Date(l.created_at).toLocaleDateString("pt-BR")}
@@ -525,7 +549,9 @@ export function AdminPanel({ email }: { email: string }) {
                     <tr key={c.id} className="border-b border-border last:border-0">
                       <td className="px-4 py-2.5">
                         <p className="font-medium">{c.nome}</p>
-                        <p className="text-xs uppercase text-muted-foreground">{c.canal}</p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="uppercase">{c.canal}</span> · {c.dono}
+                        </p>
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <BadgeStatus s={c.status} />
@@ -560,7 +586,7 @@ export function AdminPanel({ email }: { email: string }) {
                           <span className="font-mono text-xs">{b.estrategia}</span>
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {b.inseridos} inserido(s) · {usd(Number(b.custo_usd))}
+                          {b.inseridos} inserido(s) · {usd(Number(b.custo_usd))} · {b.dono}
                         </p>
                       </td>
                       <td className="px-4 py-2.5 text-right">
