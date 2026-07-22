@@ -27,6 +27,7 @@ import type { Redesign } from "@/types";
 import { RegistrarContatoBotao } from "./ContatoDialog";
 import { MarcarPerdaBotao } from "./PerdaDialog";
 import { NotaBotao } from "./NotaPopover";
+import { AtribuirLead } from "./AtribuirLead";
 import {
   StatusBadge,
   ScoreBadge,
@@ -251,6 +252,10 @@ export function LeadDetalhe({
                 }}
               />
               <NotaBotao lead={leadView} onSalvo={(notes) => aplicarPatch({ notes })} />
+              <AtribuirLead
+                lead={leadView}
+                onAtribuido={(assigned_to) => aplicarPatch({ assigned_to })}
+              />
             </div>
             {/* Dados de contato */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
