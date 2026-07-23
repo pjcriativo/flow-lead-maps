@@ -185,7 +185,10 @@ Deno.serve(async (req) => {
     if (acao === "plano_toggle") {
       const id = String(b.id || "");
       if (!id) return json({ ok: false, reason: "sem_id" });
-      await admin.from("planos").update({ ativo: b.ativo === true }).eq("id", id);
+      await admin
+        .from("planos")
+        .update({ ativo: b.ativo === true })
+        .eq("id", id);
       return json({ ok: true, id, ativo: b.ativo === true });
     }
 
