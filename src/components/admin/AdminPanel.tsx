@@ -54,6 +54,7 @@ import { AdminPlanos } from "./AdminPlanos";
 import { AdminTickets } from "./AdminTickets";
 import { AdminRelatorios } from "./AdminRelatorios";
 import { AdminConfiguracoes } from "./AdminConfiguracoes";
+import { AdminNotificacoes } from "./AdminNotificacoes";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
@@ -66,7 +67,8 @@ type TelaAdmin =
   | "plans"
   | "tickets"
   | "relatorios"
-  | "configuracoes";
+  | "configuracoes"
+  | "notificacoes";
 
 type ItemNav = {
   rotulo: string;
@@ -99,6 +101,7 @@ const NAV: ItemNav[] = [
   { rotulo: "Pagamentos", Icon: Wallet, emBreve: true },
   { rotulo: "Relatórios", Icon: BarChart3, tela: "relatorios" },
   { rotulo: "Suporte", Icon: LifeBuoy, tela: "tickets" },
+  { rotulo: "Notificações", Icon: Bell, tela: "notificacoes" },
   { rotulo: "Configurações", Icon: Settings, tela: "configuracoes" },
 ];
 
@@ -435,6 +438,7 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "tickets" && <AdminTickets />}
             {tela === "relatorios" && <AdminRelatorios />}
             {tela === "configuracoes" && <AdminConfiguracoes />}
+            {tela === "notificacoes" && <AdminNotificacoes />}
           </main>
         </div>
       </div>

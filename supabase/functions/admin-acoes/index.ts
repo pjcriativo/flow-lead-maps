@@ -416,6 +416,95 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // notificacao_enviar / notificacoes_listar — aviso IN-APP pra todos os usuários da
+    // PLATAFORMA (profiles). Registra quem recebeu (notificacao_destinatarios). NÃO toca em
+    // consumo_org nem em nenhum contador de prospecção — não consome cota nem rampa.
+    if (acao === "notificacao_enviar") {
+      const titulo = String(b.titulo || "").trim();
+      const mensagem = String(b.mensagem || "").trim();
+      if (!titulo || !mensagem) return json({ ok: false, reason: "campos_obrigatorios" });
+      const { data: perfis } = await admin.from("profiles").select("id");
+      const destinatarios = perfis ?? [];
+      if (destinatarios.length === 0) return json({ ok: false, reason: "sem_usuarios" });
+      const { data: notif, error: errNotif } = await admin
+        .from("notificacoes")
+        .insert({ titulo, mensagem, criado_por: userData.user.id })
+        .select("id")
+        .single();
+      if (errNotif || !notif)
+        return json({ ok: false, reason: "erro_criar", detalhe: errNotif?.message });
+      const linhas = destinatarios.map((p: Rec) => ({ notificacao_id: notif.id, user_id: p.id }));
+      const { error: errDest } = await admin.from("notificacao_destinatarios").insert(linhas);
+      if (errDest)
+        return json({ ok: false, reason: "erro_destinatarios", detalhe: errDest.message });
+      return json({ ok: true, notificacao_id: notif.id, destinatarios: linhas.length });
+    }
+
+    if (acao === "notificacoes_listar") {
+      const { data: notifs } = await admin
+        .from("notificacoes")
+        .select("id, titulo, mensagem, criado_em")
+        .order("criado_em", { ascending: false })
+        .limit(50);
+      const ids = (notifs ?? []).map((n: Rec) => n.id);
+      const { data: destRows } = ids.length
+        ? await admin
+            .from("notificacao_destinatarios")
+            .select("notificacao_id, lida_em")
+            .in("notificacao_id", ids)
+        : { data: [] as Rec[] };
+      const porNotif = new Map<string, { total: number; lidas: number }>();
+      for (const d of destRows ?? []) {
+        const k = String(d.notificacao_id);
+        const c = porNotif.get(k) ?? { total: 0, lidas: 0 };
+        c.total++;
+        if (d.lida_em) c.lidas++;
+        porNotif.set(k, c);
+      }
+      const lista = (notifs ?? []).map((n: Rec) => ({
+        ...n,
+        total: porNotif.get(String(n.id))?.total ?? 0,
+        lidas: porNotif.get(String(n.id))?.lidas ?? 0,
+      }));
+      return json({ ok: true, notificacoes: lista });
+    }
+
+    // assinantes — CRUD manual (sem base de captura ainda; "Enviar e-mail" fica desabilitado
+    // no client com o motivo — não há motor de disparo em massa/newsletter hoje).
+    if (acao === "assinantes_listar") {
+      const { data } = await admin
+        .from("assinantes")
+        .select("id, email, nome, criado_em")
+        .order("criado_em", { ascending: false });
+      return json({ ok: true, assinantes: data ?? [] });
+    }
+
+    if (acao === "assinante_add") {
+      const email = String(b.email || "")
+        .trim()
+        .toLowerCase();
+      const nome = typeof b.nome === "string" && b.nome.trim() ? b.nome.trim() : null;
+      if (!email.includes("@")) return json({ ok: false, reason: "email_invalido" });
+      const { data, error } = await admin
+        .from("assinantes")
+        .insert({ email, nome, criado_por: userData.user.id })
+        .select("id, email, nome, criado_em")
+        .single();
+      if (error) {
+        if ((error as { code?: string }).code === "23505")
+          return json({ ok: false, reason: "email_duplicado" });
+        return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
+      }
+      return json({ ok: true, assinante: data });
+    }
+
+    if (acao === "assinante_remove") {
+      const id = String(b.id || "");
+      if (!id) return json({ ok: false, reason: "id_obrigatorio" });
+      await admin.from("assinantes").delete().eq("id", id);
+      return json({ ok: true, removido: id });
+    }
+
     return json({ ok: false, reason: "acao_desconhecida" });
   } catch (e) {
     return json({ ok: false, reason: "erro", detalhe: e instanceof Error ? e.message : String(e) });

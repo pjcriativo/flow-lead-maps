@@ -66,7 +66,11 @@ try {
   const rForaLer = await chamar(jwtFora, { acao: "config_ler" });
   T(rForaLer.status === 403, "não-super-admin → 403 em config_ler", String(rForaLer.status));
   const rForaSalvar = await chamar(jwtFora, { acao: "config_salvar", teto_rodada_usd: 999 });
-  T(rForaSalvar.status === 403, "não-super-admin → 403 em config_salvar", String(rForaSalvar.status));
+  T(
+    rForaSalvar.status === 403,
+    "não-super-admin → 403 em config_salvar",
+    String(rForaSalvar.status),
+  );
 
   const antes = await chamarJson(jwtDono, { acao: "config_ler" });
   T(antes.ok === true, "super_admin → config_ler ok");
@@ -91,7 +95,9 @@ try {
     .eq("id", true)
     .maybeSingle();
   T(
-    Object.entries(teste).every(([k, v]) => Number(linhaBanco?.[k] ?? linhaBanco?.[k]) == v || linhaBanco?.[k] === v),
+    Object.entries(teste).every(
+      ([k, v]) => Number(linhaBanco?.[k] ?? linhaBanco?.[k]) == v || linhaBanco?.[k] === v,
+    ),
     "linha em config_plataforma bate byte-a-byte com o que foi salvo (não é cache/mock)",
     JSON.stringify(linhaBanco),
   );

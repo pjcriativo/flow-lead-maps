@@ -22,6 +22,7 @@ import {
   Bot,
   ShieldCheck,
   LifeBuoy,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,8 @@ import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
 import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
+import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
+import { listarMinhasNotificacoes } from "@/services/notificacoes";
 import { lerPerfilEmail, salvarNomeRemetente, salvarReplyTo, emailValido } from "@/services/perfil";
 import { toast } from "sonner";
 
@@ -96,6 +99,7 @@ type Section =
   | "redesign"
   | "publicar"
   | "suporte"
+  | "notificacoes"
   // "sheets" (Google Sheets) segue no código como DEPRECATED — fora da navegação
   // (o dono não usa). A seção ainda renderiza p/ não quebrar o callback de OAuth.
   | "sheets"
@@ -116,6 +120,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "redesign", label: "Redesign", Icon: Wand2 },
   { id: "publicar", label: "Publicar", Icon: Rocket },
   { id: "suporte", label: "Suporte", Icon: LifeBuoy },
+  { id: "notificacoes", label: "Notificações", Icon: Bell },
   { id: "settings", label: "Configurações", Icon: SettingsIcon },
 ];
 
@@ -128,6 +133,7 @@ function Dashboard() {
   const [googleConnected, setGoogleConnected] = useState(false);
   const [userReady, setUserReady] = useState(false);
   const [superAdmin, setSuperAdmin] = useState(false);
+  const [naoLidas, setNaoLidas] = useState(0);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -143,6 +149,10 @@ function Dashboard() {
       }
       setUserReady(true);
     });
+    // badge de "Notificações" no menu — conta real (não decorativo)
+    listarMinhasNotificacoes()
+      .then((ns) => setNaoLidas(ns.filter((n) => !n.lida_em).length))
+      .catch(() => setNaoLidas(0));
   }, []);
 
   useEffect(() => {
@@ -180,6 +190,11 @@ function Dashboard() {
             >
               <item.Icon className="h-4 w-4" />
               {item.label}
+              {item.id === "notificacoes" && naoLidas > 0 && (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-semibold text-navy">
+                  {naoLidas}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -257,6 +272,15 @@ function Dashboard() {
         )}
         {section === "publicar" && <PublicarSection />}
         {section === "suporte" && <SuporteSection />}
+        {section === "notificacoes" && (
+          <NotificacoesSection
+            onMudou={() =>
+              listarMinhasNotificacoes()
+                .then((ns) => setNaoLidas(ns.filter((n) => !n.lida_em).length))
+                .catch(() => {})
+            }
+          />
+        )}
         {/* DEPRECATED: Google Sheets saiu da sidebar. Render mantido só para não
             quebrar o callback de OAuth (?sheets_connected=true). Remover em passo à parte. */}
         {section === "sheets" && (

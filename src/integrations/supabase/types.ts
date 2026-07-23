@@ -49,6 +49,30 @@ export type Database = {
           },
         ];
       };
+      assinantes: {
+        Row: {
+          criado_em: string;
+          criado_por: string | null;
+          email: string;
+          id: string;
+          nome: string | null;
+        };
+        Insert: {
+          criado_em?: string;
+          criado_por?: string | null;
+          email: string;
+          id?: string;
+          nome?: string | null;
+        };
+        Update: {
+          criado_em?: string;
+          criado_por?: string | null;
+          email?: string;
+          id?: string;
+          nome?: string | null;
+        };
+        Relationships: [];
+      };
       automacao_receitas: {
         Row: {
           ativa: boolean;
@@ -1000,6 +1024,62 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      notificacao_destinatarios: {
+        Row: {
+          enviado_em: string;
+          id: string;
+          lida_em: string | null;
+          notificacao_id: string;
+          user_id: string;
+        };
+        Insert: {
+          enviado_em?: string;
+          id?: string;
+          lida_em?: string | null;
+          notificacao_id: string;
+          user_id: string;
+        };
+        Update: {
+          enviado_em?: string;
+          id?: string;
+          lida_em?: string | null;
+          notificacao_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notificacao_destinatarios_notificacao_id_fkey";
+            columns: ["notificacao_id"];
+            isOneToOne: false;
+            referencedRelation: "notificacoes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      notificacoes: {
+        Row: {
+          criado_em: string;
+          criado_por: string | null;
+          id: string;
+          mensagem: string;
+          titulo: string;
+        };
+        Insert: {
+          criado_em?: string;
+          criado_por?: string | null;
+          id?: string;
+          mensagem: string;
+          titulo: string;
+        };
+        Update: {
+          criado_em?: string;
+          criado_por?: string | null;
+          id?: string;
+          mensagem?: string;
+          titulo?: string;
+        };
+        Relationships: [];
       };
       org_papeis: {
         Row: {

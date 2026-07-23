@@ -74,7 +74,10 @@ if (!browser) {
   console.error("Nem Edge nem Chrome encontrados no sistema");
   process.exit(1);
 }
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1.5 });
+const ctx = await browser.newContext({
+  viewport: { width: 1440, height: 1100 },
+  deviceScaleFactor: 1.5,
+});
 await ctx.addInitScript(
   ([k, v]) => {
     try {

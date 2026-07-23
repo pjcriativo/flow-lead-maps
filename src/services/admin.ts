@@ -142,6 +142,7 @@ export type AdminAcao =
   | "config_salvar"
   | "notificacao_enviar"
   | "notificacoes_listar"
+  | "assinantes_listar"
   | "assinante_add"
   | "assinante_remove"
   | "cms_ler"
