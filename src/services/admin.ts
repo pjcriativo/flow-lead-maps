@@ -80,6 +80,21 @@ export type Staff = {
   nome: string | null;
   criada_em: string;
 };
+export type Plano = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  preco: number;
+  periodo: "mensal" | "anual";
+  limite_leads: number | null;
+  limite_sites: number | null;
+  limite_campanhas: number | null;
+  limite_whatsapp: number | null;
+  limite_templates: number | null;
+  limite_segmentos: number | null;
+  ativo: boolean;
+  ordem: number;
+};
 
 export type PainelAdmin = {
   kpis: AdminKpis;
@@ -94,6 +109,7 @@ export type PainelAdmin = {
   roles: Role[];
   staffs: Staff[];
   subscribers: null; // sem base de newsletter → "Em breve"
+  planos: Plano[];
 };
 
 /** Uma chamada só: a Edge valida o papel no servidor e devolve a plataforma inteira. */
@@ -106,7 +122,14 @@ export async function carregarPainelAdmin(): Promise<PainelAdmin> {
 
 /** Mutações das telas de admin (Edge admin-acoes valida super_admin no servidor). */
 export async function adminAcao(
-  acao: "role_toggle" | "staff_add" | "staff_remove" | "user_add",
+  acao:
+    | "role_toggle"
+    | "staff_add"
+    | "staff_remove"
+    | "user_add"
+    | "plano_upsert"
+    | "plano_toggle"
+    | "plano_delete",
   payload: Record<string, unknown>,
 ): Promise<{ ok: boolean; reason?: string; detalhe?: string }> {
   const { data, error } = await supabase.functions.invoke("admin-acoes", {

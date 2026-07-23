@@ -154,6 +154,54 @@ Deno.serve(async (req) => {
       return json({ ok: true, user_id: u.id, email });
     }
 
+    // ── PLANOS (billing camada 1) ──
+    if (acao === "plano_upsert") {
+      const p = (b.plano ?? {}) as Record<string, unknown>;
+      const nome = String(p.nome || "").trim();
+      if (!nome) return json({ ok: false, reason: "nome_obrigatorio" });
+      const num = (v: unknown) => (v === "" || v === null || v === undefined ? null : Number(v));
+      const linha = {
+        nome,
+        descricao: String(p.descricao ?? "") || null,
+        preco: Number(p.preco ?? 0),
+        periodo: p.periodo === "anual" ? "anual" : "mensal",
+        limite_leads: num(p.limite_leads),
+        limite_sites: num(p.limite_sites),
+        limite_campanhas: num(p.limite_campanhas),
+        limite_whatsapp: num(p.limite_whatsapp),
+        limite_templates: num(p.limite_templates),
+        limite_segmentos: num(p.limite_segmentos),
+        ativo: p.ativo !== false,
+      };
+      if (p.id) {
+        await admin.from("planos").update(linha).eq("id", String(p.id));
+        return json({ ok: true, id: p.id });
+      }
+      const { data, error } = await admin.from("planos").insert(linha).select("id").single();
+      if (error) return json({ ok: false, reason: "falha_criar", detalhe: error.message });
+      return json({ ok: true, id: data.id });
+    }
+
+    if (acao === "plano_toggle") {
+      const id = String(b.id || "");
+      if (!id) return json({ ok: false, reason: "sem_id" });
+      await admin.from("planos").update({ ativo: b.ativo === true }).eq("id", id);
+      return json({ ok: true, id, ativo: b.ativo === true });
+    }
+
+    if (acao === "plano_delete") {
+      const id = String(b.id || "");
+      if (!id) return json({ ok: false, reason: "sem_id" });
+      // não apaga plano em uso por alguma org (protege a integridade da assinatura)
+      const { count } = await admin
+        .from("orgs")
+        .select("id", { count: "exact", head: true })
+        .eq("plano_id", id);
+      if ((count ?? 0) > 0) return json({ ok: false, reason: "plano_em_uso", orgs: count });
+      await admin.from("planos").delete().eq("id", id);
+      return json({ ok: true, removido: id });
+    }
+
     return json({ ok: false, reason: "acao_desconhecida" });
   } catch (e) {
     return json({ ok: false, reason: "erro", detalhe: e instanceof Error ? e.message : String(e) });

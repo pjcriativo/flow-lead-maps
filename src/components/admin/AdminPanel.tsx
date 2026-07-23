@@ -27,6 +27,9 @@ import {
   ArrowLeft,
   TerminalSquare,
   Radar,
+  ChevronDown,
+  ChevronRight,
+  Tag,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -47,19 +50,44 @@ import { cn } from "@/lib/utils";
 import { carregarPainelAdmin, type PainelAdmin } from "@/services/admin";
 import { AdminRoles, AdminStaffs } from "./AdminStaffRoles";
 import { AdminAllUsers, AdminSubscribers } from "./AdminUsers";
+import { AdminPlanos } from "./AdminPlanos";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
-type TelaAdmin = "dashboard" | "staff" | "users";
-const NAV: { rotulo: string; Icon: typeof LayoutDashboard; tela?: TelaAdmin }[] = [
-  { rotulo: "Dashboard", Icon: LayoutDashboard, tela: "dashboard" },
-  { rotulo: "Staff & Roles", Icon: ShieldCheck, tela: "staff" },
-  { rotulo: "Usuários", Icon: Users, tela: "users" },
-  { rotulo: "Planos", Icon: CreditCard },
-  { rotulo: "Pagamentos", Icon: Wallet },
-  { rotulo: "Relatórios", Icon: BarChart3 },
-  { rotulo: "Suporte", Icon: LifeBuoy },
-  { rotulo: "Configurações", Icon: Settings },
+type TelaAdmin = "dashboard" | "roles" | "staffs" | "all-users" | "subscribers" | "plans";
+
+type ItemNav = {
+  rotulo: string;
+  Icon: typeof LayoutDashboard;
+  tela?: TelaAdmin;
+  emBreve?: boolean;
+  filhos?: { rotulo: string; tela: TelaAdmin }[];
+};
+
+// Navegação em grupos, como no LeadzenAI: pais expansíveis com sub-itens dentro.
+const NAV: ItemNav[] = [
+  { rotulo: "Painel", Icon: LayoutDashboard, tela: "dashboard" },
+  {
+    rotulo: "Equipe & Papéis",
+    Icon: ShieldCheck,
+    filhos: [
+      { rotulo: "Papéis", tela: "roles" },
+      { rotulo: "Colaboradores", tela: "staffs" },
+    ],
+  },
+  {
+    rotulo: "Usuários",
+    Icon: Users,
+    filhos: [
+      { rotulo: "Todos os usuários", tela: "all-users" },
+      { rotulo: "Assinantes", tela: "subscribers" },
+    ],
+  },
+  { rotulo: "Planos", Icon: Tag, tela: "plans" },
+  { rotulo: "Pagamentos", Icon: Wallet, emBreve: true },
+  { rotulo: "Relatórios", Icon: BarChart3, emBreve: true },
+  { rotulo: "Suporte", Icon: LifeBuoy, emBreve: true },
+  { rotulo: "Configurações", Icon: Settings, emBreve: true },
 ];
 
 function EmBreve({ className }: { className?: string }) {
@@ -76,43 +104,109 @@ function EmBreve({ className }: { className?: string }) {
 }
 
 function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmin) => void }) {
+  // grupo aberto: começa aberto o grupo que contém a tela atual
+  const grupoDaTela = NAV.find((n) => n.filhos?.some((f) => f.tela === tela))?.rotulo ?? null;
+  const [aberto, setAberto] = useState<string | null>(grupoDaTela);
+
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <div className="flex h-16 items-center border-b border-sidebar-border px-4">
         <FlowLeadsLogo variant="dark" className="h-7" />
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {NAV.map(({ rotulo, Icon, tela: destino }) =>
-          destino ? (
-            <button
-              key={rotulo}
-              type="button"
-              aria-current={tela === destino ? "page" : undefined}
-              onClick={() => onNavegar(destino)}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-                tela === destino
-                  ? "border-l-2 border-gold bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-              )}
-            >
-              <Icon className={cn("h-4 w-4", tela === destino && "text-gold")} />
-              {rotulo}
-            </button>
-          ) : (
-            // sem base ainda → visível, mas desabilitado e dizendo o porquê
+        {NAV.map((item) => {
+          const { rotulo, Icon, tela: destino, emBreve, filhos } = item;
+          // 1) item simples navegável
+          if (destino) {
+            return (
+              <button
+                key={rotulo}
+                type="button"
+                aria-current={tela === destino ? "page" : undefined}
+                onClick={() => onNavegar(destino)}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                  tela === destino
+                    ? "border-l-2 border-gold bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                )}
+              >
+                <Icon className={cn("h-4 w-4", tela === destino && "text-gold")} />
+                {rotulo}
+              </button>
+            );
+          }
+          // 2) grupo com sub-itens (expansível, como no print)
+          if (filhos) {
+            const estaAberto = aberto === rotulo;
+            const filhoAtivo = filhos.some((f) => f.tela === tela);
+            return (
+              <div key={rotulo}>
+                <button
+                  type="button"
+                  aria-expanded={estaAberto}
+                  onClick={() => setAberto(estaAberto ? null : rotulo)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                    filhoAtivo
+                      ? "text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  )}
+                >
+                  <Icon className={cn("h-4 w-4", filhoAtivo && "text-gold")} />
+                  {rotulo}
+                  {estaAberto ? (
+                    <ChevronDown className="ml-auto h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="ml-auto h-3.5 w-3.5" />
+                  )}
+                </button>
+                {estaAberto && (
+                  <div className="mt-1 space-y-0.5 pl-4">
+                    {filhos.map((f) => (
+                      <button
+                        key={f.tela}
+                        type="button"
+                        aria-current={tela === f.tela ? "page" : undefined}
+                        onClick={() => onNavegar(f.tela)}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-md border-l-2 px-3 py-1.5 text-[13px] transition-colors",
+                          tela === f.tela
+                            ? "border-gold bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                            : "border-sidebar-border/40 text-sidebar-foreground/60 hover:text-sidebar-foreground",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full",
+                            tela === f.tela ? "bg-gold" : "bg-sidebar-foreground/40",
+                          )}
+                        />
+                        {f.rotulo}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          // 3) sem base ainda → visível, desabilitado, dizendo o porquê
+          return (
             <div
               key={rotulo}
               aria-disabled="true"
               title="Este módulo ainda não tem base no produto — em breve."
-              className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/50"
+              className={cn(
+                "flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/50",
+                !emBreve && "",
+              )}
             >
               <Icon className="h-4 w-4" />
               {rotulo}
               <EmBreve className="ml-auto" />
             </div>
-          ),
-        )}
+          );
+        })}
       </nav>
       <div className="border-t border-sidebar-border p-4">
         <Link
@@ -305,7 +399,7 @@ export function AdminPanel({ email }: { email: string }) {
   const usuarios = painel?.usuarios ?? [];
   const snapshot = painel?.snapshot ?? null;
 
-  if (tela === "staff" || tela === "users") {
+  if (tela !== "dashboard") {
     return (
       <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar tela={tela} onNavegar={setTela} />
@@ -317,17 +411,15 @@ export function AdminPanel({ email }: { email: string }) {
                 Falha ao carregar: {erro}
               </p>
             )}
-            {tela === "staff" ? (
-              <>
-                <AdminRoles roles={painel?.roles ?? []} onMudou={recarregar} />
-                <AdminStaffs staffs={painel?.staffs ?? []} onMudou={recarregar} />
-              </>
-            ) : (
-              <>
-                <AdminAllUsers usuarios={painel?.usuarios ?? []} onMudou={recarregar} />
-                <AdminSubscribers />
-              </>
+            {tela === "roles" && <AdminRoles roles={painel?.roles ?? []} onMudou={recarregar} />}
+            {tela === "staffs" && (
+              <AdminStaffs staffs={painel?.staffs ?? []} onMudou={recarregar} />
             )}
+            {tela === "all-users" && (
+              <AdminAllUsers usuarios={painel?.usuarios ?? []} onMudou={recarregar} />
+            )}
+            {tela === "subscribers" && <AdminSubscribers />}
+            {tela === "plans" && <AdminPlanos planos={painel?.planos ?? []} onMudou={recarregar} />}
           </main>
         </div>
       </div>
@@ -353,7 +445,7 @@ export function AdminPanel({ email }: { email: string }) {
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               {/* ação REAL: leva à tela de usuários da plataforma */}
               <button
-                onClick={() => setTela("users")}
+                onClick={() => setTela("all-users")}
                 className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/15"
               >
                 <Users className="h-3.5 w-3.5" /> Gerenciar usuários

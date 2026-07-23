@@ -120,6 +120,45 @@ try {
     "staff_add em papel desligado → negado",
   );
   await chamar(jwtDono, { acao: "role_toggle", papel: "sdr", ativo: true }); // restaura
+
+  // ── PLANOS (etapa 5): CRUD grava de verdade ──
+  const rNovo = await chamar(jwtDono, {
+    acao: "plano_upsert",
+    plano: { nome: "[TESTE] Plano X", preco: 7.5, periodo: "mensal", limite_leads: 10 },
+  });
+  const jNovo = await rNovo.json();
+  T(jNovo.ok === true && !!jNovo.id, "plano_upsert cria plano no banco", JSON.stringify(jNovo));
+  const planoId = jNovo.id;
+  limpeza.push(() => admin.from("planos").delete().eq("id", planoId));
+  const { data: p1 } = await admin
+    .from("planos")
+    .select("nome, preco, limite_leads, ativo")
+    .eq("id", planoId)
+    .single();
+  T(
+    p1.nome === "[TESTE] Plano X" && Number(p1.preco) === 7.5 && p1.limite_leads === 10,
+    "plano gravado com os campos certos",
+    JSON.stringify(p1),
+  );
+  await chamar(jwtDono, {
+    acao: "plano_upsert",
+    plano: { id: planoId, nome: "[TESTE] Plano X2", preco: 8, periodo: "mensal" },
+  });
+  const { data: p2 } = await admin.from("planos").select("nome").eq("id", planoId).single();
+  T(p2.nome === "[TESTE] Plano X2", "plano_upsert com id EDITA (não duplica)");
+  await chamar(jwtDono, { acao: "plano_toggle", id: planoId, ativo: false });
+  const { data: p3 } = await admin.from("planos").select("ativo").eq("id", planoId).single();
+  T(p3.ativo === false, "plano_toggle desativa o plano");
+  const rDel = await chamar(jwtDono, { acao: "plano_delete", id: planoId });
+  T((await rDel.json()).ok === true, "plano_delete remove plano sem org vinculada");
+  // proteção: não apaga plano em uso (o Starter tem 3 orgs)
+  const { data: starter } = await admin.from("planos").select("id").eq("nome", "Starter").single();
+  const rProt = await chamar(jwtDono, { acao: "plano_delete", id: starter.id });
+  const jProt = await rProt.json();
+  T(jProt.ok === false && jProt.reason === "plano_em_uso", "não exclui plano EM USO por orgs");
+  // guard: não-super-admin não mexe em planos
+  const rForaPlano = await chamar(jwtFora, { acao: "plano_toggle", id: starter.id, ativo: false });
+  T(rForaPlano.status === 403, "não-super-admin em planos → 403");
 } catch (e) {
   fail++;
   console.error("\n\x1b[31mERRO FATAL\x1b[0m", e.message);

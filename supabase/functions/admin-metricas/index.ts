@@ -104,6 +104,7 @@ Deno.serve(async (req) => {
     clPorCampanha,
     enviosPorCampanha,
     propostasEnviadas,
+    planosRows,
   ] = await Promise.all([
     contar(admin.from("leads").select("id", head)),
     admin.from("campanhas").select("status"),
@@ -153,6 +154,12 @@ Deno.serve(async (req) => {
     admin.from("campanha_leads").select("campanha_id"),
     admin.from("wa_envios").select("campanha_id"),
     admin.from("propostas").select("campanha_id").eq("status", "enviada"),
+    admin
+      .from("planos")
+      .select(
+        "id, nome, descricao, preco, periodo, limite_leads, limite_sites, limite_campanhas, limite_whatsapp, limite_templates, limite_segmentos, ativo, ordem",
+      )
+      .order("ordem", { ascending: true }),
   ]);
 
   const campanhasStatus = new Map<string, number>();
@@ -276,5 +283,7 @@ Deno.serve(async (req) => {
     }),
     // tela Subscribers: sem base de newsletter no produto → o painel mostra "Em breve"
     subscribers: null,
+    // tela Planos: catálogo real (planos)
+    planos: (planosRows.data ?? []) as Rec[],
   });
 });
