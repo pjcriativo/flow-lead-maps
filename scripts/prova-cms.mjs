@@ -72,7 +72,15 @@ try {
     hero_titulo_destaque: "PALAVRA-TESTE",
     cta_final_botao: "Botão de Teste",
     planos_json: [
-      { name: "Plano Teste", monthly: 7, yearly: 70, yearlyMonthly: "5,83", blurb: "x", cta: "Ir", features: ["a", "b"] },
+      {
+        name: "Plano Teste",
+        monthly: 7,
+        yearly: 70,
+        yearlyMonthly: "5,83",
+        blurb: "x",
+        cta: "Ir",
+        features: ["a", "b"],
+      },
     ],
   };
   const rSalvar = await chamarJson(jwtDono, { acao: "cms_salvar", ...teste });
@@ -100,7 +108,8 @@ try {
     erroPublico?.message ?? JSON.stringify(leituraPublica),
   );
   T(
-    Array.isArray(leituraPublica?.planos_json) && leituraPublica.planos_json[0]?.name === "Plano Teste",
+    Array.isArray(leituraPublica?.planos_json) &&
+      leituraPublica.planos_json[0]?.name === "Plano Teste",
     "planos_json chega intacto pro visitante anônimo (planos exibidos em /pricing)",
   );
 

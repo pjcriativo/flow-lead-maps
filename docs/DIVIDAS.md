@@ -24,6 +24,19 @@ plugar depois, o modelo já está pronto:
 **Até lá:** os planos funcionam como limite operacional (freio de uso), não como
 cobrança. Ninguém é cobrado; o `preco` dos planos é só catálogo.
 
+**Política de inadimplência (decidida pelo dono em 2026-07-23, gateway ainda
+não escolhido):** assinatura vencida/inadimplente → **bloquear acesso até
+regularizar**. Refinamento ainda a decidir na implementação: bloquear as
+AÇÕES (busca, disparo, publicação) mas manter os DADOS visíveis (leads,
+propostas, histórico) — por dois motivos: (a) atrito de cobrança — corte total
+some com a chance de o cliente regularizar por conta própria vendo o que
+perderia; (b) LGPD — o titular tem direito de acesso aos próprios dados mesmo
+com a conta em atraso, então apagar/esconder tudo é o caminho errado. Quando o
+gateway for escolhido, implementar o bloqueio de ação reusando o mesmo padrão
+de `consumir_ou_bloquear` (nova condição: assinatura em dia), não um mecanismo
+novo. Tela `/admin` → Pagamentos já existe com o estado honesto (o que está
+pronto vs. o que falta) — ver `AdminPagamentos.tsx`.
+
 ## 1. Gasto Apify CEGO anterior ao livro-caixa (registrada em 2026-07-22)
 
 **O que é:** as 2 buscas de Maps via provider `apify` feitas ANTES do livro-caixa

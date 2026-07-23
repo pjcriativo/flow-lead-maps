@@ -56,6 +56,7 @@ import { AdminRelatorios } from "./AdminRelatorios";
 import { AdminConfiguracoes } from "./AdminConfiguracoes";
 import { AdminNotificacoes } from "./AdminNotificacoes";
 import { AdminCms } from "./AdminCms";
+import { AdminPagamentos } from "./AdminPagamentos";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
@@ -70,7 +71,8 @@ type TelaAdmin =
   | "relatorios"
   | "configuracoes"
   | "notificacoes"
-  | "cms";
+  | "cms"
+  | "pagamentos";
 
 type ItemNav = {
   rotulo: string;
@@ -100,7 +102,7 @@ const NAV: ItemNav[] = [
     ],
   },
   { rotulo: "Planos", Icon: Tag, tela: "plans" },
-  { rotulo: "Pagamentos", Icon: Wallet, emBreve: true },
+  { rotulo: "Pagamentos", Icon: Wallet, tela: "pagamentos" },
   { rotulo: "Relatórios", Icon: BarChart3, tela: "relatorios" },
   { rotulo: "Suporte", Icon: LifeBuoy, tela: "tickets" },
   { rotulo: "Notificações", Icon: Bell, tela: "notificacoes" },
@@ -443,6 +445,7 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "configuracoes" && <AdminConfiguracoes />}
             {tela === "notificacoes" && <AdminNotificacoes />}
             {tela === "cms" && <AdminCms />}
+            {tela === "pagamentos" && <AdminPagamentos />}
           </main>
         </div>
       </div>
