@@ -252,6 +252,129 @@ Deno.serve(async (req) => {
       return json({ ok: true, ticket_id: ticketId, status });
     }
 
+    // ── RELATÓRIOS (todas as orgs; dado real, nada inventado) ──
+    // ⚠️ o funil usa o STATUS ATUAL do lead (não há histórico de estágios) — é uma aproximação
+    // honesta: um lead que chegou a "proposta enviada" e depois foi marcado 'lost' conta em
+    // "perdido", não em "proposta enviada". Documentado também na tela.
+    if (acao === "relatorios_ler") {
+      const desde = typeof b.desde === "string" ? b.desde : null;
+      const ate = typeof b.ate === "string" ? b.ate : null;
+      const filtroData = (q: ReturnType<typeof admin.from>) => {
+        let r = q;
+        if (desde) r = r.gte("created_at", desde);
+        if (ate) r = r.lte("created_at", ate);
+        return r;
+      };
+
+      const { data: leadsRows } = await filtroData(
+        admin.from("leads").select("origem_fonte, origem_estrategia, status, motivo_perda"),
+      );
+      const porFonte = new Map<string, number>();
+      const porEstrategia = new Map<string, number>();
+      const porMotivo = new Map<string, number>();
+      let novos = 0,
+        contatados = 0,
+        propostaEnviada = 0,
+        respondeu = 0,
+        ganho = 0,
+        perdido = 0;
+      for (const r of leadsRows ?? []) {
+        const fonte = (r.origem_fonte as string | null) ?? "google_maps";
+        porFonte.set(fonte, (porFonte.get(fonte) ?? 0) + 1);
+        if (r.origem_estrategia)
+          porEstrategia.set(
+            r.origem_estrategia as string,
+            (porEstrategia.get(r.origem_estrategia as string) ?? 0) + 1,
+          );
+        const st = r.status as string;
+        if (["new", "enriched"].includes(st)) novos++;
+        if (!["new", "enriched"].includes(st)) contatados++;
+        if (["proposta_enviada", "responded", "meeting", "won"].includes(st)) propostaEnviada++;
+        if (["responded", "meeting", "won"].includes(st)) respondeu++;
+        if (st === "won") ganho++;
+        if (["lost", "nurture"].includes(st)) {
+          perdido++;
+          if (r.motivo_perda)
+            porMotivo.set(
+              r.motivo_perda as string,
+              (porMotivo.get(r.motivo_perda as string) ?? 0) + 1,
+            );
+        }
+      }
+
+      // consumo do mês vs limite do plano, por org
+      const mesRef = new Date().toISOString().slice(0, 7);
+      const { data: orgsRows } = await admin
+        .from("orgs")
+        .select("id, nome, plano_id, dono_user_id");
+      const { data: planosRows } = await admin
+        .from("planos")
+        .select("id, nome, limite_leads, limite_sites, limite_mensagens, limite_campanhas");
+      const planoDe = new Map((planosRows ?? []).map((p: Rec) => [String(p.id), p]));
+      const { data: consumoRows } = await admin
+        .from("consumo_org")
+        .select("org_id, leads, sites, mensagens, campanhas")
+        .eq("mes_ref", mesRef);
+      const consumoDe = new Map((consumoRows ?? []).map((c: Rec) => [String(c.org_id), c]));
+      // dono é super_admin da PLATAFORMA → ilimitado de verdade (mesma regra de limite_plano
+      // no SQL). Mostrar o limite bruto do plano aqui seria MENTIR sobre o que é aplicado.
+      const donoIds = [...new Set((orgsRows ?? []).map((o: Rec) => String(o.dono_user_id)))];
+      const { data: perfisDono } = donoIds.length
+        ? await admin.from("profiles").select("id, is_super_admin").in("id", donoIds)
+        : { data: [] as Rec[] };
+      const superDe = new Map(
+        (perfisDono ?? []).map((p: Rec) => [String(p.id), p.is_super_admin === true]),
+      );
+      const consumoPorOrg = (orgsRows ?? []).map((o: Rec) => {
+        const plano = planoDe.get(String(o.plano_id)) as Rec | undefined;
+        const ilimitada = superDe.get(String(o.dono_user_id)) === true;
+        const consumo = (consumoDe.get(String(o.id)) as Rec | undefined) ?? {
+          leads: 0,
+          sites: 0,
+          mensagens: 0,
+          campanhas: 0,
+        };
+        const lim = (v: unknown) => (ilimitada ? null : (v as number | null));
+        return {
+          org: o.nome,
+          plano: ilimitada
+            ? `${plano?.nome ?? "—"} (super admin: ilimitado)`
+            : (plano?.nome ?? "—"),
+          leads: { usado: consumo.leads, limite: lim(plano?.limite_leads) },
+          sites: { usado: consumo.sites, limite: lim(plano?.limite_sites) },
+          mensagens: { usado: consumo.mensagens, limite: lim(plano?.limite_mensagens) },
+          campanhas: { usado: consumo.campanhas, limite: lim(plano?.limite_campanhas) },
+        };
+      });
+
+      // gasto por mês (livro-caixa) — últimos 12 meses de referência que tiverem linha
+      const { data: gastoRows } = await admin.from("redes_buscas").select("mes_ref, custo_usd");
+      const gastoPorMesMap = new Map<string, number>();
+      for (const r of gastoRows ?? [])
+        gastoPorMesMap.set(
+          r.mes_ref as string,
+          (gastoPorMesMap.get(r.mes_ref as string) ?? 0) + Number(r.custo_usd ?? 0),
+        );
+      const gastoPorMes = [...gastoPorMesMap.entries()]
+        .sort((a, b2) => a[0].localeCompare(b2[0]))
+        .map(([mes_ref, total_usd]) => ({ mes_ref, total_usd }));
+
+      return json({
+        ok: true,
+        periodo: { desde, ate },
+        leadsPorFonte: [...porFonte.entries()].map(([fonte, total]) => ({ fonte, total })),
+        leadsPorEstrategia: [...porEstrategia.entries()]
+          .sort((a, b2) => b2[1] - a[1])
+          .map(([estrategia, total]) => ({ estrategia, total })),
+        funil: { novos, contatados, propostaEnviada, respondeu, ganho, perdido },
+        motivosPerda: [...porMotivo.entries()]
+          .sort((a, b2) => b2[1] - a[1])
+          .map(([motivo, total]) => ({ motivo, total })),
+        consumoPorOrg,
+        gastoPorMes,
+      });
+    }
+
     return json({ ok: false, reason: "acao_desconhecida" });
   } catch (e) {
     return json({ ok: false, reason: "erro", detalhe: e instanceof Error ? e.message : String(e) });

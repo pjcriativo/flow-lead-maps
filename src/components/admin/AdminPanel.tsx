@@ -52,11 +52,19 @@ import { AdminRoles, AdminStaffs } from "./AdminStaffRoles";
 import { AdminAllUsers, AdminSubscribers } from "./AdminUsers";
 import { AdminPlanos } from "./AdminPlanos";
 import { AdminTickets } from "./AdminTickets";
+import { AdminRelatorios } from "./AdminRelatorios";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
 type TelaAdmin =
-  "dashboard" | "roles" | "staffs" | "all-users" | "subscribers" | "plans" | "tickets";
+  | "dashboard"
+  | "roles"
+  | "staffs"
+  | "all-users"
+  | "subscribers"
+  | "plans"
+  | "tickets"
+  | "relatorios";
 
 type ItemNav = {
   rotulo: string;
@@ -87,7 +95,7 @@ const NAV: ItemNav[] = [
   },
   { rotulo: "Planos", Icon: Tag, tela: "plans" },
   { rotulo: "Pagamentos", Icon: Wallet, emBreve: true },
-  { rotulo: "Relatórios", Icon: BarChart3, emBreve: true },
+  { rotulo: "Relatórios", Icon: BarChart3, tela: "relatorios" },
   { rotulo: "Suporte", Icon: LifeBuoy, tela: "tickets" },
   { rotulo: "Configurações", Icon: Settings, emBreve: true },
 ];
@@ -423,6 +431,7 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "subscribers" && <AdminSubscribers />}
             {tela === "plans" && <AdminPlanos planos={painel?.planos ?? []} onMudou={recarregar} />}
             {tela === "tickets" && <AdminTickets />}
+            {tela === "relatorios" && <AdminRelatorios />}
           </main>
         </div>
       </div>
