@@ -505,6 +505,46 @@ Deno.serve(async (req) => {
       return json({ ok: true, removido: id });
     }
 
+    // cms_ler / cms_salvar — conteúdo da landing PÚBLICA (site_conteudo). A leitura pública
+    // (/, /pricing) é direta por RLS (não passa por edge); aqui é só a ESCRITA do admin.
+    if (acao === "cms_ler") {
+      const { data } = await admin.from("site_conteudo").select("*").eq("id", true).maybeSingle();
+      return json({ ok: true, conteudo: data ?? {} });
+    }
+
+    if (acao === "cms_salvar") {
+      const CAMPOS_TEXTO = [
+        "hero_badge",
+        "hero_titulo",
+        "hero_titulo_destaque",
+        "hero_subtitulo",
+        "hero_cta_primario",
+        "hero_cta_secundario",
+        "hero_disclaimer",
+        "features_titulo",
+        "features_subtitulo",
+        "cta_final_titulo",
+        "cta_final_subtitulo",
+        "cta_final_botao",
+        "footer_texto",
+      ] as const;
+      const patch: Rec = {};
+      for (const campo of CAMPOS_TEXTO) {
+        if (campo in b) {
+          const v = b[campo];
+          patch[campo] = typeof v === "string" && v.trim() ? v.trim() : null;
+        }
+      }
+      if ("planos_json" in b) {
+        patch.planos_json = Array.isArray(b.planos_json) ? b.planos_json : null;
+      }
+      if (Object.keys(patch).length === 0) return json({ ok: false, reason: "nada_para_salvar" });
+      patch.atualizado_em = new Date().toISOString();
+      const { error } = await admin.from("site_conteudo").update(patch).eq("id", true);
+      if (error) return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
+      return json({ ok: true });
+    }
+
     return json({ ok: false, reason: "acao_desconhecida" });
   } catch (e) {
     return json({ ok: false, reason: "erro", detalhe: e instanceof Error ? e.message : String(e) });

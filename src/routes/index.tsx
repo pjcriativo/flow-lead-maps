@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   MapPin,
@@ -13,6 +14,38 @@ import {
 } from "lucide-react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { SiteFooter } from "@/components/SiteFooter";
+import { supabase } from "@/integrations/supabase/client";
+
+// ⚙️ CMS (admin → Conteúdos do site): cada campo abaixo cai no texto PADRÃO daqui se a
+// linha/campo não existir em site_conteudo — "não construído" nunca vira tela em branco.
+type SiteConteudo = {
+  hero_badge: string | null;
+  hero_titulo: string | null;
+  hero_titulo_destaque: string | null;
+  hero_subtitulo: string | null;
+  hero_cta_primario: string | null;
+  hero_cta_secundario: string | null;
+  hero_disclaimer: string | null;
+  features_titulo: string | null;
+  features_subtitulo: string | null;
+  cta_final_titulo: string | null;
+  cta_final_subtitulo: string | null;
+  cta_final_botao: string | null;
+};
+function useConteudo() {
+  const [c, setC] = useState<SiteConteudo | null>(null);
+  useEffect(() => {
+    supabase
+      .from("site_conteudo")
+      .select(
+        "hero_badge, hero_titulo, hero_titulo_destaque, hero_subtitulo, hero_cta_primario, hero_cta_secundario, hero_disclaimer, features_titulo, features_subtitulo, cta_final_titulo, cta_final_subtitulo, cta_final_botao",
+      )
+      .eq("id", true)
+      .maybeSingle()
+      .then(({ data }) => setC(data ?? null));
+  }, []);
+  return c;
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -44,7 +77,23 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+const TITULO_PADRAO = "Descubra e pesquise empresas locais no {destaque} em segundos.";
+const DESTAQUE_PADRAO = "Google Maps";
+
+function renderHeroTitulo(titulo: string, destaque: string) {
+  const partes = titulo.split("{destaque}");
+  if (partes.length !== 2) return <>{titulo}</>;
+  return (
+    <>
+      {partes[0]}
+      <span className="text-primary">{destaque}</span>
+      {partes[1]}
+    </>
+  );
+}
+
 function Index() {
+  const conteudo = useConteudo();
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -78,30 +127,34 @@ function Index() {
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm">
               <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              Inteligência de negócios para agências e profissionais modernos
+              {conteudo?.hero_badge ||
+                "Inteligência de negócios para agências e profissionais modernos"}
             </div>
             <h1 className="text-balance text-5xl font-semibold tracking-tight md:text-6xl">
-              Descubra e pesquise empresas locais no{" "}
-              <span className="text-primary">Google Maps</span> em segundos.
+              {renderHeroTitulo(
+                conteudo?.hero_titulo || TITULO_PADRAO,
+                conteudo?.hero_titulo_destaque || DESTAQUE_PADRAO,
+              )}
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-              Busque qualquer tipo de empresa em qualquer cidade. Tenha nomes, telefones, e-mails,
-              sites e avaliações — exportados para Excel ou Google Sheets em um clique.
+              {conteudo?.hero_subtitulo ||
+                "Busque qualquer tipo de empresa em qualquer cidade. Tenha nomes, telefones, e-mails, sites e avaliações — exportados para Excel ou Google Sheets em um clique."}
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link to="/dashboard" preload="render">
                 <Button size="lg" className="h-12 px-8 text-base shadow-[var(--shadow-elegant)]">
-                  Começar grátis <ArrowRight />
+                  {conteudo?.hero_cta_primario || "Começar grátis"} <ArrowRight />
                 </Button>
               </Link>
               <a href="#features">
                 <Button size="lg" variant="outline" className="h-12 px-8 text-base">
-                  Ver como funciona
+                  {conteudo?.hero_cta_secundario || "Ver como funciona"}
                 </Button>
               </a>
             </div>
             <p className="mt-4 text-xs text-muted-foreground">
-              Sem cartão de crédito · Pesquise 50 empresas por nossa conta
+              {conteudo?.hero_disclaimer ||
+                "Sem cartão de crédito · Pesquise 50 empresas por nossa conta"}
             </p>
           </div>
         </div>
@@ -112,11 +165,11 @@ function Index() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Tudo que você precisa para pesquisar mercados locais
+              {conteudo?.features_titulo || "Tudo que você precisa para pesquisar mercados locais"}
             </h2>
             <p className="mt-3 text-muted-foreground">
-              Feito para agências, fundadores e consultores que precisam de inteligência de negócios
-              rápido.
+              {conteudo?.features_subtitulo ||
+                "Feito para agências, fundadores e consultores que precisam de inteligência de negócios rápido."}
             </p>
           </div>
           <div className="mt-14 grid gap-6 md:grid-cols-3">
@@ -202,11 +255,11 @@ function Index() {
       <section id="pricing" className="px-6 pb-24">
         <div className="mx-auto max-w-5xl rounded-2xl bg-[var(--navy)] p-12 text-center text-[var(--navy-foreground)] shadow-[var(--shadow-card)]">
           <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-            Comece a descobrir empresas hoje
+            {conteudo?.cta_final_titulo || "Comece a descobrir empresas hoje"}
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-white/70">
-            Junte-se a milhares de agências e profissionais que pesquisam mercados locais com o Flow
-            Leads.
+            {conteudo?.cta_final_subtitulo ||
+              "Junte-se a milhares de agências e profissionais que pesquisam mercados locais com o Flow Leads."}
           </p>
           <div className="mt-8">
             <Link to="/dashboard" preload="render">
@@ -214,7 +267,7 @@ function Index() {
                 size="lg"
                 className="h-12 bg-white px-8 text-base text-[var(--navy)] hover:bg-white/90"
               >
-                Abrir Painel <ArrowRight />
+                {conteudo?.cta_final_botao || "Abrir Painel"} <ArrowRight />
               </Button>
             </Link>
           </div>

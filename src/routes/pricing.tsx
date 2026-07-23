@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Check, Minus, ArrowRight, Sparkles } from "lucide-react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { SiteFooter } from "@/components/SiteFooter";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -106,8 +107,36 @@ const COMPARISON: { label: string; values: (string | boolean)[] }[] = [
   { label: "Membros da equipe", values: ["1", "1", "1", "5"] },
 ];
 
+function ehListaDePlanosValida(v: unknown): v is Plan[] {
+  return (
+    Array.isArray(v) &&
+    v.length > 0 &&
+    v.every(
+      (p) =>
+        p &&
+        typeof p === "object" &&
+        typeof (p as Plan).name === "string" &&
+        typeof (p as Plan).monthly === "number" &&
+        Array.isArray((p as Plan).features),
+    )
+  );
+}
+
 function PricingPage() {
   const [yearly, setYearly] = useState(false);
+  // ⚙️ CMS (admin → Conteúdos do site): planos_json substitui os 4 cards padrão abaixo
+  // quando presente e com o formato certo — sem linha/campo válido, cai no PLANS fixo.
+  const [planos, setPlanos] = useState<Plan[]>(PLANS);
+  useEffect(() => {
+    supabase
+      .from("site_conteudo")
+      .select("planos_json")
+      .eq("id", true)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (ehListaDePlanosValida(data?.planos_json)) setPlanos(data.planos_json);
+      });
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -158,7 +187,7 @@ function PricingPage() {
 
       <section className="mx-auto max-w-7xl px-6 pb-20">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {PLANS.map((plan) => {
+          {planos.map((plan) => {
             const isFree = plan.monthly === 0;
             const price = isFree
               ? "R$ 0"
@@ -213,52 +242,59 @@ function PricingPage() {
         </div>
       </section>
 
-      <section className="border-t border-border bg-card/40 py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="text-center text-3xl font-semibold tracking-tight">Compare os planos</h2>
-          <p className="mt-2 text-center text-muted-foreground">Todos os recursos, lado a lado.</p>
+      {/* A tabela comparativa é indexada por posição aos 4 planos PADRÃO (COMPARISON) — se o
+          admin customizou planos_json em Conteúdos do site, essa tabela sairia de sincronia
+          com os cards acima, então ela só aparece com os planos padrão do código. */}
+      {planos === PLANS && (
+        <section className="border-t border-border bg-card/40 py-20">
+          <div className="mx-auto max-w-6xl px-6">
+            <h2 className="text-center text-3xl font-semibold tracking-tight">Compare os planos</h2>
+            <p className="mt-2 text-center text-muted-foreground">
+              Todos os recursos, lado a lado.
+            </p>
 
-          <div className="mt-10 overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-border bg-secondary/40">
-                <tr>
-                  <th className="p-4 font-medium">Recurso</th>
-                  {PLANS.map((p) => (
-                    <th key={p.name} className="p-4 font-medium">
-                      {p.name}
-                      {p.popular && (
-                        <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                          Popular
-                        </span>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON.map((row) => (
-                  <tr key={row.label} className="border-b border-border last:border-b-0">
-                    <td className="p-4 font-medium">{row.label}</td>
-                    {row.values.map((v, i) => (
-                      <td key={i} className="p-4 text-muted-foreground">
-                        {typeof v === "boolean" ? (
-                          v ? (
-                            <Check className="h-4 w-4 text-primary" />
-                          ) : (
-                            <Minus className="h-4 w-4 text-muted-foreground/50" />
-                          )
-                        ) : (
-                          <span className="text-foreground">{v}</span>
+            <div className="mt-10 overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border bg-secondary/40">
+                  <tr>
+                    <th className="p-4 font-medium">Recurso</th>
+                    {PLANS.map((p) => (
+                      <th key={p.name} className="p-4 font-medium">
+                        {p.name}
+                        {p.popular && (
+                          <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                            Popular
+                          </span>
                         )}
-                      </td>
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {COMPARISON.map((row) => (
+                    <tr key={row.label} className="border-b border-border last:border-b-0">
+                      <td className="p-4 font-medium">{row.label}</td>
+                      {row.values.map((v, i) => (
+                        <td key={i} className="p-4 text-muted-foreground">
+                          {typeof v === "boolean" ? (
+                            v ? (
+                              <Check className="h-4 w-4 text-primary" />
+                            ) : (
+                              <Minus className="h-4 w-4 text-muted-foreground/50" />
+                            )
+                          ) : (
+                            <span className="text-foreground">{v}</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <SiteFooter />
     </div>

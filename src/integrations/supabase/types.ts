@@ -1630,6 +1630,63 @@ export type Database = {
           },
         ];
       };
+      site_conteudo: {
+        Row: {
+          atualizado_em: string;
+          cta_final_botao: string | null;
+          cta_final_subtitulo: string | null;
+          cta_final_titulo: string | null;
+          features_subtitulo: string | null;
+          features_titulo: string | null;
+          footer_texto: string | null;
+          hero_badge: string | null;
+          hero_cta_primario: string | null;
+          hero_cta_secundario: string | null;
+          hero_disclaimer: string | null;
+          hero_subtitulo: string | null;
+          hero_titulo: string | null;
+          hero_titulo_destaque: string | null;
+          id: boolean;
+          planos_json: Json | null;
+        };
+        Insert: {
+          atualizado_em?: string;
+          cta_final_botao?: string | null;
+          cta_final_subtitulo?: string | null;
+          cta_final_titulo?: string | null;
+          features_subtitulo?: string | null;
+          features_titulo?: string | null;
+          footer_texto?: string | null;
+          hero_badge?: string | null;
+          hero_cta_primario?: string | null;
+          hero_cta_secundario?: string | null;
+          hero_disclaimer?: string | null;
+          hero_subtitulo?: string | null;
+          hero_titulo?: string | null;
+          hero_titulo_destaque?: string | null;
+          id?: boolean;
+          planos_json?: Json | null;
+        };
+        Update: {
+          atualizado_em?: string;
+          cta_final_botao?: string | null;
+          cta_final_subtitulo?: string | null;
+          cta_final_titulo?: string | null;
+          features_subtitulo?: string | null;
+          features_titulo?: string | null;
+          footer_texto?: string | null;
+          hero_badge?: string | null;
+          hero_cta_primario?: string | null;
+          hero_cta_secundario?: string | null;
+          hero_disclaimer?: string | null;
+          hero_subtitulo?: string | null;
+          hero_titulo?: string | null;
+          hero_titulo_destaque?: string | null;
+          id?: boolean;
+          planos_json?: Json | null;
+        };
+        Relationships: [];
+      };
       sites_publicados: {
         Row: {
           arquivos_removidos: boolean;

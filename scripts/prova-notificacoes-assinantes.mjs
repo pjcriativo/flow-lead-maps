@@ -89,7 +89,9 @@ try {
   );
   const notifId = rEnviar.notificacao_id;
   if (notifId) {
-    limpeza.push(() => admin.from("notificacao_destinatarios").delete().eq("notificacao_id", notifId));
+    limpeza.push(() =>
+      admin.from("notificacao_destinatarios").delete().eq("notificacao_id", notifId),
+    );
     limpeza.push(() => admin.from("notificacoes").delete().eq("id", notifId));
   }
 
@@ -109,7 +111,10 @@ try {
     .order("enviado_em", { ascending: false })
     .limit(5);
   const recebida = (minhas ?? []).find((n) => n.notificacoes?.titulo === titulo);
-  T(!!recebida && recebida.lida_em === null, "cliente VÊ a notificação, ainda não lida (RLS direta)");
+  T(
+    !!recebida && recebida.lida_em === null,
+    "cliente VÊ a notificação, ainda não lida (RLS direta)",
+  );
 
   // cliente marca como lida (update na própria linha)
   if (recebida) {

@@ -87,7 +87,10 @@ try {
   await pageDono.getByPlaceholder("Mensagem…").fill("Print de produção — Etapa 4.");
   await pageDono.getByRole("button", { name: "Enviar a todos" }).click();
   await pageDono.getByText(/leram/).first().waitFor({ timeout: 15000 });
-  await pageDono.screenshot({ path: join(OUT, "01-admin-notificacoes-enviada.png"), fullPage: true });
+  await pageDono.screenshot({
+    path: join(OUT, "01-admin-notificacoes-enviada.png"),
+    fullPage: true,
+  });
 
   const { data: notif } = await admin
     .from("notificacoes")
@@ -114,7 +117,10 @@ try {
   pageCliente.setDefaultTimeout(45000);
   await pageCliente.goto(`${PROD}/dashboard`, { waitUntil: "domcontentloaded" });
   await pageCliente.getByText("Notificações").first().waitFor({ timeout: 60000 });
-  await pageCliente.screenshot({ path: join(OUT, "03-cliente-badge-nao-lida.png"), fullPage: true });
+  await pageCliente.screenshot({
+    path: join(OUT, "03-cliente-badge-nao-lida.png"),
+    fullPage: true,
+  });
   await pageCliente.getByText("Notificações").first().click();
   await pageCliente.getByText("[TESTE PROVA UI] Aviso da plataforma").waitFor({ timeout: 15000 });
   await pageCliente.screenshot({ path: join(OUT, "04-cliente-notificacoes.png"), fullPage: true });
