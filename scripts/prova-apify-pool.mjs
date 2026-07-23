@@ -83,19 +83,86 @@ try {
 
   const casos = [
     // [status, corpo, esperado, descrição]
-    [403, { error: { type: "platform-feature-disabled", message: "Monthly usage hard limit exceeded" } }, "esgotada", "403 limite mensal estourado (sinal REAL observado) → esgotada"],
-    [402, { error: { type: "x402-payment-required", message: "payment required" } }, "esgotada", "402 payment required (doc oficial do POST /runs) → esgotada"],
-    [400, { error: { type: "not-enough-usage-to-run-paid-actor", message: "not enough usage" } }, "esgotada", "crédito insuficiente p/ ator PAGO → esgotada"],
-    [401, { error: { type: "user-or-token-not-found", message: "User was not found or authentication token is not valid" } }, "invalida", "401 real (capturado pelo probe) → invalida, NUNCA esgotada"],
-    [401, { error: { type: "token-not-provided", message: "Authentication token was not provided" } }, "invalida", "401 token ausente → invalida"],
-    [429, { error: { type: "rate-limit-exceeded", message: "You have exceeded the rate limit" } }, "passageira", "429 rate limit → passageira (retry na MESMA chave, não marca)"],
+    [
+      403,
+      {
+        error: { type: "platform-feature-disabled", message: "Monthly usage hard limit exceeded" },
+      },
+      "esgotada",
+      "403 limite mensal estourado (sinal REAL observado) → esgotada",
+    ],
+    [
+      402,
+      { error: { type: "x402-payment-required", message: "payment required" } },
+      "esgotada",
+      "402 payment required (doc oficial do POST /runs) → esgotada",
+    ],
+    [
+      400,
+      { error: { type: "not-enough-usage-to-run-paid-actor", message: "not enough usage" } },
+      "esgotada",
+      "crédito insuficiente p/ ator PAGO → esgotada",
+    ],
+    [
+      401,
+      {
+        error: {
+          type: "user-or-token-not-found",
+          message: "User was not found or authentication token is not valid",
+        },
+      },
+      "invalida",
+      "401 real (capturado pelo probe) → invalida, NUNCA esgotada",
+    ],
+    [
+      401,
+      { error: { type: "token-not-provided", message: "Authentication token was not provided" } },
+      "invalida",
+      "401 token ausente → invalida",
+    ],
+    [
+      429,
+      { error: { type: "rate-limit-exceeded", message: "You have exceeded the rate limit" } },
+      "passageira",
+      "429 rate limit → passageira (retry na MESMA chave, não marca)",
+    ],
     [500, {}, "passageira", "5xx → passageira (não marca)"],
     [0, "fetch failed", "passageira", "falha de rede → passageira (não marca)"],
-    [408, { error: { type: "run-timeout-exceeded" } }, "passageira", "408 timeout de endpoint → passageira"],
-    [200, { error: { type: "concurrent-runs-limit-exceeded" } }, "passageira", "concorrência estourada → passageira (resolve sozinho, NÃO é crédito)"],
-    [403, { error: { type: "insufficient-permissions", message: "You do not have permission to perform this action" } }, "outro", "403 de PERMISSÃO → outro (marcar aqui queimaria o pool à toa)"],
-    [404, { error: { type: "record-not-found", message: "Actor with this name was not found" } }, "outro", "404 ator inexistente → outro (erro da operação, não da chave)"],
-    [400, { error: { type: "invalid-input", message: "Input is not valid" } }, "outro", "400 input inválido → outro"],
+    [
+      408,
+      { error: { type: "run-timeout-exceeded" } },
+      "passageira",
+      "408 timeout de endpoint → passageira",
+    ],
+    [
+      200,
+      { error: { type: "concurrent-runs-limit-exceeded" } },
+      "passageira",
+      "concorrência estourada → passageira (resolve sozinho, NÃO é crédito)",
+    ],
+    [
+      403,
+      {
+        error: {
+          type: "insufficient-permissions",
+          message: "You do not have permission to perform this action",
+        },
+      },
+      "outro",
+      "403 de PERMISSÃO → outro (marcar aqui queimaria o pool à toa)",
+    ],
+    [
+      404,
+      { error: { type: "record-not-found", message: "Actor with this name was not found" } },
+      "outro",
+      "404 ator inexistente → outro (erro da operação, não da chave)",
+    ],
+    [
+      400,
+      { error: { type: "invalid-input", message: "Input is not valid" } },
+      "outro",
+      "400 input inválido → outro",
+    ],
   ];
   for (const [status, corpo, esperado, desc] of casos) {
     const got = classificarErroApify(status, corpo);
@@ -117,8 +184,14 @@ try {
   );
   T(creditoRestanteDeLimits({}) === null, "limits ilegível → null (nunca chuta)");
 
-  T(runMortoSuspeito("ABORTED", false) === true, "run ABORTED que NÃO abortamos → suspeito (vai ao árbitro)");
-  T(runMortoSuspeito("ABORTED", true) === false, "run ABORTED por NÓS (teto) → não é suspeito (não marca chave)");
+  T(
+    runMortoSuspeito("ABORTED", false) === true,
+    "run ABORTED que NÃO abortamos → suspeito (vai ao árbitro)",
+  );
+  T(
+    runMortoSuspeito("ABORTED", true) === false,
+    "run ABORTED por NÓS (teto) → não é suspeito (não marca chave)",
+  );
   T(runMortoSuspeito("SUCCEEDED", false) === false, "run SUCCEEDED → nunca suspeito");
 
   console.log("\n\x1b[1m═══ BLOCO 2 — produção (rodízio de verdade) ═══\x1b[0m");
@@ -142,9 +215,7 @@ try {
   const linhaFake = (rL1.chaves ?? []).find((c) => c.apelido === "prova-invalida");
   idInvalida = linhaFake?.id ?? null;
   T(
-    !!linhaFake &&
-      linhaFake.ultimos4 === FAKE.slice(-4) &&
-      !JSON.stringify(rL1).includes(FAKE),
+    !!linhaFake && linhaFake.ultimos4 === FAKE.slice(-4) && !JSON.stringify(rL1).includes(FAKE),
     "pool_listar mostra só últimos4/status — o valor NUNCA volta",
   );
   const { data: noBanco } = await admin
@@ -170,7 +241,9 @@ try {
     "status virou 'invalida' — NÃO 'esgotada' (é erro de cadastro, não crédito)",
   );
   T(
-    (rL2.auditoria ?? []).some((a) => a.apelido === "prova-invalida" && a.acao === "invalida_teste"),
+    (rL2.auditoria ?? []).some(
+      (a) => a.apelido === "prova-invalida" && a.acao === "invalida_teste",
+    ),
     "auditoria registrou a invalidação (quem/quando)",
   );
 

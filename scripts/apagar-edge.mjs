@@ -21,5 +21,7 @@ const r = await fetch(`https://api.supabase.com/v1/projects/${REF}/functions/${s
   method: "DELETE",
   headers: { Authorization: `Bearer ${TOKEN}` },
 });
-console.log(r.ok ? `OK: edge "${slug}" apagada do servidor` : `HTTP ${r.status}: ${await r.text()}`);
+console.log(
+  r.ok ? `OK: edge "${slug}" apagada do servidor` : `HTTP ${r.status}: ${await r.text()}`,
+);
 process.exit(r.ok ? 0 : 1);

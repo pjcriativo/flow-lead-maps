@@ -304,7 +304,7 @@ function Kpi({
     navy: "bg-navy/5 text-navy",
   }[tom];
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)] transition-all duration-200 hover:-translate-y-0.5 hover:border-gold/30 hover:shadow-lg">
       <div className="flex items-start gap-3">
         <span
           className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", cores)}
