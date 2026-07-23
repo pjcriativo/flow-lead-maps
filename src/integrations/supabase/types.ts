@@ -363,37 +363,112 @@ export type Database = {
           },
         ];
       };
+      config_chaves: {
+        Row: {
+          atualizado_em: string;
+          atualizado_por: string | null;
+          id: string;
+          nome: string;
+          ultimos4: string;
+          valor_cifrado: string;
+        };
+        Insert: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          id?: string;
+          nome: string;
+          ultimos4: string;
+          valor_cifrado: string;
+        };
+        Update: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          id?: string;
+          nome?: string;
+          ultimos4?: string;
+          valor_cifrado?: string;
+        };
+        Relationships: [];
+      };
+      config_chaves_auditoria: {
+        Row: {
+          alterado_em: string;
+          alterado_por: string | null;
+          id: string;
+          nome: string;
+        };
+        Insert: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          id?: string;
+          nome: string;
+        };
+        Update: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          id?: string;
+          nome?: string;
+        };
+        Relationships: [];
+      };
       config_plataforma: {
         Row: {
           atualizado_em: string;
+          cadastro_usuario_ativo: boolean;
           dias_validade_site: number | null;
+          favicon_url: string | null;
+          fonte_leads_padrao: string | null;
           id: boolean;
           intervalo_disparo_max_seg: number | null;
           intervalo_disparo_min_seg: number | null;
+          logo_url: string | null;
+          max_leads_busca: number | null;
+          modelo_ia: string | null;
+          modo_manutencao_ativo: boolean;
+          nome_plataforma: string | null;
           remetente_email_padrao: string | null;
           remetente_nome_padrao: string | null;
+          termos_condicoes_ativo: boolean;
           teto_mes_usd: number | null;
           teto_rodada_usd: number | null;
         };
         Insert: {
           atualizado_em?: string;
+          cadastro_usuario_ativo?: boolean;
           dias_validade_site?: number | null;
+          favicon_url?: string | null;
+          fonte_leads_padrao?: string | null;
           id?: boolean;
           intervalo_disparo_max_seg?: number | null;
           intervalo_disparo_min_seg?: number | null;
+          logo_url?: string | null;
+          max_leads_busca?: number | null;
+          modelo_ia?: string | null;
+          modo_manutencao_ativo?: boolean;
+          nome_plataforma?: string | null;
           remetente_email_padrao?: string | null;
           remetente_nome_padrao?: string | null;
+          termos_condicoes_ativo?: boolean;
           teto_mes_usd?: number | null;
           teto_rodada_usd?: number | null;
         };
         Update: {
           atualizado_em?: string;
+          cadastro_usuario_ativo?: boolean;
           dias_validade_site?: number | null;
+          favicon_url?: string | null;
+          fonte_leads_padrao?: string | null;
           id?: boolean;
           intervalo_disparo_max_seg?: number | null;
           intervalo_disparo_min_seg?: number | null;
+          logo_url?: string | null;
+          max_leads_busca?: number | null;
+          modelo_ia?: string | null;
+          modo_manutencao_ativo?: boolean;
+          nome_plataforma?: string | null;
           remetente_email_padrao?: string | null;
           remetente_nome_padrao?: string | null;
+          termos_condicoes_ativo?: boolean;
           teto_mes_usd?: number | null;
           teto_rodada_usd?: number | null;
         };

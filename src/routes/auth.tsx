@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { Eye, EyeOff } from "lucide-react";
 import { posthog } from "@/lib/posthog";
+import { lerConfigPublica } from "@/services/config-publica";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -27,10 +28,18 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
+  const [cadastroAtivo, setCadastroAtivo] = useState(true);
+  const [termosAtivo, setTermosAtivo] = useState(false);
+  const [aceitouTermos, setAceitouTermos] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) navigate({ to: "/dashboard", replace: true });
+    });
+    // ⚙️ Configurações (admin → Painel de controle): cadastro de usuário / termos e condições.
+    lerConfigPublica().then((c) => {
+      setCadastroAtivo(c.cadastro_usuario_ativo);
+      setTermosAtivo(c.termos_condicoes_ativo);
     });
   }, [navigate]);
 
@@ -49,6 +58,14 @@ function AuthPage() {
         return;
       }
       if (mode === "signup") {
+        if (!cadastroAtivo) {
+          setError("Cadastro de novos usuários está temporariamente desativado.");
+          return;
+        }
+        if (termosAtivo && !aceitouTermos) {
+          setError("Você precisa aceitar os Termos e Condições para criar uma conta.");
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -149,6 +166,22 @@ function AuthPage() {
               </label>
             </div>
           )}
+          {mode === "signup" && termosAtivo && (
+            <label className="flex items-start gap-2 text-xs text-muted-foreground select-none">
+              <input
+                type="checkbox"
+                checked={aceitouTermos}
+                onChange={(e) => setAceitouTermos(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 rounded border-border"
+              />
+              <span>
+                Li e aceito os{" "}
+                <Link to="/terms" target="_blank" className="underline hover:text-foreground">
+                  Termos e Condições
+                </Link>
+              </span>
+            </label>
+          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           {info && <p className="text-sm text-emerald-600">{info}</p>}
           <Button type="submit" className="w-full" disabled={loading}>
@@ -161,21 +194,23 @@ function AuthPage() {
                   : "Enviar link de redefinição"}
           </Button>
         </form>
-        <button
-          type="button"
-          className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
-          onClick={() => {
-            setError(null);
-            setInfo(null);
-            setMode(mode === "signin" ? "signup" : "signin");
-          }}
-        >
-          {mode === "signin"
-            ? "Não tem conta? Cadastre-se"
-            : mode === "signup"
-              ? "Já tem conta? Entrar"
-              : "Voltar para entrar"}
-        </button>
+        {(mode !== "signin" || cadastroAtivo) && (
+          <button
+            type="button"
+            className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setError(null);
+              setInfo(null);
+              setMode(mode === "signin" ? "signup" : "signin");
+            }}
+          >
+            {mode === "signin"
+              ? "Não tem conta? Cadastre-se"
+              : mode === "signup"
+                ? "Já tem conta? Entrar"
+                : "Voltar para entrar"}
+          </button>
+        )}
       </div>
     </div>
   );

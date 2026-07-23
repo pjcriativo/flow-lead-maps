@@ -12,6 +12,8 @@ export type ConfigPlataforma = {
   remetente_email_padrao: string | null;
   intervalo_disparo_min_seg: number | null;
   intervalo_disparo_max_seg: number | null;
+  max_leads_busca: number | null;
+  modelo_ia: string | null;
 };
 
 const VAZIA: ConfigPlataforma = {
@@ -22,6 +24,8 @@ const VAZIA: ConfigPlataforma = {
   remetente_email_padrao: null,
   intervalo_disparo_min_seg: null,
   intervalo_disparo_max_seg: null,
+  max_leads_busca: null,
+  modelo_ia: null,
 };
 
 export async function lerConfigPlataforma(client: Client): Promise<ConfigPlataforma> {
@@ -29,7 +33,7 @@ export async function lerConfigPlataforma(client: Client): Promise<ConfigPlatafo
     const { data } = await client
       .from("config_plataforma")
       .select(
-        "teto_rodada_usd, teto_mes_usd, dias_validade_site, remetente_nome_padrao, remetente_email_padrao, intervalo_disparo_min_seg, intervalo_disparo_max_seg",
+        "teto_rodada_usd, teto_mes_usd, dias_validade_site, remetente_nome_padrao, remetente_email_padrao, intervalo_disparo_min_seg, intervalo_disparo_max_seg, max_leads_busca, modelo_ia",
       )
       .eq("id", true)
       .maybeSingle();

@@ -3,17 +3,24 @@
 // o orquestrador cai no rule-based. AI_PROVIDER força um provedor específico.
 import type { AiProvider } from "./types.ts";
 import { gerarConteudoOpenAI, setOpenAiKeyOverride } from "./openai.ts";
-import { gerarConteudoClaude, setAnthropicKeyOverride } from "./claude.ts";
+import {
+  gerarConteudoClaude,
+  setAnthropicKeyOverride,
+  setAnthropicModeloOverride,
+} from "./claude.ts";
 import { resolverChave } from "../chaves.ts";
+import { lerConfigPlataforma } from "../config.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any;
 
 /** Chamar 1x no início do handler (com o admin client) antes de getProviderChain() — aplica
- * o override do cofre de chaves nos dois provedores de IA. */
+ * o override do cofre de chaves (ANTHROPIC/OPENAI) e o modelo escolhido em Configurações. */
 export async function inicializarCofreIa(admin: Admin): Promise<void> {
   setAnthropicKeyOverride(await resolverChave(admin, "ANTHROPIC_API_KEY"));
   setOpenAiKeyOverride(await resolverChave(admin, "OPENAI_API_KEY"));
+  const config = await lerConfigPlataforma(admin);
+  setAnthropicModeloOverride(config.modelo_ia);
 }
 
 export type ProvedorNomeado = { nome: string; fn: AiProvider };

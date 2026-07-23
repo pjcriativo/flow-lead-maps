@@ -16,17 +16,21 @@ const PRECOS: Record<string, { in: number; out: number }> = {
   "claude-haiku-4-5": { in: 1, out: 5 },
 };
 
-// 🔐 Cofre de chaves: chamado 1x por request (setAnthropicKeyOverride, via ai/index.ts) —
+// 🔐 Cofre de chaves / ⚙️ Configurações: chamados 1x por request (via ai/index.ts) —
 // Deno.env.set não funciona no runtime das Edges, por isso o cache de módulo aqui.
 let _anthropicKeyCache: string | null = null;
+let _anthropicModeloCache: string | null = null;
 export function setAnthropicKeyOverride(v: string | null): void {
   _anthropicKeyCache = v;
+}
+export function setAnthropicModeloOverride(v: string | null): void {
+  _anthropicModeloCache = v;
 }
 
 export const gerarConteudoClaude: AiProvider = async (mp, nicho) => {
   const key = _anthropicKeyCache ?? Deno.env.get("ANTHROPIC_API_KEY");
   if (!key) throw new Error("ANTHROPIC_API_KEY não configurada.");
-  const modelo = Deno.env.get("ANTHROPIC_MODEL") || "claude-opus-4-8";
+  const modelo = _anthropicModeloCache || Deno.env.get("ANTHROPIC_MODEL") || "claude-opus-4-8";
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

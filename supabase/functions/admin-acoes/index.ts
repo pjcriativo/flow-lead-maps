@@ -408,8 +408,22 @@ Deno.serve(async (req) => {
         "dias_validade_site",
         "intervalo_disparo_min_seg",
         "intervalo_disparo_max_seg",
+        "max_leads_busca",
       ] as const;
-      const TEXTOS = ["remetente_nome_padrao", "remetente_email_padrao"] as const;
+      const TEXTOS = [
+        "remetente_nome_padrao",
+        "remetente_email_padrao",
+        "nome_plataforma",
+        "logo_url",
+        "favicon_url",
+        "fonte_leads_padrao",
+        "modelo_ia",
+      ] as const;
+      const BOOLEANOS = [
+        "cadastro_usuario_ativo",
+        "termos_condicoes_ativo",
+        "modo_manutencao_ativo",
+      ] as const;
       const patch: Rec = {};
       for (const campo of NUMERICOS) {
         if (campo in b) {
@@ -422,6 +436,9 @@ Deno.serve(async (req) => {
           const v = b[campo];
           patch[campo] = typeof v === "string" && v.trim() ? v.trim() : null;
         }
+      }
+      for (const campo of BOOLEANOS) {
+        if (campo in b) patch[campo] = b[campo] === true;
       }
       if (Object.keys(patch).length === 0) return json({ ok: false, reason: "nada_para_salvar" });
       patch.atualizado_em = new Date().toISOString();

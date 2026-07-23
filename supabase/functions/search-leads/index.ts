@@ -18,6 +18,7 @@ import { extrairBairro } from "../../../src/lib/bairro.ts";
 import { geocodeCidade } from "../_shared/geocode.ts";
 import { orgDoUsuario, estadoConsumo, consumir } from "../_shared/limite.ts";
 import { resolverChave } from "../_shared/chaves.ts";
+import { lerConfigPlataforma } from "../_shared/config.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
@@ -74,7 +75,11 @@ Deno.serve(async (req) => {
   const nicho = (body.nicho ?? "").trim();
   const cidade = (body.cidade ?? "").trim();
   const uf = (body.uf ?? "").trim();
-  const limite = Math.min(Math.max(Number(body.limite) || 50, 1), 1000);
+  // ⚙️ Configurações (admin → Configurações básicas): teto máximo de leads por busca —
+  // null = usa o padrão de 1000 (o teto rígido de sempre).
+  const configPlataforma = await lerConfigPlataforma(admin);
+  const TETO_MAX_BUSCA = configPlataforma.max_leads_busca ?? 1000;
+  const limite = Math.min(Math.max(Number(body.limite) || 50, 1), TETO_MAX_BUSCA);
   const buscarEmails = body.buscarEmails !== false;
   const fonte: Fonte = body.fonte && body.fonte in PROVIDERS ? body.fonte : "osm";
   const provider = PROVIDERS[fonte];

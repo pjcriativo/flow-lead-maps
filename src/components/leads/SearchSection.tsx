@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { posthog } from "@/lib/posthog";
+import { supabase } from "@/integrations/supabase/client";
 import {
   streamSearchLeads,
   FONTE_LABELS,
@@ -73,6 +74,19 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [limite, setLimite] = useState(50);
   const [buscarEmails, setBuscarEmails] = useState(true);
   const [fonte, setFonte] = useState<FonteBusca>("osm");
+  // ⚙️ Configurações (admin → Configurações básicas): fonte de leads padrão — só aplica se
+  // vier uma fonte VÁLIDA e não desativada; senão mantém "osm" (o padrão do código).
+  useEffect(() => {
+    supabase
+      .from("config_plataforma")
+      .select("fonte_leads_padrao")
+      .eq("id", true)
+      .maybeSingle()
+      .then(({ data }) => {
+        const f = data?.fonte_leads_padrao as FonteBusca | null;
+        if (f && f in FONTE_LABELS && !FONTES_DESATIVADAS.includes(f)) setFonte(f);
+      });
+  }, []);
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
   const [pinManual, setPinManual] = useState(false);
   const [raioKm, setRaioKm] = useState(10);

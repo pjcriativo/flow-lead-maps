@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { initPostHog, posthog } from "@/lib/posthog";
 import { Toaster } from "@/components/ui/sonner";
+import { lerConfigPublica } from "@/services/config-publica";
 
 function NotFoundComponent() {
   return (
@@ -172,6 +173,14 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    // ⚙️ Configurações (admin → Logotipo e Favicon): troca o ícone da aba quando configurado.
+    lerConfigPublica().then((c) => {
+      if (!c.favicon_url) return;
+      const link = document.createElement("link");
+      link.rel = "icon";
+      link.href = c.favicon_url;
+      document.head.appendChild(link);
+    });
     initPostHog();
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
