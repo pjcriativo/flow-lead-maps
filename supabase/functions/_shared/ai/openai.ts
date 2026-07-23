@@ -12,8 +12,15 @@ const PRECOS: Record<string, { in: number; out: number }> = {
   "gpt-4-turbo": { in: 10, out: 30 },
 };
 
+// 🔐 Cofre de chaves: chamado 1x por request (setOpenAiKeyOverride, via ai/index.ts) —
+// Deno.env.set não funciona no runtime das Edges, por isso o cache de módulo aqui.
+let _openAiKeyCache: string | null = null;
+export function setOpenAiKeyOverride(v: string | null): void {
+  _openAiKeyCache = v;
+}
+
 export const gerarConteudoOpenAI: AiProvider = async (mp, nicho) => {
-  const key = Deno.env.get("OPENAI_API_KEY");
+  const key = _openAiKeyCache ?? Deno.env.get("OPENAI_API_KEY");
   if (!key) throw new Error("OPENAI_API_KEY não configurada.");
   const modelo = Deno.env.get("OPENAI_MODEL") || "gpt-4o";
 

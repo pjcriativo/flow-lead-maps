@@ -8,6 +8,7 @@
 // 💸 TETO: US$1/dia e US$10/mês de IA. Sem teto não liga (doutrina do projeto).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { resolverChave } from "../_shared/chaves.ts";
 import {
   conversaElegivel,
   alertasDePromessa,
@@ -38,7 +39,14 @@ REGRAS INEGOCIÁVEIS:
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
-  const chave = Deno.env.get("ANTHROPIC_API_KEY");
+
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  // 🔐 Cofre de chaves: ANTHROPIC_API_KEY passa a valer o override do painel, se houver.
+  const chave = await resolverChave(admin, "ANTHROPIC_API_KEY");
   if (!chave) return json({ error: "ANTHROPIC_API_KEY não configurada" }, 503);
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -50,12 +58,6 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
   const userId = userData.user.id;
-
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
 
   let b: Rec = {};
   try {

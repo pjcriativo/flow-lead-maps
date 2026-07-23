@@ -64,6 +64,13 @@ function mapItem(it: ApifyItem): RawPlace | null {
   };
 }
 
+// 🔐 Cofre de chaves: chamado 1x por request em search-leads/index.ts (resolverChave), antes
+// de qualquer busca — Deno.env.set não funciona no runtime das Edges, por isso o cache aqui.
+let _apifyTokenCache: string | null = null;
+export function setApifyTokenOverride(v: string | null): void {
+  _apifyTokenCache = v;
+}
+
 export const searchApify: ProviderSearch = async ({
   nicho,
   cidade,
@@ -75,7 +82,7 @@ export const searchApify: ProviderSearch = async ({
   seen,
   log,
 }) => {
-  const token = Deno.env.get("APIFY_API_TOKEN");
+  const token = _apifyTokenCache ?? Deno.env.get("APIFY_API_TOKEN");
   if (!token) throw new Error("APIFY_API_TOKEN não configurada no secret da Edge Function.");
 
   // Fonte PAGA: pede só o necessário (limite + pequena folga), nunca ~1.6x.

@@ -5,6 +5,13 @@ const ACTOR = "compass~crawler-google-places";
 const API = "https://api.apify.com/v2";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// 🔐 Cofre de chaves: chamado 1x por request em redesign-site/index.ts (resolverChave), antes
+// de coletar reviews — Deno.env.set não funciona no runtime das Edges, por isso o cache aqui.
+let _apifyTokenCache: string | null = null;
+export function setReviewsApifyTokenOverride(v: string | null): void {
+  _apifyTokenCache = v;
+}
+
 export type ReviewReal = {
   author: string | null;
   photo: string | null;
@@ -52,7 +59,7 @@ export async function coletarReviews(
   opts: { maxReviews?: number; maxImages?: number; log?: (m: string) => void } = {},
 ): Promise<ColetaReviews> {
   const vazio: ColetaReviews = { reviews: [], imagens: [], custoUsd: 0, debug: "" };
-  const token = Deno.env.get("APIFY_API_TOKEN");
+  const token = _apifyTokenCache ?? Deno.env.get("APIFY_API_TOKEN");
   const placeId = placeIdCru(placeIdRaw);
   const log = opts.log ?? (() => {});
   if (!token) return { ...vazio, debug: "sem APIFY_API_TOKEN" };

@@ -18,6 +18,7 @@ import {
   pairInstancia,
   qrInstancia,
   waBase,
+  inicializarCofreWa,
 } from "../_shared/wa.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -26,6 +27,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST" && req.method !== "GET")
     return json({ error: "Método não permitido" }, 405);
+
+  // service_role só para as tabelas wa_* (inacessíveis ao cliente).
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  // 🔐 Cofre de chaves: EVOLUTION_URL/EVOLUTION_API_KEY passam a valer o override do painel.
+  await inicializarCofreWa(admin);
   if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
 
   // AUTH OBRIGATÓRIA — a org sai do JWT, nunca do corpo da requisição.
@@ -38,13 +48,6 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
   const userId = userData.user.id;
-
-  // service_role só para as tabelas wa_* (inacessíveis ao cliente).
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
 
   let fresh = false;
   let phone = "";

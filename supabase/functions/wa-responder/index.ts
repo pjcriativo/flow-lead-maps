@@ -3,11 +3,24 @@
 // (flowleads) — seu propósito é justamente conversar (nunca dispara a frio).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { waBase, instanciaConversaDaOrg, enviarTextoInstancia } from "../_shared/wa.ts";
+import {
+  waBase,
+  instanciaConversaDaOrg,
+  enviarTextoInstancia,
+  inicializarCofreWa,
+} from "../_shared/wa.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  // 🔐 Cofre de chaves: EVOLUTION_URL/EVOLUTION_API_KEY passam a valer o override do painel.
+  await inicializarCofreWa(admin);
   if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -19,12 +32,6 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
   const userId = userData.user.id;
-
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
 
   let b: { numero?: string; texto?: string };
   try {

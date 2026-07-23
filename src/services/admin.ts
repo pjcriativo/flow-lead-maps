@@ -146,7 +146,10 @@ export type AdminAcao =
   | "assinante_add"
   | "assinante_remove"
   | "cms_ler"
-  | "cms_salvar";
+  | "cms_salvar"
+  | "chaves_listar"
+  | "chave_salvar"
+  | "chaves_auditoria_listar";
 
 export async function adminAcao(
   acao: AdminAcao,

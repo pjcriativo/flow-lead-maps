@@ -8,8 +8,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import type { Fonte, ProviderSearch } from "../_shared/providers/types.ts";
 import { searchOsm } from "../_shared/providers/osm.ts";
-import { searchGeoapify } from "../_shared/providers/geoapify.ts";
-import { searchApify } from "../_shared/providers/apify.ts";
+import { searchGeoapify, setGeoapifyKeyOverride } from "../_shared/providers/geoapify.ts";
+import { searchApify, setApifyTokenOverride } from "../_shared/providers/apify.ts";
 import { searchPlaces } from "../_shared/providers/places.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
@@ -17,6 +17,7 @@ import { firstBrWhatsapp } from "../_shared/phone.ts";
 import { extrairBairro } from "../../../src/lib/bairro.ts";
 import { geocodeCidade } from "../_shared/geocode.ts";
 import { orgDoUsuario, estadoConsumo, consumir } from "../_shared/limite.ts";
+import { resolverChave } from "../_shared/chaves.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
@@ -58,6 +59,9 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
+  // 🔐 Cofre de chaves: GEOAPIFY_API_KEY/APIFY_API_TOKEN passam a valer o override do painel.
+  setGeoapifyKeyOverride(await resolverChave(admin, "GEOAPIFY_API_KEY"));
+  setApifyTokenOverride(await resolverChave(admin, "APIFY_API_TOKEN"));
   const orgId = await orgDoUsuario(admin, userId);
 
   let body: Body;

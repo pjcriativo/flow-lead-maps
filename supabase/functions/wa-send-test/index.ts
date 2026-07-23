@@ -12,11 +12,20 @@ import {
   statusInstancia,
   sincronizarInstancia,
   waBase,
+  inicializarCofreWa,
 } from "../_shared/wa.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  // 🔐 Cofre de chaves: EVOLUTION_URL/EVOLUTION_API_KEY passam a valer o override do painel.
+  await inicializarCofreWa(admin);
   if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
 
   // AUTH OBRIGATÓRIA — a org sai do JWT, nunca do corpo.
@@ -41,12 +50,6 @@ Deno.serve(async (req) => {
     return json({ error: "Número inválido — use DDI+DDD (ex.: 5511987654321)." }, 400);
   const text =
     (body.text || "").trim() || "✅ Teste do Flow Leads — conexão do WhatsApp funcionando!";
-
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
 
   // Instância DA ORG (não cria: se ela não tem, não há o que enviar).
   const inst = await resolverInstanciaDaOrg(admin, userId, false);

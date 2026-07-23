@@ -17,6 +17,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { json } from "../_shared/cors.ts";
 import { montarFrom } from "../_shared/remetente.ts";
+import { resolverChave } from "../_shared/chaves.ts";
 
 const DEFAULT_FROM = "Flow Leads <onboarding@resend.dev>";
 const DIAS = 3;
@@ -81,7 +82,8 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false },
   });
-  const RESEND = Deno.env.get("RESEND_API_KEY");
+  // 🔐 Cofre de chaves: RESEND_API_KEY passa a valer o override do painel, se houver.
+  const RESEND = await resolverChave(admin, "RESEND_API_KEY");
   if (!RESEND) return json({ error: "RESEND_API_KEY não configurada" }, 503);
   const from = Deno.env.get("EMAIL_FROM") || DEFAULT_FROM;
   const funcsBase = `${SUPABASE_URL}/functions/v1`;

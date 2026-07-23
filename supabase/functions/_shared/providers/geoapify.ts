@@ -115,6 +115,13 @@ function mapFeature(f: GeoFeature): RawPlace | null {
   };
 }
 
+// 🔐 Cofre de chaves: chamado 1x por request em search-leads/index.ts (resolverChave), antes
+// de qualquer busca — Deno.env.set não funciona no runtime das Edges, por isso o cache aqui.
+let _geoapifyKeyCache: string | null = null;
+export function setGeoapifyKeyOverride(v: string | null): void {
+  _geoapifyKeyCache = v;
+}
+
 export const searchGeoapify: ProviderSearch = async ({
   nicho,
   cidade,
@@ -126,7 +133,7 @@ export const searchGeoapify: ProviderSearch = async ({
   seen,
   log,
 }) => {
-  const key = Deno.env.get("GEOAPIFY_API_KEY");
+  const key = _geoapifyKeyCache ?? Deno.env.get("GEOAPIFY_API_KEY");
   if (!key) throw new Error("GEOAPIFY_API_KEY não configurada no secret da Edge Function.");
 
   let centro: { lat: number; lon: number } | null;

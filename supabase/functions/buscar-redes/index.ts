@@ -21,6 +21,7 @@ import {
 } from "../../../src/lib/redes-teto.ts";
 import { mesRefAtual } from "../../../src/lib/automacao-teto.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
+import { resolverChave } from "../_shared/chaves.ts";
 import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
 
 const API = "https://api.apify.com/v2";
@@ -75,7 +76,10 @@ const ATOR: Record<string, { ator: string; monta: (c: Rec) => Rec }> = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Rec = Record<string, any>;
 
-const token = () => Deno.env.get("APIFY_API_TOKEN") ?? "";
+// 🔐 Cofre de chaves: _apifyTokenCache é resolvido 1x no início do handler (resolverChave) —
+// Deno.env.set não funciona no runtime das Edges, então token() lê deste cache de módulo.
+let _apifyTokenCache: string | null = null;
+const token = () => _apifyTokenCache ?? Deno.env.get("APIFY_API_TOKEN") ?? "";
 
 /** Existe/está acessível? NÃO roda o ator — só lê os metadados (grátis). */
 async function checarAtor(ator: string) {
@@ -131,6 +135,15 @@ function achaWhats(txt: string): string | null {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  // 🔐 Cofre de chaves (admin → Configurações → Chaves e integrações): resolve ANTES de checar
+  // a chave — senão uma chave só cadastrada no cofre pareceria "não configurada".
+  _apifyTokenCache = await resolverChave(admin, "APIFY_API_TOKEN");
   if (!token()) return json({ error: "APIFY_API_TOKEN não configurada" }, 503);
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -142,12 +155,6 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
   const userId = userData.user.id;
-
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
 
   // ⚙️ CONFIGURAÇÕES (admin): teto de gasto override — null = usa o padrão de redes-teto.ts
   const configPlataforma = await lerConfigPlataforma(admin);

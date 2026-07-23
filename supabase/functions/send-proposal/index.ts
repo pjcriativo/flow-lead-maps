@@ -9,6 +9,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { montarFrom } from "../_shared/remetente.ts";
 import { orgDoUsuario, consumir } from "../_shared/limite.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
+import { resolverChave } from "../_shared/chaves.ts";
 
 // Identidade do remetente. EMAIL_FROM é GLOBAL hoje (uma reputação de domínio p/
 // todas as orgs). TODO (blueprint — identidade de envio por org): cada org deve ter
@@ -92,7 +93,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  const RESEND = Deno.env.get("RESEND_API_KEY");
+  // 🔐 Cofre de chaves: RESEND_API_KEY passa a valer o override do painel, se houver.
+  const RESEND = await resolverChave(admin, "RESEND_API_KEY");
   if (!RESEND)
     return json({ ok: false, error: "Envio indisponível: RESEND_API_KEY não configurada." });
   // ⚙️ CONFIGURAÇÕES (admin): remetente padrão — se a org não tem o próprio nome cadastrado,

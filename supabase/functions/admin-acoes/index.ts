@@ -9,9 +9,23 @@
 //   user_add     { email, papel? }               → cria conta + org própria (admin) ou vincula
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { cifrar } from "../_shared/cofre.ts";
+import { resolverChave } from "../_shared/chaves.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
 type Rec = Record<string, unknown>;
+
+// Chaves conhecidas do painel "Chaves e integrações" — a lista sempre aparece, configurada
+// ou não; o admin também pode salvar um nome novo (campo livre) que não está aqui.
+const CHAVES_CONHECIDAS = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "APIFY_API_TOKEN",
+  "GEOAPIFY_API_KEY",
+  "RESEND_API_KEY",
+  "EVOLUTION_URL",
+  "EVOLUTION_API_KEY",
+];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -543,6 +557,97 @@ Deno.serve(async (req) => {
       const { error } = await admin.from("site_conteudo").update(patch).eq("id", true);
       if (error) return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
       return json({ ok: true });
+    }
+
+    // ═══ Cofre de chaves — chaves_listar/chave_salvar/chaves_auditoria_listar ═══
+    // O valor completo NUNCA volta pro navegador em NENHUMA dessas ações — só últimos4,
+    // status e metadados. Escrita cifra ANTES de gravar (cifrar() em _shared/cofre.ts).
+    if (acao === "chaves_listar") {
+      const { data: rows } = await admin
+        .from("config_chaves")
+        .select("nome, ultimos4, atualizado_em, atualizado_por");
+      const porNome = new Map((rows ?? []).map((r: Rec) => [String(r.nome), r]));
+      const todosNomes = [...new Set([...CHAVES_CONHECIDAS, ...porNome.keys()])];
+      const idsAutores = [...porNome.values()]
+        .map((r) => (r as Rec).atualizado_por as string | null)
+        .filter((v): v is string => !!v);
+      const { data: perfis } = idsAutores.length
+        ? await admin.from("profiles").select("id, email").in("id", idsAutores)
+        : { data: [] as Rec[] };
+      const emailDe = new Map((perfis ?? []).map((p: Rec) => [String(p.id), p.email as string]));
+      const lista = todosNomes.map((nome) => {
+        const r = porNome.get(nome) as Rec | undefined;
+        return {
+          nome,
+          configurada: !!r,
+          ultimos4: r?.ultimos4 ?? null,
+          atualizado_em: r?.atualizado_em ?? null,
+          atualizado_por: r?.atualizado_por
+            ? (emailDe.get(String(r.atualizado_por)) ?? null)
+            : null,
+        };
+      });
+      return json({ ok: true, chaves: lista });
+    }
+
+    if (acao === "chave_salvar") {
+      const nome = String(b.nome || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9_]/g, "_");
+      const valor = String(b.valor || "");
+      if (!nome) return json({ ok: false, reason: "nome_obrigatorio" });
+      if (!valor || valor.length < 4) return json({ ok: false, reason: "valor_invalido" });
+      const cifrado = await cifrar(valor);
+      const ultimos4 = valor.slice(-4);
+      const { error } = await admin.from("config_chaves").upsert(
+        {
+          nome,
+          valor_cifrado: cifrado,
+          ultimos4,
+          atualizado_em: new Date().toISOString(),
+          atualizado_por: userData.user.id,
+        },
+        { onConflict: "nome" },
+      );
+      if (error) return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
+      await admin.from("config_chaves_auditoria").insert({ nome, alterado_por: userData.user.id });
+      return json({ ok: true, ultimos4 });
+    }
+
+    if (acao === "chaves_auditoria_listar") {
+      const { data } = await admin
+        .from("config_chaves_auditoria")
+        .select("nome, alterado_por, alterado_em")
+        .order("alterado_em", { ascending: false })
+        .limit(50);
+      const ids = [
+        ...new Set((data ?? []).map((r: Rec) => r.alterado_por as string | null)),
+      ].filter((v): v is string => !!v);
+      const { data: perfis } = ids.length
+        ? await admin.from("profiles").select("id, email").in("id", ids)
+        : { data: [] as Rec[] };
+      const emailDe = new Map((perfis ?? []).map((p: Rec) => [String(p.id), p.email as string]));
+      const auditoria = (data ?? []).map((r: Rec) => ({
+        nome: r.nome,
+        alterado_em: r.alterado_em,
+        email: r.alterado_por ? (emailDe.get(String(r.alterado_por)) ?? "—") : "—",
+      }));
+      return json({ ok: true, auditoria });
+    }
+
+    // chave_efetiva_teste — diagnóstico SEGURO (só o `nome` que o chamador passar; nunca uma
+    // chave real gerenciada): resolve via resolverChave() (cofre → fallback) e devolve
+    // mascarado. Prova que o mecanismo de resolução funciona de fato no runtime da Edge — o
+    // MESMO usado nas outras 11 edges (Deno.env.set NÃO funciona nesse runtime; por isso a
+    // resolução é sempre via leitura direta, nunca via mutação do ambiente).
+    if (acao === "chave_efetiva_teste") {
+      const nome = String(b.nome || "")
+        .trim()
+        .toUpperCase();
+      if (!nome) return json({ ok: false, reason: "nome_obrigatorio" });
+      const valor = await resolverChave(admin, nome);
+      return json({ ok: true, configurada: !!valor, ultimos4: valor ? valor.slice(-4) : null });
     }
 
     return json({ ok: false, reason: "acao_desconhecida" });

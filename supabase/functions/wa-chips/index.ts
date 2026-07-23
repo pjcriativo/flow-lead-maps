@@ -32,6 +32,7 @@ import {
   rotacionarDisparo,
   graduarChipDoLead,
   definirWebhookInstancia,
+  inicializarCofreWa,
 } from "../_shared/wa.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -39,6 +40,14 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  // 🔐 Cofre de chaves: EVOLUTION_URL/EVOLUTION_API_KEY passam a valer o override do painel.
+  await inicializarCofreWa(admin);
   if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -52,12 +61,6 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
   const userId = userData.user.id;
-
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let b: any = {};

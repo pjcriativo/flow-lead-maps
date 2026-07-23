@@ -6,10 +6,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { coletarConteudoSite } from "../_shared/materiaprima.ts";
-import { coletarReviews } from "../_shared/reviews.ts";
+import { coletarReviews, setReviewsApifyTokenOverride } from "../_shared/reviews.ts";
 import {
   getProviderChain,
   sanearRegistros,
+  inicializarCofreIa,
   type MateriaPrima,
   type ConteudoIA,
 } from "../_shared/ai/index.ts";
@@ -28,6 +29,7 @@ import {
 import { mesRefAtual, CUSTO_SITE_ESTIMADO_USD } from "../../../src/lib/automacao-teto.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
 import { orgDoUsuario, consumir } from "../_shared/limite.ts";
+import { resolverChave } from "../_shared/chaves.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -73,6 +75,10 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
+  // 🔐 Cofre de chaves: ANTHROPIC_API_KEY/OPENAI_API_KEY (usadas por getProviderChain mais
+  // abaixo) e APIFY_API_TOKEN (usada por coletarReviews) passam a valer o override do painel.
+  await inicializarCofreIa(admin);
+  setReviewsApifyTokenOverride(await resolverChave(admin, "APIFY_API_TOKEN"));
   // ⚙️ CONFIGURAÇÕES (admin): teto override — null = usa o padrão de redes-teto.ts
   const configPlataforma = await lerConfigPlataforma(admin);
   const TETO_RODADA = configPlataforma.teto_rodada_usd ?? TETO_RODADA_USD;

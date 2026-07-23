@@ -22,12 +22,25 @@
 // Client supabase com SERVICE_ROLE, criado na edge (as tabelas wa_* não são acessíveis ao cliente).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any;
+import { resolverChave } from "./chaves.ts";
+
+// 🔐 Cofre de chaves: cada edge que importa wa.ts chama inicializarCofreWa(admin) 1x no início
+// do handler — Deno.env.set não funciona no runtime das Edges, por isso o cache de módulo
+// aqui (todas as funções deste arquivo já leem waBase()/waGlobalKey() só através destes 2
+// getters, então nenhum outro call-site precisa mudar).
+let _waBaseCache: string | null = null;
+let _waKeyCache: string | null = null;
+
+export async function inicializarCofreWa(admin: Admin): Promise<void> {
+  _waBaseCache = await resolverChave(admin, "EVOLUTION_URL");
+  _waKeyCache = await resolverChave(admin, "EVOLUTION_API_KEY");
+}
 
 export function waBase(): string {
-  return (Deno.env.get("EVOLUTION_URL") || "").replace(/\/+$/, "");
+  return (_waBaseCache ?? Deno.env.get("EVOLUTION_URL") ?? "").replace(/\/+$/, "");
 }
 export function waGlobalKey(): string {
-  return Deno.env.get("EVOLUTION_API_KEY") || "";
+  return _waKeyCache ?? Deno.env.get("EVOLUTION_API_KEY") ?? "";
 }
 
 export type WaInstanciaOrg = {
