@@ -11,6 +11,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
+type Rec = Record<string, unknown>;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -204,6 +205,51 @@ Deno.serve(async (req) => {
       if ((count ?? 0) > 0) return json({ ok: false, reason: "plano_em_uso", orgs: count });
       await admin.from("planos").delete().eq("id", id);
       return json({ ok: true, removido: id });
+    }
+
+    // ── SUPORTE (todas as orgs — o admin vê e responde tudo) ──
+    if (acao === "tickets_listar") {
+      const { data: tks } = await admin
+        .from("tickets")
+        .select(
+          "id, org_id, autor_user_id, assunto, mensagem, prioridade, status, criado_em, atualizado_em",
+        )
+        .order("criado_em", { ascending: false });
+      const ids = [...new Set((tks ?? []).map((t: Rec) => String(t.autor_user_id)))];
+      const { data: perfis } = ids.length
+        ? await admin.from("profiles").select("id, email").in("id", ids)
+        : { data: [] as Rec[] };
+      const emailDe = new Map((perfis ?? []).map((p: Rec) => [String(p.id), p.email]));
+      return json({
+        ok: true,
+        tickets: (tks ?? []).map((t: Rec) => ({
+          ...t,
+          autor_email: emailDe.get(String(t.autor_user_id)) ?? "?",
+        })),
+      });
+    }
+
+    if (acao === "ticket_responder") {
+      const ticketId = String(b.ticket_id || "");
+      const texto = String(b.texto || "").trim();
+      if (!ticketId || !texto) return json({ ok: false, reason: "faltam_campos" });
+      const { error } = await admin
+        .from("ticket_respostas")
+        .insert({ ticket_id: ticketId, autor_user_id: userData.user.id, eh_admin: true, texto });
+      if (error) return json({ ok: false, reason: "falha_inserir", detalhe: error.message });
+      return json({ ok: true });
+    }
+
+    if (acao === "ticket_status") {
+      const ticketId = String(b.ticket_id || "");
+      const status = String(b.status || "");
+      if (!["aberto", "em_andamento", "resolvido", "fechado"].includes(status))
+        return json({ ok: false, reason: "status_invalido" });
+      await admin
+        .from("tickets")
+        .update({ status, atualizado_em: new Date().toISOString() })
+        .eq("id", ticketId);
+      return json({ ok: true, ticket_id: ticketId, status });
     }
 
     return json({ ok: false, reason: "acao_desconhecida" });

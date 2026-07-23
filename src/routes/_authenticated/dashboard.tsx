@@ -21,6 +21,7 @@ import {
   Megaphone,
   Bot,
   ShieldCheck,
+  LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ import { PublicarSection } from "@/components/publicar/PublicarSection";
 import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
 import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
+import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { lerPerfilEmail, salvarNomeRemetente, salvarReplyTo, emailValido } from "@/services/perfil";
 import { toast } from "sonner";
 
@@ -93,6 +95,7 @@ type Section =
   | "financeiro"
   | "redesign"
   | "publicar"
+  | "suporte"
   // "sheets" (Google Sheets) segue no código como DEPRECATED — fora da navegação
   // (o dono não usa). A seção ainda renderiza p/ não quebrar o callback de OAuth.
   | "sheets"
@@ -112,6 +115,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "financeiro", label: "Financeiro", Icon: Wallet },
   { id: "redesign", label: "Redesign", Icon: Wand2 },
   { id: "publicar", label: "Publicar", Icon: Rocket },
+  { id: "suporte", label: "Suporte", Icon: LifeBuoy },
   { id: "settings", label: "Configurações", Icon: SettingsIcon },
 ];
 
@@ -252,6 +256,7 @@ function Dashboard() {
           />
         )}
         {section === "publicar" && <PublicarSection />}
+        {section === "suporte" && <SuporteSection />}
         {/* DEPRECATED: Google Sheets saiu da sidebar. Render mantido só para não
             quebrar o callback de OAuth (?sheets_connected=true). Remover em passo à parte. */}
         {section === "sheets" && (

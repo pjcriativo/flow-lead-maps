@@ -30,6 +30,8 @@ export type AdminKpis = {
   /** card "Gasto de API no mês" ← sum(redes_buscas.custo_usd) do mês (livro-caixa global) */
   gastoMesUsd: number;
   tetoMesUsd: number;
+  /** card "Tickets abertos" ← count(tickets) status in (aberto, em_andamento), todas as orgs */
+  ticketsAbertos: number;
 };
 
 export type UsuarioPlataforma = { email: string; plan: string | null; created_at: string };
@@ -121,21 +123,37 @@ export async function carregarPainelAdmin(): Promise<PainelAdmin> {
   return data as PainelAdmin;
 }
 
-/** Mutações das telas de admin (Edge admin-acoes valida super_admin no servidor). */
+/** Ações (leitura e escrita) do painel admin — Edge admin-acoes valida super_admin no servidor.
+ * Tipo do retorno é genérico de propósito: cada ação devolve um formato próprio (tickets_listar
+ * devolve {tickets:[...]}, plano_upsert devolve {id}, etc.) — quem chama sabe o que espera. */
+export type AdminAcao =
+  | "role_toggle"
+  | "staff_add"
+  | "staff_remove"
+  | "user_add"
+  | "plano_upsert"
+  | "plano_toggle"
+  | "plano_delete"
+  | "tickets_listar"
+  | "ticket_responder"
+  | "ticket_status"
+  | "relatorios_ler"
+  | "config_ler"
+  | "config_salvar"
+  | "notificacao_enviar"
+  | "notificacoes_listar"
+  | "assinante_add"
+  | "assinante_remove"
+  | "cms_ler"
+  | "cms_salvar";
+
 export async function adminAcao(
-  acao:
-    | "role_toggle"
-    | "staff_add"
-    | "staff_remove"
-    | "user_add"
-    | "plano_upsert"
-    | "plano_toggle"
-    | "plano_delete",
-  payload: Record<string, unknown>,
-): Promise<{ ok: boolean; reason?: string; detalhe?: string }> {
+  acao: AdminAcao,
+  payload: Record<string, unknown> = {},
+): Promise<Record<string, unknown> & { ok: boolean; reason?: string; detalhe?: string }> {
   const { data, error } = await supabase.functions.invoke("admin-acoes", {
     body: { acao, ...payload },
   });
   if (error) throw new Error(error.message);
-  return data as { ok: boolean; reason?: string; detalhe?: string };
+  return data as Record<string, unknown> & { ok: boolean; reason?: string; detalhe?: string };
 }

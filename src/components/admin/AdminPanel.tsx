@@ -51,10 +51,12 @@ import { carregarPainelAdmin, type PainelAdmin } from "@/services/admin";
 import { AdminRoles, AdminStaffs } from "./AdminStaffRoles";
 import { AdminAllUsers, AdminSubscribers } from "./AdminUsers";
 import { AdminPlanos } from "./AdminPlanos";
+import { AdminTickets } from "./AdminTickets";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
-type TelaAdmin = "dashboard" | "roles" | "staffs" | "all-users" | "subscribers" | "plans";
+type TelaAdmin =
+  "dashboard" | "roles" | "staffs" | "all-users" | "subscribers" | "plans" | "tickets";
 
 type ItemNav = {
   rotulo: string;
@@ -86,7 +88,7 @@ const NAV: ItemNav[] = [
   { rotulo: "Planos", Icon: Tag, tela: "plans" },
   { rotulo: "Pagamentos", Icon: Wallet, emBreve: true },
   { rotulo: "Relatórios", Icon: BarChart3, emBreve: true },
-  { rotulo: "Suporte", Icon: LifeBuoy, emBreve: true },
+  { rotulo: "Suporte", Icon: LifeBuoy, tela: "tickets" },
   { rotulo: "Configurações", Icon: Settings, emBreve: true },
 ];
 
@@ -420,6 +422,7 @@ export function AdminPanel({ email }: { email: string }) {
             )}
             {tela === "subscribers" && <AdminSubscribers />}
             {tela === "plans" && <AdminPlanos planos={painel?.planos ?? []} onMudou={recarregar} />}
+            {tela === "tickets" && <AdminTickets />}
           </main>
         </div>
       </div>
@@ -451,11 +454,10 @@ export function AdminPanel({ email }: { email: string }) {
                 <Users className="h-3.5 w-3.5" /> Gerenciar usuários
               </button>
               <button
-                disabled
-                title="O módulo de suporte ainda não existe."
-                className="flex cursor-not-allowed items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground/70"
+                onClick={() => setTela("tickets")}
+                className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/15"
               >
-                <LifeBuoy className="h-3.5 w-3.5" /> Tickets <EmBreve />
+                <LifeBuoy className="h-3.5 w-3.5" /> Tickets
               </button>
               {/* ação REAL: o agendador da automação (pg_cron) vive na aba Automação do app */}
               <a
@@ -552,12 +554,14 @@ export function AdminPanel({ email }: { email: string }) {
               Icon={Radar}
               tom="sucesso"
             />
-            {/* sem base no produto ainda → Em breve, não zero fake */}
-            <KpiEmBreve
+            <Kpi
               rotulo="Tickets abertos"
-              motivo="Não existe módulo de suporte ainda."
+              valor={kpis ? String(kpis.ticketsAbertos) : "…"}
+              detalhe="aberto + em andamento — todas as orgs"
               Icon={LifeBuoy}
+              tom="ouro"
             />
+            {/* sem base no produto ainda → Em breve, não zero fake */}
             <KpiEmBreve
               rotulo="Falhas de envio"
               motivo="Métrica entra junto com o disparo real (hoje não há envios)."

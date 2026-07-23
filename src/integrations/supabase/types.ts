@@ -339,6 +339,44 @@ export type Database = {
           },
         ];
       };
+      consumo_org: {
+        Row: {
+          atualizado_em: string;
+          campanhas: number;
+          leads: number;
+          mensagens: number;
+          mes_ref: string;
+          org_id: string;
+          sites: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          campanhas?: number;
+          leads?: number;
+          mensagens?: number;
+          mes_ref: string;
+          org_id: string;
+          sites?: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          campanhas?: number;
+          leads?: number;
+          mensagens?: number;
+          mes_ref?: string;
+          org_id?: string;
+          sites?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "consumo_org_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       email_config: {
         Row: {
           org_id: string | null;
@@ -959,18 +997,83 @@ export type Database = {
           dono_user_id: string;
           id: string;
           nome: string;
+          plano_id: string | null;
         };
         Insert: {
           criada_em?: string;
           dono_user_id: string;
           id?: string;
           nome: string;
+          plano_id?: string | null;
         };
         Update: {
           criada_em?: string;
           dono_user_id?: string;
           id?: string;
           nome?: string;
+          plano_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "orgs_plano_id_fkey";
+            columns: ["plano_id"];
+            isOneToOne: false;
+            referencedRelation: "planos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      planos: {
+        Row: {
+          ativo: boolean;
+          criado_em: string;
+          descricao: string | null;
+          id: string;
+          limite_campanhas: number | null;
+          limite_leads: number | null;
+          limite_mensagens: number | null;
+          limite_segmentos: number | null;
+          limite_sites: number | null;
+          limite_templates: number | null;
+          limite_whatsapp: number | null;
+          nome: string;
+          ordem: number;
+          periodo: string;
+          preco: number;
+        };
+        Insert: {
+          ativo?: boolean;
+          criado_em?: string;
+          descricao?: string | null;
+          id?: string;
+          limite_campanhas?: number | null;
+          limite_leads?: number | null;
+          limite_mensagens?: number | null;
+          limite_segmentos?: number | null;
+          limite_sites?: number | null;
+          limite_templates?: number | null;
+          limite_whatsapp?: number | null;
+          nome: string;
+          ordem?: number;
+          periodo?: string;
+          preco?: number;
+        };
+        Update: {
+          ativo?: boolean;
+          criado_em?: string;
+          descricao?: string | null;
+          id?: string;
+          limite_campanhas?: number | null;
+          limite_leads?: number | null;
+          limite_mensagens?: number | null;
+          limite_segmentos?: number | null;
+          limite_sites?: number | null;
+          limite_templates?: number | null;
+          limite_whatsapp?: number | null;
+          nome?: string;
+          ordem?: number;
+          periodo?: string;
+          preco?: number;
         };
         Relationships: [];
       };
@@ -1475,6 +1578,85 @@ export type Database = {
           },
         ];
       };
+      ticket_respostas: {
+        Row: {
+          autor_user_id: string;
+          criado_em: string;
+          eh_admin: boolean;
+          id: string;
+          texto: string;
+          ticket_id: string;
+        };
+        Insert: {
+          autor_user_id: string;
+          criado_em?: string;
+          eh_admin?: boolean;
+          id?: string;
+          texto: string;
+          ticket_id: string;
+        };
+        Update: {
+          autor_user_id?: string;
+          criado_em?: string;
+          eh_admin?: boolean;
+          id?: string;
+          texto?: string;
+          ticket_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ticket_respostas_ticket_id_fkey";
+            columns: ["ticket_id"];
+            isOneToOne: false;
+            referencedRelation: "tickets";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      tickets: {
+        Row: {
+          assunto: string;
+          atualizado_em: string;
+          autor_user_id: string;
+          criado_em: string;
+          id: string;
+          mensagem: string;
+          org_id: string | null;
+          prioridade: Database["public"]["Enums"]["ticket_prioridade"];
+          status: Database["public"]["Enums"]["ticket_status"];
+        };
+        Insert: {
+          assunto: string;
+          atualizado_em?: string;
+          autor_user_id: string;
+          criado_em?: string;
+          id?: string;
+          mensagem: string;
+          org_id?: string | null;
+          prioridade?: Database["public"]["Enums"]["ticket_prioridade"];
+          status?: Database["public"]["Enums"]["ticket_status"];
+        };
+        Update: {
+          assunto?: string;
+          atualizado_em?: string;
+          autor_user_id?: string;
+          criado_em?: string;
+          id?: string;
+          mensagem?: string;
+          org_id?: string | null;
+          prioridade?: Database["public"]["Enums"]["ticket_prioridade"];
+          status?: Database["public"]["Enums"]["ticket_status"];
+        };
+        Relationships: [
+          {
+            foreignKeyName: "tickets_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       wa_alertas: {
         Row: {
           criado_em: string;
@@ -1769,6 +1951,12 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      _col_consumo: { Args: { p_recurso: string }; Returns: string };
+      _col_limite: { Args: { p_recurso: string }; Returns: string };
+      consumir_ou_bloquear: {
+        Args: { p_n?: number; p_org: string; p_recurso: string };
+        Returns: Json;
+      };
       eh_super_admin: { Args: never; Returns: boolean };
       email_rampa_status: {
         Args: { p_user_id?: string };
@@ -1780,11 +1968,23 @@ export type Database = {
           teto: number;
         }[];
       };
+      estado_consumo: {
+        Args: { p_org: string; p_recurso: string };
+        Returns: Json;
+      };
+      limite_plano: {
+        Args: { p_org: string; p_recurso: string };
+        Returns: number;
+      };
       org_do_usuario: { Args: { p_user: string }; Returns: string };
       papel_do_usuario: { Args: { p_org: string }; Returns: string };
       pertence_a_org: { Args: { p_org: string }; Returns: boolean };
       pode_ver_lead: {
         Args: { p_assigned: string; p_org: string };
+        Returns: boolean;
+      };
+      pode_ver_ticket: {
+        Args: { p_autor: string; p_org: string };
         Returns: boolean;
       };
       registrar_contato_manual: {
@@ -1799,6 +1999,8 @@ export type Database = {
     };
     Enums: {
       papel_org: "super_admin" | "admin" | "gerente" | "vendedor" | "sdr" | "suporte";
+      ticket_prioridade: "baixa" | "media" | "alta";
+      ticket_status: "aberto" | "em_andamento" | "resolvido" | "fechado";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1921,6 +2123,8 @@ export const Constants = {
   public: {
     Enums: {
       papel_org: ["super_admin", "admin", "gerente", "vendedor", "sdr", "suporte"],
+      ticket_prioridade: ["baixa", "media", "alta"],
+      ticket_status: ["aberto", "em_andamento", "resolvido", "fechado"],
     },
   },
 } as const;

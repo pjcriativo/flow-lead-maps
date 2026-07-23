@@ -49,6 +49,12 @@ Deno.serve(async (req) => {
     (usuarios ?? []).map((u: Rec) => [String(u.id), String(u.email ?? "?")]),
   );
 
+  // card real do dashboard: tickets abertos/em andamento, TODAS as orgs
+  const { count: ticketsAbertos } = await admin
+    .from("tickets")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["aberto", "em_andamento"]);
+
   // org do super admin (para as telas Roles/Staffs, que operam na org dele)
   const { data: minhaOrg } = await admin
     .from("memberships")
@@ -245,6 +251,7 @@ Deno.serve(async (req) => {
         0,
       ),
       tetoMesUsd: 50,
+      ticketsAbertos: ticketsAbertos ?? 0,
     },
     usuarios: (usuarios ?? []).map((u: Rec) => ({
       email: u.email,
