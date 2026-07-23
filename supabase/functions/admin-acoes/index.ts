@@ -418,6 +418,16 @@ Deno.serve(async (req) => {
         "favicon_url",
         "fonte_leads_padrao",
         "modelo_ia",
+        "moeda",
+        "simbolo_moeda",
+        "fuso_horario",
+        "cor_base",
+        "cor_secundaria",
+        "modelo_openai",
+        "seo_titulo",
+        "seo_descricao",
+        "gdpr_texto",
+        "css_personalizado",
       ] as const;
       const BOOLEANOS = [
         "cadastro_usuario_ativo",

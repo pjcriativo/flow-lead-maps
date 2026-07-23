@@ -2,7 +2,7 @@
 // não o HTML. Cadeia com fallback: tenta o preferido, depois o próximo, e só então
 // o orquestrador cai no rule-based. AI_PROVIDER força um provedor específico.
 import type { AiProvider } from "./types.ts";
-import { gerarConteudoOpenAI, setOpenAiKeyOverride } from "./openai.ts";
+import { gerarConteudoOpenAI, setOpenAiKeyOverride, setOpenAiModeloOverride } from "./openai.ts";
 import {
   gerarConteudoClaude,
   setAnthropicKeyOverride,
@@ -15,12 +15,13 @@ import { lerConfigPlataforma } from "../config.ts";
 type Admin = any;
 
 /** Chamar 1x no início do handler (com o admin client) antes de getProviderChain() — aplica
- * o override do cofre de chaves (ANTHROPIC/OPENAI) e o modelo escolhido em Configurações. */
+ * o override do cofre de chaves (ANTHROPIC/OPENAI) e os modelos escolhidos em Configurações. */
 export async function inicializarCofreIa(admin: Admin): Promise<void> {
   setAnthropicKeyOverride(await resolverChave(admin, "ANTHROPIC_API_KEY"));
   setOpenAiKeyOverride(await resolverChave(admin, "OPENAI_API_KEY"));
   const config = await lerConfigPlataforma(admin);
   setAnthropicModeloOverride(config.modelo_ia);
+  setOpenAiModeloOverride(config.modelo_openai);
 }
 
 export type ProvedorNomeado = { nome: string; fn: AiProvider };

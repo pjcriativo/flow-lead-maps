@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { SiteFooter } from "@/components/SiteFooter";
+import { EstiloSitePublico } from "@/components/EstiloSitePublico";
 import { supabase } from "@/integrations/supabase/client";
 
 // ⚙️ CMS (admin → Conteúdos do site): cada campo abaixo cai no texto PADRÃO daqui se a
@@ -96,6 +97,7 @@ function Index() {
   const conteudo = useConteudo();
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <EstiloSitePublico />
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">

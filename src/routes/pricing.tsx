@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Check, Minus, ArrowRight, Sparkles } from "lucide-react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { SiteFooter } from "@/components/SiteFooter";
+import { EstiloSitePublico } from "@/components/EstiloSitePublico";
 import { supabase } from "@/integrations/supabase/client";
+import { lerConfigPublica } from "@/services/config-publica";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -127,6 +129,8 @@ function PricingPage() {
   // ⚙️ CMS (admin → Conteúdos do site): planos_json substitui os 4 cards padrão abaixo
   // quando presente e com o formato certo — sem linha/campo válido, cai no PLANS fixo.
   const [planos, setPlanos] = useState<Plan[]>(PLANS);
+  // ⚙️ Configurações (admin → Configurações básicas): símbolo da moeda exibido nos preços.
+  const [simbolo, setSimbolo] = useState("R$");
   useEffect(() => {
     supabase
       .from("site_conteudo")
@@ -136,10 +140,14 @@ function PricingPage() {
       .then(({ data }) => {
         if (ehListaDePlanosValida(data?.planos_json)) setPlanos(data.planos_json);
       });
+    lerConfigPublica().then((c) => {
+      if (c.simbolo_moeda?.trim()) setSimbolo(c.simbolo_moeda.trim());
+    });
   }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <EstiloSitePublico />
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <Link to="/" className="flex h-full items-center">
@@ -190,15 +198,15 @@ function PricingPage() {
           {planos.map((plan) => {
             const isFree = plan.monthly === 0;
             const price = isFree
-              ? "R$ 0"
+              ? `${simbolo} 0`
               : yearly
-                ? `R$ ${plan.yearlyMonthly}`
-                : `R$ ${plan.monthly}`;
+                ? `${simbolo} ${plan.yearlyMonthly}`
+                : `${simbolo} ${plan.monthly}`;
             const suffix = isFree ? "" : "/mês";
             const sub = isFree
               ? "7 dias grátis"
               : yearly
-                ? `Cobrado R$ ${plan.yearly}/ano`
+                ? `Cobrado ${simbolo} ${plan.yearly}/ano`
                 : "Cobrança mensal";
             return (
               <div

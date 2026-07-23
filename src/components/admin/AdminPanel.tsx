@@ -57,6 +57,8 @@ import { AdminConfiguracoes } from "./AdminConfiguracoes";
 import { AdminNotificacoes } from "./AdminNotificacoes";
 import { AdminCms } from "./AdminCms";
 import { AdminPagamentos } from "./AdminPagamentos";
+import { lerConfigPublica } from "@/services/config-publica";
+import { setFusoHorario } from "@/lib/format";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
@@ -399,6 +401,8 @@ export function AdminPanel({ email }: { email: string }) {
     carregarPainelAdmin()
       .then((p) => vivo && setPainel(p))
       .catch((e) => vivo && setErro(e instanceof Error ? e.message : String(e)));
+    // ⚙️ Configurações: fuso horário de exibição das datas do painel admin
+    lerConfigPublica().then((c) => setFusoHorario(c.fuso_horario));
     return () => {
       vivo = false;
     };

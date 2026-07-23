@@ -53,6 +53,8 @@ import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
+import { lerConfigPublica } from "@/services/config-publica";
+import { setFusoHorario } from "@/lib/format";
 import { lerPerfilEmail, salvarNomeRemetente, salvarReplyTo, emailValido } from "@/services/perfil";
 import { toast } from "sonner";
 
@@ -153,6 +155,8 @@ function Dashboard() {
     listarMinhasNotificacoes()
       .then((ns) => setNaoLidas(ns.filter((n) => !n.lida_em).length))
       .catch(() => setNaoLidas(0));
+    // ⚙️ Configurações (admin): fuso horário de exibição das datas do painel
+    lerConfigPublica().then((c) => setFusoHorario(c.fuso_horario));
   }, []);
 
   useEffect(() => {
