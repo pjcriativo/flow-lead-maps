@@ -149,7 +149,14 @@ export type AdminAcao =
   | "cms_salvar"
   | "chaves_listar"
   | "chave_salvar"
-  | "chaves_auditoria_listar";
+  | "chaves_auditoria_listar"
+  | "apify_pool_listar"
+  | "apify_chave_add"
+  | "apify_chave_importar_secret"
+  | "apify_chave_remove"
+  | "apify_chave_status"
+  | "apify_chave_ordem"
+  | "apify_chave_testar";
 
 export async function adminAcao(
   acao: AdminAcao,

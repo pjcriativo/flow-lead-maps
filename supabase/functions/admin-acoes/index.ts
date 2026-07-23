@@ -9,8 +9,9 @@
 //   user_add     { email, papel? }               → cria conta + org própria (admin) ou vincula
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { cifrar } from "../_shared/cofre.ts";
+import { cifrar, decifrar } from "../_shared/cofre.ts";
 import { resolverChave } from "../_shared/chaves.ts";
+import { creditoRestanteDeLimits } from "../_shared/apify-criterio.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
 type Rec = Record<string, unknown>;
@@ -675,6 +676,208 @@ Deno.serve(async (req) => {
       if (!nome) return json({ ok: false, reason: "nome_obrigatorio" });
       const valor = await resolverChave(admin, nome);
       return json({ ok: true, configurada: !!valor, ultimos4: valor ? valor.slice(-4) : null });
+    }
+
+    // ═══ POOL DE CHAVES APIFY (rodízio por esgotamento) ═══
+    // O valor da chave NUNCA volta em nenhuma ação — só ultimos4/status/metadados.
+    if (acao === "apify_pool_listar") {
+      const { data: chaves } = await admin
+        .from("apify_chaves")
+        .select(
+          "id, apelido, ultimos4, ordem, status, esgotada_em, ultimo_uso, credito_estimado, criado_em",
+        )
+        .order("ordem", { ascending: true });
+      // gasto acumulado por chave (livro-caixa)
+      const { data: gastos } = await admin
+        .from("redes_buscas")
+        .select("chave_apelido, custo_usd")
+        .not("chave_apelido", "is", null);
+      const gastoPorChave = new Map<string, number>();
+      for (const g of gastos ?? [])
+        gastoPorChave.set(
+          g.chave_apelido as string,
+          (gastoPorChave.get(g.chave_apelido as string) ?? 0) + Number(g.custo_usd ?? 0),
+        );
+      const { data: auditoria } = await admin
+        .from("apify_chaves_auditoria")
+        .select("apelido, acao, alterado_por, alterado_em")
+        .order("alterado_em", { ascending: false })
+        .limit(20);
+      const lista = (chaves ?? []).map((c: Rec) => ({
+        ...c,
+        gasto_acumulado: gastoPorChave.get(String(c.apelido)) ?? 0,
+      }));
+      const ativas = lista.filter((c: Rec) => c.status === "ativa").length;
+      return json({ ok: true, chaves: lista, ativas, auditoria: auditoria ?? [] });
+    }
+
+    if (acao === "apify_chave_add") {
+      const apelido = String(b.apelido || "").trim();
+      const valor = String(b.valor || "").trim();
+      if (!apelido) return json({ ok: false, reason: "apelido_obrigatorio" });
+      if (valor.length < 8) return json({ ok: false, reason: "valor_invalido" });
+      const { data: ult } = await admin
+        .from("apify_chaves")
+        .select("ordem")
+        .order("ordem", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const { error } = await admin.from("apify_chaves").insert({
+        apelido,
+        valor_cifrado: await cifrar(valor),
+        ultimos4: valor.slice(-4),
+        ordem: (ult?.ordem ?? -1) + 1,
+        criado_por: userData.user.id,
+      });
+      if (error) {
+        if ((error as { code?: string }).code === "23505")
+          return json({ ok: false, reason: "apelido_duplicado" });
+        return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
+      }
+      await admin
+        .from("apify_chaves_auditoria")
+        .insert({ apelido, acao: "adicionada", alterado_por: userData.user.id });
+      return json({ ok: true });
+    }
+
+    if (acao === "apify_chave_importar_secret") {
+      // migra a chave única (cofre/secret APIFY_API_TOKEN) pro pool — o valor NUNCA sai do
+      // servidor: resolve aqui, cifra aqui, grava aqui. Útil na virada pro rodízio.
+      const apelido = String(b.apelido || "principal").trim();
+      const valor = await resolverChave(admin, "APIFY_API_TOKEN");
+      if (!valor) return json({ ok: false, reason: "secret_ausente" });
+      const { data: ult } = await admin
+        .from("apify_chaves")
+        .select("ordem")
+        .order("ordem", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const { error } = await admin.from("apify_chaves").insert({
+        apelido,
+        valor_cifrado: await cifrar(valor),
+        ultimos4: valor.slice(-4),
+        ordem: (ult?.ordem ?? -1) + 1,
+        criado_por: userData.user.id,
+      });
+      if (error) {
+        if ((error as { code?: string }).code === "23505")
+          return json({ ok: false, reason: "apelido_duplicado" });
+        return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
+      }
+      await admin
+        .from("apify_chaves_auditoria")
+        .insert({ apelido, acao: "importada_do_cofre", alterado_por: userData.user.id });
+      return json({ ok: true, ultimos4: valor.slice(-4) });
+    }
+
+    if (acao === "apify_chave_remove") {
+      const id = String(b.id || "");
+      const { data: linha } = await admin
+        .from("apify_chaves")
+        .delete()
+        .eq("id", id)
+        .select("apelido")
+        .maybeSingle();
+      if (!linha) return json({ ok: false, reason: "nao_encontrada" });
+      await admin
+        .from("apify_chaves_auditoria")
+        .insert({ apelido: linha.apelido, acao: "removida", alterado_por: userData.user.id });
+      return json({ ok: true });
+    }
+
+    if (acao === "apify_chave_status") {
+      const id = String(b.id || "");
+      const status = String(b.status || "");
+      if (!["ativa", "esgotada", "invalida", "desativada"].includes(status))
+        return json({ ok: false, reason: "status_invalido" });
+      const agora = new Date().toISOString();
+      const { data: linha } = await admin
+        .from("apify_chaves")
+        .update({
+          status,
+          atualizado_em: agora,
+          esgotada_em: status === "esgotada" ? agora : null,
+        })
+        .eq("id", id)
+        .select("apelido")
+        .maybeSingle();
+      if (!linha) return json({ ok: false, reason: "nao_encontrada" });
+      await admin.from("apify_chaves_auditoria").insert({
+        apelido: linha.apelido,
+        acao: `${status}_manual`,
+        alterado_por: userData.user.id,
+      });
+      return json({ ok: true });
+    }
+
+    if (acao === "apify_chave_ordem") {
+      const id = String(b.id || "");
+      const direcao = b.direcao === "subir" ? "subir" : "descer";
+      const { data: atual } = await admin
+        .from("apify_chaves")
+        .select("id, ordem")
+        .eq("id", id)
+        .maybeSingle();
+      if (!atual) return json({ ok: false, reason: "nao_encontrada" });
+      const { data: vizinho } = await admin
+        .from("apify_chaves")
+        .select("id, ordem")
+        [direcao === "subir" ? "lt" : "gt"]("ordem", atual.ordem)
+        .order("ordem", { ascending: direcao === "descer" })
+        .limit(1)
+        .maybeSingle();
+      if (!vizinho) return json({ ok: true, semMudanca: true });
+      await admin.from("apify_chaves").update({ ordem: vizinho.ordem }).eq("id", atual.id);
+      await admin.from("apify_chaves").update({ ordem: atual.ordem }).eq("id", vizinho.id);
+      return json({ ok: true });
+    }
+
+    if (acao === "apify_chave_testar") {
+      // chamada MÍNIMA e GRÁTIS (GET /users/me/limits) — valida a chave e mede o crédito
+      const id = String(b.id || "");
+      const { data: linha } = await admin
+        .from("apify_chaves")
+        .select("id, apelido, valor_cifrado")
+        .eq("id", id)
+        .maybeSingle();
+      if (!linha) return json({ ok: false, reason: "nao_encontrada" });
+      let tokenChave: string;
+      try {
+        tokenChave = await decifrar(linha.valor_cifrado);
+      } catch {
+        return json({ ok: false, reason: "cofre_ilegivel" });
+      }
+      const r = await fetch(
+        `https://api.apify.com/v2/users/me/limits?token=${encodeURIComponent(tokenChave)}`,
+      ).catch(() => null);
+      if (!r) return json({ ok: false, reason: "rede" });
+      if (r.status === 401) {
+        await admin
+          .from("apify_chaves")
+          .update({ status: "invalida", atualizado_em: new Date().toISOString() })
+          .eq("id", id);
+        await admin.from("apify_chaves_auditoria").insert({
+          apelido: linha.apelido,
+          acao: "invalida_teste",
+          alterado_por: userData.user.id,
+        });
+        return json({ ok: true, situacao: "invalida" });
+      }
+      const j = await r.json().catch(() => ({}));
+      const restante = creditoRestanteDeLimits(j);
+      if (restante === null) return json({ ok: false, reason: "resposta_ilegivel" });
+      await admin
+        .from("apify_chaves")
+        .update({ credito_estimado: restante, atualizado_em: new Date().toISOString() })
+        .eq("id", id);
+      return json({
+        ok: true,
+        situacao: "ok",
+        restante,
+        max: j?.data?.limits?.maxMonthlyUsageUsd ?? null,
+        uso: j?.data?.current?.monthlyUsageUsd ?? null,
+        cicloTermina: j?.data?.monthlyUsageCycle?.endAt ?? null,
+      });
     }
 
     return json({ ok: false, reason: "acao_desconhecida" });

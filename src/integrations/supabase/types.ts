@@ -49,6 +49,75 @@ export type Database = {
           },
         ];
       };
+      apify_chaves: {
+        Row: {
+          apelido: string;
+          atualizado_em: string;
+          credito_estimado: number | null;
+          criado_em: string;
+          criado_por: string | null;
+          esgotada_em: string | null;
+          id: string;
+          ordem: number;
+          status: string;
+          ultimo_uso: string | null;
+          ultimos4: string;
+          valor_cifrado: string;
+        };
+        Insert: {
+          apelido: string;
+          atualizado_em?: string;
+          credito_estimado?: number | null;
+          criado_em?: string;
+          criado_por?: string | null;
+          esgotada_em?: string | null;
+          id?: string;
+          ordem?: number;
+          status?: string;
+          ultimo_uso?: string | null;
+          ultimos4: string;
+          valor_cifrado: string;
+        };
+        Update: {
+          apelido?: string;
+          atualizado_em?: string;
+          credito_estimado?: number | null;
+          criado_em?: string;
+          criado_por?: string | null;
+          esgotada_em?: string | null;
+          id?: string;
+          ordem?: number;
+          status?: string;
+          ultimo_uso?: string | null;
+          ultimos4?: string;
+          valor_cifrado?: string;
+        };
+        Relationships: [];
+      };
+      apify_chaves_auditoria: {
+        Row: {
+          acao: string;
+          alterado_em: string;
+          alterado_por: string | null;
+          apelido: string;
+          id: string;
+        };
+        Insert: {
+          acao: string;
+          alterado_em?: string;
+          alterado_por?: string | null;
+          apelido: string;
+          id?: string;
+        };
+        Update: {
+          acao?: string;
+          alterado_em?: string;
+          alterado_por?: string | null;
+          apelido?: string;
+          id?: string;
+        };
+        Relationships: [];
+      };
       assinantes: {
         Row: {
           criado_em: string;
@@ -1464,6 +1533,7 @@ export type Database = {
       };
       redes_buscas: {
         Row: {
+          chave_apelido: string | null;
           concluida_em: string | null;
           criado_em: string;
           custo_usd: number;
@@ -1481,6 +1551,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          chave_apelido?: string | null;
           concluida_em?: string | null;
           criado_em?: string;
           custo_usd?: number;
@@ -1498,6 +1569,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          chave_apelido?: string | null;
           concluida_em?: string | null;
           criado_em?: string;
           custo_usd?: number;

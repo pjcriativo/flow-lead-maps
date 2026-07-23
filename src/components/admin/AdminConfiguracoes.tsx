@@ -402,6 +402,312 @@ function Toggle({
   );
 }
 
+/* ─────────────── Pool de chaves Apify (rodízio por esgotamento) ─────────────── */
+
+type ChavePoolApify = {
+  id: string;
+  apelido: string;
+  ultimos4: string;
+  ordem: number;
+  status: "ativa" | "esgotada" | "invalida" | "desativada";
+  esgotada_em: string | null;
+  ultimo_uso: string | null;
+  credito_estimado: number | null;
+  gasto_acumulado: number;
+};
+type AuditoriaPool = { apelido: string; acao: string; alterado_em: string };
+
+const STATUS_POOL: Record<string, { rotulo: string; cls: string }> = {
+  ativa: { rotulo: "Ativa", cls: "bg-[#16A34A]/10 text-[#15803D] border-[#16A34A]/30" },
+  esgotada: { rotulo: "Esgotada", cls: "bg-gold/10 text-gold border-gold/40" },
+  invalida: { rotulo: "Inválida", cls: "bg-destructive/10 text-destructive border-destructive/30" },
+  desativada: { rotulo: "Desativada", cls: "bg-secondary text-muted-foreground border-border" },
+};
+
+function SecaoPoolApify() {
+  const [chaves, setChaves] = useState<ChavePoolApify[] | null>(null);
+  const [ativas, setAtivas] = useState(0);
+  const [auditoria, setAuditoria] = useState<AuditoriaPool[]>([]);
+  const [apelido, setApelido] = useState("");
+  const [valor, setValor] = useState("");
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [teste, setTeste] = useState<Record<string, string>>({});
+
+  const carregar = () =>
+    adminAcao("apify_pool_listar").then((r) => {
+      if (!r.ok) return setChaves([]);
+      setChaves((r.chaves as ChavePoolApify[]) ?? []);
+      setAtivas(Number(r.ativas ?? 0));
+      setAuditoria((r.auditoria as AuditoriaPool[]) ?? []);
+    });
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  const acao = async (nome: string, payload: Record<string, unknown>, okMsg?: string) => {
+    setOcupado(nome + JSON.stringify(payload));
+    try {
+      const r = await adminAcao(nome as Parameters<typeof adminAcao>[0], payload);
+      if (r.ok) {
+        if (okMsg) toast.success(okMsg);
+        carregar();
+      } else toast.error(`Falha: ${r.reason}`);
+      return r;
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  const adicionar = async () => {
+    if (!apelido.trim() || valor.trim().length < 8) {
+      toast.error("Informe apelido e a chave completa.");
+      return;
+    }
+    const r = await acao(
+      "apify_chave_add",
+      { apelido: apelido.trim(), valor: valor.trim() },
+      "Chave adicionada ao pool.",
+    );
+    if (r?.ok) {
+      setApelido("");
+      setValor("");
+    }
+  };
+
+  const testar = async (c: ChavePoolApify) => {
+    setOcupado("testar" + c.id);
+    try {
+      const r = await adminAcao("apify_chave_testar", { id: c.id });
+      if (!r.ok) {
+        setTeste((t) => ({ ...t, [c.id]: `falha: ${r.reason}` }));
+        return;
+      }
+      if (r.situacao === "invalida") {
+        setTeste((t) => ({ ...t, [c.id]: "chave INVÁLIDA (401) — marcada" }));
+      } else {
+        setTeste((t) => ({
+          ...t,
+          [c.id]: `US$ ${Number(r.restante).toFixed(2)} restantes de US$ ${Number(r.max).toFixed(2)} (teste grátis)`,
+        }));
+      }
+      carregar();
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] transition-shadow hover:shadow-lg">
+      <div className="flex items-center gap-3 border-b border-border/70 px-6 py-4">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold/10 text-gold">
+          <KeyRound className="h-4.5 w-4.5" />
+        </span>
+        <div>
+          <h3 className="font-serif text-lg leading-tight">Pool de chaves Apify</h3>
+          <p className="text-[11px] text-muted-foreground">
+            Rodízio automático: esgotou o crédito → a próxima assume na hora, inclusive no meio de
+            uma busca. Valores cifrados; esgotada só volta quando você reativar.
+          </p>
+        </div>
+      </div>
+
+      {chaves !== null && chaves.length > 0 && ativas <= 1 && (
+        <p className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm text-foreground">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-gold" />
+          {ativas === 0
+            ? "NENHUMA chave ativa — as buscas via Apify estão PARADAS até cadastrar/reativar uma chave."
+            : "Resta apenas 1 chave ativa no pool — cadastre a próxima para o rodízio não parar."}
+        </p>
+      )}
+      {chaves !== null && chaves.length === 0 && (
+        <p className="mx-6 mt-4 rounded-xl border border-border bg-secondary/30 p-3 text-[12px] leading-relaxed text-muted-foreground">
+          Pool vazio — o sistema usa a chave única do cofre (APIFY_API_TOKEN), sem rodízio. Cadastre
+          2+ chaves abaixo para ligar a troca automática por esgotamento.
+        </p>
+      )}
+
+      <div className="divide-y divide-border/70 px-6">
+        {chaves === null && (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Carregando…
+          </p>
+        )}
+        {chaves?.map((c, i) => {
+          const st = STATUS_POOL[c.status];
+          return (
+            <div key={c.id} className="py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      onClick={() => acao("apify_chave_ordem", { id: c.id, direcao: "subir" })}
+                      disabled={i === 0 || !!ocupado}
+                      className="rounded border border-border px-1.5 text-[10px] leading-4 hover:bg-secondary disabled:opacity-30"
+                      title="Subir na ordem do rodízio"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => acao("apify_chave_ordem", { id: c.id, direcao: "descer" })}
+                      disabled={i === (chaves?.length ?? 0) - 1 || !!ocupado}
+                      className="rounded border border-border px-1.5 text-[10px] leading-4 hover:bg-secondary disabled:opacity-30"
+                      title="Descer na ordem do rodízio"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-sm font-semibold">
+                      <span className="text-muted-foreground">#{i + 1}</span> {c.apelido}
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${st.cls}`}
+                      >
+                        {st.rotulo}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      ••••••••{c.ultimos4}
+                      {c.credito_estimado != null &&
+                        ` · crédito ~US$ ${Number(c.credito_estimado).toFixed(2)}`}
+                      {` · gasto acumulado US$ ${Number(c.gasto_acumulado).toFixed(2)}`}
+                      {c.ultimo_uso &&
+                        ` · último uso ${new Date(c.ultimo_uso).toLocaleDateString("pt-BR")}`}
+                      {c.esgotada_em &&
+                        ` · esgotou em ${new Date(c.esgotada_em).toLocaleDateString("pt-BR")}`}
+                    </p>
+                    {teste[c.id] && (
+                      <p className="mt-0.5 text-[11px] font-medium text-gold">{teste[c.id]}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    onClick={() => testar(c)}
+                    disabled={!!ocupado}
+                    className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:border-gold/50 hover:bg-gold/5 disabled:opacity-50"
+                  >
+                    {ocupado === "testar" + c.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      "Testar"
+                    )}
+                  </button>
+                  {c.status === "ativa" ? (
+                    <>
+                      <button
+                        onClick={() =>
+                          acao(
+                            "apify_chave_status",
+                            { id: c.id, status: "esgotada" },
+                            "Marcada como esgotada.",
+                          )
+                        }
+                        disabled={!!ocupado}
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-secondary disabled:opacity-50"
+                      >
+                        Marcar esgotada
+                      </button>
+                      <button
+                        onClick={() =>
+                          acao(
+                            "apify_chave_status",
+                            { id: c.id, status: "desativada" },
+                            "Desativada.",
+                          )
+                        }
+                        disabled={!!ocupado}
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-secondary disabled:opacity-50"
+                      >
+                        Desativar
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() =>
+                        acao("apify_chave_status", { id: c.id, status: "ativa" }, "Reativada.")
+                      }
+                      disabled={!!ocupado}
+                      className="rounded-lg bg-gold px-2.5 py-1.5 text-xs font-semibold text-navy shadow-sm hover:shadow-md disabled:opacity-50"
+                    >
+                      Reativar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => acao("apify_chave_remove", { id: c.id }, "Removida do pool.")}
+                    disabled={!!ocupado}
+                    className="rounded-lg border border-destructive/30 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50"
+                  >
+                    Remover
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-border/70 p-6 pt-4">
+        <p className="mb-2 text-[13px] font-medium">Adicionar chave ao pool</p>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={apelido}
+            onChange={(e) => setApelido(e.target.value)}
+            placeholder="Apelido (ex.: conta-bonus-2)"
+            className="h-10 min-w-40 flex-1 rounded-lg border border-input bg-background px-3 text-sm focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25"
+          />
+          <input
+            type="password"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            placeholder="Cole a chave (apify_api_…)"
+            autoComplete="off"
+            className="h-10 min-w-52 flex-[2] rounded-lg border border-input bg-background px-3 font-mono text-sm focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25"
+          />
+          <button
+            onClick={adicionar}
+            disabled={!!ocupado || !apelido.trim() || valor.trim().length < 8}
+            className="rounded-lg bg-gold px-4 text-xs font-semibold text-navy shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+          >
+            + Adicionar
+          </button>
+        </div>
+        <button
+          onClick={() =>
+            acao(
+              "apify_chave_importar_secret",
+              { apelido: "principal" },
+              "Chave do cofre importada pro pool.",
+            )
+          }
+          disabled={!!ocupado}
+          className="mt-2 text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
+          title="Copia a chave única atual (cofre/secret APIFY_API_TOKEN) para o pool — o valor nunca sai do servidor."
+        >
+          Importar a chave única atual (cofre) para o pool
+        </button>
+      </div>
+
+      {auditoria.length > 0 && (
+        <div className="border-t border-border/70">
+          <p className="px-6 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Auditoria do pool
+          </p>
+          <div className="divide-y divide-border/50 pb-2">
+            {auditoria.slice(0, 8).map((a, i) => (
+              <div key={i} className="flex items-center justify-between px-6 py-1.5 text-[11px]">
+                <span className="font-mono">{a.apelido}</span>
+                <span className="text-muted-foreground">
+                  {a.acao} · {new Date(a.alterado_em).toLocaleString("pt-BR")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────────── Chaves e integrações ─────────────────────── */
 
 type ChaveInfo = {
@@ -951,7 +1257,12 @@ export function AdminConfiguracoes() {
             </CardSecao>
           )}
 
-          {secao === "chaves" && <SecaoChaves aoMudar={carregarChaves} />}
+          {secao === "chaves" && (
+            <div className="space-y-5">
+              <SecaoPoolApify />
+              <SecaoChaves aoMudar={carregarChaves} />
+            </div>
+          )}
 
           {secao === "seo" && (
             <CardSecao

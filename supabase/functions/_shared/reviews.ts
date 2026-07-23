@@ -1,12 +1,28 @@
 // Puxa DEPOIMENTOS REAIS + fotos reais de um place do Google via Apify (actor
 // compass~crawler-google-places, por placeIds). Roda SÓ no redesign (não na busca,
-// que fica com maxReviews=0). Token em APIFY_API_TOKEN. Custo é retornado p/ log.
+// que fica com maxReviews=0). Custo é retornado p/ log.
+//
+// 🔑 POOL DE CHAVES (Etapa 3): o START passa pelo rodízio (startRunComPool) quando o caller
+// setou o contexto (setReviewsPoolContext). Run morto no meio por crédito → a próxima chave
+// REFAZ a coleta (barata, 1 place) — reviews não têm parcial que valha preservar. Devolve
+// chaveApelido pro livro-caixa (redes_buscas.chave_apelido do registro ia_site).
+import { startRunComPool, tratarRunMorto, type ChaveApify } from "./apify-pool.ts";
+
 const ACTOR = "compass~crawler-google-places";
 const API = "https://api.apify.com/v2";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const MAX_RUNS = 3;
 
-// 🔐 Cofre de chaves: chamado 1x por request em redesign-site/index.ts (resolverChave), antes
-// de coletar reviews — Deno.env.set não funciona no runtime das Edges, por isso o cache aqui.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Admin = any;
+
+// 🔑 Contexto do pool (admin client p/ marcar/avisar/rodiziar). Sem ele → chave única.
+let _poolAdmin: Admin | null = null;
+export function setReviewsPoolContext(admin: Admin | null): void {
+  _poolAdmin = admin;
+}
+
+// Compat: caminho antigo de chave única.
 let _apifyTokenCache: string | null = null;
 export function setReviewsApifyTokenOverride(v: string | null): void {
   _apifyTokenCache = v;
@@ -26,6 +42,8 @@ export type ColetaReviews = {
   imagens: string[];
   custoUsd: number;
   debug: string;
+  /** apelido da chave do pool que pagou a coleta (null = chave única/sem coleta) */
+  chaveApelido: string | null;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,11 +76,15 @@ export async function coletarReviews(
   placeIdRaw: string | null,
   opts: { maxReviews?: number; maxImages?: number; log?: (m: string) => void } = {},
 ): Promise<ColetaReviews> {
-  const vazio: ColetaReviews = { reviews: [], imagens: [], custoUsd: 0, debug: "" };
-  const token = _apifyTokenCache ?? Deno.env.get("APIFY_API_TOKEN");
+  const vazio: ColetaReviews = {
+    reviews: [],
+    imagens: [],
+    custoUsd: 0,
+    debug: "",
+    chaveApelido: null,
+  };
   const placeId = placeIdCru(placeIdRaw);
   const log = opts.log ?? (() => {});
-  if (!token) return { ...vazio, debug: "sem APIFY_API_TOKEN" };
   if (!placeId) return { ...vazio, debug: "sem placeId" };
 
   const maxReviews = opts.maxReviews ?? 8;
@@ -79,69 +101,117 @@ export async function coletarReviews(
     scrapeReviewsPersonalData: true,
     scrapeImageAuthors: false,
   };
+  const init: RequestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  };
 
   try {
-    log(`Apify reviews: iniciando (place ${placeId}, até ${maxReviews} reviews)...`);
-    const startRes = await fetch(`${API}/acts/${ACTOR}/runs?token=${encodeURIComponent(token)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sj: any = await startRes.json().catch(() => ({}));
-    if (!startRes.ok)
-      return { ...vazio, debug: `start ${startRes.status}: ${sj?.error?.message ?? ""}` };
-    const runId = sj.data?.id;
-    const datasetId = sj.data?.defaultDatasetId;
-    if (!runId || !datasetId) return { ...vazio, debug: "start sem runId" };
-
-    const deadline = Date.now() + 150_000;
-    let status = sj.data?.status ?? "RUNNING";
-    let usd = 0;
-    const TERM = ["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"];
-    while (!TERM.includes(status)) {
-      if (Date.now() > deadline) {
-        log("Apify reviews: timeout — pego o que houver");
-        break;
-      }
-      await sleep(4000);
+    for (let rodada = 1; rodada <= MAX_RUNS; rodada++) {
+      // ── START (com rodízio quando há contexto) ──
+      let chave: ChaveApify;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const st: any = await (
-        await fetch(`${API}/actor-runs/${runId}?token=${encodeURIComponent(token)}`)
+      let sj: any;
+      if (_poolAdmin) {
+        log(
+          rodada === 1
+            ? `Apify reviews: iniciando (place ${placeId}, até ${maxReviews} reviews)...`
+            : `Apify reviews: refazendo com a próxima chave do pool (rodada ${rodada})...`,
+        );
+        const r = await startRunComPool(
+          _poolAdmin,
+          (t) => `${API}/acts/${ACTOR}/runs?token=${encodeURIComponent(t)}`,
+          init,
+        );
+        if (!r.ok) return { ...vazio, debug: `start: ${r.reason} — ${r.detalhe}` };
+        chave = r.chave;
+        sj = await r.resp.json().catch(() => ({}));
+      } else {
+        const token = _apifyTokenCache ?? Deno.env.get("APIFY_API_TOKEN");
+        if (!token) return { ...vazio, debug: "sem APIFY_API_TOKEN" };
+        chave = { id: null, apelido: "chave única", token };
+        log(`Apify reviews: iniciando (place ${placeId}, até ${maxReviews} reviews)...`);
+        const startRes = await fetch(
+          `${API}/acts/${ACTOR}/runs?token=${encodeURIComponent(token)}`,
+          init,
+        );
+        sj = await startRes.json().catch(() => ({}));
+        if (!startRes.ok)
+          return { ...vazio, debug: `start ${startRes.status}: ${sj?.error?.message ?? ""}` };
+      }
+      const runId = sj.data?.id;
+      const datasetId = sj.data?.defaultDatasetId;
+      if (!runId || !datasetId) return { ...vazio, debug: "start sem runId" };
+
+      // ── POLL (preso à chave que iniciou) ──
+      const deadline = Date.now() + 150_000;
+      let status = sj.data?.status ?? "RUNNING";
+      let usd = 0;
+      const TERM = ["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"];
+      while (!TERM.includes(status)) {
+        if (Date.now() > deadline) {
+          log("Apify reviews: timeout — pego o que houver");
+          break;
+        }
+        await sleep(4000);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const st: any = await (
+          await fetch(`${API}/actor-runs/${runId}?token=${encodeURIComponent(chave.token)}`)
+        )
+          .json()
+          .catch(() => ({}));
+        status = st.data?.status ?? status;
+        usd = st.data?.usageTotalUsd ?? usd;
+        log(`Apify reviews: ${status}${usd ? ` · ~US$ ${usd.toFixed(4)}` : ""}`);
+      }
+
+      // ── RUN MORTO? árbitro de limites decide se troca a chave e refaz ──
+      if ((status === "ABORTED" || status === "FAILED") && _poolAdmin) {
+        const veredito = await tratarRunMorto(_poolAdmin, chave, status, false);
+        if (veredito === "trocar_chave") {
+          log(`⚠️ Chave "${chave.apelido}" esgotou no meio — a próxima refaz a coleta.`);
+          continue;
+        }
+        if (veredito === "parar_sem_pool")
+          return { ...vazio, custoUsd: usd, debug: "crédito esgotado (chave única)" };
+      }
+
+      // ── DATASET ──
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const items: any[] = await (
+        await fetch(
+          `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(chave.token)}&clean=true`,
+        )
       )
         .json()
-        .catch(() => ({}));
-      status = st.data?.status ?? status;
-      usd = st.data?.usageTotalUsd ?? usd;
-      log(`Apify reviews: ${status}${usd ? ` · ~US$ ${usd.toFixed(4)}` : ""}`);
+        .catch(() => []);
+      const it = items[0] ?? {};
+      const reviews = (it.reviews ?? [])
+        .map(mapReview)
+        .filter((r: ReviewReal | null): r is ReviewReal => !!r && r.text.length >= 15)
+        .slice(0, maxReviews);
+      const imagens: string[] = (it.imageUrls ?? it.images ?? [])
+        .map((x: unknown) => {
+          if (typeof x === "string") return x;
+          const o = (x ?? {}) as { imageUrl?: string; url?: string };
+          return o.imageUrl ?? o.url;
+        })
+        .filter((u: unknown): u is string => typeof u === "string" && /^https?:\/\//.test(u))
+        .slice(0, maxImages);
+
+      log(
+        `Apify reviews: ${reviews.length} depoimentos, ${imagens.length} fotos · ~US$ ${usd.toFixed(4)}`,
+      );
+      return {
+        reviews,
+        imagens,
+        custoUsd: usd,
+        debug: `ok: ${reviews.length} reviews`,
+        chaveApelido: chave.id ? chave.apelido : null,
+      };
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const items: any[] = await (
-      await fetch(
-        `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=true`,
-      )
-    )
-      .json()
-      .catch(() => []);
-    const it = items[0] ?? {};
-    const reviews = (it.reviews ?? [])
-      .map(mapReview)
-      .filter((r: ReviewReal | null): r is ReviewReal => !!r && r.text.length >= 15)
-      .slice(0, maxReviews);
-    const imagens: string[] = (it.imageUrls ?? it.images ?? [])
-      .map((x: unknown) => {
-        if (typeof x === "string") return x;
-        const o = (x ?? {}) as { imageUrl?: string; url?: string };
-        return o.imageUrl ?? o.url;
-      })
-      .filter((u: unknown): u is string => typeof u === "string" && /^https?:\/\//.test(u))
-      .slice(0, maxImages);
-
-    log(
-      `Apify reviews: ${reviews.length} depoimentos, ${imagens.length} fotos · ~US$ ${usd.toFixed(4)}`,
-    );
-    return { reviews, imagens, custoUsd: usd, debug: `ok: ${reviews.length} reviews` };
+    return { ...vazio, debug: "esgotou as tentativas de run" };
   } catch (e) {
     return { ...vazio, debug: `erro: ${e instanceof Error ? e.message : String(e)}` };
   }

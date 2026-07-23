@@ -6,7 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { coletarConteudoSite } from "../_shared/materiaprima.ts";
-import { coletarReviews, setReviewsApifyTokenOverride } from "../_shared/reviews.ts";
+import { coletarReviews, setReviewsPoolContext } from "../_shared/reviews.ts";
 import {
   getProviderChain,
   sanearRegistros,
@@ -29,7 +29,6 @@ import {
 import { mesRefAtual, CUSTO_SITE_ESTIMADO_USD } from "../../../src/lib/automacao-teto.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
 import { orgDoUsuario, consumir } from "../_shared/limite.ts";
-import { resolverChave } from "../_shared/chaves.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -78,7 +77,8 @@ Deno.serve(async (req) => {
   // 🔐 Cofre de chaves: ANTHROPIC_API_KEY/OPENAI_API_KEY (usadas por getProviderChain mais
   // abaixo) e APIFY_API_TOKEN (usada por coletarReviews) passam a valer o override do painel.
   await inicializarCofreIa(admin);
-  setReviewsApifyTokenOverride(await resolverChave(admin, "APIFY_API_TOKEN"));
+  // 🔑 Pool de chaves Apify: as reviews resolvem/rotacionam sozinhas (fallback: chave única)
+  setReviewsPoolContext(admin);
   // ⚙️ CONFIGURAÇÕES (admin): teto override — null = usa o padrão de redes-teto.ts
   const configPlataforma = await lerConfigPlataforma(admin);
   const TETO_RODADA = configPlataforma.teto_rodada_usd ?? TETO_RODADA_USD;
@@ -94,6 +94,8 @@ Deno.serve(async (req) => {
     0,
   );
   const plano = planejarColeta(gastoMes, 1, TETO_RODADA, TETO_MES, CUSTO_SITE_ESTIMADO_USD);
+  // 📒 preenchida quando a coleta de reviews volta — o livro-caixa registra QUAL chave gastou
+  let chaveApifyUsada: string | null = null;
   const registrarGasto = async (
     status: "concluida" | "parada_teto" | "erro",
     custoUsd: number,
@@ -111,6 +113,7 @@ Deno.serve(async (req) => {
       inseridos: gerou ? 1 : 0,
       status,
       detalhe,
+      chave_apelido: chaveApifyUsada,
       mes_ref: mesRef,
       concluida_em: new Date().toISOString(),
     });
@@ -169,6 +172,7 @@ Deno.serve(async (req) => {
       raspar ? coletarConteudoSite(lead.website) : Promise.resolve(null),
       coletarReviews(lead.place_id, { maxReviews: 8, maxImages: 6, log }),
     ]);
+    chaveApifyUsada = coleta.chaveApelido;
 
     // Fotos reais: do site atual + do Google (Apify).
     const imagens = [...(siteC?.imagens ?? []), ...coleta.imagens].filter(

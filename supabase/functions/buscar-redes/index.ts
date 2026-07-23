@@ -21,7 +21,12 @@ import {
 } from "../../../src/lib/redes-teto.ts";
 import { mesRefAtual } from "../../../src/lib/automacao-teto.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
-import { resolverChave } from "../_shared/chaves.ts";
+import {
+  carregarPoolApify,
+  startRunComPool,
+  tratarRunMorto,
+  type ChaveApify,
+} from "../_shared/apify-pool.ts";
 import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
 
 const API = "https://api.apify.com/v2";
@@ -141,10 +146,23 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
-  // 🔐 Cofre de chaves (admin → Configurações → Chaves e integrações): resolve ANTES de checar
-  // a chave — senão uma chave só cadastrada no cofre pareceria "não configurada".
-  _apifyTokenCache = await resolverChave(admin, "APIFY_API_TOKEN");
-  if (!token()) return json({ error: "APIFY_API_TOKEN não configurada" }, 503);
+  // 🔑 POOL DE CHAVES (Etapa 3): a chave corrente do rodízio alimenta o token() usado pelo
+  // "verificar" (checarAtor, grátis). Pool vazio cai na chave única do cofre/secret; pool
+  // configurado mas todo esgotado → PARAR com aviso claro, nunca falhar calado.
+  const poolInicial = await carregarPoolApify(admin);
+  _apifyTokenCache = poolInicial.chaves[0]?.token ?? null;
+  // ⚠️ Guard EXPLÍCITO no pool (não em token(), que tem fallback pro secret do env): com o
+  // pool CONFIGURADO, ele é a fonte da verdade — todo indisponível = PARAR com aviso, nunca
+  // cair calado no secret (furo pego pela prova adversarial).
+  if (poolInicial.chaves.length === 0)
+    return json(
+      {
+        error: poolInicial.poolConfigurado
+          ? "Todas as chaves Apify do pool estão esgotadas/indisponíveis — cadastre ou reative uma em Configurações → Chaves e integrações."
+          : "APIFY_API_TOKEN não configurada",
+      },
+      503,
+    );
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(
@@ -251,61 +269,141 @@ Deno.serve(async (req) => {
       resultsLimit: plano.maxItens,
       maxItems: plano.maxItens,
     };
-    const start = await fetch(
-      `${API}/acts/${cfg.ator}/runs?token=${encodeURIComponent(token())}&timeout=300&memory=1024`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      },
-    );
-    if (!start.ok) {
-      const t = await start.text().catch(() => "");
-      await finalizar({ status: "erro", detalhe: `Apify ${start.status}: ${t.slice(0, 200)}` });
-      return json({
-        ok: false,
-        reason: "apify_falhou",
-        status: start.status,
-        detalhe: t.slice(0, 300),
-      });
-    }
-    const runId = (await start.json())?.data?.id;
+    const initStart: RequestInit = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    };
 
-    // aguarda o run (com teto de tempo — o edge não pode ficar preso)
-    let status = "READY";
-    let custo = 0;
-    let datasetId: string | null = null;
-    for (let i = 0; i < 100; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
-      const st = await fetch(`${API}/actor-runs/${runId}?token=${encodeURIComponent(token())}`);
-      const sj = await st.json().catch(() => ({}) as Rec);
-      status = sj?.data?.status ?? "UNKNOWN";
-      custo = Number(sj?.data?.usageTotalUsd ?? 0);
-      datasetId = sj?.data?.defaultDatasetId ?? null;
-      if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
-      // trava de segurança: se o run já passou do teto da rodada, aborta na hora
-      if (custo >= TETO_RODADA) {
-        await fetch(`${API}/actor-runs/${runId}/abort?token=${encodeURIComponent(token())}`, {
-          method: "POST",
-        }).catch(() => {});
+    // ═══ ETAPA 3 — NÃO DEIXAR CAIR: laço de rodadas com rodízio de chaves ═══
+    // Crédito acaba no meio → colhe o PARCIAL do run morto (dataset sobrevive), marca a
+    // chave, a próxima REINICIA o run — o upsert (user_id, place_id) elimina duplicata.
+    // Só falha de verdade se TODAS as chaves acabarem (e ainda entrega o parcial se houver).
+    const MAX_RODADAS = 4;
+    const itens: Rec[] = [];
+    let custoTotal = 0;
+    let chaveUsada: ChaveApify | null = null;
+    let trocasDeChave = 0;
+    let avisoChaves: string | null = null;
+
+    const colherDataset = async (dsId: string | null, tok: string) => {
+      if (!dsId) return;
+      const dsRes = await fetch(
+        `${API}/datasets/${dsId}/items?token=${encodeURIComponent(tok)}&limit=${plano.maxItens}`,
+      ).catch(() => null);
+      const parcial: Rec[] = (await dsRes?.json().catch(() => [])) ?? [];
+      itens.push(...parcial);
+    };
+
+    for (let rodada = 1; rodada <= MAX_RODADAS; rodada++) {
+      const r = await startRunComPool(
+        admin,
+        (t) =>
+          `${API}/acts/${cfg.ator}/runs?token=${encodeURIComponent(t)}&timeout=300&memory=1024`,
+        initStart,
+      );
+      if (!r.ok) {
+        if ((r.reason === "pool_esgotado" || r.reason === "sem_chave") && itens.length > 0) {
+          avisoChaves = "Crédito das chaves acabou no meio — aproveitando o que já foi coletado.";
+          break; // processa o parcial em vez de jogar fora
+        }
         await finalizar({
-          status: "parada_teto",
-          custo_usd: custo,
-          detalhe: "run abortado no teto",
+          status: "erro",
+          custo_usd: custoTotal,
+          detalhe:
+            r.reason === "pool_esgotado"
+              ? "todas as chaves Apify esgotadas"
+              : `Apify ${r.status ?? ""}: ${r.detalhe.slice(0, 180)}`,
+          chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
         });
-        return json({ ok: false, reason: "teto_no_run", custo });
+        return json({
+          ok: false,
+          reason: r.reason === "pool_esgotado" ? "chaves_esgotadas" : "apify_falhou",
+          status: r.status,
+          detalhe: r.detalhe,
+        });
       }
-    }
+      chaveUsada = r.chave;
+      trocasDeChave += r.trocas;
+      const startJson = (await r.resp.json().catch(() => ({}))) as Rec;
+      const runId = startJson?.data?.id;
+      let datasetId: string | null = startJson?.data?.defaultDatasetId ?? null;
 
-    if (status !== "SUCCEEDED" || !datasetId) {
-      await finalizar({ status: "erro", custo_usd: custo, detalhe: `run ${status}` });
-      return json({ ok: false, reason: "run_nao_concluiu", status, custo });
-    }
+      // aguarda o run (com teto de tempo — o edge não pode ficar preso)
+      let status = "READY";
+      let custoRodada = 0;
+      for (let i = 0; i < 100; i++) {
+        await new Promise((rr) => setTimeout(rr, 3000));
+        const st = await fetch(
+          `${API}/actor-runs/${runId}?token=${encodeURIComponent(chaveUsada.token)}`,
+        );
+        const sj = await st.json().catch(() => ({}) as Rec);
+        status = sj?.data?.status ?? "UNKNOWN";
+        custoRodada = Number(sj?.data?.usageTotalUsd ?? 0);
+        datasetId = sj?.data?.defaultDatasetId ?? datasetId;
+        if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
+        // trava de segurança: se a BUSCA já passou do teto da rodada, aborta na hora
+        if (custoTotal + custoRodada >= TETO_RODADA) {
+          await fetch(
+            `${API}/actor-runs/${runId}/abort?token=${encodeURIComponent(chaveUsada.token)}`,
+            { method: "POST" },
+          ).catch(() => {});
+          await finalizar({
+            status: "parada_teto",
+            custo_usd: custoTotal + custoRodada,
+            detalhe: "run abortado no teto",
+            chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
+          });
+          return json({ ok: false, reason: "teto_no_run", custo: custoTotal + custoRodada });
+        }
+      }
+      custoTotal += custoRodada;
 
-    const dsRes = await fetch(
-      `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(token())}&limit=${plano.maxItens}`,
-    );
-    const itens: Rec[] = await dsRes.json().catch(() => []);
+      if (status === "SUCCEEDED") {
+        await colherDataset(datasetId, chaveUsada.token);
+        break;
+      }
+
+      if (status === "ABORTED" || status === "FAILED") {
+        // parcial do run morto primeiro (o dataset do run morto continua legível)
+        await colherDataset(datasetId, chaveUsada.token);
+        const veredito = await tratarRunMorto(admin, chaveUsada, status, false);
+        if (veredito === "trocar_chave") {
+          trocasDeChave++;
+          avisoChaves = `A busca continuou em outra chave (a "${chaveUsada.apelido}" esgotou no meio).`;
+          continue; // a PRÓXIMA chave reinicia o run — dedupe elimina repetidos
+        }
+        if (veredito === "parar_sem_pool" && itens.length > 0) {
+          avisoChaves = "Crédito esgotou no meio — aproveitando o que já foi coletado.";
+          break;
+        }
+        await finalizar({
+          status: "erro",
+          custo_usd: custoTotal,
+          detalhe:
+            veredito === "parar_sem_pool"
+              ? "crédito Apify esgotado (chave única)"
+              : `run ${status}`,
+          chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
+        });
+        return json({
+          ok: false,
+          reason: veredito === "parar_sem_pool" ? "chaves_esgotadas" : "run_nao_concluiu",
+          status,
+          custo: custoTotal,
+        });
+      }
+
+      // TIMED-OUT / UNKNOWN — falha do run, não de crédito: sem rodízio (comportamento antigo)
+      await finalizar({
+        status: "erro",
+        custo_usd: custoTotal,
+        detalhe: `run ${status}`,
+        chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
+      });
+      return json({ ok: false, reason: "run_nao_concluiu", status, custo: custoTotal });
+    }
+    const custo = custoTotal;
 
     // ---------- MESMO PIPELINE: vira `leads`, passa pelo MESMO score ----------
     let inseridos = 0;
@@ -405,7 +503,9 @@ Deno.serve(async (req) => {
       custo_usd: custo,
       encontrados: itens.length,
       inseridos,
-      detalhe: estourou ? "custo real bateu o teto" : null,
+      // 📒 livro-caixa agora registra QUAL chave gastou + o rastro do rodízio
+      chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
+      detalhe: estourou ? "custo real bateu o teto" : (avisoChaves ?? null),
     });
 
     return json({
@@ -427,6 +527,10 @@ Deno.serve(async (req) => {
       gastoMesDepois: gastoMes + custo,
       teto: { rodada: TETO_RODADA, mes: TETO_MES },
       estourou,
+      // rastro do rodízio — a UI mostra sem susto ("a busca continuou em outra chave")
+      chaveApelido: chaveUsada?.id ? chaveUsada.apelido : null,
+      trocasDeChave,
+      avisoChaves,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
