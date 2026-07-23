@@ -3,6 +3,27 @@
 Registro honesto do que está devendo. Uma dívida sai daqui quando for PAGA (com
 prova), não quando for esquecida.
 
+## 0. Cobrança recorrente — CAMADA 3 do billing (registrada em 2026-07-22)
+
+**O que existe:** o billing está pronto até a camada 2 — cadastro de planos
+(`planos`, migration 045), org aponta pra um plano (`orgs.plano_id`), e a
+MEDIÇÃO + APLICAÇÃO de limite por org já roda (`consumo_org` + função
+`consumir_ou_bloquear`, migration 046; instrumentada em `search-leads` e
+`redesign-site`). Ao bater o limite do plano, a ação é bloqueada com aviso.
+
+**O que FALTA (camada 3 — NÃO construir agora):** cobrança recorrente de verdade.
+Depende de um gateway (Stripe / Mercado Pago) que o **dono vai escolher**. Para
+plugar depois, o modelo já está pronto:
+- `orgs.plano_id` diz o que a org assina;
+- faltam: `assinaturas` (status, ciclo, gateway_customer_id, gateway_sub_id),
+  webhook do gateway para ativar/suspender por pagamento, e a troca de plano na
+  Ut (hoje o plano da org só muda por SQL/serviço).
+- Regra ao ligar: assinatura vencida/suspensa → org cai para um plano gratuito
+  ou é bloqueada (decisão do dono), reusando o mesmo `consumir_ou_bloquear`.
+
+**Até lá:** os planos funcionam como limite operacional (freio de uso), não como
+cobrança. Ninguém é cobrado; o `preco` dos planos é só catálogo.
+
 ## 1. Gasto Apify CEGO anterior ao livro-caixa (registrada em 2026-07-22)
 
 **O que é:** as 2 buscas de Maps via provider `apify` feitas ANTES do livro-caixa

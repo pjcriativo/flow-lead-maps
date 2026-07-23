@@ -26,6 +26,7 @@ import {
   TETO_MES_USD,
 } from "../../../src/lib/redes-teto.ts";
 import { mesRefAtual, CUSTO_SITE_ESTIMADO_USD } from "../../../src/lib/automacao-teto.ts";
+import { orgDoUsuario, consumir } from "../_shared/limite.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -112,6 +113,23 @@ Deno.serve(async (req) => {
       teto: { rodada: TETO_RODADA_USD, mes: TETO_MES_USD },
     });
   }
+
+  // 📊 LIMITE DO PLANO (billing camada 2): gerar site consome a cota "sites" da org.
+  // Conta e bloqueia de forma atômica; super_admin/dono da plataforma é ilimitado.
+  const orgId = await orgDoUsuario(admin, userId);
+  if (orgId) {
+    const cota = await consumir(admin, orgId, "sites", 1);
+    if (!cota.ok && cota.reason === "limite_atingido") {
+      return json({
+        error: `Limite de sites do seu plano atingido: ${cota.usado}/${cota.limite} neste mês. Faça upgrade do plano para gerar mais.`,
+        reason: "limite_plano",
+        recurso: "sites",
+        usado: cota.usado,
+        limite: cota.limite,
+      });
+    }
+  }
+
   // custo já incorrido (Apify de reviews + IA) — vai pro livro-caixa MESMO se a geração falhar
   let custoJaIncorridoUsd = 0;
 

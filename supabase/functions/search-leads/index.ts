@@ -16,6 +16,7 @@ import { computeScore } from "../_shared/score.ts";
 import { firstBrWhatsapp } from "../_shared/phone.ts";
 import { extrairBairro } from "../../../src/lib/bairro.ts";
 import { geocodeCidade } from "../_shared/geocode.ts";
+import { orgDoUsuario, estadoConsumo, consumir } from "../_shared/limite.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
@@ -50,6 +51,14 @@ Deno.serve(async (req) => {
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
   const userId = userData.user.id;
+
+  // service role para medir o consumo do plano (funções SECURITY DEFINER; resolvem a org)
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  const orgId = await orgDoUsuario(admin, userId);
 
   let body: Body;
   try {
@@ -129,10 +138,34 @@ Deno.serve(async (req) => {
 
         send({ type: "log", message: `${candidates.length} candidatos únicos. Qualificando...` });
 
+        // 📊 LIMITE DO PLANO (billing camada 2): quantos leads a org AINDA pode coletar no mês.
+        // super_admin/dono da plataforma = ilimitado (restante null). Bloqueia se já zerou;
+        // senão limita a rodada ao que resta (nunca estoura calado).
+        let tetoLeads = limite;
+        if (orgId) {
+          const st = await estadoConsumo(admin, orgId, "leads");
+          if (st.limite != null) {
+            if ((st.restante ?? 0) <= 0) {
+              send({
+                type: "error",
+                message: `Limite de leads do seu plano atingido: ${st.usado}/${st.limite} neste mês. Faça upgrade do plano para coletar mais.`,
+              });
+              controller.close();
+              return;
+            }
+            tetoLeads = Math.min(limite, st.restante ?? limite);
+            if (st.perto)
+              send({
+                type: "log",
+                message: `⚠️ Perto do limite do plano: ${st.usado}/${st.limite} leads usados neste mês.`,
+              });
+          }
+        }
+
         // Fase 2 (comum a toda fonte): enriquecer, pontuar e gravar.
         let inserted = 0;
         for (const p of candidates) {
-          if (inserted >= limite) break;
+          if (inserted >= tetoLeads) break;
 
           // Às vezes o "site" cadastrado é, na verdade, um perfil de Instagram/Facebook.
           let website = p.website;
@@ -217,6 +250,10 @@ Deno.serve(async (req) => {
           send({ type: "lead", lead: up });
           send({ type: "progress", found: inserted, target: limite });
         }
+
+        // registra o consumo REAL do mês (só o que entrou). super_admin também conta (para o
+        // painel mostrar uso), mas nunca é bloqueado (limite null).
+        if (orgId && inserted > 0) await consumir(admin, orgId, "leads", inserted);
 
         send({ type: "done", inserted, total: inserted, fonte });
         controller.close();
