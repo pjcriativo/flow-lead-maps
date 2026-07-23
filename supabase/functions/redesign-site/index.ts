@@ -26,6 +26,7 @@ import {
   TETO_MES_USD,
 } from "../../../src/lib/redes-teto.ts";
 import { mesRefAtual, CUSTO_SITE_ESTIMADO_USD } from "../../../src/lib/automacao-teto.ts";
+import { lerConfigPlataforma } from "../_shared/config.ts";
 import { orgDoUsuario, consumir } from "../_shared/limite.ts";
 
 Deno.serve(async (req) => {
@@ -72,6 +73,10 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
+  // ⚙️ CONFIGURAÇÕES (admin): teto override — null = usa o padrão de redes-teto.ts
+  const configPlataforma = await lerConfigPlataforma(admin);
+  const TETO_RODADA = configPlataforma.teto_rodada_usd ?? TETO_RODADA_USD;
+  const TETO_MES = configPlataforma.teto_mes_usd ?? TETO_MES_USD;
   const mesRef = mesRefAtual(new Date());
   const { data: doMes } = await admin
     .from("redes_buscas")
@@ -82,7 +87,7 @@ Deno.serve(async (req) => {
     (s: number, r: { custo_usd: unknown }) => s + Number(r.custo_usd ?? 0),
     0,
   );
-  const plano = planejarColeta(gastoMes, 1, TETO_RODADA_USD, TETO_MES_USD, CUSTO_SITE_ESTIMADO_USD);
+  const plano = planejarColeta(gastoMes, 1, TETO_RODADA, TETO_MES, CUSTO_SITE_ESTIMADO_USD);
   const registrarGasto = async (
     status: "concluida" | "parada_teto" | "erro",
     custoUsd: number,
@@ -110,7 +115,7 @@ Deno.serve(async (req) => {
       error: `Teto de gasto do mês atingido — geração de site bloqueada (${plano.motivo}). O teto zera na virada do mês.`,
       reason: "teto",
       gastoMes,
-      teto: { rodada: TETO_RODADA_USD, mes: TETO_MES_USD },
+      teto: { rodada: TETO_RODADA, mes: TETO_MES },
     });
   }
 
@@ -360,7 +365,7 @@ Deno.serve(async (req) => {
 
     // 💸 registra a geração no livro-caixa com o custo REAL. Se o custo real bateu o teto,
     // fica 'parada_teto' — e a PRÓXIMA geração é recusada pelo portão lá de cima.
-    const tetoEstourou = estourouColeta(custoTotal, gastoMes);
+    const tetoEstourou = estourouColeta(custoTotal, gastoMes, TETO_RODADA, TETO_MES);
     await registrarGasto(
       tetoEstourou ? "parada_teto" : "concluida",
       custoTotal,
@@ -376,7 +381,7 @@ Deno.serve(async (req) => {
       usage: {
         gastoMesDepois: gastoMes + custoTotal,
         tetoEstourou,
-        tetoMesUsd: TETO_MES_USD,
+        tetoMesUsd: TETO_MES,
         template: nicho,
         provider,
         modelo,

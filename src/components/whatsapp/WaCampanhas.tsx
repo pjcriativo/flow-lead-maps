@@ -39,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { formatData } from "@/lib/format";
 import type { Campanha } from "@/types";
 import {
@@ -135,6 +136,21 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
   const [variacoes, setVariacoes] = useState<WaVariacao[]>(() => variacoesPadrao());
   const [intervaloBase, setIntervaloBase] = useState(35);
   const [variar, setVariar] = useState(true);
+  const [tetoMaxAbs, setTetoMaxAbs] = useState(WA_INTERVALO_MAX_ABS);
+
+  // ⚙️ Configurações (admin): intervalo padrão de disparo — override de config_plataforma,
+  // aplicado só uma vez ao entrar na tela (o usuário pode mudar o slider depois à vontade).
+  useEffect(() => {
+    supabase
+      .from("config_plataforma")
+      .select("intervalo_disparo_min_seg, intervalo_disparo_max_seg")
+      .eq("id", true)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.intervalo_disparo_min_seg) setIntervaloBase(data.intervalo_disparo_min_seg);
+        if (data?.intervalo_disparo_max_seg) setTetoMaxAbs(data.intervalo_disparo_max_seg);
+      });
+  }, []);
 
   const [disparando, setDisparando] = useState(false);
   const [ocupado, setOcupado] = useState<"preparar" | "aprovar" | "disparar" | null>(null);
@@ -218,7 +234,7 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
 
   const intervaloMin = intervaloBase;
   const intervaloMax = variar
-    ? Math.min(WA_INTERVALO_MAX_ABS, Math.round(intervaloBase * 1.5))
+    ? Math.min(tetoMaxAbs, Math.round(intervaloBase * 1.5))
     : intervaloBase;
 
   const toggle = (id: string) =>
@@ -939,7 +955,7 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
               <Slider
                 value={[intervaloBase]}
                 min={WA_INTERVALO_MIN_ABS}
-                max={WA_INTERVALO_MAX_ABS}
+                max={tetoMaxAbs}
                 step={1}
                 onValueChange={([v]) => setIntervaloBase(v)}
                 className="flex-1"
@@ -949,11 +965,11 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                   type="number"
                   value={intervaloBase}
                   min={WA_INTERVALO_MIN_ABS}
-                  max={WA_INTERVALO_MAX_ABS}
+                  max={tetoMaxAbs}
                   onChange={(e) =>
                     setIntervaloBase(
                       Math.min(
-                        WA_INTERVALO_MAX_ABS,
+                        tetoMaxAbs,
                         Math.max(WA_INTERVALO_MIN_ABS, parseInt(e.target.value) || 0),
                       ),
                     )
@@ -965,7 +981,7 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
             </div>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>
-                Mín 15 · Máx 180 · Recomendado 35–60
+                Mín {WA_INTERVALO_MIN_ABS} · Máx {tetoMaxAbs} · Recomendado 35–60
                 {variar ? ` → varia entre ${intervaloMin} e ${intervaloMax}s` : ""}
               </span>
               <label className="flex items-center gap-1">

@@ -375,6 +375,47 @@ Deno.serve(async (req) => {
       });
     }
 
+    // config_ler / config_salvar — a linha ÚNICA de config_plataforma (id=true). Cada campo
+    // aqui é lido por uma edge de verdade (buscar-redes, redesign-site, send-proposal,
+    // publicacao.core, WaCampanhas) como OVERRIDE do valor padrão — nunca decorativo.
+    if (acao === "config_ler") {
+      const { data: config } = await admin
+        .from("config_plataforma")
+        .select("*")
+        .eq("id", true)
+        .maybeSingle();
+      return json({ ok: true, config: config ?? {} });
+    }
+
+    if (acao === "config_salvar") {
+      const NUMERICOS = [
+        "teto_rodada_usd",
+        "teto_mes_usd",
+        "dias_validade_site",
+        "intervalo_disparo_min_seg",
+        "intervalo_disparo_max_seg",
+      ] as const;
+      const TEXTOS = ["remetente_nome_padrao", "remetente_email_padrao"] as const;
+      const patch: Rec = {};
+      for (const campo of NUMERICOS) {
+        if (campo in b) {
+          const v = b[campo];
+          patch[campo] = v === null || v === "" ? null : Number(v);
+        }
+      }
+      for (const campo of TEXTOS) {
+        if (campo in b) {
+          const v = b[campo];
+          patch[campo] = typeof v === "string" && v.trim() ? v.trim() : null;
+        }
+      }
+      if (Object.keys(patch).length === 0) return json({ ok: false, reason: "nada_para_salvar" });
+      patch.atualizado_em = new Date().toISOString();
+      const { error } = await admin.from("config_plataforma").update(patch).eq("id", true);
+      if (error) return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
+      return json({ ok: true });
+    }
+
     return json({ ok: false, reason: "acao_desconhecida" });
   } catch (e) {
     return json({ ok: false, reason: "erro", detalhe: e instanceof Error ? e.message : String(e) });

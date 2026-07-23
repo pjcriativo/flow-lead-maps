@@ -339,6 +339,42 @@ export type Database = {
           },
         ];
       };
+      config_plataforma: {
+        Row: {
+          atualizado_em: string;
+          dias_validade_site: number | null;
+          id: boolean;
+          intervalo_disparo_max_seg: number | null;
+          intervalo_disparo_min_seg: number | null;
+          remetente_email_padrao: string | null;
+          remetente_nome_padrao: string | null;
+          teto_mes_usd: number | null;
+          teto_rodada_usd: number | null;
+        };
+        Insert: {
+          atualizado_em?: string;
+          dias_validade_site?: number | null;
+          id?: boolean;
+          intervalo_disparo_max_seg?: number | null;
+          intervalo_disparo_min_seg?: number | null;
+          remetente_email_padrao?: string | null;
+          remetente_nome_padrao?: string | null;
+          teto_mes_usd?: number | null;
+          teto_rodada_usd?: number | null;
+        };
+        Update: {
+          atualizado_em?: string;
+          dias_validade_site?: number | null;
+          id?: boolean;
+          intervalo_disparo_max_seg?: number | null;
+          intervalo_disparo_min_seg?: number | null;
+          remetente_email_padrao?: string | null;
+          remetente_nome_padrao?: string | null;
+          teto_mes_usd?: number | null;
+          teto_rodada_usd?: number | null;
+        };
+        Relationships: [];
+      };
       consumo_org: {
         Row: {
           atualizado_em: string;

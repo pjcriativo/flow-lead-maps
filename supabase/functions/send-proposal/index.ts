@@ -8,6 +8,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { montarFrom } from "../_shared/remetente.ts";
 import { orgDoUsuario, consumir } from "../_shared/limite.ts";
+import { lerConfigPlataforma } from "../_shared/config.ts";
 
 // Identidade do remetente. EMAIL_FROM é GLOBAL hoje (uma reputação de domínio p/
 // todas as orgs). TODO (blueprint — identidade de envio por org): cada org deve ter
@@ -94,7 +95,11 @@ Deno.serve(async (req) => {
   const RESEND = Deno.env.get("RESEND_API_KEY");
   if (!RESEND)
     return json({ ok: false, error: "Envio indisponível: RESEND_API_KEY não configurada." });
-  const from = Deno.env.get("EMAIL_FROM") || DEFAULT_FROM;
+  // ⚙️ CONFIGURAÇÕES (admin): remetente padrão — se a org não tem o próprio nome cadastrado,
+  // usa o nome padrão da plataforma em vez de bloquear o envio (config_plataforma).
+  const configPlataforma = await lerConfigPlataforma(supabase);
+  const from =
+    configPlataforma.remetente_email_padrao || Deno.env.get("EMAIL_FROM") || DEFAULT_FROM;
 
   // REPLY-TO da org: é onde a resposta do lead cai. Sem ele, o e-mail pede "responde este
   // e-mail" e a resposta some numa caixa que o dono não lê — pior do que não enviar. Barra.
@@ -115,8 +120,11 @@ Deno.serve(async (req) => {
     });
 
   // From com o NOME PESSOAL da org (o lead não pode ver a marca da plataforma na caixa
-  // dele). O DOMÍNIO continua o verificado — só o nome de exibição muda.
-  const fromPessoal = montarFrom(from, p?.full_name);
+  // dele). O DOMÍNIO continua o verificado — só o nome de exibição muda. Sem nome próprio,
+  // cai no nome padrão da plataforma (config_plataforma.remetente_nome_padrao) em vez de
+  // bloquear — só bloqueia se NENHUM dos dois existir.
+  const nomeEfetivo = p?.full_name || configPlataforma.remetente_nome_padrao;
+  const fromPessoal = montarFrom(from, nomeEfetivo);
   if (!fromPessoal)
     return json({
       ok: false,

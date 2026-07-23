@@ -88,9 +88,18 @@ export async function publishCore(opts: {
       continue;
     }
 
+    // ⚙️ Configurações (admin): dias de validade do site — override de config_plataforma,
+    // cai no padrão (DIAS_VALIDADE) se a linha/campo não existir. RLS: qualquer autenticado lê.
+    const { data: config } = await db
+      .from("config_plataforma")
+      .select("dias_validade_site")
+      .eq("id", true)
+      .maybeSingle();
+    const diasValidade = config?.dias_validade_site ?? DIAS_VALIDADE;
+
     const agora = new Date();
     const expira = new Date(agora);
-    expira.setDate(expira.getDate() + DIAS_VALIDADE);
+    expira.setDate(expira.getDate() + diasValidade);
     const url = `${baseUrl}/site/${slug}`;
 
     const { data: row, error: insErr } = await db

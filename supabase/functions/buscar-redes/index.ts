@@ -20,6 +20,7 @@ import {
   TETO_MES_USD,
 } from "../../../src/lib/redes-teto.ts";
 import { mesRefAtual } from "../../../src/lib/automacao-teto.ts";
+import { lerConfigPlataforma } from "../_shared/config.ts";
 import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
 
 const API = "https://api.apify.com/v2";
@@ -148,6 +149,11 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
 
+  // ⚙️ CONFIGURAÇÕES (admin): teto de gasto override — null = usa o padrão de redes-teto.ts
+  const configPlataforma = await lerConfigPlataforma(admin);
+  const TETO_RODADA = configPlataforma.teto_rodada_usd ?? TETO_RODADA_USD;
+  const TETO_MES = configPlataforma.teto_mes_usd ?? TETO_MES_USD;
+
   let b: Rec = {};
   try {
     b = await req.json();
@@ -166,7 +172,7 @@ Deno.serve(async (req) => {
     const atores: Rec = {};
     for (const [estr, cfg] of Object.entries(ATOR))
       atores[estr] = { ator: cfg.ator, ...(vistos.get(cfg.ator) as Rec) };
-    return json({ ok: true, atores, teto: { rodada: TETO_RODADA_USD, mes: TETO_MES_USD } });
+    return json({ ok: true, atores, teto: { rodada: TETO_RODADA, mes: TETO_MES } });
   }
 
   // ---------- BUSCAR ----------
@@ -188,7 +194,7 @@ Deno.serve(async (req) => {
     .eq("user_id", userId)
     .eq("mes_ref", mesRef);
   const gastoMes = (doMes ?? []).reduce((s, r) => s + Number(r.custo_usd ?? 0), 0);
-  const plano = planejarColeta(gastoMes, limitePedido);
+  const plano = planejarColeta(gastoMes, limitePedido, TETO_RODADA, TETO_MES);
   if (!plano.podeRodar) {
     await admin.from("redes_buscas").insert({
       user_id: userId,
@@ -206,7 +212,7 @@ Deno.serve(async (req) => {
       reason: "teto",
       motivo: plano.motivo,
       gastoMes,
-      teto: { rodada: TETO_RODADA_USD, mes: TETO_MES_USD },
+      teto: { rodada: TETO_RODADA, mes: TETO_MES },
     });
   }
 
@@ -271,7 +277,7 @@ Deno.serve(async (req) => {
       datasetId = sj?.data?.defaultDatasetId ?? null;
       if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
       // trava de segurança: se o run já passou do teto da rodada, aborta na hora
-      if (custo >= TETO_RODADA_USD) {
+      if (custo >= TETO_RODADA) {
         await fetch(`${API}/actor-runs/${runId}/abort?token=${encodeURIComponent(token())}`, {
           method: "POST",
         }).catch(() => {});
@@ -386,7 +392,7 @@ Deno.serve(async (req) => {
       if (!error) inseridos++;
     }
 
-    const estourou = estourouColeta(custo, gastoMes);
+    const estourou = estourouColeta(custo, gastoMes, TETO_RODADA, TETO_MES);
     await finalizar({
       status: estourou ? "parada_teto" : "concluida",
       custo_usd: custo,
@@ -412,7 +418,7 @@ Deno.serve(async (req) => {
       descartados,
       custo,
       gastoMesDepois: gastoMes + custo,
-      teto: { rodada: TETO_RODADA_USD, mes: TETO_MES_USD },
+      teto: { rodada: TETO_RODADA, mes: TETO_MES },
       estourou,
     });
   } catch (e) {
