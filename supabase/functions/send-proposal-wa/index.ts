@@ -21,6 +21,7 @@ import {
   registrarEnvio,
   WA_TETO_DIARIO_CHIP,
 } from "../_shared/wa.ts";
+import { orgDoUsuario, consumir } from "../_shared/limite.ts";
 import {
   escolherVariacao,
   resolverVariaveis,
@@ -158,6 +159,24 @@ Deno.serve(async (req) => {
   const variacao = escolherVariacao(eleg, lead.id, ultima);
   if (!variacao) return json({ ok: false, reason: "sem_variacao" });
   const texto = resolverVariaveis(variacao.texto, dados);
+
+  // 📊 LIMITE DO PLANO (billing camada 2): enviar mensagem consome a cota "mensagens" da org.
+  // Checa e CONTA antes de mandar de verdade — bater o limite bloqueia, NÃO manda, NÃO marca
+  // enviado (mesma regra do falso-"enviado": nada de gravar sucesso sem entrega real).
+  const orgId = await orgDoUsuario(admin, userId);
+  if (orgId) {
+    const cota = await consumir(admin, orgId, "mensagens", 1);
+    if (!cota.ok && cota.reason === "limite_atingido") {
+      return json({
+        ok: false,
+        reason: "limite_plano",
+        error: `Limite de mensagens do plano atingido: ${cota.usado}/${cota.limite} neste mês. Faça upgrade do plano para enviar mais.`,
+        recurso: "mensagens",
+        usado: cota.usado,
+        limite: cota.limite,
+      });
+    }
+  }
 
   // 9) ENVIA de fato.
   const env = await enviarTextoInstancia(chip.token, numero, texto);

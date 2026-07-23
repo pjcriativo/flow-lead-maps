@@ -89,6 +89,7 @@ export type Plano = {
   limite_leads: number | null;
   limite_sites: number | null;
   limite_campanhas: number | null;
+  limite_mensagens: number | null;
   limite_whatsapp: number | null;
   limite_templates: number | null;
   limite_segmentos: number | null;

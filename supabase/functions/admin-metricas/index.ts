@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     admin
       .from("planos")
       .select(
-        "id, nome, descricao, preco, periodo, limite_leads, limite_sites, limite_campanhas, limite_whatsapp, limite_templates, limite_segmentos, ativo, ordem",
+        "id, nome, descricao, preco, periodo, limite_leads, limite_sites, limite_campanhas, limite_mensagens, limite_whatsapp, limite_templates, limite_segmentos, ativo, ordem",
       )
       .order("ordem", { ascending: true }),
   ]);

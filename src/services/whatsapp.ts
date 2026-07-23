@@ -168,6 +168,7 @@ export const WA_MOTIVO_LABEL: Record<string, string> = {
   envio_falhou: "falha no envio (Evolution)",
   canal_errado: "campanha não é de WhatsApp",
   campanha_concluida: "campanha concluída",
+  limite_plano: "limite de mensagens do plano atingido — faça upgrade",
 };
 
 /** Envia a mensagem de campanha WhatsApp para UM campanha_lead (aprovado). */

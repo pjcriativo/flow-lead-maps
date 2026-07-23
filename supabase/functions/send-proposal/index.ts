@@ -7,6 +7,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { montarFrom } from "../_shared/remetente.ts";
+import { orgDoUsuario, consumir } from "../_shared/limite.ts";
 
 // Identidade do remetente. EMAIL_FROM é GLOBAL hoje (uma reputação de domínio p/
 // todas as orgs). TODO (blueprint — identidade de envio por org): cada org deve ter
@@ -66,6 +67,29 @@ Deno.serve(async (req) => {
   // global). Se estourou, não envia — a UI avisa pra tentar amanhã.
   const { data: rampa } = await supabase.rpc("email_rampa_status");
   if ((rampa?.[0]?.restante ?? 0) <= 0) return json({ ok: false, reason: "teto_dia" });
+
+  // 📊 LIMITE DO PLANO (billing camada 2): enviar mensagem consome a cota "mensagens" da org.
+  // Checa e CONTA antes de mandar de verdade — bater o limite bloqueia, NÃO manda, NÃO marca
+  // enviada. super_admin/dono da plataforma é ilimitado (mesma função de leads/sites/campanhas).
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } },
+  );
+  const orgId = await orgDoUsuario(admin, userData.user.id);
+  if (orgId) {
+    const cota = await consumir(admin, orgId, "mensagens", 1);
+    if (!cota.ok && cota.reason === "limite_atingido") {
+      return json({
+        ok: false,
+        reason: "limite_plano",
+        error: `Limite de mensagens do plano atingido: ${cota.usado}/${cota.limite} neste mês. Faça upgrade do plano para enviar mais.`,
+        recurso: "mensagens",
+        usado: cota.usado,
+        limite: cota.limite,
+      });
+    }
+  }
 
   const RESEND = Deno.env.get("RESEND_API_KEY");
   if (!RESEND)

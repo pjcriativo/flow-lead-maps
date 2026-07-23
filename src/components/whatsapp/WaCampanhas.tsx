@@ -436,6 +436,11 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
             );
             break;
           }
+          // limite do plano batido: continuar tentando só repetiria o mesmo bloqueio.
+          if (env.reason === "limite_plano") {
+            toast.error(`${WA_MOTIVO_LABEL.limite_plano} — disparo pausado.`);
+            break;
+          }
         }
         setProgresso({ feito: i + 1, total: alvos.length, fase: "" });
         if (i < alvos.length - 1 && !cancelar.current) await sleep(intervaloMs());

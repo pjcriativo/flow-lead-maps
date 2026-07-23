@@ -141,6 +141,7 @@ export function AdminPlanos({ planos, onMudou }: { planos: Plano[]; onMudou: () 
                     <LimiteChip rotulo="Leads" valor={p.limite_leads} />
                     <LimiteChip rotulo="Sites IA" valor={p.limite_sites} />
                     <LimiteChip rotulo="Campanhas" valor={p.limite_campanhas} />
+                    <LimiteChip rotulo="Mensagens" valor={p.limite_mensagens} />
                     <LimiteChip rotulo="WhatsApp" valor={p.limite_whatsapp} />
                     <LimiteChip rotulo="Modelos" valor={p.limite_templates} />
                     <LimiteChip rotulo="Segmentos" valor={p.limite_segmentos} />
@@ -315,6 +316,11 @@ function PlanoForm({
           rotulo="Campanhas"
           valor={plano.limite_campanhas}
           onChange={(v) => set({ limite_campanhas: numOrNull(v) })}
+        />
+        <LimiteInput
+          rotulo="Mensagens"
+          valor={plano.limite_mensagens}
+          onChange={(v) => set({ limite_mensagens: numOrNull(v) })}
         />
         <LimiteInput
           rotulo="WhatsApp"

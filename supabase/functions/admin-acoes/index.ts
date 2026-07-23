@@ -168,6 +168,7 @@ Deno.serve(async (req) => {
         limite_leads: num(p.limite_leads),
         limite_sites: num(p.limite_sites),
         limite_campanhas: num(p.limite_campanhas),
+        limite_mensagens: num(p.limite_mensagens),
         limite_whatsapp: num(p.limite_whatsapp),
         limite_templates: num(p.limite_templates),
         limite_segmentos: num(p.limite_segmentos),
