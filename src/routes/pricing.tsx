@@ -42,71 +42,69 @@ type Plan = {
 
 const PLANS: Plan[] = [
   {
-    name: "Teste Grátis",
-    monthly: 0,
-    yearly: 0,
-    yearlyMonthly: "0",
-    blurb: "7 dias grátis, sem cartão de crédito.",
-    cta: "Começar teste grátis",
-    features: ["50 leads no total", "Exportar para Google Sheets", "Localizador de e-mail"],
-  },
-  {
     name: "Básico",
-    monthly: 19,
-    yearly: 182,
-    yearlyMonthly: "15,16",
-    blurb: "Para quem está começando sozinho.",
+    monthly: 49,
+    yearly: 294,
+    yearlyMonthly: "24,50",
+    blurb: "Para quem está começando a prospectar.",
     cta: "Começar",
     features: [
-      "300 leads / mês",
-      "Exportar para Google Sheets",
-      "Localizador de e-mail",
+      "1.000 leads / mês",
+      "Busca no Google Maps",
+      "Minhas Listas e Contatos",
+      "Pipeline de Vendas Kanban",
       "Suporte padrão",
     ],
   },
   {
     name: "Pro",
-    monthly: 49,
-    yearly: 470,
-    yearlyMonthly: "39,16",
-    blurb: "Para times de vendas que precisam de volume.",
+    monthly: 99,
+    yearly: 594,
+    yearlyMonthly: "49,50",
+    blurb: "O mais completo para escalar suas vendas.",
     cta: "Começar",
     popular: true,
     features: [
-      "1.000 leads / mês",
-      "Exportar para Google Sheets",
-      "Localizador de e-mail",
-      "Coleta prioritária",
-      "Suporte prioritário",
+      "5.000 leads / mês",
+      "Busca (Maps, Instagram, LinkedIn)",
+      "CRM, Propostas e Contratos",
+      "Controle Financeiro",
+      "Campanhas e Automação de Whats",
+      "Publicação e Redesign de Sites",
     ],
   },
   {
     name: "Agência",
-    monthly: 99,
-    yearly: 950,
-    yearlyMonthly: "79,16",
-    blurb: "Feito para agências rodando campanhas em escala.",
+    monthly: 597,
+    yearly: 3582,
+    yearlyMonthly: "298,50",
+    blurb: "Para agências e times de alta demanda.",
     cta: "Começar",
     features: [
-      "5.000 leads / mês",
-      "Exportar para Google Sheets",
-      "Localizador de e-mail",
-      "Coleta prioritária",
-      "5 membros da equipe",
-      "Suporte dedicado",
+      "Leads ilimitados",
+      "Busca (Maps, Instagram, LinkedIn)",
+      "CRM, Propostas e Contratos",
+      "Controle Financeiro",
+      "Campanhas e Automação de Whats",
+      "Publicação e Redesign de Sites",
     ],
   },
 ];
 
 const COMPARISON: { label: string; values: (string | boolean)[] }[] = [
-  { label: "Leads por mês", values: ["50 no total", "300", "1.000", "5.000"] },
-  { label: "Exportar para Google Sheets", values: [true, true, true, true] },
-  { label: "Localizador de e-mail", values: [true, true, true, true] },
-  { label: "Coleta prioritária", values: [false, false, true, true] },
-  { label: "Suporte padrão", values: [false, true, false, false] },
-  { label: "Suporte prioritário", values: [false, false, true, false] },
-  { label: "Suporte dedicado", values: [false, false, false, true] },
-  { label: "Membros da equipe", values: ["1", "1", "1", "5"] },
+  { label: "Leads por mês", values: ["1.000", "5.000", "Ilimitados"] },
+  { label: "Busca no Google Maps", values: [true, true, true] },
+  { label: "Modo Prospecção Instagram", values: [false, true, true] },
+  { label: "Modo Prospecção LinkedIn", values: [false, true, true] },
+  { label: "CRM (Minhas Listas, Leads, Kanban)", values: [true, true, true] },
+  { label: "Geração de Propostas PDF", values: [false, true, true] },
+  { label: "Emissão de Contratos", values: [false, true, true] },
+  { label: "Controle Financeiro", values: [false, true, true] },
+  { label: "Campanhas de WhatsApp", values: [false, true, true] },
+  { label: "Automações de WhatsApp", values: [false, true, true] },
+  { label: "Ferramenta de Redesign de Sites", values: [false, true, true] },
+  { label: "Ferramenta de Publicação", values: [false, true, true] },
+  { label: "Suporte Técnico", values: ["Padrão", "Prioritário", "Dedicado"] },
 ];
 
 function ehListaDePlanosValida(v: unknown): v is Plan[] {
@@ -174,7 +172,7 @@ function PricingPage() {
           Preços que escalam com o seu funil
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-          Comece grátis. Faça upgrade quando precisar de mais leads. Cancele quando quiser.
+          Escolha o plano ideal para você. Faça upgrade quando precisar de mais leads. Cancele quando quiser.
         </p>
 
         <div className="mt-10 inline-flex items-center gap-2 rounded-full border border-border bg-card p-1 text-sm shadow-sm">
@@ -188,13 +186,13 @@ function PricingPage() {
             onClick={() => setYearly(true)}
             className={`rounded-full px-4 py-1.5 transition-colors ${yearly ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Anual <span className="ml-1 text-xs opacity-80">−20%</span>
+            Anual <span className="ml-1 text-xs opacity-80">−50%</span>
           </button>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-6 pb-20">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3">
           {planos.map((plan) => {
             const isFree = plan.monthly === 0;
             const price = isFree
