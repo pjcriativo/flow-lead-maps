@@ -238,7 +238,7 @@ function PricingPage() {
             <Sparkles className="h-4 w-4" /> 
             Máquina de Prospecção B2B Definitiva
           </div>
-          <h1 className="text-balance text-5xl font-bold tracking-tight md:text-6xl lg:text-7xl">
+          <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
             Preços que escalam com o <br className="hidden md:block"/> seu funil de vendas.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
@@ -270,7 +270,7 @@ function PricingPage() {
 
       {/* Pricing Cards */}
       <section className="mx-auto max-w-7xl px-6 pb-20 z-10 relative">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-3 items-end">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-3 lg:items-center">
           {planos.map((plan) => {
             const price = yearly
                 ? `${simbolo} ${plan.yearlyMonthly}`
@@ -297,7 +297,7 @@ function PricingPage() {
                 <p className={`mt-2 text-sm ${plan.popular ? "text-slate-300" : "text-muted-foreground"}`}>{plan.blurb}</p>
                 
                 <div className="mt-8 flex items-end gap-2">
-                  <span className="text-5xl font-bold tracking-tight">{price}</span>
+                  <span className="text-4xl md:text-5xl font-bold tracking-tight">{price}</span>
                   <span className={`text-base font-medium mb-1 ${plan.popular ? "text-slate-400" : "text-muted-foreground"}`}>/mês</span>
                 </div>
                 <p className={`mt-2 text-xs font-medium ${plan.popular ? "text-slate-400" : "text-muted-foreground"}`}>{sub}</p>
@@ -334,7 +334,7 @@ function PricingPage() {
             <h2 className="text-3xl font-bold md:text-4xl">Tudo que você precisa para dominar o B2B</h2>
             <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">Recursos projetados para colocar sua operação de vendas no piloto automático.</p>
           </div>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feat) => (
               <div key={feat.title} className="flex flex-col gap-4 rounded-2xl bg-card p-6 shadow-sm border border-border/50 hover:border-primary/30 transition-colors">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -362,9 +362,9 @@ function PricingPage() {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-secondary/40 border-b border-border">
                     <tr>
-                      <th className="p-6 font-semibold sticky left-0 z-10 bg-secondary/40 backdrop-blur min-w-[250px]">Recurso</th>
+                      <th className="p-4 md:p-6 font-semibold sticky left-0 z-10 bg-secondary/40 backdrop-blur min-w-[150px] md:min-w-[250px]">Recurso</th>
                       {PLANS.map((p) => (
-                        <th key={p.name} className="p-6 font-semibold min-w-[180px]">
+                        <th key={p.name} className="p-4 md:p-6 font-semibold min-w-[150px] md:min-w-[180px]">
                           <div className="flex flex-col gap-1">
                             <span className="text-lg">{p.name}</span>
                             <span className="text-muted-foreground text-xs font-normal">
@@ -378,9 +378,9 @@ function PricingPage() {
                   <tbody className="divide-y divide-border">
                     {COMPARISON.map((row) => (
                       <tr key={row.label} className="transition-colors hover:bg-muted/30">
-                        <td className="p-6 font-medium sticky left-0 bg-card z-10 group-hover:bg-muted/30">{row.label}</td>
+                        <td className="p-4 md:p-6 font-medium sticky left-0 bg-card z-10 group-hover:bg-muted/30">{row.label}</td>
                         {row.values.map((v, i) => (
-                          <td key={i} className="p-6 text-muted-foreground">
+                          <td key={i} className="p-4 md:p-6 text-muted-foreground">
                             {typeof v === "boolean" ? (
                               v ? (
                                 <Check className="h-5 w-5 text-primary" />
