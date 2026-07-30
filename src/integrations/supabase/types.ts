@@ -60,6 +60,9 @@ export type Database = {
           id: string;
           ordem: number;
           status: string;
+          testada_em: string | null;
+          teste_detalhe: string | null;
+          teste_ok: boolean | null;
           ultimo_uso: string | null;
           ultimos4: string;
           valor_cifrado: string;
@@ -74,6 +77,9 @@ export type Database = {
           id?: string;
           ordem?: number;
           status?: string;
+          testada_em?: string | null;
+          teste_detalhe?: string | null;
+          teste_ok?: boolean | null;
           ultimo_uso?: string | null;
           ultimos4: string;
           valor_cifrado: string;
@@ -88,6 +94,9 @@ export type Database = {
           id?: string;
           ordem?: number;
           status?: string;
+          testada_em?: string | null;
+          teste_detalhe?: string | null;
+          teste_ok?: boolean | null;
           ultimo_uso?: string | null;
           ultimos4?: string;
           valor_cifrado?: string;

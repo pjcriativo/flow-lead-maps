@@ -79,6 +79,8 @@ export type BuscaRecente = {
   custo_usd: number;
   criado_em: string;
   dono: string;
+  /** qual chave Apify do pool pagou esta busca (livro-caixa) — null = fontes grátis/antigas */
+  chave_apelido: string | null;
 };
 
 export type Role = { papel: string; ativo: boolean };
@@ -164,7 +166,8 @@ export type AdminAcao =
   | "apify_chave_remove"
   | "apify_chave_status"
   | "apify_chave_ordem"
-  | "apify_chave_testar";
+  | "apify_chave_testar"
+  | "apify_simular_esgotamento";
 
 export async function adminAcao(
   acao: AdminAcao,

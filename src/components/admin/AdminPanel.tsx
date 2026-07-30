@@ -873,6 +873,14 @@ export function AdminPanel({ email }: { email: string }) {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {b.inseridos} inserido(s) · {usd(Number(b.custo_usd))} · {b.dono}
+                          {b.chave_apelido && (
+                            <>
+                              {" · "}
+                              <span className="rounded-full border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[10px] font-semibold text-gold">
+                                chave: {b.chave_apelido}
+                              </span>
+                            </>
+                          )}
                         </p>
                       </td>
                       <td className="px-4 py-2.5 text-right">

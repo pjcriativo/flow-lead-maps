@@ -704,11 +704,73 @@ Deno.serve(async (req) => {
 
     // ═══ POOL DE CHAVES APIFY (rodízio por esgotamento) ═══
     // O valor da chave NUNCA volta em nenhuma ação — só ultimos4/status/metadados.
+
+    // Testa uma chave contra GET /users/me/limits (grátis) e PERSISTE o resultado —
+    // sucesso, falha COM O MOTIVO REAL da Apify, ou "resposta ilegível". Usado pelo botão
+    // "Testar" e automaticamente ao adicionar.
+    const testarChaveApify = async (id: string, tokenChave: string) => {
+      const agora = new Date().toISOString();
+      let resultado: Rec;
+      let patch: Rec;
+      try {
+        const r = await fetch(
+          `https://api.apify.com/v2/users/me/limits?token=${encodeURIComponent(tokenChave)}`,
+        );
+        if (r.status === 401) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const corpo: any = await r.json().catch(() => ({}));
+          const motivo = String(corpo?.error?.message ?? "token inválido (401)");
+          patch = {
+            status: "invalida",
+            testada_em: agora,
+            teste_ok: false,
+            teste_detalhe: motivo,
+            atualizado_em: agora,
+          };
+          resultado = { ok: true, situacao: "invalida", motivo };
+        } else {
+          const j = await r.json().catch(() => ({}));
+          const restante = creditoRestanteDeLimits(j);
+          if (restante === null) {
+            const motivo = `resposta da Apify ilegível (HTTP ${r.status}) — não deu pra ler o crédito`;
+            patch = {
+              testada_em: agora,
+              teste_ok: false,
+              teste_detalhe: motivo,
+              atualizado_em: agora,
+            };
+            resultado = { ok: true, situacao: "ilegivel", motivo };
+          } else {
+            patch = {
+              testada_em: agora,
+              teste_ok: true,
+              teste_detalhe: null,
+              credito_estimado: restante,
+              atualizado_em: agora,
+            };
+            resultado = {
+              ok: true,
+              situacao: "ok",
+              restante,
+              max: j?.data?.limits?.maxMonthlyUsageUsd ?? null,
+              uso: j?.data?.current?.monthlyUsageUsd ?? null,
+            };
+          }
+        }
+      } catch (e) {
+        const motivo = `falha de rede ao testar: ${e instanceof Error ? e.message : String(e)}`;
+        patch = { testada_em: agora, teste_ok: false, teste_detalhe: motivo, atualizado_em: agora };
+        resultado = { ok: true, situacao: "rede", motivo };
+      }
+      await admin.from("apify_chaves").update(patch).eq("id", id);
+      return resultado;
+    };
+
     if (acao === "apify_pool_listar") {
       const { data: chaves } = await admin
         .from("apify_chaves")
         .select(
-          "id, apelido, ultimos4, ordem, status, esgotada_em, ultimo_uso, credito_estimado, criado_em",
+          "id, apelido, ultimos4, ordem, status, esgotada_em, ultimo_uso, credito_estimado, criado_em, testada_em, teste_ok, teste_detalhe",
         )
         .order("ordem", { ascending: true });
       // gasto acumulado por chave (livro-caixa)
@@ -722,6 +784,14 @@ Deno.serve(async (req) => {
           g.chave_apelido as string,
           (gastoPorChave.get(g.chave_apelido as string) ?? 0) + Number(g.custo_usd ?? 0),
         );
+      // "está funcionando?" — a ÚLTIMA busca que gastou (o livro-caixa registra a chave)
+      const { data: ultimaBusca } = await admin
+        .from("redes_buscas")
+        .select("chave_apelido, fonte, estrategia, custo_usd, criado_em, status")
+        .not("chave_apelido", "is", null)
+        .order("criado_em", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       const { data: auditoria } = await admin
         .from("apify_chaves_auditoria")
         .select("apelido, acao, alterado_por, alterado_em")
@@ -732,36 +802,51 @@ Deno.serve(async (req) => {
         gasto_acumulado: gastoPorChave.get(String(c.apelido)) ?? 0,
       }));
       const ativas = lista.filter((c: Rec) => c.status === "ativa").length;
-      return json({ ok: true, chaves: lista, ativas, auditoria: auditoria ?? [] });
+      return json({
+        ok: true,
+        chaves: lista,
+        ativas,
+        ultima_busca: ultimaBusca ?? null,
+        auditoria: auditoria ?? [],
+      });
     }
 
     if (acao === "apify_chave_add") {
       const apelido = String(b.apelido || "").trim();
       const valor = String(b.valor || "").trim();
       if (!apelido) return json({ ok: false, reason: "apelido_obrigatorio" });
-      if (valor.length < 8) return json({ ok: false, reason: "valor_invalido" });
+      // validação de formato: token da Apify começa com "apify_api_"; e-mail/espaço é
+      // claramente OUTRA coisa (o dono chegou a colar o e-mail achando que era o campo)
+      if (valor.includes("@") || /\s/.test(valor) || valor.length < 20)
+        return json({ ok: false, reason: "formato_invalido" });
       const { data: ult } = await admin
         .from("apify_chaves")
         .select("ordem")
         .order("ordem", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const { error } = await admin.from("apify_chaves").insert({
-        apelido,
-        valor_cifrado: await cifrar(valor),
-        ultimos4: valor.slice(-4),
-        ordem: (ult?.ordem ?? -1) + 1,
-        criado_por: userData.user.id,
-      });
-      if (error) {
-        if ((error as { code?: string }).code === "23505")
+      const { data: nova, error } = await admin
+        .from("apify_chaves")
+        .insert({
+          apelido,
+          valor_cifrado: await cifrar(valor),
+          ultimos4: valor.slice(-4),
+          ordem: (ult?.ordem ?? -1) + 1,
+          criado_por: userData.user.id,
+        })
+        .select("id")
+        .single();
+      if (error || !nova) {
+        if ((error as { code?: string } | null)?.code === "23505")
           return json({ ok: false, reason: "apelido_duplicado" });
-        return json({ ok: false, reason: "erro_salvar", detalhe: error.message });
+        return json({ ok: false, reason: "erro_salvar", detalhe: error?.message });
       }
       await admin
         .from("apify_chaves_auditoria")
         .insert({ apelido, acao: "adicionada", alterado_por: userData.user.id });
-      return json({ ok: true });
+      // TESTE AUTOMÁTICO na hora — o dono vê imediatamente se a chave funciona
+      const teste = await testarChaveApify(nova.id, valor);
+      return json({ ok: true, id: nova.id, teste });
     }
 
     if (acao === "apify_chave_importar_secret") {
@@ -857,7 +942,8 @@ Deno.serve(async (req) => {
     }
 
     if (acao === "apify_chave_testar") {
-      // chamada MÍNIMA e GRÁTIS (GET /users/me/limits) — valida a chave e mede o crédito
+      // chamada MÍNIMA e GRÁTIS (GET /users/me/limits) — valida a chave, mede o crédito e
+      // PERSISTE o resultado (sucesso/motivo real da falha) pra tela mostrar sempre.
       const id = String(b.id || "");
       const { data: linha } = await admin
         .from("apify_chaves")
@@ -869,38 +955,58 @@ Deno.serve(async (req) => {
       try {
         tokenChave = await decifrar(linha.valor_cifrado);
       } catch {
-        return json({ ok: false, reason: "cofre_ilegivel" });
-      }
-      const r = await fetch(
-        `https://api.apify.com/v2/users/me/limits?token=${encodeURIComponent(tokenChave)}`,
-      ).catch(() => null);
-      if (!r) return json({ ok: false, reason: "rede" });
-      if (r.status === 401) {
+        const agora = new Date().toISOString();
         await admin
           .from("apify_chaves")
-          .update({ status: "invalida", atualizado_em: new Date().toISOString() })
+          .update({
+            testada_em: agora,
+            teste_ok: false,
+            teste_detalhe: "valor no cofre ilegível (chave-mestra trocada?) — recadastre a chave",
+            atualizado_em: agora,
+          })
           .eq("id", id);
+        return json({ ok: false, reason: "cofre_ilegivel" });
+      }
+      const resultado = await testarChaveApify(id, tokenChave);
+      if (resultado.situacao === "invalida") {
         await admin.from("apify_chaves_auditoria").insert({
           apelido: linha.apelido,
           acao: "invalida_teste",
           alterado_por: userData.user.id,
         });
-        return json({ ok: true, situacao: "invalida" });
       }
-      const j = await r.json().catch(() => ({}));
-      const restante = creditoRestanteDeLimits(j);
-      if (restante === null) return json({ ok: false, reason: "resposta_ilegivel" });
-      await admin
+      return json(resultado);
+    }
+
+    if (acao === "apify_simular_esgotamento") {
+      // Demonstra o rodízio SEM gastar crédito: marca a chave como esgotada (o MESMO
+      // caminho da marcação real) e responde quem assume em seguida. Reativação é manual.
+      const id = String(b.id || "");
+      const agora = new Date().toISOString();
+      const { data: linha } = await admin
         .from("apify_chaves")
-        .update({ credito_estimado: restante, atualizado_em: new Date().toISOString() })
-        .eq("id", id);
+        .update({ status: "esgotada", esgotada_em: agora, atualizado_em: agora })
+        .eq("id", id)
+        .select("apelido")
+        .maybeSingle();
+      if (!linha) return json({ ok: false, reason: "nao_encontrada" });
+      await admin.from("apify_chaves_auditoria").insert({
+        apelido: linha.apelido,
+        acao: "esgotada_simulacao",
+        alterado_por: userData.user.id,
+      });
+      // quem assume: a chave ATIVA de menor ordem (a mesma seleção do rodízio real)
+      const { data: proxima } = await admin
+        .from("apify_chaves")
+        .select("apelido")
+        .eq("status", "ativa")
+        .order("ordem", { ascending: true })
+        .limit(1)
+        .maybeSingle();
       return json({
         ok: true,
-        situacao: "ok",
-        restante,
-        max: j?.data?.limits?.maxMonthlyUsageUsd ?? null,
-        uso: j?.data?.current?.monthlyUsageUsd ?? null,
-        cicloTermina: j?.data?.monthlyUsageCycle?.endAt ?? null,
+        esgotada: linha.apelido,
+        proxima: proxima?.apelido ?? null,
       });
     }
 

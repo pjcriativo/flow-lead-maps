@@ -143,7 +143,9 @@ Deno.serve(async (req) => {
       .limit(5),
     admin
       .from("redes_buscas")
-      .select("id, user_id, fonte, estrategia, status, inseridos, custo_usd, criado_em")
+      .select(
+        "id, user_id, fonte, estrategia, status, inseridos, custo_usd, criado_em, chave_apelido",
+      )
       .order("criado_em", { ascending: false })
       .limit(8),
     // Snapshot: buscas por status (ativas/concluídas/paradas no teto/erro) — livro-caixa

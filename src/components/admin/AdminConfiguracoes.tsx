@@ -414,8 +414,19 @@ type ChavePoolApify = {
   ultimo_uso: string | null;
   credito_estimado: number | null;
   gasto_acumulado: number;
+  testada_em: string | null;
+  teste_ok: boolean | null;
+  teste_detalhe: string | null;
 };
 type AuditoriaPool = { apelido: string; acao: string; alterado_em: string };
+type UltimaBusca = {
+  chave_apelido: string;
+  fonte: string;
+  estrategia: string;
+  custo_usd: number;
+  criado_em: string;
+  status: string;
+};
 
 const STATUS_POOL: Record<string, { rotulo: string; cls: string }> = {
   ativa: { rotulo: "Ativa", cls: "bg-[#16A34A]/10 text-[#15803D] border-[#16A34A]/30" },
@@ -424,20 +435,58 @@ const STATUS_POOL: Record<string, { rotulo: string; cls: string }> = {
   desativada: { rotulo: "Desativada", cls: "bg-secondary text-muted-foreground border-border" },
 };
 
+/** Linha de status de teste — SEMPRE visível, nunca campo vazio e mudo. */
+function StatusTeste({ c }: { c: ChavePoolApify }) {
+  if (c.teste_ok === true && c.testada_em) {
+    return (
+      <p className="mt-1 text-[11px] font-medium text-[#15803D]">
+        ✓ Testada em {new Date(c.testada_em).toLocaleDateString("pt-BR")}
+        {c.credito_estimado != null && ` · crédito ~US$ ${Number(c.credito_estimado).toFixed(2)}`}
+      </p>
+    );
+  }
+  if (c.teste_ok === false && c.testada_em) {
+    return (
+      <p className="mt-1 text-[11px] font-medium text-destructive">
+        ✗ Falha no teste ({new Date(c.testada_em).toLocaleDateString("pt-BR")}):{" "}
+        {c.teste_detalhe ?? "motivo não registrado"}
+      </p>
+    );
+  }
+  return (
+    <p className="mt-1 text-[11px] font-medium text-muted-foreground">
+      — Nunca testada · clique em Testar para validar e medir o crédito (grátis)
+    </p>
+  );
+}
+
 function SecaoPoolApify() {
   const [chaves, setChaves] = useState<ChavePoolApify[] | null>(null);
   const [ativas, setAtivas] = useState(0);
+  const [ultimaBusca, setUltimaBusca] = useState<UltimaBusca | null>(null);
   const [auditoria, setAuditoria] = useState<AuditoriaPool[]>([]);
   const [apelido, setApelido] = useState("");
   const [valor, setValor] = useState("");
   const [ocupado, setOcupado] = useState<string | null>(null);
-  const [teste, setTeste] = useState<Record<string, string>>({});
+  const [resultadoLinha, setResultadoLinha] = useState<Record<string, string>>({});
+
+  // validação do token AO COLAR — e-mail/espaço não é token; o da Apify começa com apify_api_
+  const valorLimpo = valor.trim();
+  const avisoToken = !valorLimpo
+    ? null
+    : valorLimpo.includes("@") || /\s/.test(valorLimpo)
+      ? "Isso parece um e-mail/texto, não um token. O token da Apify começa com “apify_api_”."
+      : !valorLimpo.startsWith("apify_api_")
+        ? "Não parece um token da Apify (eles começam com “apify_api_”). Confira antes de salvar."
+        : null;
+  const tokenBloqueado = !!valorLimpo && (valorLimpo.includes("@") || /\s/.test(valorLimpo));
 
   const carregar = () =>
     adminAcao("apify_pool_listar").then((r) => {
       if (!r.ok) return setChaves([]);
       setChaves((r.chaves as ChavePoolApify[]) ?? []);
       setAtivas(Number(r.ativas ?? 0));
+      setUltimaBusca((r.ultima_busca as UltimaBusca | null) ?? null);
       setAuditoria((r.auditoria as AuditoriaPool[]) ?? []);
     });
   useEffect(() => {
@@ -459,18 +508,41 @@ function SecaoPoolApify() {
   };
 
   const adicionar = async () => {
-    if (!apelido.trim() || valor.trim().length < 8) {
-      toast.error("Informe apelido e a chave completa.");
+    if (!apelido.trim() || valorLimpo.length < 20 || tokenBloqueado) {
+      toast.error("Confira o apelido e o token (começa com apify_api_).");
       return;
     }
-    const r = await acao(
-      "apify_chave_add",
-      { apelido: apelido.trim(), valor: valor.trim() },
-      "Chave adicionada ao pool.",
-    );
-    if (r?.ok) {
+    setOcupado("add");
+    try {
+      const r = await adminAcao("apify_chave_add", { apelido: apelido.trim(), valor: valorLimpo });
+      if (!r.ok) {
+        toast.error(
+          r.reason === "apelido_duplicado"
+            ? "Já existe uma chave com esse apelido."
+            : r.reason === "formato_invalido"
+              ? "Isso não é um token da Apify — cole o token (apify_api_…), não o e-mail."
+              : `Falha: ${r.reason}`,
+        );
+        return;
+      }
+      // TESTE AUTOMÁTICO: o resultado aparece na hora
+      const teste = r.teste as
+        { situacao?: string; restante?: number; motivo?: string } | undefined;
+      if (teste?.situacao === "ok")
+        toast.success(
+          `Chave adicionada e testada ✓ — crédito ~US$ ${Number(teste.restante ?? 0).toFixed(2)}.`,
+        );
+      else if (teste?.situacao === "invalida")
+        toast.error(`Chave adicionada, mas o teste FALHOU: ${teste.motivo ?? "token inválido"}.`);
+      else
+        toast.warning(
+          `Chave adicionada; teste inconclusivo: ${teste?.motivo ?? "sem resposta da Apify"}.`,
+        );
       setApelido("");
       setValor("");
+      carregar();
+    } finally {
+      setOcupado(null);
     }
   };
 
@@ -479,22 +551,54 @@ function SecaoPoolApify() {
     try {
       const r = await adminAcao("apify_chave_testar", { id: c.id });
       if (!r.ok) {
-        setTeste((t) => ({ ...t, [c.id]: `falha: ${r.reason}` }));
+        setResultadoLinha((t) => ({ ...t, [c.id]: `falha: ${r.reason}` }));
+      } else if (r.situacao === "ok") {
+        setResultadoLinha((t) => ({
+          ...t,
+          [c.id]: `✓ Funciona — US$ ${Number(r.restante).toFixed(2)} de crédito restante (de US$ ${Number(r.max).toFixed(2)})`,
+        }));
+      } else {
+        setResultadoLinha((t) => ({ ...t, [c.id]: `✗ ${String(r.motivo ?? r.situacao)}` }));
+      }
+      carregar(); // o resultado também PERSISTE — a linha StatusTeste mostra sempre
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  const simular = async (c: ChavePoolApify) => {
+    if (
+      !confirm(
+        `Simular esgotamento da chave "${c.apelido}"?\n\nEla sai do rodízio como "esgotada" (sem gastar crédito) e a tela mostra quem assume. Você reativa quando quiser.`,
+      )
+    )
+      return;
+    setOcupado("simular" + c.id);
+    try {
+      const r = await adminAcao("apify_simular_esgotamento", { id: c.id });
+      if (!r.ok) {
+        toast.error(`Falha: ${r.reason}`);
         return;
       }
-      if (r.situacao === "invalida") {
-        setTeste((t) => ({ ...t, [c.id]: "chave INVÁLIDA (401) — marcada" }));
-      } else {
-        setTeste((t) => ({
-          ...t,
-          [c.id]: `US$ ${Number(r.restante).toFixed(2)} restantes de US$ ${Number(r.max).toFixed(2)} (teste grátis)`,
-        }));
-      }
+      const proxima = r.proxima as string | null;
+      setResultadoLinha((t) => ({
+        ...t,
+        [c.id]: proxima
+          ? `Simulação: "${c.apelido}" saiu do rodízio — quem assume agora é "${proxima}". Reative quando quiser.`
+          : `Simulação: "${c.apelido}" saiu do rodízio — NÃO SOBROU chave ativa (as buscas parariam de verdade). Reative!`,
+      }));
+      toast.success(
+        proxima
+          ? `Rodízio funcionando: "${proxima}" assumiria agora.`
+          : "Nenhuma chave ativa restante — reative uma!",
+      );
       carregar();
     } finally {
       setOcupado(null);
     }
   };
+
+  const nuncaTestadas = (chaves ?? []).filter((c) => !c.testada_em).length;
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] transition-shadow hover:shadow-lg">
@@ -511,12 +615,38 @@ function SecaoPoolApify() {
         </div>
       </div>
 
+      {/* "está funcionando?" — a última busca que gastou, com a chave que pagou */}
+      {ultimaBusca && (
+        <p className="mx-6 mt-4 rounded-xl border border-border bg-secondary/30 p-3 text-[12px] leading-relaxed">
+          <b>Última busca que usou o pool:</b>{" "}
+          <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-semibold text-gold">
+            chave: {ultimaBusca.chave_apelido}
+          </span>{" "}
+          · {ultimaBusca.fonte === "ia_site" ? "Site por IA" : ultimaBusca.fonte} (
+          {ultimaBusca.estrategia}) · {new Date(ultimaBusca.criado_em).toLocaleString("pt-BR")} ·
+          US$ {Number(ultimaBusca.custo_usd ?? 0).toFixed(4)} · {ultimaBusca.status}
+          <span className="text-muted-foreground">
+            {" "}
+            — o histórico completo (com a chave de cada linha) está no Painel, em "Buscas e gerações
+            recentes".
+          </span>
+        </p>
+      )}
+
       {chaves !== null && chaves.length > 0 && ativas <= 1 && (
         <p className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm text-foreground">
           <AlertTriangle className="h-4 w-4 shrink-0 text-gold" />
           {ativas === 0
             ? "NENHUMA chave ativa — as buscas via Apify estão PARADAS até cadastrar/reativar uma chave."
             : "Resta apenas 1 chave ativa no pool — cadastre a próxima para o rodízio não parar."}
+        </p>
+      )}
+      {nuncaTestadas > 0 && (
+        <p className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-border bg-secondary/30 p-3 text-[12px] text-muted-foreground">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {nuncaTestadas === 1
+            ? "1 chave nunca foi testada — clique em Testar nela para validar e medir o crédito (grátis)."
+            : `${nuncaTestadas} chaves nunca foram testadas — clique em Testar em cada uma (grátis).`}
         </p>
       )}
       {chaves !== null && chaves.length === 0 && (
@@ -566,17 +696,19 @@ function SecaoPoolApify() {
                       </span>
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      ••••••••{c.ultimos4}
-                      {c.credito_estimado != null &&
-                        ` · crédito ~US$ ${Number(c.credito_estimado).toFixed(2)}`}
+                      Token ••••••••{c.ultimos4}
                       {` · gasto acumulado US$ ${Number(c.gasto_acumulado).toFixed(2)}`}
-                      {c.ultimo_uso &&
-                        ` · último uso ${new Date(c.ultimo_uso).toLocaleDateString("pt-BR")}`}
+                      {c.ultimo_uso
+                        ? ` · último uso ${new Date(c.ultimo_uso).toLocaleDateString("pt-BR")}`
+                        : " · nunca usada em busca"}
                       {c.esgotada_em &&
                         ` · esgotou em ${new Date(c.esgotada_em).toLocaleDateString("pt-BR")}`}
                     </p>
-                    {teste[c.id] && (
-                      <p className="mt-0.5 text-[11px] font-medium text-gold">{teste[c.id]}</p>
+                    <StatusTeste c={c} />
+                    {resultadoLinha[c.id] && (
+                      <p className="mt-1 rounded-lg border border-gold/30 bg-gold/5 px-2 py-1 text-[11px] font-medium text-foreground">
+                        {resultadoLinha[c.id]}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -585,6 +717,7 @@ function SecaoPoolApify() {
                     onClick={() => testar(c)}
                     disabled={!!ocupado}
                     className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:border-gold/50 hover:bg-gold/5 disabled:opacity-50"
+                    title="Valida o token e mede o crédito restante (chamada grátis)"
                   >
                     {ocupado === "testar" + c.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -595,17 +728,16 @@ function SecaoPoolApify() {
                   {c.status === "ativa" ? (
                     <>
                       <button
-                        onClick={() =>
-                          acao(
-                            "apify_chave_status",
-                            { id: c.id, status: "esgotada" },
-                            "Marcada como esgotada.",
-                          )
-                        }
+                        onClick={() => simular(c)}
                         disabled={!!ocupado}
-                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-secondary disabled:opacity-50"
+                        className="rounded-lg border border-gold/40 px-2.5 py-1.5 text-xs font-medium text-gold hover:bg-gold/10 disabled:opacity-50"
+                        title="Demonstra o rodízio sem gastar crédito: marca esta como esgotada e mostra quem assume"
                       >
-                        Marcar esgotada
+                        {ocupado === "simular" + c.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          "Simular esgotamento"
+                        )}
                       </button>
                       <button
                         onClick={() =>
@@ -647,29 +779,71 @@ function SecaoPoolApify() {
       </div>
 
       <div className="border-t border-border/70 p-6 pt-4">
-        <p className="mb-2 text-[13px] font-medium">Adicionar chave ao pool</p>
-        <div className="flex flex-wrap gap-2">
-          <input
-            value={apelido}
-            onChange={(e) => setApelido(e.target.value)}
-            placeholder="Apelido (ex.: conta-bonus-2)"
-            className="h-10 min-w-40 flex-1 rounded-lg border border-input bg-background px-3 text-sm focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25"
-          />
-          <input
-            type="password"
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            placeholder="Cole a chave (apify_api_…)"
-            autoComplete="off"
-            className="h-10 min-w-52 flex-[2] rounded-lg border border-input bg-background px-3 font-mono text-sm focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25"
-          />
-          <button
-            onClick={adicionar}
-            disabled={!!ocupado || !apelido.trim() || valor.trim().length < 8}
-            className="rounded-lg bg-gold px-4 text-xs font-semibold text-navy shadow-sm transition-all hover:shadow-md disabled:opacity-60"
-          >
-            + Adicionar
-          </button>
+        <p className="mb-3 text-[13px] font-semibold">Adicionar chave ao pool</p>
+        <div className="grid gap-3 sm:grid-cols-[1fr_1.6fr_auto]">
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-foreground">
+              Apelido{" "}
+              <span className="font-normal text-muted-foreground">(só pra você identificar)</span>
+            </label>
+            <input
+              value={apelido}
+              onChange={(e) => setApelido(e.target.value)}
+              placeholder="ex.: conta 1, conta bônus"
+              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Um nome qualquer, tipo “conta bônus 2”. NÃO é o e-mail da conta Apify.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium text-foreground">
+              Token da API Apify
+            </label>
+            <input
+              type="password"
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              placeholder="apify_api_..."
+              autoComplete="off"
+              className={`h-10 w-full rounded-lg border bg-background px-3 font-mono text-sm focus:outline-none focus:ring-2 ${
+                avisoToken
+                  ? "border-destructive/50 focus:border-destructive focus:ring-destructive/20"
+                  : "border-input focus:border-gold focus:ring-gold/25"
+              }`}
+            />
+            <p
+              className={`mt-1 text-[11px] ${avisoToken ? "font-medium text-destructive" : "text-muted-foreground"}`}
+            >
+              {avisoToken ?? (
+                <>
+                  Pegue em{" "}
+                  <a
+                    href="https://console.apify.com/settings/integrations"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-gold underline underline-offset-2 hover:opacity-80"
+                  >
+                    console.apify.com → Settings → Integrations
+                  </a>{" "}
+                  → API token.
+                </>
+              )}
+            </p>
+          </div>
+          <div className="flex items-start pt-[26px]">
+            <button
+              onClick={adicionar}
+              disabled={!!ocupado || !apelido.trim() || valorLimpo.length < 20 || tokenBloqueado}
+              className="h-10 rounded-lg bg-gold px-4 text-xs font-semibold text-navy shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+            >
+              {ocupado === "add" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "+ Adicionar e testar"
+              )}
+            </button>
+          </div>
         </div>
         <button
           onClick={() =>
