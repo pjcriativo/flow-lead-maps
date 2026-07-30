@@ -168,6 +168,8 @@ Deno.serve(async (req) => {
             { org_id: org.id, user_id: u.id, papel: "admin" },
             { onConflict: "org_id,user_id" },
           );
+      // conta adicionada diretamente pelo admin nasce liberada
+      await admin.from("profiles").update({ acesso_liberado: true }).eq("id", u.id);
       return json({ ok: true, user_id: u.id, email });
     }
 

@@ -19,6 +19,7 @@ const cadastroSchema = z
   .object({
     nome: z.string().trim().min(2, "Informe seu nome completo."),
     email: z.string().trim().email("Informe um e-mail válido."),
+    phone: z.string().trim().min(8, "Informe um telefone/WhatsApp válido."),
     password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres."),
     confirmPassword: z.string(),
   })
@@ -51,6 +52,7 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">(initialMode);
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -70,8 +72,21 @@ function AuthPage() {
   }, [search.mode, search.tab]);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/dashboard", replace: true });
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (data.user) {
+        // Verificar portão de aprovação antes de ir para o dashboard
+        const { data: perfil } = await supabase
+          .from("profiles")
+          .select("is_super_admin, acesso_liberado")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (perfil?.is_super_admin === true || perfil?.acesso_liberado === true) {
+          navigate({ to: "/dashboard", replace: true });
+        } else {
+          navigate({ to: "/aguardando-aprovacao", replace: true });
+        }
+      }
     });
     // ⚙️ Configurações (admin → Painel de controle): cadastro de usuário / termos e condições.
     lerConfigPublica().then((c) => {
@@ -103,7 +118,7 @@ function AuthPage() {
           setError("Você precisa aceitar os Termos e Condições para criar uma conta.");
           return;
         }
-        const validacao = cadastroSchema.safeParse({ nome, email, password, confirmPassword });
+        const validacao = cadastroSchema.safeParse({ nome, email, phone, password, confirmPassword });
         if (!validacao.success) {
           setError(validacao.error.issues[0]?.message ?? "Revise os dados do cadastro.");
           return;
@@ -112,7 +127,10 @@ function AuthPage() {
           email: validacao.data.email,
           password: validacao.data.password,
           options: {
-            data: { full_name: validacao.data.nome },
+            data: {
+              full_name: validacao.data.nome,
+              phone: validacao.data.phone,
+            },
             emailRedirectTo: `${window.location.origin}/aguardando-aprovacao`,
           },
         });
@@ -127,8 +145,22 @@ function AuthPage() {
         }
         return;
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (authData.user) {
+          const { data: perfil } = await supabase
+            .from("profiles")
+            .select("is_super_admin, acesso_liberado")
+            .eq("id", authData.user.id)
+            .maybeSingle();
+
+          if (perfil?.is_super_admin === true || perfil?.acesso_liberado === true) {
+            navigate({ to: "/dashboard", replace: true });
+          } else {
+            navigate({ to: "/aguardando-aprovacao", replace: true });
+          }
+          return;
+        }
       }
       navigate({ to: "/dashboard", replace: true });
     } catch (e) {
@@ -139,7 +171,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
       <div className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
         <div className="flex justify-center">
           <FlowLeadsLogo className="h-10 w-auto" />
@@ -199,36 +231,115 @@ function AuthPage() {
 
         <form onSubmit={submit} className="space-y-4">
           {mode === "signup" && (
-            <div className="space-y-1.5">
-              <Label htmlFor="nome">Nome completo</Label>
-              <Input
-                id="nome"
-                type="text"
-                required
-                placeholder="Seu nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-              />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="nome">Nome completo</Label>
+                <Input
+                  id="nome"
+                  type="text"
+                  required
+                  placeholder="Seu nome"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="seuemail@exemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="phone">Telefone / WhatsApp</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  required
+                  placeholder="(11) 99999-9999"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Criar senha</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    placeholder="Sua senha"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-password">Confirmar senha</Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={8}
+                    placeholder="Confirme sua senha"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="pr-10"
+                    aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Ocultar senhas" : "Mostrar senhas"}
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
+                {confirmPassword.length > 0 && password !== confirmPassword && (
+                  <p className="text-xs text-destructive">As senhas não coincidem.</p>
+                )}
+              </div>
+            </>
           )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="email">E-mail</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              placeholder="seuemail@exemplo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+          {mode === "signin" && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="seuemail@exemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
 
-          {mode !== "forgot" && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Senha</Label>
-                {mode === "signin" && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Senha</Label>
                   <button
                     type="button"
                     className="text-xs text-muted-foreground hover:text-foreground"
@@ -240,59 +351,41 @@ function AuthPage() {
                   >
                     Esqueceu a senha?
                   </button>
-                )}
+                </div>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {mode === "signup" && (
-                <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
-              )}
-            </div>
+            </>
           )}
 
-          {mode === "signup" && (
+          {mode === "forgot" && (
             <div className="space-y-1.5">
-              <Label htmlFor="confirm-password">Confirme sua senha</Label>
-              <div className="relative">
-                <Input
-                  id="confirm-password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  minLength={8}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pr-10"
-                  aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                  aria-label={showPassword ? "Ocultar senhas" : "Mostrar senhas"}
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-              {confirmPassword.length > 0 && password !== confirmPassword && (
-                <p className="text-xs text-destructive">As senhas não coincidem.</p>
-              )}
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                required
+                placeholder="seuemail@exemplo.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
           )}
 
@@ -349,4 +442,5 @@ function AuthPage() {
     </div>
   );
 }
+
 
