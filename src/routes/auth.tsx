@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Sparkles } from "lucide-react";
 import { posthog } from "@/lib/posthog";
 import { lerConfigPublica } from "@/services/config-publica";
 import { z } from "zod";
@@ -171,273 +171,349 @@ function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
-      <div className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-card p-8 shadow-[var(--shadow-card)]">
-        <div className="flex justify-center">
-          <FlowLeadsLogo className="h-10 w-auto" />
+    <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-2">
+      {/* 🟢 Coluna da Esquerda: Painel Hero com Imagem Profissional e Badges (Oculto em telas pequenas) */}
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-slate-950 p-12 text-white lg:flex">
+        {/* Banner com Overlay em Gradiente */}
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/auth-hero.png"
+            alt="Flow Leads Prospecção B2B"
+            className="h-full w-full object-cover object-center opacity-55 transition-transform duration-1000 hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/40 to-transparent" />
         </div>
 
-        {mode !== "forgot" && cadastroAtivo && (
-          <div className="flex rounded-lg bg-muted p-1 text-sm font-medium">
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                setInfo(null);
-                setMode("signin");
-              }}
-              className={`flex-1 rounded-md py-1.5 text-center transition-all ${
-                mode === "signin"
-                  ? "bg-background text-foreground shadow-sm font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                setInfo(null);
-                setMode("signup");
-              }}
-              className={`flex-1 rounded-md py-1.5 text-center transition-all ${
-                mode === "signup"
-                  ? "bg-background text-foreground shadow-sm font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Criar conta
-            </button>
+        {/* Top Branding Logo */}
+        <div className="relative z-10 flex items-center gap-3">
+          <FlowLeadsLogo className="h-9 w-auto text-white" />
+        </div>
+
+        {/* Conteúdo Central e Badges de Métricas */}
+        <div className="relative z-10 my-auto max-w-lg space-y-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-medium text-blue-200 backdrop-blur-md shadow-lg">
+            <Sparkles className="h-3.5 w-3.5 text-blue-400" />
+            <span>Inteligência de Vendas B2B</span>
           </div>
-        )}
 
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {mode === "signin"
-              ? "Bem-vindo de volta"
-              : mode === "signup"
-                ? "Crie sua conta"
-                : "Redefina sua senha"}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {mode === "signin"
-              ? "Entre para acessar seu painel."
-              : mode === "signup"
-                ? "Comece a encontrar leads em segundos."
-                : "Informe seu e-mail e enviaremos um link de redefinição."}
+          <h2 className="text-3xl font-bold tracking-tight text-white leading-tight md:text-4xl">
+            Gere leads qualificados do Google Maps em um único clique.
+          </h2>
+
+          <p className="text-sm leading-relaxed text-slate-300">
+            Descubra empresas locais, colete telefones e e-mails verificados, envie propostas pelo WhatsApp e potencialize a prospecção da sua equipe.
           </p>
+
+          {/* Cards com efeito Glassmorphism */}
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-md shadow-md">
+              <p className="text-2xl font-bold text-white">+50k</p>
+              <p className="text-xs text-slate-400">Leads pesquisados/mês</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-md shadow-md">
+              <p className="text-2xl font-bold text-blue-400">99.8%</p>
+              <p className="text-xs text-slate-400">Precisão de contatos</p>
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
-          {mode === "signup" && (
-            <>
-              <div className="space-y-1.5">
-                <Label htmlFor="nome">Nome completo</Label>
-                <Input
-                  id="nome"
-                  type="text"
-                  required
-                  placeholder="Seu nome"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                />
-              </div>
+        {/* Rodapé da Coluna Esquerda */}
+        <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-6 text-xs text-slate-400">
+          <p>© {new Date().getFullYear()} Flow Leads. Todos os direitos reservados.</p>
+          <Link to="/privacy" className="transition-colors hover:text-white">
+            Privacidade
+          </Link>
+        </div>
+      </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  placeholder="seuemail@exemplo.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
+      {/* 🔵 Coluna da Direita: Formulário de Login / Cadastro Responsivo */}
+      <div className="flex flex-col justify-between bg-background p-6 md:p-10 lg:p-14 overflow-y-auto">
+        {/* Topo: Atalho de voltar */}
+        <div className="flex items-center justify-between">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Voltar ao site
+          </Link>
+          <div className="lg:hidden">
+            <FlowLeadsLogo className="h-8 w-auto" />
+          </div>
+        </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">Telefone / WhatsApp</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  required
-                  placeholder="(11) 99999-9999"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Criar senha</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={8}
-                    placeholder="Sua senha"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="confirm-password">Confirmar senha</Label>
-                <div className="relative">
-                  <Input
-                    id="confirm-password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={8}
-                    placeholder="Confirme sua senha"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pr-10"
-                    aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Ocultar senhas" : "Mostrar senhas"}
-                  >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                  </button>
-                </div>
-                {confirmPassword.length > 0 && password !== confirmPassword && (
-                  <p className="text-xs text-destructive">As senhas não coincidem.</p>
-                )}
-              </div>
-            </>
-          )}
-
-          {mode === "signin" && (
-            <>
-              <div className="space-y-1.5">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  placeholder="seuemail@exemplo.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Senha</Label>
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      setError(null);
-                      setInfo(null);
-                      setMode("forgot");
-                    }}
-                  >
-                    Esqueceu a senha?
-                  </button>
-                </div>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {mode === "forgot" && (
-            <div className="space-y-1.5">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                placeholder="seuemail@exemplo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+        {/* Caixa Central do Formulário */}
+        <div className="mx-auto my-auto w-full max-w-sm space-y-6 py-6">
+          {mode !== "forgot" && cadastroAtivo && (
+            <div className="flex rounded-lg bg-muted p-1 text-sm font-medium">
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setInfo(null);
+                  setMode("signin");
+                }}
+                className={`flex-1 rounded-md py-2 text-center transition-all ${
+                  mode === "signin"
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Entrar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setInfo(null);
+                  setMode("signup");
+                }}
+                className={`flex-1 rounded-md py-2 text-center transition-all ${
+                  mode === "signup"
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Criar conta
+              </button>
             </div>
           )}
 
-          {mode === "signup" && termosAtivo && (
-            <label className="flex items-start gap-2 text-xs text-muted-foreground select-none">
-              <input
-                type="checkbox"
-                checked={aceitouTermos}
-                onChange={(e) => setAceitouTermos(e.target.checked)}
-                className="mt-0.5 h-3.5 w-3.5 rounded border-border"
-              />
-              <span>
-                Li e aceito os{" "}
-                <Link to="/terms" target="_blank" className="underline hover:text-foreground">
-                  Termos e Condições
-                </Link>
-              </span>
-            </label>
-          )}
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          {info && <p className="text-sm text-emerald-600">{info}</p>}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading
-              ? "Aguarde..."
-              : mode === "signin"
-                ? "Entrar"
+          <div className="text-center space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {mode === "signin"
+                ? "Bem-vindo de volta"
                 : mode === "signup"
-                  ? "Criar minha conta"
-                  : "Enviar link de redefinição"}
-          </Button>
-        </form>
+                  ? "Crie sua conta"
+                  : "Redefina sua senha"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {mode === "signin"
+                ? "Entre para acessar seu painel."
+                : mode === "signup"
+                  ? "Comece a encontrar leads em segundos."
+                  : "Informe seu e-mail e enviaremos um link de redefinição."}
+            </p>
+          </div>
 
-        {(mode !== "signin" || cadastroAtivo) && (
-          <button
-            type="button"
-            className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              setError(null);
-              setInfo(null);
-              setConfirmPassword("");
-              setMode(mode === "signin" ? "signup" : "signin");
-            }}
-          >
-            {mode === "signin"
-              ? "Não tem conta? Cadastre-se"
-              : mode === "signup"
-                ? "Já tem conta? Entrar"
-                : "Voltar para entrar"}
-          </button>
-        )}
+          <form onSubmit={submit} className="space-y-4">
+            {mode === "signup" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="nome">Nome completo</Label>
+                  <Input
+                    id="nome"
+                    type="text"
+                    required
+                    placeholder="Seu nome"
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    placeholder="seuemail@exemplo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone">Telefone / WhatsApp</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    required
+                    placeholder="(11) 99999-9999"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Criar senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={8}
+                      placeholder="Sua senha"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm-password">Confirmar senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={8}
+                      placeholder="Confirme sua senha"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pr-10"
+                      aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Ocultar senhas" : "Mostrar senhas"}
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword.length > 0 && password !== confirmPassword && (
+                    <p className="text-xs text-destructive">As senhas não coincidem.</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {mode === "signin" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    placeholder="seuemail@exemplo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Senha</Label>
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setError(null);
+                        setInfo(null);
+                        setMode("forgot");
+                      }}
+                    >
+                      Esqueceu a senha?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {mode === "forgot" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="seuemail@exemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            )}
+
+            {mode === "signup" && termosAtivo && (
+              <label className="flex items-start gap-2 text-xs text-muted-foreground select-none">
+                <input
+                  type="checkbox"
+                  checked={aceitouTermos}
+                  onChange={(e) => setAceitouTermos(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 rounded border-border"
+                />
+                <span>
+                  Li e aceito os{" "}
+                  <Link to="/terms" target="_blank" className="underline hover:text-foreground">
+                    Termos e Condições
+                  </Link>
+                </span>
+              </label>
+            )}
+
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            {info && <p className="text-sm text-emerald-600">{info}</p>}
+
+            <Button type="submit" className="w-full h-10 font-semibold" disabled={loading}>
+              {loading
+                ? "Aguarde..."
+                : mode === "signin"
+                  ? "Entrar"
+                  : mode === "signup"
+                    ? "Criar minha conta"
+                    : "Enviar link de redefinição"}
+            </Button>
+          </form>
+
+          {(mode !== "signin" || cadastroAtivo) && (
+            <button
+              type="button"
+              className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setError(null);
+                setInfo(null);
+                setConfirmPassword("");
+                setMode(mode === "signin" ? "signup" : "signin");
+              }}
+            >
+              {mode === "signin"
+                ? "Não tem conta? Cadastre-se"
+                : mode === "signup"
+                  ? "Já tem conta? Entrar"
+                  : "Voltar para entrar"}
+            </button>
+          )}
+        </div>
+
+        {/* Rodapé Direita */}
+        <div className="text-center text-xs text-muted-foreground">
+          Ao continuar, você concorda com nossos{" "}
+          <Link to="/terms" className="underline hover:text-foreground">
+            Termos de Serviço
+          </Link>
+        </div>
       </div>
     </div>
   );
