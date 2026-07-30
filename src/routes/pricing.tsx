@@ -230,7 +230,7 @@ function PricingPage() {
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{sub}</p>
 
-                <Link to="/dashboard" preload="render" className="mt-6">
+                <Link to="/auth" search={{ mode: "signup" }} preload="render" className="mt-6">
                   <Button className="w-full" variant={plan.popular ? "default" : "outline"}>
                     {plan.cta}
                   </Button>

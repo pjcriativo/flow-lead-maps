@@ -10,8 +10,14 @@ import { posthog } from "@/lib/posthog";
 import { lerConfigPublica } from "@/services/config-publica";
 import { z } from "zod";
 
+const authSearchSchema = z.object({
+  mode: z.enum(["signin", "signup", "forgot"]).optional(),
+  tab: z.string().optional(),
+});
+
 const cadastroSchema = z
   .object({
+    nome: z.string().trim().min(2, "Informe seu nome completo."),
     email: z.string().trim().email("Informe um e-mail válido."),
     password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres."),
     confirmPassword: z.string(),
@@ -22,10 +28,11 @@ const cadastroSchema = z
   });
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: authSearchSchema,
   head: () => ({
     meta: [
-      { title: "Entrar — Flow Leads" },
-      { name: "description", content: "Entre na sua conta do Flow Leads." },
+      { title: "Entrar ou Criar Conta — Flow Leads" },
+      { name: "description", content: "Acesse ou crie sua conta no Flow Leads." },
     ],
   }),
   component: AuthPage,
@@ -33,7 +40,16 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const search = Route.useSearch();
+  const initialMode =
+    search.mode === "signup" || search.tab === "signup"
+      ? "signup"
+      : search.mode === "forgot"
+        ? "forgot"
+        : "signin";
+
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot">(initialMode);
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -44,6 +60,14 @@ function AuthPage() {
   const [cadastroAtivo, setCadastroAtivo] = useState(true);
   const [termosAtivo, setTermosAtivo] = useState(false);
   const [aceitouTermos, setAceitouTermos] = useState(false);
+
+  useEffect(() => {
+    if (search.mode === "signup" || search.tab === "signup") {
+      setMode("signup");
+    } else if (search.mode === "signin") {
+      setMode("signin");
+    }
+  }, [search.mode, search.tab]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -79,7 +103,7 @@ function AuthPage() {
           setError("Você precisa aceitar os Termos e Condições para criar uma conta.");
           return;
         }
-        const validacao = cadastroSchema.safeParse({ email, password, confirmPassword });
+        const validacao = cadastroSchema.safeParse({ nome, email, password, confirmPassword });
         if (!validacao.success) {
           setError(validacao.error.issues[0]?.message ?? "Revise os dados do cadastro.");
           return;
@@ -87,7 +111,10 @@ function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email: validacao.data.email,
           password: validacao.data.password,
-          options: { emailRedirectTo: `${window.location.origin}/aguardando-aprovacao` },
+          options: {
+            data: { full_name: validacao.data.nome },
+            emailRedirectTo: `${window.location.origin}/aguardando-aprovacao`,
+          },
         });
         if (error) throw error;
         posthog.capture("user_signed_up", { email });
@@ -117,6 +144,42 @@ function AuthPage() {
         <div className="flex justify-center">
           <FlowLeadsLogo className="h-10 w-auto" />
         </div>
+
+        {mode !== "forgot" && cadastroAtivo && (
+          <div className="flex rounded-lg bg-muted p-1 text-sm font-medium">
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setInfo(null);
+                setMode("signin");
+              }}
+              className={`flex-1 rounded-md py-1.5 text-center transition-all ${
+                mode === "signin"
+                  ? "bg-background text-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setInfo(null);
+                setMode("signup");
+              }}
+              className={`flex-1 rounded-md py-1.5 text-center transition-all ${
+                mode === "signup"
+                  ? "bg-background text-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Criar conta
+            </button>
+          </div>
+        )}
+
         <div className="text-center">
           <h1 className="text-2xl font-semibold tracking-tight">
             {mode === "signin"
@@ -133,17 +196,34 @@ function AuthPage() {
                 : "Informe seu e-mail e enviaremos um link de redefinição."}
           </p>
         </div>
+
         <form onSubmit={submit} className="space-y-4">
+          {mode === "signup" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="nome">Nome completo</Label>
+              <Input
+                id="nome"
+                type="text"
+                required
+                placeholder="Seu nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+              />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="email">E-mail</Label>
             <Input
               id="email"
               type="email"
               required
+              placeholder="seuemail@exemplo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
+
           {mode !== "forgot" && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
@@ -186,6 +266,7 @@ function AuthPage() {
               )}
             </div>
           )}
+
           {mode === "signup" && (
             <div className="space-y-1.5">
               <Label htmlFor="confirm-password">Confirme sua senha</Label>
@@ -214,6 +295,7 @@ function AuthPage() {
               )}
             </div>
           )}
+
           {mode === "signup" && termosAtivo && (
             <label className="flex items-start gap-2 text-xs text-muted-foreground select-none">
               <input
@@ -230,18 +312,21 @@ function AuthPage() {
               </span>
             </label>
           )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
           {info && <p className="text-sm text-emerald-600">{info}</p>}
+
           <Button type="submit" className="w-full" disabled={loading}>
             {loading
               ? "Aguarde..."
               : mode === "signin"
                 ? "Entrar"
                 : mode === "signup"
-                  ? "Cadastrar"
+                  ? "Criar minha conta"
                   : "Enviar link de redefinição"}
           </Button>
         </form>
+
         {(mode !== "signin" || cadastroAtivo) && (
           <button
             type="button"
@@ -264,3 +349,4 @@ function AuthPage() {
     </div>
   );
 }
+

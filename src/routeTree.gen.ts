@@ -17,6 +17,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ManutencaoRouteImport } from './routes/manutencao'
 import { Route as EntrarRouteImport } from './routes/entrar'
+import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AguardandoAprovacaoRouteImport } from './routes/aguardando-aprovacao'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -65,6 +66,11 @@ const EntrarRoute = EntrarRouteImport.update({
   path: '/entrar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aguardando-aprovacao': typeof AguardandoAprovacaoRoute
   '/auth': typeof AuthRoute
+  '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aguardando-aprovacao': typeof AguardandoAprovacaoRoute
   '/auth': typeof AuthRoute
+  '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/aguardando-aprovacao': typeof AguardandoAprovacaoRoute
   '/auth': typeof AuthRoute
+  '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aguardando-aprovacao'
     | '/auth'
+    | '/cadastro'
     | '/entrar'
     | '/manutencao'
     | '/pricing'
@@ -172,6 +182,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aguardando-aprovacao'
     | '/auth'
+    | '/cadastro'
     | '/entrar'
     | '/manutencao'
     | '/pricing'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/aguardando-aprovacao'
     | '/auth'
+    | '/cadastro'
     | '/entrar'
     | '/manutencao'
     | '/pricing'
@@ -207,6 +219,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AguardandoAprovacaoRoute: typeof AguardandoAprovacaoRoute
   AuthRoute: typeof AuthRoute
+  CadastroRoute: typeof CadastroRoute
   EntrarRoute: typeof EntrarRoute
   ManutencaoRoute: typeof ManutencaoRoute
   PricingRoute: typeof PricingRoute
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       path: '/entrar'
       fullPath: '/entrar'
       preLoaderRoute: typeof EntrarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -346,6 +366,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AguardandoAprovacaoRoute: AguardandoAprovacaoRoute,
   AuthRoute: AuthRoute,
+  CadastroRoute: CadastroRoute,
   EntrarRoute: EntrarRoute,
   ManutencaoRoute: ManutencaoRoute,
   PricingRoute: PricingRoute,

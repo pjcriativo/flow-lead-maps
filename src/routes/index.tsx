@@ -115,7 +115,7 @@ function Index() {
               Preços
             </Link>
           </nav>
-          <Link to="/dashboard" preload="render">
+          <Link to="/auth" search={{ mode: "signup" }} preload="render">
             <Button>
               Começar <ArrowRight />
             </Button>
@@ -143,7 +143,7 @@ function Index() {
                 "Busque qualquer tipo de empresa em qualquer cidade. Tenha nomes, telefones, e-mails, sites e avaliações — exportados para Excel ou Google Sheets em um clique."}
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link to="/dashboard" preload="render">
+              <Link to="/auth" search={{ mode: "signup" }} preload="render">
                 <Button size="lg" className="h-12 px-8 text-base shadow-[var(--shadow-elegant)]">
                   {conteudo?.hero_cta_primario || "Começar grátis"} <ArrowRight />
                 </Button>
