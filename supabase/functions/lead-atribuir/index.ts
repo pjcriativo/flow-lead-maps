@@ -7,6 +7,7 @@
 // (RLS) muda junto: o novo responsável passa a ver; o antigo, se vendedor/sdr, deixa de ver.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -20,6 +21,8 @@ Deno.serve(async (req) => {
   );
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  if (!(await acessoFerramentaLiberado(userClient, userData.user.id)))
+    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
   const quem = userData.user.id;
 
   const admin = createClient(

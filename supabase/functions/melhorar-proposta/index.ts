@@ -10,6 +10,7 @@
 // a visibilidade de consumo por org.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import { resolverChave } from "../_shared/chaves.ts";
 
 const TETO_PADRAO = 30;
@@ -67,6 +68,8 @@ Deno.serve(async (req) => {
   );
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  if (!(await acessoFerramentaLiberado(userClient, userData.user.id)))
+    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
   const userId = userData.user.id;
 
   // RATE-LIMIT por org: quantas melhorias esta org já fez HOJE (UTC)?

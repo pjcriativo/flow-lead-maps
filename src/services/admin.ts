@@ -34,7 +34,14 @@ export type AdminKpis = {
   ticketsAbertos: number;
 };
 
-export type UsuarioPlataforma = { email: string; plan: string | null; created_at: string };
+export type UsuarioPlataforma = {
+  id: string;
+  email: string;
+  plan: string | null;
+  created_at: string;
+  acesso_liberado: boolean;
+  is_super_admin: boolean;
+};
 export type PontoSerie = { dia: string; leads: number; disparos: number };
 export type LeadRecente = {
   id: string;
@@ -131,6 +138,7 @@ export type AdminAcao =
   | "staff_add"
   | "staff_remove"
   | "user_add"
+  | "user_access_set"
   | "plano_upsert"
   | "plano_toggle"
   | "plano_delete"

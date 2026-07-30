@@ -7,6 +7,7 @@
 //   staff_add    { email, papel }               → cria (ou acha) o usuário e o vincula à org
 //   staff_remove { user_id }                     → remove o membership (não apaga a conta)
 //   user_add     { email, papel? }               → cria conta + org própria (admin) ou vincula
+//   user_access_set { user_id, liberado }         → libera/bloqueia o acesso à plataforma
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { cifrar, decifrar } from "../_shared/cofre.ts";
@@ -168,6 +169,29 @@ Deno.serve(async (req) => {
             { onConflict: "org_id,user_id" },
           );
       return json({ ok: true, user_id: u.id, email });
+    }
+
+    if (acao === "user_access_set") {
+      const userId = String(b.user_id || "");
+      const liberado = b.liberado === true;
+      if (!userId) return json({ ok: false, reason: "usuario_invalido" });
+
+      const { data: alvo, error } = await admin
+        .from("profiles")
+        .update({ acesso_liberado: liberado })
+        .eq("id", userId)
+        .select("id, email, acesso_liberado")
+        .maybeSingle();
+
+      if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
+      if (!alvo) return json({ ok: false, reason: "usuario_nao_encontrado" });
+
+      return json({
+        ok: true,
+        user_id: alvo.id,
+        email: alvo.email,
+        acesso_liberado: alvo.acesso_liberado,
+      });
     }
 
     // ── PLANOS (billing camada 1) ──

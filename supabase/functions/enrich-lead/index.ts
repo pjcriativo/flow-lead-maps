@@ -4,6 +4,7 @@
 // status='enriched'. Respeita RLS (usa o JWT do usuário).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { json, corsHeaders } from "../_shared/cors.ts";
+import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
 import { firstBrWhatsapp } from "../_shared/phone.ts";
@@ -19,6 +20,8 @@ Deno.serve(async (req) => {
 
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  if (!(await acessoFerramentaLiberado(supabase, userData.user.id)))
+    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
 
   let leadId: string | undefined;
   try {

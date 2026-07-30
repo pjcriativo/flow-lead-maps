@@ -5,6 +5,7 @@
 // com animações. Salva em `redesigns` e os reviews em `lead_reviews` (RLS por user).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import { coletarConteudoSite } from "../_shared/materiaprima.ts";
 import { coletarReviews, setReviewsPoolContext } from "../_shared/reviews.ts";
 import {
@@ -41,6 +42,8 @@ Deno.serve(async (req) => {
 
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  if (!(await acessoFerramentaLiberado(supabase, userData.user.id)))
+    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
   const userId = userData.user.id;
 
   let leadId: string | undefined;

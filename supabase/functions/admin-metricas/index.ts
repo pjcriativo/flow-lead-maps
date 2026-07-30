@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
   // usuários (todas as orgs) — id→email para rotular o dono em cada linha das tabelas
   const { data: usuarios } = await admin
     .from("profiles")
-    .select("id, email, plan, created_at")
+    .select("id, email, plan, created_at, acesso_liberado, is_super_admin")
     .order("created_at", { ascending: true });
   const emailDe = new Map<string, string>(
     (usuarios ?? []).map((u: Rec) => [String(u.id), String(u.email ?? "?")]),
@@ -254,9 +254,12 @@ Deno.serve(async (req) => {
       ticketsAbertos: ticketsAbertos ?? 0,
     },
     usuarios: (usuarios ?? []).map((u: Rec) => ({
+      id: u.id,
       email: u.email,
       plan: u.plan,
       created_at: u.created_at,
+      acesso_liberado: u.acesso_liberado,
+      is_super_admin: u.is_super_admin,
     })),
     statusCampanhas: [...campanhasStatus.entries()].map(([status, total]) => ({ status, total })),
     serie14d: [...porDia.values()],

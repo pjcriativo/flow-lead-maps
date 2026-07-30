@@ -16,8 +16,15 @@ export const Route = createFileRoute("/_authenticated")({
         .select("modo_manutencao_ativo")
         .eq("id", true)
         .maybeSingle(),
-      supabase.from("profiles").select("is_super_admin").eq("id", data.user.id).maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("is_super_admin, acesso_liberado")
+        .eq("id", data.user.id)
+        .maybeSingle(),
     ]);
+    if (perfil?.is_super_admin !== true && perfil?.acesso_liberado !== true) {
+      throw redirect({ to: "/aguardando-aprovacao" });
+    }
     if (config?.modo_manutencao_ativo === true && perfil?.is_super_admin !== true) {
       throw redirect({ to: "/manutencao" });
     }

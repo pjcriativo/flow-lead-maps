@@ -1369,6 +1369,7 @@ export type Database = {
       };
       profiles: {
         Row: {
+          acesso_liberado: boolean;
           avatar_url: string | null;
           company_name: string | null;
           created_at: string;
@@ -1391,6 +1392,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          acesso_liberado?: boolean;
           avatar_url?: string | null;
           company_name?: string | null;
           created_at?: string;
@@ -1413,6 +1415,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          acesso_liberado?: boolean;
           avatar_url?: string | null;
           company_name?: string | null;
           created_at?: string;

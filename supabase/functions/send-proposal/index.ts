@@ -6,6 +6,7 @@
 // (a UI cai no "copiar"). Falha do Resend → { ok:false, error } (NÃO marca enviada).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import { montarFrom } from "../_shared/remetente.ts";
 import { orgDoUsuario, consumir } from "../_shared/limite.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
@@ -31,6 +32,8 @@ Deno.serve(async (req) => {
 
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  if (!(await acessoFerramentaLiberado(supabase, userData.user.id)))
+    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
 
   let propostaId: string | undefined;
   try {

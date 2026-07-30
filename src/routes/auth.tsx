@@ -8,6 +8,18 @@ import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { Eye, EyeOff } from "lucide-react";
 import { posthog } from "@/lib/posthog";
 import { lerConfigPublica } from "@/services/config-publica";
+import { z } from "zod";
+
+const cadastroSchema = z
+  .object({
+    email: z.string().trim().email("Informe um e-mail válido."),
+    password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres."),
+    confirmPassword: z.string(),
+  })
+  .refine((dados) => dados.password === dados.confirmPassword, {
+    message: "As senhas não coincidem.",
+    path: ["confirmPassword"],
+  });
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -24,6 +36,7 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -66,13 +79,26 @@ function AuthPage() {
           setError("Você precisa aceitar os Termos e Condições para criar uma conta.");
           return;
         }
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+        const validacao = cadastroSchema.safeParse({ email, password, confirmPassword });
+        if (!validacao.success) {
+          setError(validacao.error.issues[0]?.message ?? "Revise os dados do cadastro.");
+          return;
+        }
+        const { data, error } = await supabase.auth.signUp({
+          email: validacao.data.email,
+          password: validacao.data.password,
+          options: { emailRedirectTo: `${window.location.origin}/aguardando-aprovacao` },
         });
         if (error) throw error;
         posthog.capture("user_signed_up", { email });
+        if (data.session) {
+          navigate({ to: "/aguardando-aprovacao", replace: true });
+        } else {
+          setInfo(
+            "Conta criada. Confirme seu e-mail e, depois, aguarde a liberação manual do administrador.",
+          );
+        }
+        return;
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -155,15 +181,37 @@ function AuthPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground select-none">
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={(e) => setShowPassword(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-border"
+              {mode === "signup" && (
+                <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
+              )}
+            </div>
+          )}
+          {mode === "signup" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password">Confirme sua senha</Label>
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={8}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pr-10"
+                  aria-invalid={confirmPassword.length > 0 && password !== confirmPassword}
                 />
-                Mostrar senha
-              </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? "Ocultar senhas" : "Mostrar senhas"}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+              {confirmPassword.length > 0 && password !== confirmPassword && (
+                <p className="text-xs text-destructive">As senhas não coincidem.</p>
+              )}
             </div>
           )}
           {mode === "signup" && termosAtivo && (
@@ -201,6 +249,7 @@ function AuthPage() {
             onClick={() => {
               setError(null);
               setInfo(null);
+              setConfirmPassword("");
               setMode(mode === "signin" ? "signup" : "signin");
             }}
           >

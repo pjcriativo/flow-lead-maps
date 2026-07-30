@@ -4,9 +4,10 @@
 //  • Subscribers → CRUD manual (sem origem de captação automática); "Enviar e-mail" fica
 //                  desabilitado com o motivo (não existe motor de disparo em massa ainda).
 import { useEffect, useState } from "react";
-import { Plus, Loader2, Mail } from "lucide-react";
+import { Check, Clock3, Loader2, LockKeyhole, Mail, Plus, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { adminAcao, type UsuarioPlataforma } from "@/services/admin";
+import { Button } from "@/components/ui/button";
 
 export function AdminAllUsers({
   usuarios,
@@ -18,6 +19,7 @@ export function AdminAllUsers({
   const [addOpen, setAddOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [alterandoId, setAlterandoId] = useState<string | null>(null);
 
   const adicionar = async () => {
     if (!email.includes("@")) {
@@ -42,13 +44,41 @@ export function AdminAllUsers({
     }
   };
 
+  const alterarAcesso = async (usuario: UsuarioPlataforma, liberado: boolean) => {
+    setAlterandoId(usuario.id);
+    try {
+      const r = await adminAcao("user_access_set", {
+        user_id: usuario.id,
+        liberado,
+      });
+      if (!r.ok) {
+        toast.error(`Não foi possível alterar o acesso: ${r.reason ?? "erro"}`);
+        return;
+      }
+      toast.success(
+        liberado
+          ? `Acesso liberado para ${usuario.email}.`
+          : `Acesso bloqueado para ${usuario.email}.`,
+      );
+      onMudou();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao alterar acesso");
+    } finally {
+      setAlterandoId(null);
+    }
+  };
+
+  const pendentes = usuarios.filter(
+    (usuario) => !usuario.acesso_liberado && !usuario.is_super_admin,
+  );
+
   return (
     <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
           <h2 className="font-serif text-xl">Todos os usuários</h2>
           <p className="text-xs text-muted-foreground">
-            Todas as contas da plataforma ({usuarios.length}).
+            {usuarios.length} contas na plataforma · {pendentes.length} aguardando liberação.
           </p>
         </div>
         <button
@@ -84,8 +114,9 @@ export function AdminAllUsers({
             <tr>
               <th className="px-5 py-2.5 font-medium">Usuário</th>
               <th className="px-5 py-2.5 font-medium">Plano</th>
+              <th className="px-5 py-2.5 font-medium">Acesso</th>
               <th className="px-5 py-2.5 font-medium">Entrou em</th>
-              <th className="px-5 py-2.5 text-right font-medium">Saldo</th>
+              <th className="px-5 py-2.5 text-right font-medium">Ação</th>
             </tr>
           </thead>
           <tbody>
@@ -95,24 +126,51 @@ export function AdminAllUsers({
                 <td className="px-5 py-3 text-xs uppercase text-muted-foreground">
                   {u.plan ?? "—"}
                 </td>
+                <td className="px-5 py-3">
+                  {u.is_super_admin ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                      <ShieldCheck className="size-3.5" /> Super admin
+                    </span>
+                  ) : u.acesso_liberado ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                      <Check className="size-3.5" /> Liberado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                      <Clock3 className="size-3.5" /> Pendente
+                    </span>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-muted-foreground">
                   {new Date(u.created_at).toLocaleDateString("pt-BR")}
                 </td>
-                {/* billing não existe → saldo NÃO é inventado */}
-                <td
-                  className="px-5 py-3 text-right text-muted-foreground"
-                  title="Cobrança/saldo ainda não existe no produto — em breve."
-                >
-                  —
+                <td className="px-5 py-3 text-right">
+                  {!u.is_super_admin && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={u.acesso_liberado ? "outline" : "default"}
+                      disabled={alterandoId === u.id}
+                      onClick={() => alterarAcesso(u, !u.acesso_liberado)}
+                    >
+                      {alterandoId === u.id ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : u.acesso_liberado ? (
+                        <LockKeyhole className="size-3.5" />
+                      ) : (
+                        <Check className="size-3.5" />
+                      )}
+                      {u.acesso_liberado ? "Bloquear" : "Liberar acesso"}
+                    </Button>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="border-t border-border px-5 py-2 text-[11px] text-muted-foreground">
-        A coluna <b>Saldo</b> fica “—” de propósito: não há cobrança/carteira no produto ainda.
-        Nenhum valor é inventado.
+      <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+        Novos cadastros ficam pendentes até um administrador liberar o acesso manualmente.
       </p>
     </div>
   );
