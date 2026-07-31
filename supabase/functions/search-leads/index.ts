@@ -267,7 +267,21 @@ Deno.serve(async (req) => {
 
         // registra o consumo REAL do mês (só o que entrou). super_admin também conta (para o
         // painel mostrar uso), mas nunca é bloqueado (limite null).
-        if (orgId && inserted > 0) await consumir(admin, orgId, "leads", inserted);
+        if (orgId && inserted > 0) {
+          await consumir(admin, orgId, "leads", inserted);
+          const costUsd = inserted * 0.001;
+          const costBrl = costUsd * 5.60;
+          await admin.from("api_consumption_logs").insert({
+            org_id: orgId,
+            user_id: userId,
+            service: "apify_maps",
+            action: "search_crawled",
+            quantity: inserted,
+            cost_usd: costUsd,
+            cost_brl: costBrl,
+            metadata: { nicho, cidade, fonte },
+          });
+        }
 
         send({ type: "done", inserted, total: inserted, fonte });
         controller.close();

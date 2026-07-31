@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   LifeBuoy,
   Bell,
+  Lock,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,8 @@ import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
 import { UserProfileSection } from "@/components/perfil/UserProfileSection";
+import { usePlanPermissions } from "@/hooks/usePlanPermissions";
+import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
 import { lerConfigPublica } from "@/services/config-publica";
 import { setFusoHorario } from "@/lib/format";
@@ -131,6 +134,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
 
 function Dashboard() {
   const navigate = useNavigate();
+  const planPerms = usePlanPermissions();
   const [section, setSection] = useState<Section>("buscar");
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
@@ -140,6 +144,17 @@ function Dashboard() {
   const [superAdmin, setSuperAdmin] = useState(false);
   const [naoLidas, setNaoLidas] = useState(0);
   const [userProfile, setUserProfile] = useState<{ full_name: string; email: string; avatar_url: string; plan: string } | null>(null);
+  const [upgradeModal, setUpgradeModal] = useState<{ isOpen: boolean; recurso: string }>({ isOpen: false, recurso: "" });
+
+  const restrictedSections = ["propostas", "contratos", "financeiro", "whatsapp", "automacao", "redesign", "publicar"];
+
+  const handleNavClick = (id: Section, label: string) => {
+    if (restrictedSections.includes(id) && !planPerms.canAccessPropostas && !planPerms.loading) {
+      setUpgradeModal({ isOpen: true, recurso: label });
+      return;
+    }
+    setSection(id);
+  };
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -201,26 +216,34 @@ function Dashboard() {
           <FlowLeadsLogo variant="dark" className="h-12 w-auto" />
         </Link>
         <nav className="flex-1 space-y-1 px-3 py-2">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setSection(item.id)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                section === item.id
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-              )}
-            >
-              <item.Icon className="h-4 w-4" />
-              {item.label}
-              {item.id === "notificacoes" && naoLidas > 0 && (
-                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-semibold text-navy">
-                  {naoLidas}
-                </span>
-              )}
-            </button>
-          ))}
+          {NAV.map((item) => {
+            const isLocked = restrictedSections.includes(item.id) && !planPerms.canAccessPropostas && !planPerms.loading;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.id, item.label)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                  section === item.id
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                )}
+              >
+                <item.Icon className="h-4 w-4" />
+                <span>{item.label}</span>
+                {isLocked && (
+                  <span className="ml-auto flex items-center gap-1 rounded-full border border-gold/40 bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold text-gold uppercase">
+                    <Lock className="h-2.5 w-2.5" /> PRO
+                  </span>
+                )}
+                {item.id === "notificacoes" && naoLidas > 0 && !isLocked && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-semibold text-navy">
+                    {naoLidas}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Card do Usuário Logado no Rodapé da Sidebar */}
@@ -348,6 +371,12 @@ function Dashboard() {
         )}
         {section === "settings" && <UserProfileSection />}
       </main>
+
+      <UpgradePlanModal
+        isOpen={upgradeModal.isOpen}
+        onClose={() => setUpgradeModal({ isOpen: false, recurso: "" })}
+        recursoNome={upgradeModal.recurso}
+      />
     </div>
   );
 }

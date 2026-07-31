@@ -57,6 +57,7 @@ import { AdminConfiguracoes } from "./AdminConfiguracoes";
 import { AdminNotificacoes } from "./AdminNotificacoes";
 import { AdminCms } from "./AdminCms";
 import { AdminPagamentos } from "./AdminPagamentos";
+import { AdminApiUsageDashboard } from "./AdminApiUsageDashboard";
 import { lerConfigPublica } from "@/services/config-publica";
 import { setFusoHorario } from "@/lib/format";
 
@@ -71,6 +72,7 @@ type TelaAdmin =
   | "plans"
   | "tickets"
   | "relatorios"
+  | "api-usage"
   | "configuracoes"
   | "notificacoes"
   | "cms"
@@ -103,6 +105,7 @@ const NAV: ItemNav[] = [
       { rotulo: "Assinantes", tela: "subscribers" },
     ],
   },
+  { rotulo: "Consumo de APIs", Icon: BarChart3, tela: "api-usage" },
   { rotulo: "Planos", Icon: Tag, tela: "plans" },
   { rotulo: "Pagamentos", Icon: Wallet, tela: "pagamentos" },
   { rotulo: "Relatórios", Icon: BarChart3, tela: "relatorios" },
@@ -446,6 +449,7 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "plans" && <AdminPlanos planos={painel?.planos ?? []} onMudou={recarregar} />}
             {tela === "tickets" && <AdminTickets />}
             {tela === "relatorios" && <AdminRelatorios />}
+            {tela === "api-usage" && <AdminApiUsageDashboard />}
             {tela === "configuracoes" && <AdminConfiguracoes />}
             {tela === "notificacoes" && <AdminNotificacoes />}
             {tela === "cms" && <AdminCms />}
