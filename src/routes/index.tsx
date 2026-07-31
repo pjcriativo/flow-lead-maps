@@ -15,6 +15,9 @@ import {
   Target,
   FileText,
   Zap,
+  MousePointerClick,
+  Activity,
+  AlertTriangle,
 } from "lucide-react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -55,328 +58,310 @@ function useConteudo() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Flow Leads — A Máquina Definitiva de Prospecção" },
+      { title: "Flow Leads — O Fim da Prospecção Manual" },
       {
         name: "description",
         content:
-          "Transforme sua prospecção com automação no LinkedIn, Instagram, Google Maps e CRM integrado. Construa sites e fature muito mais.",
+          "Pare de caçar leads na mão. Tenha uma máquina automática de prospecção, Lead Scoring, WhatsApp e CRM.",
       },
-      { property: "og:title", content: "Flow Leads — Prospecção Automática" },
-      {
-        property: "og:description",
-        content: "Extraia leads, automatize o WhatsApp e feche contratos em uma única plataforma.",
-      },
-      { property: "og:url", content: "https://flowleads.com.br/" },
     ],
-    links: [{ rel: "canonical", href: "https://flowleads.com.br/" }],
   }),
   component: Index,
 });
-
-function renderHeroTitulo(titulo: string, destaque: string) {
-  const partes = titulo.split("{destaque}");
-  if (partes.length !== 2) {
-    return (
-      <>
-        {titulo} <br className="hidden md:block" />
-        <span className="bg-gradient-to-r from-primary to-violet-500 bg-clip-text text-transparent">
-          {destaque}
-        </span>
-      </>
-    );
-  }
-  return (
-    <>
-      {partes[0]}
-      <br className="hidden md:block" />
-      <span className="bg-gradient-to-r from-primary to-violet-500 bg-clip-text text-transparent">
-        {destaque}
-      </span>
-      {partes[1]}
-    </>
-  );
-}
 
 function Index() {
   const conteudo = useConteudo();
   
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/20">
+    <div className="min-h-screen bg-[#0A0A0A] text-foreground selection:bg-primary/20 overflow-x-hidden">
       <EstiloSitePublico />
       
+      {/* Estilos customizados para 3D e Animações agressivas */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .preserve-3d { transform-style: preserve-3d; }
+        .perspective-1000 { perspective: 1000px; }
+        .tilt-card { transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1); }
+        .tilt-card:hover { transform: rotateX(8deg) rotateY(-8deg) scale(1.05); }
+        .tilt-card-reverse:hover { transform: rotateX(-8deg) rotateY(8deg) scale(1.05); }
+        
+        @keyframes float {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+          100% { transform: translateY(0px); }
+        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        
+        .text-glow { text-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
+        .box-glow { box-shadow: 0 0 60px -15px rgba(99, 102, 241, 0.6); }
+      `}} />
+
       {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+      <header className="fixed w-full top-0 z-50 border-b border-white/5 bg-[#0A0A0A]/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
           <Link to="/" className="flex h-full items-center">
-            <FlowLeadsLogo className="h-9 w-auto" />
+            <FlowLeadsLogo className="h-10 w-auto" />
           </Link>
-          <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
-            <a href="#features" className="hover:text-foreground transition-colors">
-              Recursos
-            </a>
-            <a href="#how" className="hover:text-foreground transition-colors">
-              Como funciona
-            </a>
-            <Link to="/pricing" className="hover:text-foreground transition-colors">
-              Preços
-            </Link>
+          <nav className="hidden items-center gap-10 text-sm font-semibold text-zinc-400 md:flex">
+            <a href="#dor" className="hover:text-white transition-colors">A Realidade</a>
+            <a href="#solucao" className="hover:text-white transition-colors">A Solução</a>
+            <a href="#recursos" className="hover:text-white transition-colors">Arsenal Técnico</a>
+            <Link to="/pricing" className="hover:text-white transition-colors">Planos</Link>
           </nav>
           <Link to="/auth" search={{ mode: "signup" }} preload="render">
-            <Button className="rounded-full shadow-md font-semibold">
-              Começar Agora <ArrowRight className="ml-2 h-4 w-4" />
+            <Button className="rounded-full h-12 px-8 font-bold bg-white text-black hover:bg-zinc-200 shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:scale-105 transition-all duration-300">
+              Acessar Máquina
             </Button>
           </Link>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-24 pb-20 md:pt-32 md:pb-32">
-        <div className="absolute inset-0 bg-gradient-to-b from-background to-secondary/30 -z-10" />
-        <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[600px] w-full max-w-[800px] -translate-x-1/2 rounded-full bg-primary/20 opacity-60 blur-[120px]" />
+      {/* 1. ATENÇÃO: Hero Section */}
+      <section className="relative pt-40 pb-20 md:pt-48 md:pb-32 flex flex-col items-center justify-center min-h-[90vh]">
+        {/* Fundo Cibernético */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-[#0A0A0A] to-[#0A0A0A] -z-10" />
+        <div className="absolute top-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
         
-        <div className="mx-auto max-w-7xl px-6">
+        <div className="mx-auto max-w-7xl px-6 relative z-10">
           <div className="mx-auto max-w-4xl text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <TrendingUp className="h-4 w-4" />
-              {conteudo?.hero_badge || "Acelere suas vendas B2B. Gere no mínimo R$ 3.500/mês."}
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-5 py-2 text-sm font-bold text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-pulse">
+              <AlertTriangle className="h-4 w-4" />
+              Alerta para Agências e Home Office: O amadorismo acabou.
             </div>
             
-            <h1 className="text-balance text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl animate-in fade-in slide-in-from-bottom-6 duration-1000">
-              {renderHeroTitulo(
-                conteudo?.hero_titulo || "Transforme seu LinkedIn e Maps em uma",
-                conteudo?.hero_titulo_destaque || "Máquina de Dinheiro"
-              )}
+            <h1 className="text-balance text-5xl font-black tracking-tighter text-white sm:text-6xl md:text-7xl lg:text-8xl leading-[1.1]">
+              Se você continua caçando leads na mão, seu negócio está com os <br className="hidden lg:block"/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500 text-glow">
+                dias contados.
+              </span>
             </h1>
             
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-150 fill-mode-both">
-              {conteudo?.hero_subtitulo ||
-                "Chega de prospecção manual fria e sem respostas. Extraia leads qualificados, crie sites e feche contratos automáticos usando o Flow Leads."}
+            <p className="mx-auto mt-8 max-w-3xl text-xl font-medium leading-relaxed text-zinc-400">
+              O mercado engoliu quem perde 80% do dia copiando e colando e-mails frios. 
+              Extraia, qualifique e feche negócios automaticamente com a única ferramenta desenhada para SDRs, Freelancers e Agências que desejam faturar <strong className="text-white">R$ 3.500+ líquidos</strong> sem depender da sorte.
             </p>
             
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300 fill-mode-both">
+            <div className="mt-12 flex flex-col items-center justify-center gap-6 sm:flex-row">
               <Link to="/auth" search={{ mode: "signup" }} preload="render" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full h-14 px-8 text-lg font-bold shadow-xl shadow-primary/25 transition-transform hover:scale-105 active:scale-95 rounded-full">
-                  {conteudo?.hero_cta_primario || "Começar a Faturar Agora"} <ArrowRight className="ml-2 h-5 w-5" />
+                <Button size="lg" className="w-full h-16 px-10 text-xl font-black bg-gradient-to-r from-primary to-violet-600 text-white border-0 shadow-[0_0_40px_rgba(99,102,241,0.5)] transition-all duration-300 hover:scale-110 hover:shadow-[0_0_60px_rgba(99,102,241,0.7)] rounded-full">
+                  Construir Minha Máquina Agora <Zap className="ml-3 h-6 w-6" />
                 </Button>
               </Link>
-              <a href="#how" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="w-full h-14 px-8 text-lg bg-background/50 backdrop-blur rounded-full transition-all hover:bg-secondary">
-                  {conteudo?.hero_cta_secundario || "Entender o Processo"}
-                </Button>
-              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. INTERESSE: A Dor Extrema (Freelancer Pain) */}
+      <section id="dor" className="py-24 relative overflow-hidden bg-zinc-950 border-t border-white/5">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="grid gap-16 lg:grid-cols-2 lg:items-center">
+            <div className="order-2 lg:order-1 relative perspective-1000">
+              <div className="absolute inset-0 bg-red-500/20 blur-[100px] rounded-full" />
+              <img 
+                src="/images/freelancer_pain.png" 
+                alt="Freelancer Frustrado e Exausto" 
+                className="relative z-10 w-full rounded-2xl shadow-2xl border border-white/10 tilt-card animate-float"
+              />
             </div>
             
-            <p className="mt-8 text-sm text-muted-foreground flex items-center justify-center gap-2 animate-in fade-in duration-1000 delay-500 fill-mode-both">
-              <ShieldCheck className="h-4 w-4" /> {conteudo?.hero_disclaimer || "Garantia de eficiência. Teste sem compromisso e sem burocracia."}
-            </p>
+            <div className="order-1 lg:order-2">
+              <h2 className="text-4xl font-black text-white md:text-5xl leading-tight">
+                Home Office não deveria ser sinônimo de <span className="text-red-500">escravidão em planilhas.</span>
+              </h2>
+              <p className="mt-6 text-xl text-zinc-400 leading-relaxed font-medium">
+                Você vende a ideia de "liberdade geográfica", mas passa 12 horas por dia com os olhos vermelhos rastreando o LinkedIn e o Instagram em busca de decisores que nunca te respondem.
+              </p>
+              
+              <div className="mt-10 space-y-6">
+                <div className="flex gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500">
+                    <Search className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold text-white">Leads frios e desqualificados</h4>
+                    <p className="mt-2 text-zinc-500">Comprar listas de emails vazados na internet só serve para destruir a reputação do seu domínio. Seus e-mails caem no SPAM.</p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-500/10 text-red-500">
+                    <Activity className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold text-white">Gestão amadora que te faz perder dinheiro</h4>
+                    <p className="mt-2 text-zinc-500">Esquecer de fazer o follow-up porque anotou o número do cliente em um bloco de notas perdido. O dinheiro escapa pelos seus dedos.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Dores & Agitação */}
-      <section className="border-y border-border/50 bg-card py-24">
+      {/* 3. DESEJO: A Solução Suprema (Dashboard & Rocket) */}
+      <section id="solucao" className="py-32 relative bg-[#0A0A0A]">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+          <div className="text-center max-w-3xl mx-auto mb-20">
+            <h2 className="text-4xl font-black text-white md:text-5xl lg:text-6xl text-glow">
+              O antídoto definitivo para a falência B2B.
+            </h2>
+            <p className="mt-6 text-xl text-zinc-400">
+              Transformamos prospecção em engenharia reversa. O Flow Leads não é apenas um extrator, é o ecossistema completo que grandes agências usam para triturar a concorrência.
+            </p>
+          </div>
+
+          {/* Funcionalidade: Insights e Dashboard */}
+          <div className="grid gap-16 lg:grid-cols-2 lg:items-center mb-32">
             <div>
-              <div className="inline-block rounded-lg bg-destructive/10 px-3 py-1 text-sm font-semibold text-destructive mb-4">
-                O Problema
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-bold text-primary mb-6">
+                <Target className="h-4 w-4" /> Inteligência Artificial & Dados
               </div>
-              <h2 className="text-3xl font-bold md:text-4xl leading-tight text-balance">
-                Ainda perdendo 4 horas por dia caçando clientes manualmente?
-              </h2>
-              <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-                Copiar e colar contatos do Google ou mandar DMs genéricas no Instagram não funciona mais. Você está esgotando sua energia onde não dá lucro.
+              <h3 className="text-3xl font-black text-white md:text-4xl">
+                Lead Score e Insights Vivos. Pare de adivinhar quem vai comprar.
+              </h3>
+              <p className="mt-6 text-lg text-zinc-400 leading-relaxed">
+                Nossa plataforma pontua cada contato extraído do Google Maps, LinkedIn ou Instagram. Você saberá exatamente qual empresa tem a maior urgência e o maior orçamento. Tudo gerido em um <strong>Pipeline Kanban Visual</strong>. Você não precisa mais assinar Pipefy, Trello ou Pipedrive.
               </p>
               <ul className="mt-8 space-y-4">
-                {[
-                  "Ficar implorando por respostas no LinkedIn e Instagram.",
-                  "Não ter previsibilidade de vendas ou fluxo constante de leads.",
-                  "Pagar caro em listas de e-mails vazados e totalmente desatualizados."
-                ].map((pain, idx) => (
-                  <li key={idx} className="flex items-start gap-3 text-muted-foreground">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive mt-0.5">
-                      <Minus className="h-4 w-4" />
-                    </span>
-                    <span className="leading-snug">{pain}</span>
-                  </li>
-                ))}
+                <li className="flex items-center gap-3 text-zinc-300 font-medium"><CheckCircle2 className="h-5 w-5 text-primary" /> Qualificação automática de Leads.</li>
+                <li className="flex items-center gap-3 text-zinc-300 font-medium"><CheckCircle2 className="h-5 w-5 text-primary" /> Dashboard executivo com métricas financeiras.</li>
+                <li className="flex items-center gap-3 text-zinc-300 font-medium"><CheckCircle2 className="h-5 w-5 text-primary" /> Visualização de funil clara e sem ruídos.</li>
               </ul>
             </div>
-            <div className="relative rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/10 to-card p-8 md:p-12 shadow-2xl">
-              <div className="absolute top-0 right-0 -mt-4 -mr-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg rotate-12">
-                <TrendingUp className="h-6 w-6" />
+            <div className="relative perspective-1000">
+              <div className="absolute inset-0 bg-primary/20 blur-[100px] rounded-full" />
+              <img 
+                src="/images/dashboard_solution.png" 
+                alt="Dashboard Kanban 3D CRM Flow Leads" 
+                className="relative z-10 w-full rounded-2xl shadow-[0_0_50px_rgba(99,102,241,0.3)] border border-white/10 tilt-card-reverse"
+              />
+            </div>
+          </div>
+
+          {/* Funcionalidade: Automação Total */}
+          <div className="grid gap-16 lg:grid-cols-2 lg:items-center">
+            <div className="order-2 lg:order-1 relative perspective-1000">
+              <div className="absolute inset-0 bg-emerald-500/20 blur-[100px] rounded-full" />
+              <img 
+                src="/images/automation_rocket.png" 
+                alt="Automação Rocket Flow Leads" 
+                className="relative z-10 w-full rounded-2xl shadow-[0_0_50px_rgba(16,185,129,0.2)] border border-white/10 tilt-card animate-float"
+              />
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-sm font-bold text-emerald-500 mb-6">
+                <Bot className="h-4 w-4" /> Disparos e Conversão
               </div>
-              <h3 className="text-2xl font-bold text-foreground">A Solução Flow Leads</h3>
-              <p className="mt-2 text-muted-foreground">Automatize o trabalho chato e foque em fechar vendas.</p>
-              <ul className="mt-8 space-y-5">
-                {[
-                  "Leads fresquinhos extraídos em tempo real.",
-                  "Encontre o decisor direto (LinkedIn/Instagram) com 1 clique.",
-                  "Automação completa: do primeiro 'Oi' no Whats até o Pix."
-                ].map((sol, idx) => (
-                  <li key={idx} className="flex items-start gap-3 font-medium">
-                    <CheckCircle2 className="h-6 w-6 shrink-0 text-primary" />
-                    <span className="leading-snug">{sol}</span>
-                  </li>
-                ))}
+              <h3 className="text-3xl font-black text-white md:text-4xl">
+                Campanhas que rodam enquanto você dorme. Do 1º contato ao PIX na conta.
+              </h3>
+              <p className="mt-6 text-lg text-zinc-400 leading-relaxed">
+                Você encontrou os contatos perfeitos. E agora? Dispare centenas de mensagens via WhatsApp com um clique. Envie propostas comerciais em PDF geradas dinamicamente dentro da plataforma e faça a cobrança de contratos sem sair da cadeira.
+              </p>
+              <ul className="mt-8 space-y-4">
+                <li className="flex items-center gap-3 text-zinc-300 font-medium"><CheckCircle2 className="h-5 w-5 text-emerald-500" /> Disparos em Massa no WhatsApp.</li>
+                <li className="flex items-center gap-3 text-zinc-300 font-medium"><CheckCircle2 className="h-5 w-5 text-emerald-500" /> Geração de Propostas PDF customizadas.</li>
+                <li className="flex items-center gap-3 text-zinc-300 font-medium"><CheckCircle2 className="h-5 w-5 text-emerald-500" /> Construtor de Sites Integrado para Landing Pages.</li>
               </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Grade de Recursos 3D */}
-      <section id="features" className="py-24 relative overflow-hidden bg-background">
-        <div className="mx-auto max-w-7xl px-6 perspective-[2000px]">
-          <div className="mx-auto max-w-3xl text-center mb-16">
-            <h2 className="text-3xl font-bold md:text-5xl text-balance">
-              {conteudo?.features_titulo || "Um arsenal completo para você dominar o mercado"}
-            </h2>
-            <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-              {conteudo?.features_subtitulo || "Tudo que uma agência gasta R$ 2.000/mês para ter, unificado em uma única plataforma inteligente e acessível."}
-            </p>
+      {/* Grade de Recursos Técnica 3D */}
+      <section id="recursos" className="py-24 bg-zinc-950 border-y border-white/5">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-black text-white md:text-5xl">O Arsenal Completo</h2>
           </div>
           
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 perspective-1000">
             {[
               {
                 icon: Linkedin,
                 title: "Modo LinkedIn & Insta",
-                desc: "Invada a rede social mais lucrativa. Extraia contatos B2B de alto calão automaticamente do LinkedIn e Instagram.",
+                desc: "Invada a rede social mais lucrativa. Extraia decisores B2B de alto calão.",
                 color: "text-blue-500",
-                bg: "bg-blue-500/10",
-                borderHover: "hover:border-blue-500/50"
+                bg: "bg-blue-500/10"
               },
               {
                 icon: MapPin,
-                title: "Google Maps Extractor",
-                desc: "Vire o dono da sua cidade. Liste todas as empresas de um nicho local com telefones reais em apenas 10 segundos.",
+                title: "Google Maps Max",
+                desc: "Liste todas as empresas locais e triture a concorrência.",
                 color: "text-red-500",
-                bg: "bg-red-500/10",
-                borderHover: "hover:border-red-500/50"
+                bg: "bg-red-500/10"
               },
               {
                 icon: LayoutTemplate,
-                title: "Construtor de Sites (PRO)",
-                desc: "Crie Landing Pages absurdamente rápidas para capturar clientes, sem depender de WordPress, plugins ou programadores.",
+                title: "Construtor Web",
+                desc: "Crie Landing Pages absurdas para captura sem depender de devs.",
                 color: "text-emerald-500",
-                bg: "bg-emerald-500/10",
-                borderHover: "hover:border-emerald-500/50"
-              },
-              {
-                icon: Bot,
-                title: "Automação de WhatsApp",
-                desc: "Campanhas em massa. Dispare 500 mensagens de prospecção fria diretamente pro bolso do seu lead e aguarde as respostas.",
-                color: "text-green-500",
-                bg: "bg-green-500/10",
-                borderHover: "hover:border-green-500/50"
+                bg: "bg-emerald-500/10"
               },
               {
                 icon: Target,
-                title: "CRM e Kanban Visual",
-                desc: "Nunca mais esqueça de retornar um lead quente. Arraste e solte seus contatos no pipeline até o fechamento.",
+                title: "Pipeline CRM",
+                desc: "Kanban visual inteligente com scoring. Saiba quem vai fechar hoje.",
                 color: "text-purple-500",
-                bg: "bg-purple-500/10",
-                borderHover: "hover:border-purple-500/50"
+                bg: "bg-purple-500/10"
+              },
+              {
+                icon: Bot,
+                title: "Automação WhatsApp",
+                desc: "Robô de disparos para derreter as objeções e agendar reuniões.",
+                color: "text-green-500",
+                bg: "bg-green-500/10"
               },
               {
                 icon: FileText,
                 title: "Contratos Automáticos",
-                desc: "Do pitch ao Pix. Gere PDFs de propostas profissionais e contratos com acompanhamento e cobrança financeira.",
+                desc: "Emissão de propostas e controle financeiro integrado num só lugar.",
                 color: "text-amber-500",
-                bg: "bg-amber-500/10",
-                borderHover: "hover:border-amber-500/50"
-              },
+                bg: "bg-amber-500/10"
+              }
             ].map((f) => (
               <div
                 key={f.title}
-                className={`group relative rounded-3xl border border-border bg-card p-8 shadow-sm transition-all duration-500 hover:-translate-y-2 hover:scale-[1.02] ${f.borderHover} hover:shadow-2xl hover:shadow-primary/10 transform-gpu cursor-default`}
+                className="group relative rounded-3xl border border-white/10 bg-[#111] p-8 transition-all duration-500 tilt-card preserve-3d cursor-crosshair hover:border-primary/50 box-glow"
               >
-                <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
-                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${f.bg} ${f.color} mb-6 transition-transform group-hover:scale-110 group-hover:rotate-3`}>
-                  <f.icon className="h-7 w-7" />
+                <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/10 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100 pointer-events-none" />
+                
+                <div className={`flex h-16 w-16 items-center justify-center rounded-2xl ${f.bg} ${f.color} mb-6 transition-transform duration-500 group-hover:translate-z-10 group-hover:scale-110`} style={{ transform: 'translateZ(30px)' }}>
+                  <f.icon className="h-8 w-8" />
                 </div>
-                <h3 className="text-xl font-bold tracking-tight">{f.title}</h3>
-                <p className="mt-3 text-muted-foreground leading-relaxed relative z-10">{f.desc}</p>
+                <h3 className="text-2xl font-bold text-white transition-all duration-500 group-hover:translate-x-2" style={{ transform: 'translateZ(20px)' }}>{f.title}</h3>
+                <p className="mt-3 text-zinc-400 font-medium leading-relaxed transition-all duration-500" style={{ transform: 'translateZ(10px)' }}>{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* O Caminho dos R$ 3500 */}
-      <section id="how" className="bg-secondary/30 py-24 border-y border-border overflow-hidden">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl font-bold md:text-5xl tracking-tight">Como faturar seus primeiros <span className="text-primary">R$ 3.500?</span></h2>
-            <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              A matemática é simples. Se você vender apenas 2 sites ou gerenciar 2 campanhas locais usando o Flow Leads, a ferramenta já se paga por dezenas de meses.
-            </p>
-          </div>
-
-          <div className="grid gap-16 md:grid-cols-3 relative">
-            {/* Linha conectora desktop */}
-            <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-0.5 bg-gradient-to-r from-primary/10 via-primary to-primary/10 -z-10" />
-            
-            {[
-              {
-                step: "01",
-                title: "Extraia o Ouro",
-                desc: "Use o extrator de Maps ou LinkedIn para pegar os contatos dos donos de 200 clínicas odontológicas da sua região.",
-                icon: Search
-              },
-              {
-                step: "02",
-                title: "Abordagem Massiva",
-                desc: "Jogue todos no CRM e inicie uma campanha de WhatsApp. Em média, 20 vão responder interessados no seu serviço.",
-                icon: Zap
-              },
-              {
-                step: "03",
-                title: "Contrato Fechado",
-                desc: "Envie a Proposta em PDF direto pela ferramenta. Feche 2 contratos de R$ 1.800. Boom: R$ 3.600 de lucro líquido.",
-                icon: CheckCircle2
-              }
-            ].map((s) => (
-               <div key={s.step} className="flex flex-col items-center text-center group">
-                 <div className="flex h-24 w-24 items-center justify-center rounded-full border-8 border-background bg-card text-primary shadow-xl transition-all duration-500 group-hover:scale-110 group-hover:shadow-primary/30 group-hover:bg-primary group-hover:text-primary-foreground">
-                   <s.icon className="h-10 w-10 transition-transform group-hover:scale-90" />
-                 </div>
-                 <div className="mt-8 inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-black tracking-widest text-primary">PASSO {s.step}</div>
-                 <h3 className="mt-4 text-2xl font-bold">{s.title}</h3>
-                 <p className="mt-3 text-muted-foreground leading-relaxed max-w-xs">{s.desc}</p>
-               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-primary/5 -z-10" />
-        <div className="pointer-events-none absolute left-1/2 bottom-0 -z-10 h-[400px] w-full max-w-[800px] -translate-x-1/2 rounded-full bg-primary/20 opacity-40 blur-[100px]" />
+      {/* 4. AÇÃO: CTA Final Agressivo */}
+      <section className="py-40 relative flex items-center justify-center overflow-hidden bg-[#0A0A0A]">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/30 via-[#0A0A0A] to-[#0A0A0A] -z-10" />
         
-        <div className="mx-auto max-w-4xl px-6 text-center">
-          <h2 className="text-4xl font-black tracking-tight md:text-5xl lg:text-6xl text-balance leading-tight">
-            {conteudo?.cta_final_titulo || "O custo da indecisão é continuar quebrado."}
+        <div className="mx-auto max-w-5xl px-6 text-center relative z-10">
+          <h2 className="text-5xl font-black text-white md:text-7xl leading-[1.1] tracking-tighter text-glow">
+            O custo da sua indecisão <br/> é continuar quebrado.
           </h2>
-          <p className="mx-auto mt-6 max-w-2xl text-lg md:text-xl text-muted-foreground leading-relaxed">
-            {conteudo?.cta_final_subtitulo ||
-              "Assuma o controle da sua prospecção hoje. Seus futuros clientes estão a apenas 1 clique de distância."}
+          <p className="mx-auto mt-8 max-w-3xl text-2xl text-zinc-400 font-medium">
+            Agências e SDRs de elite já abandonaram o amadorismo. Quem não tem uma máquina de prospecção hoje, amanhã estará pedindo emprego no LinkedIn. 
+            Você vai agir ou vai ser engolido?
           </p>
-          <div className="mt-12 flex flex-col sm:flex-row justify-center gap-4">
+          
+          <div className="mt-14 flex justify-center">
             <Link to="/auth" search={{ mode: "signup" }} preload="render">
               <Button
                 size="lg"
-                className="w-full sm:w-auto h-16 px-10 text-xl font-bold shadow-2xl shadow-primary/30 hover:scale-105 transition-transform rounded-full"
+                className="h-20 px-14 text-2xl font-black bg-white text-black hover:bg-zinc-200 border-0 shadow-[0_0_50px_rgba(255,255,255,0.4)] hover:scale-110 transition-all duration-300 rounded-full"
               >
-                {conteudo?.cta_final_botao || "Quero Acessar Agora"} <ArrowRight className="ml-2 h-6 w-6" />
+                Eu Quero Faturar Agora <MousePointerClick className="ml-4 h-8 w-8" />
               </Button>
             </Link>
           </div>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm text-muted-foreground font-medium">
+          <div className="mt-8 flex justify-center gap-8 text-sm font-bold text-zinc-500">
             <span className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-primary" /> Setup imediato</span>
-            <span className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-primary" /> Cancele quando quiser</span>
+            <span className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-primary" /> Sem taxas ocultas</span>
           </div>
         </div>
       </section>
