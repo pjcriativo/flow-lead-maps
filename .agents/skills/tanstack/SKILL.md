@@ -7,19 +7,20 @@ metadata:
   github: https://github.com/pedronauck
   repository: https://github.com/pedronauck/skills
 ---
+
 # TanStack Developer Guide
 
 Before writing or reviewing code in a TanStack area, read the matching reference file(s) below **in full** — they hold the patterns, anti-patterns, and validation checklists this page only points to. The reference is the contract; this page is the index.
 
 ## Which reference to read
 
-| When you are working on… | Read in full first |
-|--------------------------|--------------------|
-| `useQuery`/`useMutation`, prefetch, infinite lists, SSR hydration, or `staleTime`/cache config | `references/query-patterns.md` |
-| Typed collections, live queries, optimistic collection mutations, or persistence handlers | `references/db-patterns.md` |
-| Forms, field components, Zod validation, or async/debounced field checks | `references/form-patterns.md` |
-| Routes, loaders, search-param validation, navigation, auth layouts, or router setup | `references/router-patterns.md` |
-| Server functions, middleware, sessions, SSR streaming, env split, or deploy adapters | `references/start-patterns.md` |
+| When you are working on…                                                                       | Read in full first              |
+| ---------------------------------------------------------------------------------------------- | ------------------------------- |
+| `useQuery`/`useMutation`, prefetch, infinite lists, SSR hydration, or `staleTime`/cache config | `references/query-patterns.md`  |
+| Typed collections, live queries, optimistic collection mutations, or persistence handlers      | `references/db-patterns.md`     |
+| Forms, field components, Zod validation, or async/debounced field checks                       | `references/form-patterns.md`   |
+| Routes, loaders, search-param validation, navigation, auth layouts, or router setup            | `references/router-patterns.md` |
+| Server functions, middleware, sessions, SSR streaming, env split, or deploy adapters           | `references/start-patterns.md`  |
 
 Working across two or more areas (e.g. a route loader that calls a server function and feeds a form)? Read every matching file before you design.
 

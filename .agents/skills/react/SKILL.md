@@ -7,6 +7,7 @@ metadata:
   github: https://github.com/pedronauck
   repository: https://github.com/pedronauck/skills
 ---
+
 # React Development Guide
 
 This skill provides comprehensive guidelines, patterns, and best practices for React development in this project.
@@ -14,7 +15,7 @@ This skill provides comprehensive guidelines, patterns, and best practices for R
 ## Quick Start
 
 1. **Best Practices**: For component architecture, state management, and TypeScript integration, read `references/best-practices.md`
-2. **Element wrappers**: If a component renders a single native element (`button`, `input`, `a`, …), extend that element’s props (`React.ComponentProps<"…">`) and spread `...props` — see **Extend native element props** below and `references/best-practices.md` → *Extending HTML Elements*.
+2. **Element wrappers**: If a component renders a single native element (`button`, `input`, `a`, …), extend that element’s props (`React.ComponentProps<"…">`) and spread `...props` — see **Extend native element props** below and `references/best-practices.md` → _Extending HTML Elements_.
 3. **useEffect Patterns**: For understanding when to use (and avoid) useEffect, read `references/useeffect-patterns.md`
 4. **Data Fetching**: For TanStack Query patterns, use the `tanstack` skill
 5. **Forms**: For form handling with TanStack Form, use the `tanstack` skill
@@ -33,11 +34,11 @@ This skill provides comprehensive guidelines, patterns, and best practices for R
 
 **Do this:**
 
-| Requirement | Detail |
-| ------------- | ------ |
-| Base type | `interface XProps extends React.ComponentProps<"button">` (or `"input"`, `"a"`, `"div"`, …) |
-| Spreading | Destructure your custom fields, then `{...props}` (and merged `className`) onto the DOM node |
-| Ref | Use `React.forwardRef` and the matching element ref type when refs are needed |
+| Requirement | Detail                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| Base type   | `interface XProps extends React.ComponentProps<"button">` (or `"input"`, `"a"`, `"div"`, …)  |
+| Spreading   | Destructure your custom fields, then `{...props}` (and merged `className`) onto the DOM node |
+| Ref         | Use `React.forwardRef` and the matching element ref type when refs are needed                |
 
 ```typescript
 interface TextFieldProps extends React.ComponentProps<"input"> {
@@ -58,29 +59,29 @@ function TextField({ label, error, className, ...props }: TextFieldProps) {
 
 **Variants + CVA:** if you use `class-variance-authority`, combine intrinsic props with `VariantProps<typeof variants>` (often `extends React.ButtonHTMLAttributes<HTMLButtonElement>`). Follow the **`shadcn`** skill patterns.
 
-**Deep dive:** `references/best-practices.md` → *Extending HTML Elements*.
+**Deep dive:** `references/best-practices.md` → _Extending HTML Elements_.
 
 ## Quick Reference Tables
 
 ### State Management Hierarchy
 
-| Priority | Tool | Use Case |
-|----------|------|----------|
-| 1 | `useState`/`useReducer` | Component-specific UI state |
-| 2 | Zustand | Shared client state across components |
-| 3 | TanStack Query | Server state and data synchronization |
-| 4 | URL state | Shareable application state (TanStack Router) |
+| Priority | Tool                    | Use Case                                      |
+| -------- | ----------------------- | --------------------------------------------- |
+| 1        | `useState`/`useReducer` | Component-specific UI state                   |
+| 2        | Zustand                 | Shared client state across components         |
+| 3        | TanStack Query          | Server state and data synchronization         |
+| 4        | URL state               | Shareable application state (TanStack Router) |
 
 ### useEffect Decision Tree
 
-| Situation | DON'T | DO |
-|-----------|-------|-----|
-| Derived state from props/state | `useState` + `useEffect` | Calculate during render |
-| Expensive calculations | `useEffect` to cache | `useMemo` |
-| Reset state on prop change | `useEffect` with `setState` | `key` prop |
-| User event responses | `useEffect` watching state | Event handler directly |
-| Notify parent of changes | `useEffect` calling `onChange` | Call in event handler |
-| Fetch data | `useEffect` without cleanup | `useEffect` with cleanup OR TanStack Query |
+| Situation                      | DON'T                          | DO                                         |
+| ------------------------------ | ------------------------------ | ------------------------------------------ |
+| Derived state from props/state | `useState` + `useEffect`       | Calculate during render                    |
+| Expensive calculations         | `useEffect` to cache           | `useMemo`                                  |
+| Reset state on prop change     | `useEffect` with `setState`    | `key` prop                                 |
+| User event responses           | `useEffect` watching state     | Event handler directly                     |
+| Notify parent of changes       | `useEffect` calling `onChange` | Call in event handler                      |
+| Fetch data                     | `useEffect` without cleanup    | `useEffect` with cleanup OR TanStack Query |
 
 ### When You DO Need Effects
 
@@ -179,13 +180,13 @@ function IssueList({ projectId }: { projectId: string }) {
 
 ## File Naming Conventions
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Components | kebab-case.tsx | `user-avatar.tsx` |
-| Hooks | use-kebab-case.ts | `use-user-data.ts` |
-| Utilities | camelCase.ts | `formatDate.ts` |
-| Types | types.ts | `types.ts` |
-| Tests | *.test.tsx | `user-avatar.test.tsx` |
+| Type       | Pattern           | Example                |
+| ---------- | ----------------- | ---------------------- |
+| Components | kebab-case.tsx    | `user-avatar.tsx`      |
+| Hooks      | use-kebab-case.ts | `use-user-data.ts`     |
+| Utilities  | camelCase.ts      | `formatDate.ts`        |
+| Types      | types.ts          | `types.ts`             |
+| Tests      | *.test.tsx        | `user-avatar.test.tsx` |
 
 ## Testing with Vitest
 

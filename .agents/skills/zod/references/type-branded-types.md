@@ -91,7 +91,7 @@ type User = z.infer<typeof User>;
 
 function sendReferralBonus(
   referrerId: z.infer<typeof User>["id"],
-  refereeId: z.infer<typeof User>["id"]
+  refereeId: z.infer<typeof User>["id"],
 ) {
   // Can't accidentally swap these - both are UserId but distinct values
 }

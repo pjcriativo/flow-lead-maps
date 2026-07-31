@@ -1,24 +1,36 @@
 import { useEffect, useState } from "react";
-import { 
-  DollarSign, 
-  Activity, 
-  Users, 
-  Zap, 
-  TrendingUp, 
-  BarChart3, 
+import {
+  DollarSign,
+  Activity,
+  Users,
+  Zap,
+  TrendingUp,
+  BarChart3,
   RefreshCw,
   Search,
   Filter,
-  ShieldAlert
+  ShieldAlert,
 } from "lucide-react";
 import { obterResumoConsumoApi, type ApiUsageResumo } from "@/services/api-consumption";
 import { cn } from "@/lib/utils";
 
 const SERVICE_LABELS: Record<string, { label: string; badgeClass: string }> = {
-  apify_maps: { label: "Apify (Google Maps Extractor)", badgeClass: "bg-blue-100 text-blue-800 border-blue-200" },
-  openai_enrichment: { label: "OpenAI (GPT-4o Site Enrichment)", badgeClass: "bg-purple-100 text-purple-800 border-purple-200" },
-  whatsapp_evolution: { label: "Evolution API (WhatsApp Disparos)", badgeClass: "bg-green-100 text-green-800 border-green-200" },
-  google_places: { label: "Google Places API Direct", badgeClass: "bg-amber-100 text-amber-800 border-amber-200" },
+  apify_maps: {
+    label: "Apify (Google Maps Extractor)",
+    badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
+  },
+  openai_enrichment: {
+    label: "OpenAI (GPT-4o Site Enrichment)",
+    badgeClass: "bg-purple-100 text-purple-800 border-purple-200",
+  },
+  whatsapp_evolution: {
+    label: "Evolution API (WhatsApp Disparos)",
+    badgeClass: "bg-green-100 text-green-800 border-green-200",
+  },
+  google_places: {
+    label: "Google Places API Direct",
+    badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
+  },
 };
 
 const PLAN_BADGES: Record<string, string> = {
@@ -51,14 +63,14 @@ export function AdminApiUsageDashboard() {
     carregarDados();
   }, [dias]);
 
-  const topUsersFiltrados = resumo?.top_users.filter((u) => {
-    if (!busca.trim()) return true;
-    const b = busca.toLowerCase();
-    return u.user_name.toLowerCase().includes(b) || u.user_email.toLowerCase().includes(b);
-  }) ?? [];
+  const topUsersFiltrados =
+    resumo?.top_users.filter((u) => {
+      if (!busca.trim()) return true;
+      const b = busca.toLowerCase();
+      return u.user_name.toLowerCase().includes(b) || u.user_email.toLowerCase().includes(b);
+    }) ?? [];
 
-  const brl = (v: number) =>
-    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const usd = (v: number) =>
     v.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 3 });
@@ -69,10 +81,12 @@ export function AdminApiUsageDashboard() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" /> Consumo de APIs & Análise Financeira por Cliente
+            <BarChart3 className="h-6 w-6 text-primary" /> Consumo de APIs & Análise Financeira por
+            Cliente
           </h2>
           <p className="text-sm text-muted-foreground">
-            Acompanhe em tempo real o gasto de infraestrutura de cada conta (Apify, OpenAI, WhatsApp) e a margem por cliente.
+            Acompanhe em tempo real o gasto de infraestrutura de cada conta (Apify, OpenAI,
+            WhatsApp) e a margem por cliente.
           </p>
         </div>
 
@@ -103,7 +117,9 @@ export function AdminApiUsageDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Custo Total de Infra (US$)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Custo Total de Infra (US$)
+            </span>
             <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
               <DollarSign className="h-5 w-5" />
             </div>
@@ -120,7 +136,9 @@ export function AdminApiUsageDashboard() {
 
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total de Leads Extraídos</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Total de Leads Extraídos
+            </span>
             <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
               <Zap className="h-5 w-5" />
             </div>
@@ -137,7 +155,9 @@ export function AdminApiUsageDashboard() {
 
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Requisições de API</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Requisições de API
+            </span>
             <div className="rounded-lg bg-purple-100 p-2 text-purple-700">
               <Activity className="h-5 w-5" />
             </div>
@@ -154,17 +174,23 @@ export function AdminApiUsageDashboard() {
 
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Maior Consumidor</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Maior Consumidor
+            </span>
             <div className="rounded-lg bg-amber-100 p-2 text-amber-700">
               <TrendingUp className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-3">
             <p className="truncate text-base font-bold text-foreground">
-              {loading ? "..." : (resumo?.top_users[0]?.user_name || "Nenhum no período")}
+              {loading ? "..." : resumo?.top_users[0]?.user_name || "Nenhum no período"}
             </p>
             <p className="mt-1 text-xs font-semibold text-amber-700">
-              {loading ? "..." : resumo?.top_users[0] ? usd(resumo.top_users[0].total_cost_usd) : "US$ 0,00"}
+              {loading
+                ? "..."
+                : resumo?.top_users[0]
+                  ? usd(resumo.top_users[0].total_cost_usd)
+                  : "US$ 0,00"}
             </p>
           </div>
         </div>
@@ -177,10 +203,18 @@ export function AdminApiUsageDashboard() {
         </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {resumo?.service_breakdown.map((s) => {
-            const meta = SERVICE_LABELS[s.service] ?? { label: s.service, badgeClass: "bg-gray-100 text-gray-800" };
+            const meta = SERVICE_LABELS[s.service] ?? {
+              label: s.service,
+              badgeClass: "bg-gray-100 text-gray-800",
+            };
             return (
               <div key={s.service} className="rounded-lg border border-border/80 bg-background p-4">
-                <span className={cn("inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-semibold mb-2", meta.badgeClass)}>
+                <span
+                  className={cn(
+                    "inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-semibold mb-2",
+                    meta.badgeClass,
+                  )}
+                >
                   {meta.label}
                 </span>
                 <p className="text-xl font-bold text-foreground mt-1">{usd(s.cost_usd)}</p>
@@ -203,7 +237,9 @@ export function AdminApiUsageDashboard() {
         <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between border-b">
           <div>
             <h3 className="text-base font-bold text-foreground">Consumo por Conta de Cliente</h3>
-            <p className="text-xs text-muted-foreground">Ranking de contas por valor gasto em APIs externas.</p>
+            <p className="text-xs text-muted-foreground">
+              Ranking de contas por valor gasto em APIs externas.
+            </p>
           </div>
 
           <div className="relative min-w-64">
@@ -238,12 +274,18 @@ export function AdminApiUsageDashboard() {
                     <p className="text-[11px] text-muted-foreground">{u.user_email}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] uppercase font-bold", PLAN_BADGES[u.plan.toLowerCase()] || PLAN_BADGES.starter)}>
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] uppercase font-bold",
+                        PLAN_BADGES[u.plan.toLowerCase()] || PLAN_BADGES.starter,
+                      )}
+                    >
                       {u.plan}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center font-medium">
-                    <span className="font-bold text-foreground">{u.leads_used}</span> / {u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
+                    <span className="font-bold text-foreground">{u.leads_used}</span> /{" "}
+                    {u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
                   </td>
                   <td className="px-4 py-3 text-center font-semibold text-foreground">
                     {u.requests_count}

@@ -69,7 +69,7 @@ const fullUserSchema = userSchema.and(timestampsSchema).and(softDeleteSchema);
 // Or using z.intersection()
 const fullUserSchema2 = z.intersection(
   z.intersection(userSchema, timestampsSchema),
-  softDeleteSchema
+  softDeleteSchema,
 );
 
 type FullUser = z.infer<typeof fullUserSchema>;

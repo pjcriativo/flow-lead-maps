@@ -45,14 +45,14 @@ Without this `declare module`, `useNavigate`, `Link`, `useParams`, and `useSearc
 
 ```typescript
 // src/router.tsx
-import { createRouter } from '@tanstack/react-router'
-import { routeTree } from './routeTree.gen'
+import { createRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
 
-export const router = createRouter({ routeTree })
+export const router = createRouter({ routeTree });
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface Register {
-    router: typeof router
+    router: typeof router;
   }
 }
 ```
@@ -67,33 +67,33 @@ const router = createRouter({
   context: { queryClient, user: null },
 
   // Preloading
-  defaultPreload: 'intent',           // preload on hover/focus
-  defaultPreloadStaleTime: 0,         // delegate freshness to TanStack Query
+  defaultPreload: "intent", // preload on hover/focus
+  defaultPreloadStaleTime: 0, // delegate freshness to TanStack Query
 
   // Global error / 404 handling
   defaultErrorComponent: DefaultCatchBoundary,
   defaultNotFoundComponent: DefaultNotFound,
 
   // UX
-  scrollRestoration: true,            // restore scroll on back/forward
+  scrollRestoration: true, // restore scroll on back/forward
   defaultPendingComponent: PendingBar,
-  defaultPendingMs: 1000,             // delay before showing pending UI
-  defaultPendingMinMs: 200,           // min time pending UI is shown
+  defaultPendingMs: 1000, // delay before showing pending UI
+  defaultPendingMinMs: 200, // min time pending UI is shown
 
   // Performance
-  defaultStructuralSharing: true,     // re-render less from loader data
-})
+  defaultStructuralSharing: true, // re-render less from loader data
+});
 ```
 
 Key options:
 
-| Option | When to use |
-|--------|-------------|
-| `defaultPreload: 'intent'` | Always — almost free win on hover/focus |
+| Option                       | When to use                                      |
+| ---------------------------- | ------------------------------------------------ |
+| `defaultPreload: 'intent'`   | Always — almost free win on hover/focus          |
 | `defaultPreloadStaleTime: 0` | When using TanStack Query; let Query own caching |
-| `scrollRestoration` | Almost always — improves back/forward UX |
-| `defaultErrorComponent` | Replace the built-in white-screen fallback |
-| `defaultNotFoundComponent` | Required for global 404 |
+| `scrollRestoration`          | Almost always — improves back/forward UX         |
+| `defaultErrorComponent`      | Replace the built-in white-screen fallback       |
+| `defaultNotFoundComponent`   | Required for global 404                          |
 
 Routes can override any default (`errorComponent: AdminErrorBoundary`, `preload: false`, etc.).
 
@@ -102,9 +102,9 @@ Routes can override any default (`errorComponent: AdminErrorBoundary`, `preload:
 Hooks accept a `from` parameter that narrows types to that specific route:
 
 ```typescript
-const { postId } = useParams({ from: '/posts/$postId' })   // postId: string
-const search    = useSearch({ from: '/posts' })            // typed search shape
-const data      = useLoaderData({ from: '/posts/$postId' })// typed loader return
+const { postId } = useParams({ from: "/posts/$postId" }); // postId: string
+const search = useSearch({ from: "/posts" }); // typed search shape
+const data = useLoaderData({ from: "/posts/$postId" }); // typed loader return
 ```
 
 Without `from`, types collapse to `unknown` or the union of all possibilities. Always use `from` outside of `Route.useX()` (which is already scoped).
@@ -191,22 +191,22 @@ function PostDetail() {
 Use `validateSearch` with a Zod schema for type-safe URL search parameters.
 
 ```typescript
-import { createFileRoute } from '@tanstack/react-router'
-import { z } from 'zod'
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 
 const searchSchema = z.object({
   page: z.number().min(1).catch(1),
   search: z.string().optional(),
-  sort: z.enum(['asc', 'desc']).catch('asc'),
-})
+  sort: z.enum(["asc", "desc"]).catch("asc"),
+});
 
-export const Route = createFileRoute('/posts/')({
+export const Route = createFileRoute("/posts/")({
   validateSearch: searchSchema,
   component: PostsList,
-})
+});
 
 function PostsList() {
-  const { page, search, sort } = Route.useSearch()
+  const { page, search, sort } = Route.useSearch();
   // Use search params...
 }
 ```
@@ -216,19 +216,19 @@ function PostsList() {
 Use the `loader` option for server-side data fetching and `loaderDeps` to control re-fetching.
 
 ```typescript
-export const Route = createFileRoute('/posts/')({
+export const Route = createFileRoute("/posts/")({
   validateSearch: z.object({
     page: z.number().min(1).catch(1),
   }),
   loaderDeps: ({ search }) => ({ page: search.page }),
   loader: async ({ deps }) => {
-    return await fetchPosts(deps.page)
+    return await fetchPosts(deps.page);
   },
   component: PostsList,
-})
+});
 
 function PostsList() {
-  const posts = Route.useLoaderData()
+  const posts = Route.useLoaderData();
   // Render posts...
 }
 ```
@@ -240,24 +240,24 @@ Nested route loaders run **in parallel** by default. Inside a single loader, fan
 ```typescript
 // GOOD — fans out
 beforeLoad: async () => {
-  const [user, config] = await Promise.all([fetchUser(), fetchAppConfig()])
-  return { user, config }
-}
+  const [user, config] = await Promise.all([fetchUser(), fetchAppConfig()]);
+  return { user, config };
+};
 
 loader: async ({ context }) => {
   const [stats, activity] = await Promise.all([
     queryClient.ensureQueryData(statsQueries.for(context.user.id)),
     queryClient.ensureQueryData(activityQueries.for(context.user.id)),
-  ])
-  return { stats, activity }
-}
+  ]);
+  return { stats, activity };
+};
 
 // BAD — serial waterfall
 beforeLoad: async () => {
-  const user = await fetchUser()          // 200ms
-  const perms = await fetchPermissions()  // +200ms
-  return { user, perms }                  // 400ms total
-}
+  const user = await fetchUser(); // 200ms
+  const perms = await fetchPermissions(); // +200ms
+  return { user, perms }; // 400ms total
+};
 ```
 
 ### Deferred (streaming) data
@@ -361,28 +361,28 @@ Two complementary mechanisms:
 
 ```typescript
 // routes/admin.tsx — critical, eagerly loaded
-export const Route = createFileRoute('/admin')({
+export const Route = createFileRoute("/admin")({
   validateSearch: z.object({ tab: z.string().optional() }),
   loader: ({ context }) => context.queryClient.ensureQueryData(adminQueries.summary()),
-})
+});
 
 // routes/admin.lazy.tsx — lazy, only the component
-import { createLazyFileRoute } from '@tanstack/react-router'
+import { createLazyFileRoute } from "@tanstack/react-router";
 
-export const Route = createLazyFileRoute('/admin')({
+export const Route = createLazyFileRoute("/admin")({
   component: AdminDashboard,
-})
+});
 ```
 
 **2. `autoCodeSplitting: true`** in the Vite plugin — splits component/pendingComponent/errorComponent automatically without manual `.lazy.tsx` files:
 
 ```typescript
 // vite.config.ts
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 export default defineConfig({
   plugins: [tanstackRouter({ autoCodeSplitting: true })],
-})
+});
 ```
 
 Prefer auto-splitting in new projects. Use `.lazy.tsx` only when you need fine control over which parts are split.
@@ -409,36 +409,36 @@ Pass context data through the route tree.
 
 ```typescript
 // __root.tsx
-import { createRootRouteWithContext } from '@tanstack/react-router'
-import type { QueryClient } from '@tanstack/react-query'
+import { createRootRouteWithContext } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
 
 interface RouterContext {
-  queryClient: QueryClient
-  auth: AuthState
+  queryClient: QueryClient;
+  auth: AuthState;
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootComponent,
-})
+});
 ```
 
 ### Using Route Context in Child Routes
 
 ```typescript
-export const Route = createFileRoute('/posts/')({
+export const Route = createFileRoute("/posts/")({
   beforeLoad: ({ context }) => {
     // Access context.queryClient, context.auth, etc.
     if (!context.auth.isAuthenticated) {
-      throw redirect({ to: '/login' })
+      throw redirect({ to: "/login" });
     }
   },
   loader: ({ context }) => {
     return context.queryClient.ensureQueryData({
-      queryKey: ['posts'],
+      queryKey: ["posts"],
       queryFn: fetchPosts,
-    })
+    });
   },
-})
+});
 ```
 
 ### Updating Search Params
@@ -477,10 +477,10 @@ Masks let the rendered route differ from the URL the user sees. Two main use cas
 ```typescript
 // Open product detail as a modal overlaid on /products
 navigate({
-  to: '/products/$productId',
-  params: { productId: '123' },
-  mask: { to: '/products', search: { modal: '123' } },
-})
+  to: "/products/$productId",
+  params: { productId: "123" },
+  mask: { to: "/products", search: { modal: "123" } },
+});
 // User sees /products?modal=123 but renders /products/$productId
 ```
 
@@ -491,15 +491,16 @@ Masks are bookmark-safe: visiting the masked URL directly loads the real route t
 The default JSON serializer produces ugly URLs (`?filters=%7B...%7D`). Override globally on the router when URLs need to be shareable or human-readable:
 
 ```typescript
-import qs from 'qs'
+import qs from "qs";
 
 const router = createRouter({
   routeTree,
   search: {
-    serialize: (search) => qs.stringify(search, { encodeValuesOnly: true, arrayFormat: 'brackets' }),
+    serialize: (search) =>
+      qs.stringify(search, { encodeValuesOnly: true, arrayFormat: "brackets" }),
     parse: (str) => qs.parse(str, { ignoreQueryPrefix: true }),
   },
-})
+});
 // /products?filters[category]=electronics&filters[price][min]=100
 ```
 
@@ -524,13 +525,13 @@ const router = createRouter({
 Throw `notFound()` from a loader to trigger it without throwing a generic error:
 
 ```typescript
-import { notFound } from '@tanstack/react-router'
+import { notFound } from "@tanstack/react-router";
 
 loader: async ({ params }) => {
-  const post = await fetchPost(params.postId)
-  if (!post) throw notFound()
-  return post
-}
+  const post = await fetchPost(params.postId);
+  if (!post) throw notFound();
+  return post;
+};
 ```
 
 ### Prefetching Routes
@@ -560,23 +561,23 @@ function PostLink({ postId }: { postId: string }) {
 For optimal data fetching, integrate TanStack Router with TanStack Query:
 
 ```typescript
-export const Route = createFileRoute('/posts/$postId')({
+export const Route = createFileRoute("/posts/$postId")({
   loader: async ({ params, context }) => {
     // Use queryClient from context
     await context.queryClient.ensureQueryData({
-      queryKey: ['post', params.postId],
+      queryKey: ["post", params.postId],
       queryFn: () => fetchPost(params.postId),
-    })
+    });
   },
   component: PostDetail,
-})
+});
 
 function PostDetail() {
-  const { postId } = Route.useParams()
+  const { postId } = Route.useParams();
   const { data: post } = useQuery({
-    queryKey: ['post', postId],
+    queryKey: ["post", postId],
     queryFn: () => fetchPost(postId),
-  })
+  });
   // Render post...
 }
 ```

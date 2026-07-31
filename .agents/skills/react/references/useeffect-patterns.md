@@ -15,14 +15,14 @@ Effects are an **escape hatch** from React. They let you synchronize with extern
 
 ## Quick Reference
 
-| Situation | DON'T | DO |
-|-----------|-------|-----|
-| Derived state from props/state | `useState` + `useEffect` | Calculate during render |
-| Expensive calculations | `useEffect` to cache | `useMemo` |
-| Reset state on prop change | `useEffect` with `setState` | `key` prop |
-| User event responses | `useEffect` watching state | Event handler directly |
-| Notify parent of changes | `useEffect` calling `onChange` | Call in event handler |
-| Fetch data | `useEffect` without cleanup | `useEffect` with cleanup OR framework |
+| Situation                      | DON'T                          | DO                                    |
+| ------------------------------ | ------------------------------ | ------------------------------------- |
+| Derived state from props/state | `useState` + `useEffect`       | Calculate during render               |
+| Expensive calculations         | `useEffect` to cache           | `useMemo`                             |
+| Reset state on prop change     | `useEffect` with `setState`    | `key` prop                            |
+| User event responses           | `useEffect` watching state     | Event handler directly                |
+| Notify parent of changes       | `useEffect` calling `onChange` | Call in event handler                 |
+| Fetch data                     | `useEffect` without cleanup    | `useEffect` with cleanup OR framework |
 
 ---
 
@@ -175,12 +175,12 @@ function Game() {
   const [isGameOver, setIsGameOver] = useState(false);
 
   useEffect(() => {
-    if (card?.gold) setGoldCardCount(c => c + 1);
+    if (card?.gold) setGoldCardCount((c) => c + 1);
   }, [card]);
 
   useEffect(() => {
     if (goldCardCount > 3) {
-      setRound(r => r + 1);
+      setRound((r) => r + 1);
       setGoldCardCount(0);
     }
   }, [goldCardCount]);
@@ -294,7 +294,7 @@ function SearchResults({ query }) {
   const [results, setResults] = useState([]);
 
   useEffect(() => {
-    fetchResults(query).then(json => {
+    fetchResults(query).then((json) => {
       setResults(json); // "hello" response may arrive after "hell"
     });
   }, [query]);
@@ -307,7 +307,7 @@ function SearchResults({ query }) {
   useEffect(() => {
     let ignore = false;
 
-    fetchResults(query).then(json => {
+    fetchResults(query).then((json) => {
       if (!ignore) setResults(json);
     });
 
@@ -444,7 +444,7 @@ function List({ items }) {
   const [selectedId, setSelectedId] = useState(null);
 
   // Derived - no Effect needed
-  const selection = items.find(item => item.id === selectedId) ?? null;
+  const selection = items.find((item) => item.id === selectedId) ?? null;
 }
 ```
 
@@ -532,7 +532,7 @@ function useOnlineStatus() {
   return useSyncExternalStore(
     subscribe,
     () => navigator.onLine, // Client value
-    () => true // Server value (SSR)
+    () => true, // Server value (SSR)
   );
 }
 ```
@@ -574,14 +574,14 @@ function useData(url) {
     setLoading(true);
 
     fetch(url)
-      .then(res => res.json())
-      .then(json => {
+      .then((res) => res.json())
+      .then((json) => {
         if (!ignore) {
           setData(json);
           setError(null);
         }
       })
-      .catch(err => {
+      .catch((err) => {
         if (!ignore) setError(err);
       })
       .finally(() => {
@@ -608,13 +608,13 @@ function SearchResults({ query }) {
 
 ## Summary: When to Use What
 
-| Need | Solution |
-|------|----------|
-| Value from props/state | Calculate during render |
-| Expensive calculation | `useMemo` |
-| Reset all state on prop change | `key` prop |
-| Respond to user action | Event handler |
-| Sync with external system | `useEffect` with cleanup |
-| Subscribe to external store | `useSyncExternalStore` |
-| Share state between components | Lift state up |
-| Fetch data | Custom hook with cleanup / TanStack Query |
+| Need                           | Solution                                  |
+| ------------------------------ | ----------------------------------------- |
+| Value from props/state         | Calculate during render                   |
+| Expensive calculation          | `useMemo`                                 |
+| Reset all state on prop change | `key` prop                                |
+| Respond to user action         | Event handler                             |
+| Sync with external system      | `useEffect` with cleanup                  |
+| Subscribe to external store    | `useSyncExternalStore`                    |
+| Share state between components | Lift state up                             |
+| Fetch data                     | Custom hook with cleanup / TanStack Query |

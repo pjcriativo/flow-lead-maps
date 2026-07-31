@@ -17,11 +17,11 @@ import { z } from "zod";
 // All transforms in one long chain - hard to understand stages
 const priceSchema = z
   .string()
-  .transform(s => parseFloat(s.replace(/[$,]/g, "")))
-  .refine(n => !isNaN(n), "Invalid number")
-  .refine(n => n >= 0, "Must be positive")
-  .refine(n => n <= 1000000, "Too large")
-  .transform(n => Math.round(n * 100));
+  .transform((s) => parseFloat(s.replace(/[$,]/g, "")))
+  .refine((n) => !isNaN(n), "Invalid number")
+  .refine((n) => n >= 0, "Must be positive")
+  .refine((n) => n <= 1000000, "Too large")
+  .transform((n) => Math.round(n * 100));
 
 // What type is n at each stage? Hard to tell
 ```
@@ -32,7 +32,7 @@ const priceSchema = z
 import { z } from "zod";
 
 // Stage 1: Coerce string to number
-const parsePrice = z.string().transform(s => {
+const parsePrice = z.string().transform((s) => {
   const cleaned = s.replace(/[$,]/g, "");
   const parsed = parseFloat(cleaned);
   if (isNaN(parsed)) throw new Error("Invalid number");
@@ -43,7 +43,7 @@ const parsePrice = z.string().transform(s => {
 const validPrice = z.number().min(0, "Must be positive").max(1000000, "Too large");
 
 // Stage 3: Transform to cents
-const centsPrice = z.number().transform(n => Math.round(n * 100));
+const centsPrice = z.number().transform((n) => Math.round(n * 100));
 
 // Pipe them together - clear data flow
 const priceSchema = parsePrice.pipe(validPrice).pipe(centsPrice);
@@ -75,17 +75,17 @@ schema2.parse(""); // Fails correctly: 0 is less than 1
 const emailArraySchema = z
   .string()
   // Stage 1: Split CSV
-  .transform(s => s.split(",").map(e => e.trim()))
+  .transform((s) => s.split(",").map((e) => e.trim()))
   // Stage 2: Validate as email array
   .pipe(z.array(z.string().email()))
   // Stage 3: Transform to objects
   .pipe(
-    z.array(z.string()).transform(emails =>
-      emails.map(email => ({
+    z.array(z.string()).transform((emails) =>
+      emails.map((email) => ({
         address: email.toLowerCase(),
         domain: email.split("@")[1],
-      }))
-    )
+      })),
+    ),
   );
 
 emailArraySchema.parse("John@Example.com, jane@test.com");

@@ -75,8 +75,14 @@ const destinoPendente = verificarDestinoRota({
   is_super_admin: false,
   acesso_liberado: false,
 });
-assert.strictEqual(destinoPendente, "/aguardando-aprovacao", "FAIL: Perfil pendente deve ser bloqueado");
-console.log("✔ Passou: Conta pendente (acesso_liberado=false) é direcionada para /aguardando-aprovacao");
+assert.strictEqual(
+  destinoPendente,
+  "/aguardando-aprovacao",
+  "FAIL: Perfil pendente deve ser bloqueado",
+);
+console.log(
+  "✔ Passou: Conta pendente (acesso_liberado=false) é direcionada para /aguardando-aprovacao",
+);
 
 // Teste 2.2: Perfil liberado pode ir para o /dashboard
 const destinoLiberado = verificarDestinoRota({

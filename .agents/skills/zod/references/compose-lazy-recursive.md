@@ -116,7 +116,7 @@ const jsonValueSchema: z.ZodType<JSONValue> = z.lazy(() =>
     z.null(),
     z.array(jsonValueSchema),
     z.record(jsonValueSchema),
-  ])
+  ]),
 );
 ```
 

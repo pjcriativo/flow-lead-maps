@@ -46,8 +46,8 @@ const commentSchema = z.object({
     .string()
     .url("Invalid URL")
     .refine(
-      url => url.startsWith("http://") || url.startsWith("https://"),
-      "Only http/https URLs allowed"
+      (url) => url.startsWith("http://") || url.startsWith("https://"),
+      "Only http/https URLs allowed",
     )
     .optional(),
 });

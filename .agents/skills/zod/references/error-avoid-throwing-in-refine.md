@@ -19,7 +19,7 @@ const passwordSchema = z
     password: z.string().min(8),
     confirmPassword: z.string(),
   })
-  .refine(data => {
+  .refine((data) => {
     if (data.password !== data.confirmPassword) {
       // Throwing stops all further validation
       throw new Error("Passwords do not match");
@@ -30,7 +30,7 @@ const passwordSchema = z
 const formSchema = z.object({
   email: z.string().email(),
   passwords: passwordSchema,
-  terms: z.boolean().refine(v => v === true, "Must accept terms"),
+  terms: z.boolean().refine((v) => v === true, "Must accept terms"),
 });
 
 // If passwords don't match, user never learns about other errors
@@ -53,7 +53,7 @@ const passwordSchema = z
     password: z.string().min(8),
     confirmPassword: z.string(),
   })
-  .refine(data => data.password === data.confirmPassword, {
+  .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
@@ -61,7 +61,7 @@ const passwordSchema = z
 const formSchema = z.object({
   email: z.string().email(),
   passwords: passwordSchema,
-  terms: z.boolean().refine(v => v === true, "Must accept terms"),
+  terms: z.boolean().refine((v) => v === true, "Must accept terms"),
 });
 
 // All errors are collected
@@ -117,12 +117,12 @@ const schema = z
     email: z.string().email(),
   })
   .refine(
-    async data => {
+    async (data) => {
       // Return boolean, don't throw
       const exists = await checkEmailExists(data.email);
       return !exists;
     },
-    { message: "Email already registered", path: ["email"] }
+    { message: "Email already registered", path: ["email"] },
   );
 ```
 

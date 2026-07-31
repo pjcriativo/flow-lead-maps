@@ -86,7 +86,9 @@ export async function lerPerfilCompleto(): Promise<PerfilUsuarioCompleto> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, full_name, phone, avatar_url, plan, plan_status, acesso_liberado, is_super_admin, reply_to_email, leads_used_monthly, monthly_lead_limit")
+    .select(
+      "id, email, full_name, phone, avatar_url, plan, plan_status, acesso_liberado, is_super_admin, reply_to_email, leads_used_monthly, monthly_lead_limit",
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -116,6 +118,7 @@ export async function atualizarPerfilUsuario(patch: {
   avatar_url?: string | null;
 }): Promise<void> {
   const id = await idDaOrg();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData: any = {
     updated_at: new Date().toISOString(),
   };
@@ -144,9 +147,7 @@ export async function uploadAvatarUsuario(file: File): Promise<string> {
 
   if (uploadError) throw uploadError;
 
-  const { data: publicData } = supabase.storage
-    .from("avatars")
-    .getPublicUrl(filePath);
+  const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
   const avatarUrl = publicData.publicUrl;
   await atualizarPerfilUsuario({ avatar_url: avatarUrl });

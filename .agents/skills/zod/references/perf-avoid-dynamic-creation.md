@@ -46,7 +46,7 @@ const itemSchema = z.object({
 
 async function validateBatch(items: unknown[]) {
   // Reuse the same schema instance
-  return items.map(item => itemSchema.safeParse(item));
+  return items.map((item) => itemSchema.safeParse(item));
 }
 
 // 1000 items = 1 schema creation + 1000 fast parses
@@ -107,9 +107,7 @@ const schemas = {
   _user: null as z.ZodType | null,
   get user() {
     if (!this._user) {
-      this._user = z.object({
-        /* ... */
-      });
+      this._user = z.object({/* ... */});
     }
     return this._user;
   },

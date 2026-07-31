@@ -41,7 +41,7 @@ retornam verde, e para de forma segura se não conseguir.
 4. **Uma tarefa por loop.** Não expanda o escopo. Se descobrir trabalho adicional,
    anote como "follow-up" e não o execute sem confirmação.
 5. **Respeite os guardrails do projeto.** Nunca toque no `.env`, nunca faça `git
-   push` sem o critério ter passado, nunca rode comando destrutivo (`rm -rf`,
+push` sem o critério ter passado, nunca rode comando destrutivo (`rm -rf`,
    `git reset --hard`) sem confirmação explícita.
 
 ## O ciclo
@@ -49,33 +49,40 @@ retornam verde, e para de forma segura se não conseguir.
 Repita os passos 1–5 até PRONTO ou até bater o teto de 5 iterações.
 
 ### 0. Enquadrar (uma vez, no começo)
+
 - Reafirme em 1–2 frases o que a tarefa entrega.
 - Defina o `CRITÉRIO DE PRONTO` desta tarefa (ver seção abaixo). Se o usuário não
   deu um, proponha um e confirme antes de executar.
 - Registre o teto: iteração 0 de 5.
 
 ### 1. Planejar
+
 - Liste os passos concretos. Se a tarefa for grande, quebre em subtarefas
   sequenciais e faça uma de cada vez.
 
 ### 2. Executar
+
 - Implemente o menor incremento que aproxima do critério.
 - Faça commits locais por incremento (mensagem descritiva). NÃO faça push ainda.
 
 ### 3. Verificar (o coração do loop)
+
 - Rode, na ordem, os comandos do `CRITÉRIO DE PRONTO` e CAPTURE a saída real.
 - Se algum falhar: NÃO conserte no chute. Antes, investigue a causa-raiz (leia o
   erro completo, o arquivo e a linha). Só então corrija. Volte ao passo 2.
 - Incremente o contador de iteração.
 
 ### 4. Autoauditoria anti-fraude
+
 Antes de considerar verde, confirme para si mesmo:
+
 - Nenhum teste foi pulado, comentado, enfraquecido ou mockado indevidamente?
 - A asserção testa o comportamento real, não uma versão trivializada?
 - O `git diff` dos testes não removeu cobertura?
-Se qualquer resposta for "sim/duvidosa", o trabalho NÃO está pronto.
+  Se qualquer resposta for "sim/duvidosa", o trabalho NÃO está pronto.
 
 ### 5. Fechar
+
 - Quando TODOS os comandos passam e a autoauditoria está limpa:
   - Mostre ao usuário a saída dos comandos como prova.
   - Faça o commit final e, se o projeto autorizar push, faça push.
@@ -105,19 +112,23 @@ timeout 15 npm run dev
 ```
 
 Para tarefas de banco/Supabase, adicione ao critério:
+
 - a migration aplica sem erro (`supabase db push` ou o fluxo do projeto);
 - uma query de fumaça retorna o esperado.
 
 Para tarefas de Edge Function, adicione:
+
 - a função responde 200 a uma chamada de teste com payload mínimo.
 
 ## Quando NÃO usar este loop
+
 - Pedidos de explicação, pesquisa ou decisão de arquitetura → responda direto.
 - Mudança trivial de 1 linha (doc/config) → faça e verifique sem cerimônia.
 - Quando o critério de pronto não puder ser objetivo → alinhe com o usuário
   primeiro; não entre em loop sem saber o que é "verde".
 
 ## Integração com outras skills (se instaladas)
+
 - `systematic-debugging` → use no passo 3 quando algo falhar.
 - `verification-before-completion` → reforça o passo 3/5.
 - `no-workarounds` → reforça a regra 3 (proibido fraudar).

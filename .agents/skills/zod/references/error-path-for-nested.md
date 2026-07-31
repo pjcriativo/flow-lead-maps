@@ -26,7 +26,7 @@ const orderSchema = z.object({
     z.object({
       productId: z.string(),
       quantity: z.number().positive("Quantity must be positive"),
-    })
+    }),
   ),
 });
 
@@ -37,7 +37,7 @@ const result = orderSchema.safeParse({
 
 if (!result.success) {
   // Only showing message, not WHERE the error is
-  result.error.issues.forEach(issue => {
+  result.error.issues.forEach((issue) => {
     console.log(issue.message); // 'Name required', 'Street required', 'Quantity must be positive'
     // User: "Which quantity? Which field?"
   });
@@ -61,7 +61,7 @@ const orderSchema = z.object({
     z.object({
       productId: z.string(),
       quantity: z.number().positive("Quantity must be positive"),
-    })
+    }),
   ),
 });
 
@@ -71,7 +71,7 @@ const result = orderSchema.safeParse({
 });
 
 if (!result.success) {
-  result.error.issues.forEach(issue => {
+  result.error.issues.forEach((issue) => {
     // path is an array of keys/indices
     console.log(`${issue.path.join(".")}: ${issue.message}`);
     // 'customer.name: Name required'
@@ -108,7 +108,7 @@ errors.get("items.0.quantity"); // ['Quantity must be positive']
 ```typescript
 const itemsWithErrors: Set<number> = new Set();
 
-result.error.issues.forEach(issue => {
+result.error.issues.forEach((issue) => {
   if (issue.path[0] === "items" && typeof issue.path[1] === "number") {
     itemsWithErrors.add(issue.path[1]);
   }

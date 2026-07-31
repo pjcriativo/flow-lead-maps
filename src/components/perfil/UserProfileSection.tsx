@@ -200,7 +200,10 @@ export function UserProfileSection() {
 
   const replyInvalido = !!replyTo.trim() && !emailValido(replyTo);
   const percentualLeads = perfil
-    ? Math.min(100, Math.round((perfil.leads_used_monthly / Math.max(1, perfil.monthly_lead_limit)) * 100))
+    ? Math.min(
+        100,
+        Math.round((perfil.leads_used_monthly / Math.max(1, perfil.monthly_lead_limit)) * 100),
+      )
     : 0;
 
   return (
@@ -236,7 +239,8 @@ export function UserProfileSection() {
                 )}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Status da Assinatura: <b className="capitalize text-foreground">{perfil?.plan_status ?? "Ativo"}</b>
+                Status da Assinatura:{" "}
+                <b className="capitalize text-foreground">{perfil?.plan_status ?? "Ativo"}</b>
               </p>
             </div>
           </div>
@@ -254,7 +258,9 @@ export function UserProfileSection() {
                 style={{ width: `${percentualLeads}%` }}
               />
             </div>
-            <p className="text-[11px] text-muted-foreground text-right">{percentualLeads}% utilizado</p>
+            <p className="text-[11px] text-muted-foreground text-right">
+              {percentualLeads}% utilizado
+            </p>
           </div>
         </div>
       </div>
@@ -265,7 +271,11 @@ export function UserProfileSection() {
           <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-6 text-center shadow-xs">
             <div className="relative group">
               <Avatar className="h-28 w-28 border-4 border-background shadow-md">
-                <AvatarImage src={avatarUrl} alt={nome || "Foto de Perfil"} className="object-cover" />
+                <AvatarImage
+                  src={avatarUrl}
+                  alt={nome || "Foto de Perfil"}
+                  className="object-cover"
+                />
                 <AvatarFallback className="bg-primary/10 text-primary font-bold text-2xl">
                   {iniciais}
                 </AvatarFallback>
@@ -278,7 +288,11 @@ export function UserProfileSection() {
                 className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
                 title="Alterar foto"
               >
-                {uploadingFoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                {uploadingFoto ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
               </button>
             </div>
 
@@ -290,9 +304,7 @@ export function UserProfileSection() {
               className="hidden"
             />
 
-            <h3 className="mt-4 font-semibold text-foreground text-base">
-              {nome || "Seu Nome"}
-            </h3>
+            <h3 className="mt-4 font-semibold text-foreground text-base">{nome || "Seu Nome"}</h3>
             <p className="text-xs text-muted-foreground">{perfil?.email}</p>
 
             <div className="mt-4 flex flex-col gap-2 w-full">
@@ -337,7 +349,10 @@ export function UserProfileSection() {
             {/* AVISO DO E-MAIL (E-MAIL BLOQUEADO) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="user-email" className="text-xs font-semibold text-muted-foreground uppercase">
+                <Label
+                  htmlFor="user-email"
+                  className="text-xs font-semibold text-muted-foreground uppercase"
+                >
                   E-mail de Acesso (Login)
                 </Label>
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
@@ -361,9 +376,13 @@ export function UserProfileSection() {
                 <div className="flex items-start gap-2">
                   <HelpCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-blue-900">Por que não posso alterar meu e-mail aqui?</p>
+                    <p className="font-semibold text-blue-900">
+                      Por que não posso alterar meu e-mail aqui?
+                    </p>
                     <p className="mt-0.5 text-blue-800 leading-relaxed">
-                      O e-mail é o identificador único da sua conta. Para garantir a segurança dos dados da sua empresa, alterações de e-mail devem ser solicitadas e validadas através da nossa equipe de suporte.
+                      O e-mail é o identificador único da sua conta. Para garantir a segurança dos
+                      dados da sua empresa, alterações de e-mail devem ser solicitadas e validadas
+                      através da nossa equipe de suporte.
                     </p>
                   </div>
                 </div>
@@ -382,7 +401,10 @@ export function UserProfileSection() {
 
             {/* NOME COMPLETO */}
             <div className="space-y-1.5">
-              <Label htmlFor="user-name" className="text-xs font-semibold text-muted-foreground uppercase">
+              <Label
+                htmlFor="user-name"
+                className="text-xs font-semibold text-muted-foreground uppercase"
+              >
                 Seu Nome Completo (Assina E-mails & Propostas)
               </Label>
               <Input
@@ -398,7 +420,10 @@ export function UserProfileSection() {
 
             {/* NÚMERO DE TELEFONE */}
             <div className="space-y-1.5">
-              <Label htmlFor="user-phone" className="text-xs font-semibold text-muted-foreground uppercase">
+              <Label
+                htmlFor="user-phone"
+                className="text-xs font-semibold text-muted-foreground uppercase"
+              >
                 Número de Telefone / WhatsApp
               </Label>
               <div className="relative">
@@ -418,22 +443,34 @@ export function UserProfileSection() {
                 disabled={salvandoPerfil}
                 className="gap-2 font-medium"
               >
-                {salvandoPerfil ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {salvandoPerfil ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
                 Salvar Informações
               </Button>
             </div>
           </div>
 
           {/* ALTERAÇÃO DE SENHA */}
-          <form onSubmit={handleMudarSenha} className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-xs">
+          <form
+            onSubmit={handleMudarSenha}
+            className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-xs"
+          >
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <Lock className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold text-foreground text-base">Segurança & Alteração de Senha</h2>
+              <h2 className="font-semibold text-foreground text-base">
+                Segurança & Alteração de Senha
+              </h2>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="nova-senha" className="text-xs font-semibold text-muted-foreground uppercase">
+                <Label
+                  htmlFor="nova-senha"
+                  className="text-xs font-semibold text-muted-foreground uppercase"
+                >
                   Nova Senha
                 </Label>
                 <div className="relative">
@@ -455,7 +492,10 @@ export function UserProfileSection() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="confirmar-senha" className="text-xs font-semibold text-muted-foreground uppercase">
+                <Label
+                  htmlFor="confirmar-senha"
+                  className="text-xs font-semibold text-muted-foreground uppercase"
+                >
                   Confirmar Nova Senha
                 </Label>
                 <Input
@@ -475,7 +515,11 @@ export function UserProfileSection() {
                 variant="outline"
                 className="gap-2 font-medium"
               >
-                {alterandoSenha ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                {alterandoSenha ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Lock className="h-4 w-4" />
+                )}
                 Atualizar Senha
               </Button>
             </div>
@@ -485,11 +529,16 @@ export function UserProfileSection() {
           <div className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-xs">
             <div className="flex items-center gap-2 border-b border-border pb-3">
               <Mail className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold text-foreground text-base">E-mail para Respostas (Reply-To)</h2>
+              <h2 className="font-semibold text-foreground text-base">
+                E-mail para Respostas (Reply-To)
+              </h2>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="reply-to-email" className="text-xs font-semibold text-muted-foreground uppercase">
+              <Label
+                htmlFor="reply-to-email"
+                className="text-xs font-semibold text-muted-foreground uppercase"
+              >
                 E-mail para Respostas dos Leads
               </Label>
               <div className="flex gap-2">

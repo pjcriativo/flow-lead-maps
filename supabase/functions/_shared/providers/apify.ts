@@ -114,13 +114,15 @@ export const searchApify: ProviderSearch = async ({
 }) => {
   // Garante margem suficiente de candidatos para atingir a meta exata do usuário
   const maxPlaces = Math.max(Math.ceil(limite * 2.5), 150);
-  const searchStringsArray = Array.from(new Set([
-    nicho,
-    cidade ? `${nicho} em ${cidade}` : nicho,
-    `clínica de ${nicho}`,
-    `consultório de ${nicho}`,
-    `atendimento ${nicho}`,
-  ])).filter(Boolean);
+  const searchStringsArray = Array.from(
+    new Set([
+      nicho,
+      cidade ? `${nicho} em ${cidade}` : nicho,
+      `clínica de ${nicho}`,
+      `consultório de ${nicho}`,
+      `atendimento ${nicho}`,
+    ]),
+  ).filter(Boolean);
 
   const input: Record<string, unknown> = {
     searchStringsArray,

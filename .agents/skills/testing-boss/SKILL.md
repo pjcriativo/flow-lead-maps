@@ -28,13 +28,13 @@ Apply every law that bears on the change under test. They subsume every anti-pat
 
 The Iron Laws are the always-loaded tripwire; each reference is the contract. Match the task, read the listed file(s) **in full** before producing output, and apply every gate, pattern, and principle in them that bears on the work.
 
-| When you are… | Read in full |
-| --- | --- |
-| Deciding where a test belongs — layer, owner, boundary, or whether to write it at all | `references/foundations.md` |
-| Writing a test at any layer — selectors, waits, test data, isolation, what to mock | `references/patterns.md` |
-| Reviewing a test, smelling brittleness, or rebuilding a brittle suite | `references/antipatterns.md` |
-| Letting a coding agent generate, modify, or "fix" tests | `references/ai-writes-tests.md` + `references/antipatterns.md` |
-| Triaging flaky CI, designing gates, or choosing contract / property / mutation tests | `references/ci-automation.md` |
-| Designing an eval for an LLM/agent feature — oracle ladder, LLM-as-judge, RAG, trajectory vs outcome | `references/llm-eval.md` |
+| When you are…                                                                                        | Read in full                                                   |
+| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Deciding where a test belongs — layer, owner, boundary, or whether to write it at all                | `references/foundations.md`                                    |
+| Writing a test at any layer — selectors, waits, test data, isolation, what to mock                   | `references/patterns.md`                                       |
+| Reviewing a test, smelling brittleness, or rebuilding a brittle suite                                | `references/antipatterns.md`                                   |
+| Letting a coding agent generate, modify, or "fix" tests                                              | `references/ai-writes-tests.md` + `references/antipatterns.md` |
+| Triaging flaky CI, designing gates, or choosing contract / property / mutation tests                 | `references/ci-automation.md`                                  |
+| Designing an eval for an LLM/agent feature — oracle ladder, LLM-as-judge, RAG, trajectory vs outcome | `references/llm-eval.md`                                       |
 
 Each reference ends with its own sources; `references/sources.md` is the consolidated bibliography for auditing any claim.

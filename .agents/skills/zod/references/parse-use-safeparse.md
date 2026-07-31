@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     // Return structured error response
     return NextResponse.json(
       { error: "Validation failed", issues: result.error.issues },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

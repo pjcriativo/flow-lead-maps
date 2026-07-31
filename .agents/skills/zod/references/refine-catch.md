@@ -69,7 +69,7 @@ const prefs = userPrefsSchema.parse(stored);
 ```typescript
 // Factory function receives the caught error
 const schema = z.object({
-  data: z.array(z.number()).catch(ctx => {
+  data: z.array(z.number()).catch((ctx) => {
     console.warn("Invalid data array:", ctx.error);
     return []; // Return empty array as fallback
   }),

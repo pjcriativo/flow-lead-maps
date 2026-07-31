@@ -69,7 +69,7 @@ function DynamicForm({ minAge }: { minAge: number }) {
         name: z.string().min(1),
         age: z.number().min(minAge),
       }),
-    [minAge]
+    [minAge],
   );
 
   // ...
@@ -109,7 +109,7 @@ function createUserSchema(role: string) {
 }
 
 // Called in hot loop
-users.forEach(user => {
+users.forEach((user) => {
   createUserSchema(user.role).parse(user); // New schema every iteration!
 });
 
@@ -123,14 +123,14 @@ function getUserSchema(role: string) {
       z.object({
         name: z.string(),
         permissions: z.array(z.string()),
-      })
+      }),
     );
   }
   return schemaCache.get(role)!;
 }
 
 // Reuses cached schemas
-users.forEach(user => {
+users.forEach((user) => {
   getUserSchema(user.role).parse(user);
 });
 ```

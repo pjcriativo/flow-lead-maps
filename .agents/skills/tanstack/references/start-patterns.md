@@ -44,22 +44,22 @@ Patterns for TanStack Start (full-stack React framework): server functions, midd
 
 ```typescript
 // lib/posts.functions.ts
-import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
-import { db } from './db.server'
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { db } from "./db.server";
 
 const createPostSchema = z.object({
   title: z.string().min(1).max(200),
   content: z.string().min(1),
   published: z.boolean().default(false),
-})
+});
 
-export const createPost = createServerFn({ method: 'POST' })
+export const createPost = createServerFn({ method: "POST" })
   .validator(createPostSchema)
   .handler(async ({ data }) => {
     // server-only — never reaches the client bundle
-    return db.posts.create({ data })
-  })
+    return db.posts.create({ data });
+  });
 ```
 
 Three reasons this beats raw `fetch`:
@@ -84,20 +84,20 @@ export const getPostWithComments = createServerFn()
     const [post, comments] = await Promise.all([
       getPost({ data: { id: data.postId } }),
       getComments({ data: { postId: data.postId } }),
-    ])
-    return { post, comments }
-  })
+    ]);
+    return { post, comments };
+  });
 ```
 
 ### Calling from loaders and components
 
 ```typescript
 // from a route loader
-loader: ({ params }) => getPost({ data: { id: params.postId } })
+loader: ({ params }) => getPost({ data: { id: params.postId } });
 
 // from a component (mutations)
-const createPostMutation = useServerFn(createPost)
-await createPostMutation({ data: { title, content, published: false } })
+const createPostMutation = useServerFn(createPost);
+await createPostMutation({ data: { title, content, published: false } });
 ```
 
 ### Error handling
@@ -105,16 +105,16 @@ await createPostMutation({ data: { title, content, published: false } })
 Throw inside the handler; errors are serialized to the client. Use `redirect()` and `notFound()` for control flow, not generic `Error`:
 
 ```typescript
-import { notFound, redirect } from '@tanstack/react-router'
+import { notFound, redirect } from "@tanstack/react-router";
 
 export const getPost = createServerFn()
   .validator(z.object({ id: z.string() }))
   .handler(async ({ data }) => {
-    const post = await db.posts.findUnique({ where: { id: data.id } })
-    if (!post) throw notFound()
-    if (post.deleted) throw redirect({ to: '/posts' })
-    return post
-  })
+    const post = await db.posts.findUnique({ where: { id: data.id } });
+    if (!post) throw notFound();
+    if (post.deleted) throw redirect({ to: "/posts" });
+    return post;
+  });
 ```
 
 ## Middleware
@@ -128,21 +128,21 @@ Two flavors:
 
 ```typescript
 // lib/middleware/auth.ts
-import { createMiddleware } from '@tanstack/react-start'
+import { createMiddleware } from "@tanstack/react-start";
 
 export const authMiddleware = createMiddleware().server(async ({ next }) => {
-  const session = await getSession()
+  const session = await getSession();
   return next({
     context: { session, user: session?.user ?? null },
-  })
-})
+  });
+});
 
 // app/start.ts
-import { createStart } from '@tanstack/react-start/server'
+import { createStart } from "@tanstack/react-start/server";
 
 export default createStart({
   requestMiddleware: [loggingMiddleware, authMiddleware],
-})
+});
 ```
 
 ### Composing middleware
@@ -153,21 +153,21 @@ export default createStart({
 export const requireAuthMiddleware = createMiddleware()
   .middleware([authMiddleware])
   .server(async ({ next, context }) => {
-    if (!context.user) throw redirect({ to: '/login' })
-    return next({ context: { user: context.user } })
-  })
+    if (!context.user) throw redirect({ to: "/login" });
+    return next({ context: { user: context.user } });
+  });
 ```
 
 ### Attaching middleware to a server function
 
 ```typescript
-export const updateProfile = createServerFn({ method: 'POST' })
+export const updateProfile = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .validator(profileSchema)
   .handler(async ({ data, context }) => {
     // context.user is typed and guaranteed
-    return db.users.update({ where: { id: context.user.id }, data })
-  })
+    return db.users.update({ where: { id: context.user.id }, data });
+  });
 ```
 
 ### Execution order
@@ -186,19 +186,19 @@ Always HTTP-only. localStorage is XSS-bait:
 
 ```typescript
 // lib/session.server.ts
-import { useSession } from '@tanstack/react-start/server'
+import { useSession } from "@tanstack/react-start/server";
 
 export function getSession() {
   return useSession({
-    password: process.env.SESSION_SECRET!,         // 32+ random chars
+    password: process.env.SESSION_SECRET!, // 32+ random chars
     cookie: {
-      name: '__session',
-      httpOnly: true,                              // not readable by JS
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',                             // CSRF mitigation
-      maxAge: 60 * 60 * 24 * 7,                    // 7 days
+      name: "__session",
+      httpOnly: true, // not readable by JS
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax", // CSRF mitigation
+      maxAge: 60 * 60 * 24 * 7, // 7 days
     },
-  })
+  });
 }
 ```
 
@@ -207,23 +207,23 @@ Generate the secret with `openssl rand -base64 32`. Rotate on breach.
 ### Login / logout pattern
 
 ```typescript
-export const login = createServerFn({ method: 'POST' })
+export const login = createServerFn({ method: "POST" })
   .validator(z.object({ email: z.string().email(), password: z.string().min(1) }))
   .handler(async ({ data }) => {
-    const user = await db.users.findUnique({ where: { email: data.email } })
+    const user = await db.users.findUnique({ where: { email: data.email } });
     if (!user || !(await verifyPassword(data.password, user.passwordHash))) {
-      throw new Error('Invalid email or password')
+      throw new Error("Invalid email or password");
     }
-    const session = await getSession()
-    await session.update({ userId: user.id, email: user.email })
-    throw redirect({ to: '/dashboard' })
-  })
+    const session = await getSession();
+    await session.update({ userId: user.id, email: user.email });
+    throw redirect({ to: "/dashboard" });
+  });
 
-export const logout = createServerFn({ method: 'POST' }).handler(async () => {
-  const session = await getSession()
-  await session.clear()
-  throw redirect({ to: '/' })
-})
+export const logout = createServerFn({ method: "POST" }).handler(async () => {
+  const session = await getSession();
+  await session.clear();
+  throw redirect({ to: "/" });
+});
 ```
 
 Keep the session payload minimal — `userId` plus what you need for every request. Fetch the full user on demand.
@@ -244,12 +244,12 @@ export const Route = createFileRoute('/_authenticated')({
 })
 ```
 
-| Cookie setting | Value | Why |
-|----------------|-------|-----|
-| `httpOnly` | `true` | XSS can't read the cookie |
-| `secure` | `true` in prod | HTTPS-only |
-| `sameSite` | `'lax'` or `'strict'` | CSRF mitigation |
-| `maxAge` | App-specific | Bound session lifetime |
+| Cookie setting | Value                 | Why                       |
+| -------------- | --------------------- | ------------------------- |
+| `httpOnly`     | `true`                | XSS can't read the cookie |
+| `secure`       | `true` in prod        | HTTPS-only                |
+| `sameSite`     | `'lax'` or `'strict'` | CSRF mitigation           |
+| `maxAge`       | App-specific          | Bound session lifetime    |
 
 ## SSR
 
@@ -304,10 +304,10 @@ For values that must come from the server (current time, feature flags), pass th
 Static-ish pages should prerender at build time. Configure on a route:
 
 ```typescript
-export const Route = createFileRoute('/blog/$slug')({
-  ssr: 'prerender',  // build-time static
+export const Route = createFileRoute("/blog/$slug")({
+  ssr: "prerender", // build-time static
   loader: ({ params }) => getPost({ data: { slug: params.slug } }),
-})
+});
 ```
 
 For incremental revalidation, combine prerender with a `revalidate` interval at the adapter level (Vercel, Netlify).
@@ -325,17 +325,17 @@ Use `createAPIFileRoute` for endpoints meant for external consumers (webhooks, O
 
 ```typescript
 // routes/api/webhook.ts
-import { createAPIFileRoute } from '@tanstack/react-start/api'
+import { createAPIFileRoute } from "@tanstack/react-start/api";
 
-export const APIRoute = createAPIFileRoute('/api/webhook')({
+export const APIRoute = createAPIFileRoute("/api/webhook")({
   POST: async ({ request }) => {
-    const signature = request.headers.get('x-signature')
+    const signature = request.headers.get("x-signature");
     if (!verifySignature(signature, await request.text())) {
-      return new Response('Unauthorized', { status: 401 })
+      return new Response("Unauthorized", { status: 401 });
     }
-    return Response.json({ ok: true })
+    return Response.json({ ok: true });
   },
-})
+});
 ```
 
 Rule of thumb: prefer server functions for your own UI; reach for API routes only when an external system dictates the HTTP shape.
@@ -346,20 +346,20 @@ Rule of thumb: prefer server functions for your own UI; reach for API routes onl
 
 ```typescript
 // lib/env.ts
-import { createEnv } from '@t3-oss/env-core'
-import { z } from 'zod'
+import { createEnv } from "@t3-oss/env-core";
+import { z } from "zod";
 
 export const env = createEnv({
   server: {
     DATABASE_URL: z.string().url(),
     SESSION_SECRET: z.string().min(32),
   },
-  clientPrefix: 'PUBLIC_',
+  clientPrefix: "PUBLIC_",
   client: {
     PUBLIC_APP_URL: z.string().url(),
   },
   runtimeEnv: process.env,
-})
+});
 ```
 
 Server keys must never appear in the client bundle — the typed split makes that a compile-time guarantee instead of a code-review chore.
@@ -376,13 +376,13 @@ Validation schemas typically live in `*.shared.ts` so the form and the server fu
 
 `@tanstack/react-start` ships adapters that compile the app for the target platform. Pick at build time:
 
-| Adapter | Target | Notes |
-|---------|--------|-------|
-| `vercel` | Vercel | First-class streaming + ISR |
-| `netlify` | Netlify Functions | Edge-compatible builds available |
-| `node` | Custom Node server | Long-running, self-hosted |
-| `cloudflare-workers` | CF Workers | Edge runtime — no Node APIs |
-| `bun` | Bun runtime | Fast cold start |
+| Adapter              | Target             | Notes                            |
+| -------------------- | ------------------ | -------------------------------- |
+| `vercel`             | Vercel             | First-class streaming + ISR      |
+| `netlify`            | Netlify Functions  | Edge-compatible builds available |
+| `node`               | Custom Node server | Long-running, self-hosted        |
+| `cloudflare-workers` | CF Workers         | Edge runtime — no Node APIs      |
+| `bun`                | Bun runtime        | Fast cold start                  |
 
 Avoid platform-specific APIs (`fs`, native modules) in code that the edge adapter must run. Gate them behind `.server.ts` files plus runtime checks if needed.
 

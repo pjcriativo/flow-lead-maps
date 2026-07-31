@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { 
-  Check, 
-  Minus, 
-  ArrowRight, 
-  Sparkles, 
-  MapPin, 
-  Search, 
-  LineChart, 
-  FileText, 
-  Bot, 
-  Zap, 
-  ChevronDown 
+import {
+  Check,
+  Minus,
+  ArrowRight,
+  Sparkles,
+  MapPin,
+  Search,
+  LineChart,
+  FileText,
+  Bot,
+  Zap,
+  ChevronDown,
 } from "lucide-react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -155,19 +155,23 @@ const FEATURES = [
 const FAQS = [
   {
     question: "O que acontece se eu atingir meu limite de leads mensais?",
-    answer: "Você pode continuar usando todas as outras funcionalidades do sistema (CRM, Campanhas, Contratos). Para buscar mais leads, basta fazer o upgrade do seu plano a qualquer momento.",
+    answer:
+      "Você pode continuar usando todas as outras funcionalidades do sistema (CRM, Campanhas, Contratos). Para buscar mais leads, basta fazer o upgrade do seu plano a qualquer momento.",
   },
   {
     question: "Posso cancelar a qualquer momento?",
-    answer: "Sim, sem burocracia ou taxas de cancelamento. Você manterá o acesso até o fim do ciclo que já foi pago.",
+    answer:
+      "Sim, sem burocracia ou taxas de cancelamento. Você manterá o acesso até o fim do ciclo que já foi pago.",
   },
   {
     question: "Como funciona o desconto do plano anual?",
-    answer: "No plano anual, você paga os 12 meses de uma vez, mas com 50% de desconto sobre o valor mensal. É a opção ideal para times que desejam escalar com previsibilidade e economia.",
+    answer:
+      "No plano anual, você paga os 12 meses de uma vez, mas com 50% de desconto sobre o valor mensal. É a opção ideal para times que desejam escalar com previsibilidade e economia.",
   },
   {
     question: "Preciso de um cartão de crédito para testar?",
-    answer: "Você pode criar sua conta gratuitamente e explorar o painel antes de decidir assinar qualquer plano.",
+    answer:
+      "Você pode criar sua conta gratuitamente e explorar o painel antes de decidir assinar qualquer plano.",
   },
 ];
 
@@ -190,7 +194,7 @@ function PricingPage() {
   const [yearly, setYearly] = useState(false);
   const [planos, setPlanos] = useState<Plan[]>(PLANS);
   const [simbolo, setSimbolo] = useState("R$");
-  
+
   useEffect(() => {
     supabase
       .from("site_conteudo")
@@ -232,18 +236,18 @@ function PricingPage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden pt-24 pb-16 text-center">
         <div className="pointer-events-none absolute left-1/2 top-0 -z-10 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-primary/10 opacity-50 blur-[100px]" />
-        
+
         <div className="mx-auto max-w-7xl px-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary shadow-sm mb-6">
-            <Sparkles className="h-4 w-4" /> 
+            <Sparkles className="h-4 w-4" />
             Máquina de Prospecção B2B Definitiva
           </div>
           <h1 className="text-balance text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-            Preços que escalam com o <br className="hidden md:block"/> seu funil de vendas.
+            Preços que escalam com o <br className="hidden md:block" /> seu funil de vendas.
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Pare de perder tempo com prospecção manual. Escolha o plano ideal e automatize 
-            sua captação de clientes a partir de hoje.
+            Pare de perder tempo com prospecção manual. Escolha o plano ideal e automatize sua
+            captação de clientes a partir de hoje.
           </p>
 
           <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -273,11 +277,9 @@ function PricingPage() {
         <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-3 lg:items-center">
           {planos.map((plan) => {
             const price = yearly
-                ? `${simbolo} ${plan.yearlyMonthly}`
-                : `${simbolo} ${plan.monthly}`;
-            const sub = yearly
-                ? `Cobrado ${simbolo} ${plan.yearly} / ano`
-                : "Cobrado mensalmente";
+              ? `${simbolo} ${plan.yearlyMonthly}`
+              : `${simbolo} ${plan.monthly}`;
+            const sub = yearly ? `Cobrado ${simbolo} ${plan.yearly} / ano` : "Cobrado mensalmente";
             return (
               <div
                 key={plan.name}
@@ -292,31 +294,49 @@ function PricingPage() {
                     <Sparkles className="mr-1.5 inline h-4 w-4" /> Mais Recomendado
                   </div>
                 )}
-                
+
                 <h3 className="text-xl font-semibold">{plan.name}</h3>
-                <p className={`mt-2 text-sm ${plan.popular ? "text-slate-300" : "text-muted-foreground"}`}>{plan.blurb}</p>
-                
+                <p
+                  className={`mt-2 text-sm ${plan.popular ? "text-slate-300" : "text-muted-foreground"}`}
+                >
+                  {plan.blurb}
+                </p>
+
                 <div className="mt-8 flex items-end gap-2">
                   <span className="text-4xl md:text-5xl font-bold tracking-tight">{price}</span>
-                  <span className={`text-base font-medium mb-1 ${plan.popular ? "text-slate-400" : "text-muted-foreground"}`}>/mês</span>
+                  <span
+                    className={`text-base font-medium mb-1 ${plan.popular ? "text-slate-400" : "text-muted-foreground"}`}
+                  >
+                    /mês
+                  </span>
                 </div>
-                <p className={`mt-2 text-xs font-medium ${plan.popular ? "text-slate-400" : "text-muted-foreground"}`}>{sub}</p>
+                <p
+                  className={`mt-2 text-xs font-medium ${plan.popular ? "text-slate-400" : "text-muted-foreground"}`}
+                >
+                  {sub}
+                </p>
 
                 <Link to="/auth" search={{ mode: "signup" }} preload="render" className="mt-8">
-                  <Button 
-                    className={`w-full h-12 rounded-xl font-semibold text-base transition-transform active:scale-95 ${plan.popular ? "bg-white text-slate-900 hover:bg-slate-100" : ""}`} 
+                  <Button
+                    className={`w-full h-12 rounded-xl font-semibold text-base transition-transform active:scale-95 ${plan.popular ? "bg-white text-slate-900 hover:bg-slate-100" : ""}`}
                     variant={plan.popular ? "default" : "outline"}
                   >
                     {plan.cta}
                   </Button>
                 </Link>
 
-                <div className={`mt-8 pt-8 border-t ${plan.popular ? "border-slate-800" : "border-border"}`}>
+                <div
+                  className={`mt-8 pt-8 border-t ${plan.popular ? "border-slate-800" : "border-border"}`}
+                >
                   <ul className="space-y-4 text-sm">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-start gap-3">
-                        <Check className={`mt-0.5 h-5 w-5 shrink-0 ${plan.popular ? "text-primary" : "text-primary"}`} />
-                        <span className={plan.popular ? "text-slate-200" : "text-foreground"}>{f}</span>
+                        <Check
+                          className={`mt-0.5 h-5 w-5 shrink-0 ${plan.popular ? "text-primary" : "text-primary"}`}
+                        />
+                        <span className={plan.popular ? "text-slate-200" : "text-foreground"}>
+                          {f}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -331,12 +351,19 @@ function PricingPage() {
       <section className="bg-secondary/30 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold md:text-4xl">Tudo que você precisa para dominar o B2B</h2>
-            <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">Recursos projetados para colocar sua operação de vendas no piloto automático.</p>
+            <h2 className="text-3xl font-bold md:text-4xl">
+              Tudo que você precisa para dominar o B2B
+            </h2>
+            <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+              Recursos projetados para colocar sua operação de vendas no piloto automático.
+            </p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feat) => (
-              <div key={feat.title} className="flex flex-col gap-4 rounded-2xl bg-card p-6 shadow-sm border border-border/50 hover:border-primary/30 transition-colors">
+              <div
+                key={feat.title}
+                className="flex flex-col gap-4 rounded-2xl bg-card p-6 shadow-sm border border-border/50 hover:border-primary/30 transition-colors"
+              >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <feat.icon className="h-6 w-6" />
                 </div>
@@ -354,7 +381,9 @@ function PricingPage() {
           <div className="mx-auto max-w-6xl px-6">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold md:text-4xl">Compare os planos em detalhes</h2>
-              <p className="mt-4 text-muted-foreground">Todos os recursos, lado a lado, sem pegadinhas.</p>
+              <p className="mt-4 text-muted-foreground">
+                Todos os recursos, lado a lado, sem pegadinhas.
+              </p>
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
@@ -362,13 +391,20 @@ function PricingPage() {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="bg-secondary/40 border-b border-border">
                     <tr>
-                      <th className="p-4 md:p-6 font-semibold sticky left-0 z-10 bg-secondary/40 backdrop-blur min-w-[150px] md:min-w-[250px]">Recurso</th>
+                      <th className="p-4 md:p-6 font-semibold sticky left-0 z-10 bg-secondary/40 backdrop-blur min-w-[150px] md:min-w-[250px]">
+                        Recurso
+                      </th>
                       {PLANS.map((p) => (
-                        <th key={p.name} className="p-4 md:p-6 font-semibold min-w-[150px] md:min-w-[180px]">
+                        <th
+                          key={p.name}
+                          className="p-4 md:p-6 font-semibold min-w-[150px] md:min-w-[180px]"
+                        >
                           <div className="flex flex-col gap-1">
                             <span className="text-lg">{p.name}</span>
                             <span className="text-muted-foreground text-xs font-normal">
-                              {yearly ? `${simbolo} ${p.yearlyMonthly}/mês` : `${simbolo} ${p.monthly}/mês`}
+                              {yearly
+                                ? `${simbolo} ${p.yearlyMonthly}/mês`
+                                : `${simbolo} ${p.monthly}/mês`}
                             </span>
                           </div>
                         </th>
@@ -378,7 +414,9 @@ function PricingPage() {
                   <tbody className="divide-y divide-border">
                     {COMPARISON.map((row) => (
                       <tr key={row.label} className="transition-colors hover:bg-muted/30">
-                        <td className="p-4 md:p-6 font-medium sticky left-0 bg-card z-10 group-hover:bg-muted/30">{row.label}</td>
+                        <td className="p-4 md:p-6 font-medium sticky left-0 bg-card z-10 group-hover:bg-muted/30">
+                          {row.label}
+                        </td>
                         {row.values.map((v, i) => (
                           <td key={i} className="p-4 md:p-6 text-muted-foreground">
                             {typeof v === "boolean" ? (
@@ -411,14 +449,15 @@ function PricingPage() {
           </div>
           <div className="space-y-4">
             {FAQS.map((faq, i) => (
-              <details key={i} className="group rounded-2xl border border-border bg-card p-6 shadow-sm open:bg-secondary/10 transition-colors cursor-pointer">
+              <details
+                key={i}
+                className="group rounded-2xl border border-border bg-card p-6 shadow-sm open:bg-secondary/10 transition-colors cursor-pointer"
+              >
                 <summary className="flex items-center justify-between font-semibold list-none outline-none">
                   <span className="text-base">{faq.question}</span>
                   <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
-                <p className="mt-4 text-muted-foreground leading-relaxed pr-6">
-                  {faq.answer}
-                </p>
+                <p className="mt-4 text-muted-foreground leading-relaxed pr-6">{faq.answer}</p>
               </details>
             ))}
           </div>
@@ -429,9 +468,12 @@ function PricingPage() {
       <section className="py-24 relative overflow-hidden border-t border-border/50">
         <div className="absolute inset-0 bg-primary/5 -z-10" />
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <h2 className="text-3xl font-bold tracking-tight md:text-5xl">Pronto para transformar sua captação?</h2>
+          <h2 className="text-3xl font-bold tracking-tight md:text-5xl">
+            Pronto para transformar sua captação?
+          </h2>
           <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Junte-se a centenas de agências e SDRs que usam o Flow Leads para encher a agenda todos os dias.
+            Junte-se a centenas de agências e SDRs que usam o Flow Leads para encher a agenda todos
+            os dias.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/auth" search={{ mode: "signup" }} preload="render">

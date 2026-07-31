@@ -28,15 +28,15 @@ The fix is done when it would have been unnecessary had the code been correct in
 
 Each row is the compiler, linter, runtime, or reviewer telling you something true. Fix what it points at.
 
-| Category | The signal it silences | Fix the source by… |
-|---|---|---|
-| **TYPE** — `as`, `any`, `!`, `as unknown as` | The type system found the code wrong | Making types truthful: correct the definition, or validate genuinely-unknown data at the boundary (Zod / Schema / type guard) |
-| **LINT** — `eslint-disable`, `@ts-ignore`, `@ts-expect-error` | Static analysis found a real problem | Fixing what the rule flagged; if the rule is truly wrong for this repo, disable it in config, not inline |
-| **SWALLOW** — empty catch, `.catch(() => null)`, catch-and-default | Something failed and the code pretends it didn't | Handling each error: log with context, then re-throw or map it to a typed result |
-| **TIMING** — `setTimeout`, `sleep`, blind retry loops | Code runs in the wrong order | Coordinating on the real readiness event; in tests, wait on a condition, not the clock |
-| **PATCH** — prototype / global / library-internal mutation | The API doesn't do what the code needs | Composing around it: wrapper, adapter, or the library's official extension point |
-| **SCATTER** — deep `?.` / `??`, fallback chains | The data is unreliable at its source | Validating once at the boundary, then trusting the shape everywhere downstream |
-| **CLONE** — copy-and-tweak of similar code | An abstraction doesn't fit but gets forced | Extracting the shared pattern, or writing purpose-built code |
+| Category                                                           | The signal it silences                           | Fix the source by…                                                                                                            |
+| ------------------------------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **TYPE** — `as`, `any`, `!`, `as unknown as`                       | The type system found the code wrong             | Making types truthful: correct the definition, or validate genuinely-unknown data at the boundary (Zod / Schema / type guard) |
+| **LINT** — `eslint-disable`, `@ts-ignore`, `@ts-expect-error`      | Static analysis found a real problem             | Fixing what the rule flagged; if the rule is truly wrong for this repo, disable it in config, not inline                      |
+| **SWALLOW** — empty catch, `.catch(() => null)`, catch-and-default | Something failed and the code pretends it didn't | Handling each error: log with context, then re-throw or map it to a typed result                                              |
+| **TIMING** — `setTimeout`, `sleep`, blind retry loops              | Code runs in the wrong order                     | Coordinating on the real readiness event; in tests, wait on a condition, not the clock                                        |
+| **PATCH** — prototype / global / library-internal mutation         | The API doesn't do what the code needs           | Composing around it: wrapper, adapter, or the library's official extension point                                              |
+| **SCATTER** — deep `?.` / `??`, fallback chains                    | The data is unreliable at its source             | Validating once at the boundary, then trusting the shape everywhere downstream                                                |
+| **CLONE** — copy-and-tweak of similar code                         | An abstraction doesn't fit but gets forced       | Extracting the shared pattern, or writing purpose-built code                                                                  |
 
 **When any category's signal fires, read `references/workaround-catalog.md` in full before choosing the fix** — 30+ named patterns (W-01…W-30) with before/after code, including environment, build, test, and architecture workarounds beyond the seven above.
 

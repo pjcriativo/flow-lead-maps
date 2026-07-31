@@ -20,12 +20,12 @@ const userSchema = z
     username: z.string().min(3),
   })
   .refine(
-    async data => {
+    async (data) => {
       // Async database check
       const exists = await db.users.findByEmail(data.email);
       return !exists;
     },
-    { message: "Email already registered" }
+    { message: "Email already registered" },
   );
 
 // This throws an error!
@@ -45,11 +45,11 @@ const userSchema = z
     username: z.string().min(3),
   })
   .refine(
-    async data => {
+    async (data) => {
       const exists = await db.users.findByEmail(data.email);
       return !exists;
     },
-    { message: "Email already registered" }
+    { message: "Email already registered" },
   );
 
 // Use parseAsync for async refinements
@@ -69,7 +69,7 @@ const enrichedUserSchema = z
   .object({
     userId: z.string().uuid(),
   })
-  .transform(async data => {
+  .transform(async (data) => {
     // Async data enrichment
     const user = await db.users.findById(data.userId);
     return {

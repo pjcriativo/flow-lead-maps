@@ -21,13 +21,13 @@ Break strings over 100 characters into grouped arrays joined into `cn()`/`clsx()
 ```typescript
 // BAD — single long string
 const cardBase =
-  'relative flex flex-col rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-colors duration-150'
+  "relative flex flex-col rounded-xl border border-border bg-card text-card-foreground shadow-xs transition-colors duration-150";
 
 // GOOD — grouped arrays
 const cardBaseClasses = [
-  'relative flex flex-col rounded-xl border border-border',
-  'bg-card text-card-foreground shadow-xs transition-colors duration-150',
-]
+  "relative flex flex-col rounded-xl border border-border",
+  "bg-card text-card-foreground shadow-xs transition-colors duration-150",
+];
 ```
 
 Order utilities logically — layout, spacing, sizing, color, border, effects, then state:

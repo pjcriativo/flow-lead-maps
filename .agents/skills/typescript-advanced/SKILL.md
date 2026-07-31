@@ -6,6 +6,7 @@ metadata:
   github: https://github.com/pedronauck
   repository: https://github.com/pedronauck/skills
 ---
+
 # TypeScript Advanced Types
 
 Comprehensive guidance for mastering TypeScript's advanced type system. This SKILL.md is a **dispatcher** — the detailed code patterns live in `references/*.md` and are loaded on demand.
@@ -14,12 +15,12 @@ Comprehensive guidance for mastering TypeScript's advanced type system. This SKI
 
 Read the matching reference before producing code. Each is one level deep and self-contained.
 
-| Goal | Read |
-|------|------|
-| Refresh foundational generics, conditional types, mapped types, template literals, utility types | `references/core-concepts.md` |
+| Goal                                                                                                               | Read                              |
+| ------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| Refresh foundational generics, conditional types, mapped types, template literals, utility types                   | `references/core-concepts.md`     |
 | Build a type-safe event emitter, API client, builder, deep utility, form validator, or discriminated state machine | `references/advanced-patterns.md` |
-| Use `infer`, type guards, assertion functions, or write compile-time type tests | `references/type-inference.md` |
-| Apply project-level configuration, interfaces-vs-types, error handling, performance | `references/best-practices.md` |
+| Use `infer`, type guards, assertion functions, or write compile-time type tests                                    | `references/type-inference.md`    |
+| Apply project-level configuration, interfaces-vs-types, error handling, performance                                | `references/best-practices.md`    |
 
 ## When to Use This Skill
 
@@ -36,16 +37,16 @@ Read the matching reference before producing code. Each is one level deep and se
 
 Use these decision points to pick the right tool before writing code:
 
-| Scenario | Recommendation |
-|----------|----------------|
-| Function parameters | Always explicit |
-| Return types | Let TypeScript infer (usually) |
-| Local variables | Let TypeScript infer |
-| Public API boundaries | Always explicit |
-| Object shapes (extensible) | Use `interface` |
-| Union types | Use `type` |
-| Computed/mapped types | Use `type` |
-| Runtime-narrowing of `unknown` | Type guard or assertion (see `references/type-inference.md`) |
+| Scenario                       | Recommendation                                                        |
+| ------------------------------ | --------------------------------------------------------------------- |
+| Function parameters            | Always explicit                                                       |
+| Return types                   | Let TypeScript infer (usually)                                        |
+| Local variables                | Let TypeScript infer                                                  |
+| Public API boundaries          | Always explicit                                                       |
+| Object shapes (extensible)     | Use `interface`                                                       |
+| Union types                    | Use `type`                                                            |
+| Computed/mapped types          | Use `type`                                                            |
+| Runtime-narrowing of `unknown` | Type guard or assertion (see `references/type-inference.md`)          |
 | Variant data with shared field | Discriminated union (see `references/advanced-patterns.md` Pattern 6) |
 
 ## Core Guidelines

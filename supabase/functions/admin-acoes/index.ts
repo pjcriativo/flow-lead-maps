@@ -197,7 +197,10 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (!org) {
-          const nome = String(alvo.full_name || "").trim() || String(alvo.email || "").split("@")[0] || "Organização";
+          const nome =
+            String(alvo.full_name || "").trim() ||
+            String(alvo.email || "").split("@")[0] ||
+            "Organização";
           const ins = await admin
             .from("orgs")
             .insert({ nome, dono_user_id: alvo.id })

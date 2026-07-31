@@ -14,7 +14,7 @@ When schemas use `.transform()`, the input and output types differ. `z.infer` (s
 ```typescript
 import { z } from "zod";
 
-const dateSchema = z.string().transform(s => new Date(s));
+const dateSchema = z.string().transform((s) => new Date(s));
 
 type DateOutput = z.infer<typeof dateSchema>;
 // Date (post-transform)
@@ -33,7 +33,7 @@ handleDate("2024-01-15"); // TypeScript error
 ```typescript
 import { z } from "zod";
 
-const dateSchema = z.string().transform(s => new Date(s));
+const dateSchema = z.string().transform((s) => new Date(s));
 
 // Input type = what parse() accepts
 type DateInput = z.input<typeof dateSchema>;
@@ -57,9 +57,9 @@ handleDate("2024-01-15"); // Works - string input
 ```typescript
 const apiUserSchema = z.object({
   id: z.string(),
-  created_at: z.string().transform(s => new Date(s)),
-  tags: z.string().transform(s => s.split(",")),
-  is_active: z.union([z.boolean(), z.literal(1), z.literal(0)]).transform(v => Boolean(v)),
+  created_at: z.string().transform((s) => new Date(s)),
+  tags: z.string().transform((s) => s.split(",")),
+  is_active: z.union([z.boolean(), z.literal(1), z.literal(0)]).transform((v) => Boolean(v)),
 });
 
 // What the API sends
@@ -94,8 +94,8 @@ function handleApiResponse(rawData: ApiUserInput) {
 
 ```typescript
 const formSchema = z.object({
-  amount: z.string().transform(s => parseFloat(s)),
-  quantity: z.string().transform(s => parseInt(s, 10)),
+  amount: z.string().transform((s) => parseFloat(s)),
+  quantity: z.string().transform((s) => parseInt(s, 10)),
 });
 
 type FormInput = z.input<typeof formSchema>;

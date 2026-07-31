@@ -26,14 +26,14 @@ class TypedEventEmitter<T extends Record<string, any>> {
   emit<K extends keyof T>(event: K, data: T[K]): void {
     const callbacks = this.listeners[event];
     if (callbacks) {
-      callbacks.forEach(callback => callback(data));
+      callbacks.forEach((callback) => callback(data));
     }
   }
 }
 
 const emitter = new TypedEventEmitter<EventMap>();
 
-emitter.on("user:created", data => {
+emitter.on("user:created", (data) => {
   console.log(data.id, data.name); // Type-safe!
 });
 
@@ -245,17 +245,17 @@ interface LoginForm {
 const validator = new FormValidator<LoginForm>({
   email: [
     {
-      validate: v => v.includes("@"),
+      validate: (v) => v.includes("@"),
       message: "Email must contain @",
     },
     {
-      validate: v => v.length > 0,
+      validate: (v) => v.length > 0,
       message: "Email is required",
     },
   ],
   password: [
     {
-      validate: v => v.length >= 8,
+      validate: (v) => v.length >= 8,
       message: "Password must be at least 8 characters",
     },
   ],

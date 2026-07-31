@@ -32,7 +32,7 @@ const orderSchema = z.object({
     z.object({
       productId: z.string().uuid(), // Duplicated
       quantity: z.number().int().positive(),
-    })
+    }),
   ),
   createdAt: z.date(), // Duplicated
 });

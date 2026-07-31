@@ -95,7 +95,7 @@ const {
 **Customizing flatten output:**
 
 ```typescript
-const flattened = result.error.flatten(issue => ({
+const flattened = result.error.flatten((issue) => ({
   message: issue.message,
   code: issue.code,
 }));

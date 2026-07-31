@@ -47,7 +47,7 @@ const orderSchema = z.object({
       z.object({
         productId: z.string(),
         quantity: z.number().int().positive(),
-      })
+      }),
     )
     .min(1),
   shippingAddress: z.object({
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   if (!result.success) {
     return NextResponse.json(
       { error: "Invalid order", issues: result.error.issues },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -84,7 +84,7 @@ async function processOrder(order: Order) {
 
 async function calculateTotals(order: Order) {
   // No validation needed - type guarantees shape
-  return order.items.map(item => ({
+  return order.items.map((item) => ({
     ...item,
     total: item.quantity * getPrice(item.productId),
   }));

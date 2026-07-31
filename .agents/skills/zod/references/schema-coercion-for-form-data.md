@@ -78,7 +78,7 @@ z.coerce.boolean().parse(""); // false
 z.coerce.boolean().parse("0"); // true! (non-empty string)
 
 // For strict boolean parsing from strings:
-const strictBooleanSchema = z.enum(["true", "false"]).transform(v => v === "true");
+const strictBooleanSchema = z.enum(["true", "false"]).transform((v) => v === "true");
 ```
 
 **When NOT to use this pattern:**

@@ -118,7 +118,13 @@ function AuthPage() {
           setError("Você precisa aceitar os Termos e Condições para criar uma conta.");
           return;
         }
-        const validacao = cadastroSchema.safeParse({ nome, email, phone, password, confirmPassword });
+        const validacao = cadastroSchema.safeParse({
+          nome,
+          email,
+          phone,
+          password,
+          confirmPassword,
+        });
         if (!validacao.success) {
           setError(validacao.error.issues[0]?.message ?? "Revise os dados do cadastro.");
           return;
@@ -145,7 +151,10 @@ function AuthPage() {
         }
         return;
       } else {
-        const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data: authData, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
         if (error) throw error;
         if (authData.user) {
           const { data: perfil } = await supabase
@@ -202,7 +211,8 @@ function AuthPage() {
           </h2>
 
           <p className="text-sm leading-relaxed text-slate-300">
-            Descubra empresas locais, colete telefones e e-mails verificados, envie propostas pelo WhatsApp e potencialize a prospecção da sua equipe.
+            Descubra empresas locais, colete telefones e e-mails verificados, envie propostas pelo
+            WhatsApp e potencialize a prospecção da sua equipe.
           </p>
 
           {/* Cards com efeito Glassmorphism */}
@@ -518,5 +528,3 @@ function AuthPage() {
     </div>
   );
 }
-
-

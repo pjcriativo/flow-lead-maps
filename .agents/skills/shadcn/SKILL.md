@@ -25,6 +25,7 @@ This skill provides guidelines, patterns, and best practices for working with sh
 **Always use design system tokens for theme switching compatibility:**
 
 **Required tokens:**
+
 - Backgrounds: `bg-background`, `bg-card`, `bg-muted`, `bg-popover`
 - Text: `text-foreground`, `text-muted-foreground`, `text-card-foreground`
 - Borders: `border-border`, `border-input`, `border-ring`

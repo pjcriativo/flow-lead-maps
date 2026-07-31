@@ -14,6 +14,7 @@ MEDIÇÃO + APLICAÇÃO de limite por org já roda (`consumo_org` + função
 **O que FALTA (camada 3 — NÃO construir agora):** cobrança recorrente de verdade.
 Depende de um gateway (Stripe / Mercado Pago) que o **dono vai escolher**. Para
 plugar depois, o modelo já está pronto:
+
 - `orgs.plano_id` diz o que a org assina;
 - faltam: `assinaturas` (status, ciclo, gateway_customer_id, gateway_sub_id),
   webhook do gateway para ativar/suspender por pagamento, e a troca de plano na
@@ -54,6 +55,7 @@ teto — o total real do mês pode ser maior do que o sistema acredita.
 **Regra até pagar a dívida:** antes de ligar QUALQUER automação contínua que
 gaste, TODO caminho de gasto de API tem que registrar no livro-caixa
 (`redes_buscas`). Estado em 2026-07-22:
+
 - ✅ coleta de redes (`buscar-redes`) — registra desde a criação;
 - ✅ geração de sites (`redesign-site`) — registra desde a FASE 0 (fonte
   `ia_site`, custo real IA + Apify de reviews, inclusive parcial em erro);

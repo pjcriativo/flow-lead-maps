@@ -23,26 +23,28 @@ This reference provides practical guidelines for TypeScript configuration, type 
 
 **Key Settings Explained:**
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| `strict` | `true` | Enables all strict type-checking options |
-| `noUncheckedIndexedAccess` | `true` | Adds `undefined` to index signatures for safer array/object access |
-| `exactOptionalPropertyTypes` | `true` | Distinguishes between `undefined` and missing properties |
-| `moduleResolution` | `"Bundler"` | Optimized for modern bundlers (Vite, esbuild, etc.) |
-| `target` | `"ES2022"` | Modern JavaScript features without unnecessary transpilation |
-| `skipLibCheck` | `true` | Faster builds by skipping declaration file type checking |
+| Setting                      | Value       | Purpose                                                            |
+| ---------------------------- | ----------- | ------------------------------------------------------------------ |
+| `strict`                     | `true`      | Enables all strict type-checking options                           |
+| `noUncheckedIndexedAccess`   | `true`      | Adds `undefined` to index signatures for safer array/object access |
+| `exactOptionalPropertyTypes` | `true`      | Distinguishes between `undefined` and missing properties           |
+| `moduleResolution`           | `"Bundler"` | Optimized for modern bundlers (Vite, esbuild, etc.)                |
+| `target`                     | `"ES2022"`  | Modern JavaScript features without unnecessary transpilation       |
+| `skipLibCheck`               | `true`      | Faster builds by skipping declaration file type checking           |
 
 ## Type Inference vs Explicit Types
 
 ### Strategic Type Declaration Guidelines
 
 **Be explicit with:**
+
 - Function parameters
 - Public API boundaries
 - Complex objects and configurations
 - Generic type parameters that can't be inferred
 
 **Let TypeScript infer:**
+
 - Return types (when straightforward)
 - Local variables
 - Internal logic
@@ -176,7 +178,7 @@ class ValidationError extends Error {
   constructor(
     message: string,
     public field: string,
-    public value: unknown
+    public value: unknown,
   ) {
     super(message);
     this.name = "ValidationError";
@@ -194,9 +196,7 @@ class NotFoundError extends Error {
 ### Result Pattern for Functional Error Handling
 
 ```typescript
-type Result<T, E = Error> =
-  | { success: true; data: T }
-  | { success: false; error: E };
+type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
 
 async function safeApiCall<T>(apiCall: () => Promise<T>): Promise<Result<T>> {
   try {
@@ -236,13 +236,7 @@ function isString(value: unknown): value is string {
 }
 
 function isUser(obj: unknown): obj is User {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    "id" in obj &&
-    "name" in obj &&
-    "email" in obj
-  );
+  return typeof obj === "object" && obj !== null && "id" in obj && "name" in obj && "email" in obj;
 }
 ```
 
@@ -283,9 +277,8 @@ type ComplexConditional<T> = T extends string
 type Expect<T extends true> = T;
 
 // Equality check - returns true if types are exactly equal
-type Equal<X, Y> = (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
-  ? true
-  : false;
+type Equal<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false;
 
 // Not equal check
 type NotEqual<X, Y> = true extends Equal<X, Y> ? false : true;
@@ -295,7 +288,9 @@ type NotEqual<X, Y> = true extends Equal<X, Y> ? false : true;
 
 ```typescript
 // Test that a function returns the expected type
-type TestGroupBy = Expect<Equal<ReturnType<typeof groupBy<User, "status">>, Record<string, User[]>>>;
+type TestGroupBy = Expect<
+  Equal<ReturnType<typeof groupBy<User, "status">>, Record<string, User[]>>
+>;
 
 // Test generic constraints at compile time
 function testGenericConstraints() {
@@ -352,12 +347,12 @@ getUser(userId); // OK
 
 ## Quick Reference Summary
 
-| Category | Guideline |
-|----------|-----------|
-| Configuration | Enable `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` |
-| Type Inference | Explicit at boundaries, inferred internally |
-| Interfaces vs Types | Interfaces for objects, types for unions/computed |
-| Imports | Use path aliases for cross-feature, relative for local |
-| Error Handling | Use Result pattern or custom error classes |
-| Performance | Keep types simple, avoid deep nesting |
-| Testing | Use `Expect<Equal<X, Y>>` for type-level tests |
+| Category            | Guideline                                                                 |
+| ------------------- | ------------------------------------------------------------------------- |
+| Configuration       | Enable `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` |
+| Type Inference      | Explicit at boundaries, inferred internally                               |
+| Interfaces vs Types | Interfaces for objects, types for unions/computed                         |
+| Imports             | Use path aliases for cross-feature, relative for local                    |
+| Error Handling      | Use Result pattern or custom error classes                                |
+| Performance         | Keep types simple, avoid deep nesting                                     |
+| Testing             | Use `Expect<Equal<X, Y>>` for type-level tests                            |

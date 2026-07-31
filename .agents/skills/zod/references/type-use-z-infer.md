@@ -68,7 +68,7 @@ function createUser(user: User) {
 ```typescript
 const userSchema = z.object({
   name: z.string(),
-  createdAt: z.string().transform(s => new Date(s)), // String in, Date out
+  createdAt: z.string().transform((s) => new Date(s)), // String in, Date out
 });
 
 // z.infer gives output type (after transforms)
@@ -99,9 +99,7 @@ const UserSchema = z.object({
 type User = z.infer<typeof UserSchema>;
 
 // Alternative: lowercase schema, uppercase type
-const userSchema = z.object({
-  /*...*/
-});
+const userSchema = z.object({/*...*/});
 type User = z.infer<typeof userSchema>;
 ```
 

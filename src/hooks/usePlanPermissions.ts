@@ -51,7 +51,8 @@ export function usePlanPermissions(): PlanPermissions {
 
       const rawPlan = (perfil?.plan ?? "basico").toLowerCase();
       const isSuperAdmin = perfil?.is_super_admin === true;
-      const isProOrAbove = isSuperAdmin || rawPlan === "pro" || rawPlan === "agencia" || rawPlan === "enterprise";
+      const isProOrAbove =
+        isSuperAdmin || rawPlan === "pro" || rawPlan === "agencia" || rawPlan === "enterprise";
 
       const limit = isSuperAdmin ? 999999 : (perfil?.monthly_lead_limit ?? 1000);
       const used = perfil?.leads_used_monthly ?? 0;

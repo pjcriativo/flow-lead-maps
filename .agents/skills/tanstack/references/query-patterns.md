@@ -34,23 +34,23 @@ Centralize keys in factories. Prevents typo bugs, makes invalidation a discovera
 ```typescript
 // lib/query-keys.ts
 export const todoKeys = {
-  all: ['todos'] as const,
-  lists: () => [...todoKeys.all, 'list'] as const,
+  all: ["todos"] as const,
+  lists: () => [...todoKeys.all, "list"] as const,
   list: (filters: TodoFilters) => [...todoKeys.lists(), filters] as const,
-  details: () => [...todoKeys.all, 'detail'] as const,
+  details: () => [...todoKeys.all, "detail"] as const,
   detail: (id: number) => [...todoKeys.details(), id] as const,
-  comments: (id: number) => [...todoKeys.detail(id), 'comments'] as const,
+  comments: (id: number) => [...todoKeys.detail(id), "comments"] as const,
 };
 
 // Targeted invalidation
-queryClient.invalidateQueries({ queryKey: todoKeys.all });          // everything
-queryClient.invalidateQueries({ queryKey: todoKeys.detail(5) });    // one item + nested
+queryClient.invalidateQueries({ queryKey: todoKeys.all }); // everything
+queryClient.invalidateQueries({ queryKey: todoKeys.detail(5) }); // one item + nested
 ```
 
 ### Pair with `queryOptions` for full type inference
 
 ```typescript
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions } from "@tanstack/react-query";
 
 export const todoQueries = {
   detail: (id: number) =>
@@ -72,13 +72,13 @@ await queryClient.prefetchQuery(todoQueries.detail(5));
 
 Default is `0` — every mount triggers a background refetch. Tune per data type:
 
-| Data type | staleTime | Why |
-|-----------|-----------|-----|
-| Real-time (stocks, live) | `0` | Must always refresh |
-| Notifications, feeds | `30s – 1min` | Changes frequently |
-| User-generated content | `1 – 5min` | Changes on user action |
-| Reference data (categories) | `10 – 30min` | Rarely changes |
-| Static content | `Infinity` | Never changes |
+| Data type                   | staleTime    | Why                    |
+| --------------------------- | ------------ | ---------------------- |
+| Real-time (stocks, live)    | `0`          | Must always refresh    |
+| Notifications, feeds        | `30s – 1min` | Changes frequently     |
+| User-generated content      | `1 – 5min`   | Changes on user action |
+| Reference data (categories) | `10 – 30min` | Rarely changes         |
+| Static content              | `Infinity`   | Never changes          |
 
 ### `gcTime` retention
 
@@ -90,7 +90,7 @@ Default is `0` — every mount triggers a background refetch. Tune per data type
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000,      // 1 min — sensible default
+      staleTime: 60 * 1000, // 1 min — sensible default
       gcTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
       retry: 1,
@@ -103,16 +103,16 @@ Override per-query when needed via `queryOptions` factory.
 
 ### `placeholderData` vs `initialData` — non-obvious gotcha
 
-| | `initialData` | `placeholderData` |
-|--|---------------|-------------------|
-| Persists to cache | yes | no |
-| Considered fresh | yes (subject to `staleTime`) | no — always refetches |
-| Use case | seeded from SSR / known good | optimistic UI while loading |
+|                   | `initialData`                | `placeholderData`           |
+| ----------------- | ---------------------------- | --------------------------- |
+| Persists to cache | yes                          | no                          |
+| Considered fresh  | yes (subject to `staleTime`) | no — always refetches       |
+| Use case          | seeded from SSR / known good | optimistic UI while loading |
 
 ```typescript
 // initialData — treated as canonical, won't refetch unless stale
 useQuery({
-  queryKey: ['user', id],
+  queryKey: ["user", id],
   queryFn: fetchUser,
   initialData: ssrUser,
   initialDataUpdatedAt: ssrTimestamp, // so staleTime works correctly
@@ -120,7 +120,7 @@ useQuery({
 
 // placeholderData — instant UI, always refetches in background
 useQuery({
-  queryKey: ['users', filters],
+  queryKey: ["users", filters],
   queryFn: () => fetchUsers(filters),
   placeholderData: (prev) => prev, // keep previous page during pagination
 });
@@ -175,7 +175,7 @@ When several components must react to the same mutation (e.g., a toolbar and a l
 
 ```typescript
 const pending = useMutationState({
-  filters: { mutationKey: ['updateTodo'], status: 'pending' },
+  filters: { mutationKey: ["updateTodo"], status: "pending" },
 });
 ```
 
@@ -253,11 +253,10 @@ loader: ({ context, params }) =>
 
 ```typescript
 const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-  queryKey: ['todos', 'infinite'],
+  queryKey: ["todos", "infinite"],
   queryFn: ({ pageParam }) => fetchPage(pageParam),
   initialPageParam: 0,
-  getNextPageParam: (last, _all, lastPageParam) =>
-    last.hasMore ? lastPageParam + 1 : undefined,
+  getNextPageParam: (last, _all, lastPageParam) => (last.hasMore ? lastPageParam + 1 : undefined),
   maxPages: 10, // cap memory in long lists
 });
 
@@ -298,7 +297,7 @@ new QueryClient({ defaultOptions: { queries: { staleTime: 60 * 1000 } } });
 ```typescript
 const results = useQueries({
   queries: userIds.map((id) => ({
-    queryKey: ['user', id],
+    queryKey: ["user", id],
     queryFn: () => fetchUser(id),
   })),
 });
@@ -315,7 +314,7 @@ Use this whenever the number of queries is dynamic — never call `useQuery` in 
 
 ```typescript
 useQuery({
-  queryKey: ['search', term],
+  queryKey: ["search", term],
   queryFn: ({ signal }) => fetch(`/api/search?q=${term}`, { signal }).then((r) => r.json()),
 });
 ```
@@ -337,10 +336,10 @@ const count = useQuery({
 ### Dependent queries via `enabled`
 
 ```typescript
-const { data: user } = useQuery({ queryKey: ['user', userId], queryFn: () => getUser(userId) });
+const { data: user } = useQuery({ queryKey: ["user", userId], queryFn: () => getUser(userId) });
 
 const { data: projects } = useQuery({
-  queryKey: ['projects', user?.id],
+  queryKey: ["projects", user?.id],
   queryFn: () => getProjects(user!.id),
   enabled: !!user?.id,
 });
@@ -355,14 +354,14 @@ const { data: projects } = useQuery({
 - `'offlineFirst'`: tries network once, falls back to cache.
 
 ```typescript
-new QueryClient({ defaultOptions: { queries: { networkMode: 'offlineFirst' } } });
+new QueryClient({ defaultOptions: { queries: { networkMode: "offlineFirst" } } });
 ```
 
 ### Persisting the cache
 
 ```typescript
-import { persistQueryClient } from '@tanstack/react-query-persist-client';
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
+import { persistQueryClient } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
 persistQueryClient({
   queryClient,

@@ -16,14 +16,14 @@ import { z } from "zod";
 
 // refine can only report one error at a time
 const passwordSchema = z.string().refine(
-  password => {
+  (password) => {
     // Checks all conditions but only reports first failure
     if (password.length < 8) return false; // Only this error shown
     if (!/[A-Z]/.test(password)) return false;
     if (!/[0-9]/.test(password)) return false;
     return true;
   },
-  { message: "Password does not meet requirements" }
+  { message: "Password does not meet requirements" },
 );
 
 passwordSchema.parse("weak");
@@ -78,7 +78,7 @@ passwordSchema.safeParse("weak");
 
 ```typescript
 // Simple boolean condition with one error message
-const adultSchema = z.number().refine(age => age >= 18, { message: "Must be 18 or older" });
+const adultSchema = z.number().refine((age) => age >= 18, { message: "Must be 18 or older" });
 
 // Cross-field validation with single outcome
 const formSchema = z
@@ -86,7 +86,7 @@ const formSchema = z
     password: z.string(),
     confirmPassword: z.string(),
   })
-  .refine(data => data.password === data.confirmPassword, {
+  .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords must match",
     path: ["confirmPassword"],
   });
@@ -96,11 +96,11 @@ const emailSchema = z
   .string()
   .email()
   .refine(
-    async email => {
+    async (email) => {
       const exists = await checkEmailExists(email);
       return !exists;
     },
-    { message: "Email already registered" }
+    { message: "Email already registered" },
   );
 ```
 
@@ -118,7 +118,7 @@ const orderSchema = z
       z.object({
         productId: z.string(),
         quantity: z.number(),
-      })
+      }),
     ),
     promoCode: z.string().optional(),
   })

@@ -9,6 +9,7 @@ export type ApiConsumptionLog = {
   quantity: number;
   cost_usd: number;
   cost_brl: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   created_at: string;
   user_email?: string;
@@ -49,6 +50,7 @@ export async function registrarConsumoApi(dados: {
   quantity: number;
   cost_usd: number;
   cost_brl?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }) {
   try {
@@ -63,9 +65,10 @@ export async function registrarConsumoApi(dados: {
       .eq("user_id", userId)
       .maybeSingle();
 
-    const cotacaoDolar = 5.60;
-    const costBrl = dados.cost_brl ?? (dados.cost_usd * cotacaoDolar);
+    const cotacaoDolar = 5.6;
+    const costBrl = dados.cost_brl ?? dados.cost_usd * cotacaoDolar;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await supabase.from<any, any>("api_consumption_logs").insert({
       user_id: userId,
       org_id: member?.org_id ?? null,
@@ -89,11 +92,14 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
   dataLimite.setDate(dataLimite.getDate() - dias);
 
   const { data: logs, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from<any, any>("api_consumption_logs")
-    .select(`
+    .select(
+      `
       id, org_id, user_id, service, action, quantity, cost_usd, cost_brl, created_at,
       profiles:user_id(full_name, email, plan, monthly_lead_limit, leads_used_monthly)
-    `)
+    `,
+    )
     .gte("created_at", dataLimite.toISOString())
     .order("created_at", { ascending: false });
 
@@ -114,20 +120,27 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
   let totalRequests = logs.length;
   let totalLeadsCrawled = 0;
 
-  const usersMap = new Map<string, {
-    user_id: string;
-    user_name: string;
-    user_email: string;
-    plan: string;
-    monthly_limit: number;
-    leads_used: number;
-    total_cost_usd: number;
-    total_cost_brl: number;
-    requests_count: number;
-  }>();
+  const usersMap = new Map<
+    string,
+    {
+      user_id: string;
+      user_name: string;
+      user_email: string;
+      plan: string;
+      monthly_limit: number;
+      leads_used: number;
+      total_cost_usd: number;
+      total_cost_brl: number;
+      requests_count: number;
+    }
+  >();
 
-  const serviceMap = new Map<string, { service: string; requests_count: number; cost_usd: number; cost_brl: number }>();
+  const serviceMap = new Map<
+    string,
+    { service: string; requests_count: number; cost_usd: number; cost_brl: number }
+  >();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logs.forEach((log: any) => {
     const costUsd = Number(log.cost_usd) || 0;
     const costBrl = Number(log.cost_brl) || 0;
@@ -139,7 +152,12 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
 
     // Service Breakdown
     const sKey = log.service;
-    const sCurr = serviceMap.get(sKey) || { service: sKey, requests_count: 0, cost_usd: 0, cost_brl: 0 };
+    const sCurr = serviceMap.get(sKey) || {
+      service: sKey,
+      requests_count: 0,
+      cost_usd: 0,
+      cost_brl: 0,
+    };
     sCurr.requests_count += 1;
     sCurr.cost_usd += costUsd;
     sCurr.cost_brl += costBrl;
@@ -168,7 +186,9 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
     }
   });
 
-  const topUsers = Array.from(usersMap.values()).sort((a, b) => b.total_cost_usd - a.total_cost_usd);
+  const topUsers = Array.from(usersMap.values()).sort(
+    (a, b) => b.total_cost_usd - a.total_cost_usd,
+  );
   const serviceBreakdown = Array.from(serviceMap.values()).sort((a, b) => b.cost_usd - a.cost_usd);
 
   return {

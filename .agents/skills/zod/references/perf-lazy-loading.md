@@ -104,10 +104,10 @@ export default function ReportsForm() {
 ```typescript
 // schemas/registry.ts
 const schemaLoaders = {
-  user: () => import("./user").then(m => m.userSchema),
-  order: () => import("./order").then(m => m.orderSchema),
-  analytics: () => import("./analytics").then(m => m.analyticsSchema),
-  reports: () => import("./reports").then(m => m.reportsSchema),
+  user: () => import("./user").then((m) => m.userSchema),
+  order: () => import("./order").then((m) => m.orderSchema),
+  analytics: () => import("./analytics").then((m) => m.analyticsSchema),
+  reports: () => import("./reports").then((m) => m.reportsSchema),
 } as const;
 
 type SchemaName = keyof typeof schemaLoaders;

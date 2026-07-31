@@ -18,6 +18,7 @@ autorização explícita do dono PARA AQUELA AÇÃO ESPECÍFICA.**
   **exceção, não precedente** — não valida o padrão.
 
 Estado autorizado hoje (mantido pelo dono):
+
 - Coleta em redes LIGADA só nas estratégias **IG-5, IG-7, IG-8, IG-9 e LI-4**
   (Edge `buscar-redes`), sempre sob o teto de **US$ 5/busca e US$ 50/mês**
   (`src/lib/redes-teto.ts` + livro-caixa `redes_buscas`). As outras 15

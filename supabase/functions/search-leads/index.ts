@@ -270,7 +270,7 @@ Deno.serve(async (req) => {
         if (orgId && inserted > 0) {
           await consumir(admin, orgId, "leads", inserted);
           const costUsd = inserted * 0.001;
-          const costBrl = costUsd * 5.60;
+          const costBrl = costUsd * 5.6;
           await admin.from("api_consumption_logs").insert({
             org_id: orgId,
             user_id: userId,

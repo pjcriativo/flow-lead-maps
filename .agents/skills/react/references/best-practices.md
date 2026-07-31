@@ -565,7 +565,7 @@ function useDebounce<T>(value: T, delay: number): T {
 ```typescript
 function useSearchWithFilters<T>(
   searchFn: (query: string, filters: Filters) => Promise<T[]>,
-  initialFilters: Filters
+  initialFilters: Filters,
 ) {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState(initialFilters);
@@ -947,14 +947,14 @@ describe("useUser", () => {
 
 ### File Naming Conventions
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Components | kebab-case.tsx | `user-avatar.tsx` |
-| Hooks | use-kebab-case.ts | `use-user-data.ts` |
-| Utilities | camelCase.ts | `formatDate.ts` |
-| Types | types.ts | `types.ts` |
-| Tests | *.test.tsx | `user-avatar.test.tsx` |
-| Stories | *.stories.tsx | `user-avatar.stories.tsx` |
+| Type       | Pattern           | Example                   |
+| ---------- | ----------------- | ------------------------- |
+| Components | kebab-case.tsx    | `user-avatar.tsx`         |
+| Hooks      | use-kebab-case.ts | `use-user-data.ts`        |
+| Utilities  | camelCase.ts      | `formatDate.ts`           |
+| Types      | types.ts          | `types.ts`                |
+| Tests      | *.test.tsx        | `user-avatar.test.tsx`    |
+| Stories    | *.stories.tsx     | `user-avatar.stories.tsx` |
 
 ### Export Patterns
 

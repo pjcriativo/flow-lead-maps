@@ -119,10 +119,7 @@ interface CardProps extends React.ComponentProps<"div"> {
 function Card({ className, ...props }: CardProps) {
   return (
     <div
-      className={cn(
-        "rounded-md border bg-card text-card-foreground shadow-xs",
-        className
-      )}
+      className={cn("rounded-md border bg-card text-card-foreground shadow-xs", className)}
       data-slot="card"
       {...props}
     />
@@ -175,22 +172,16 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
+  },
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   // Additional custom props
 }
 
 function Button({ className, variant, size, ...props }: ButtonProps) {
-  return (
-    <button
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  );
+  return <button className={cn(buttonVariants({ variant, size, className }))} {...props} />;
 }
 
 export { Button, buttonVariants };
@@ -238,7 +229,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/card";
     <CardTitle>Title</CardTitle>
   </CardHeader>
   <CardContent>Content</CardContent>
-</Card>
+</Card>;
 ```
 
 ```tsx
@@ -257,13 +248,7 @@ export const Card = Object.assign(CardRoot, {
 When creating themed variants of base components:
 
 ```tsx
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "../base/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "../base/card";
 
 function CardTechRoot({ className, children, ...props }: CardTechProps) {
   return (
@@ -302,9 +287,7 @@ Radix UI primitives provide built-in accessibility. Never remove or override the
       {/* DialogTitle is required for screen readers */}
       <DialogTitle>Accessible Title</DialogTitle>
       {/* DialogDescription helps screen readers understand purpose */}
-      <DialogDescription>
-        This description provides context for the dialog.
-      </DialogDescription>
+      <DialogDescription>This description provides context for the dialog.</DialogDescription>
     </DialogHeader>
     {/* Content */}
   </DialogContent>
@@ -446,20 +429,11 @@ module.exports = {
 import { Loader2 } from "lucide-react";
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   loading?: boolean;
 }
 
-function Button({
-  className,
-  variant,
-  size,
-  loading,
-  disabled,
-  children,
-  ...props
-}: ButtonProps) {
+function Button({ className, variant, size, loading, disabled, children, ...props }: ButtonProps) {
   return (
     <button
       className={cn(buttonVariants({ variant, size, className }))}

@@ -260,7 +260,12 @@ export function StatusBadge({ status }: { status?: string | null }) {
   const label = STATUS_LABELS[s] ?? s;
   const style = STATUS_STYLE[s] ?? "bg-secondary text-muted-foreground";
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border border-border/40", style)}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border border-border/40",
+        style,
+      )}
+    >
       {label}
     </span>
   );

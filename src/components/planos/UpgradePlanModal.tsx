@@ -24,7 +24,8 @@ export function UpgradePlanModal({ isOpen, onClose, recursoNome, recursoDescrica
             <Lock className="h-5 w-5 text-gold" /> Desbloqueie o {recursoNome}
           </h3>
           <p className="text-xs text-white/80 mt-1 leading-relaxed">
-            {recursoDescricao || `O recurso de ${recursoNome} é exclusivo para assinantes dos planos Pro e Agência.`}
+            {recursoDescricao ||
+              `O recurso de ${recursoNome} é exclusivo para assinantes dos planos Pro e Agência.`}
           </p>
         </div>
 
@@ -37,23 +38,33 @@ export function UpgradePlanModal({ isOpen, onClose, recursoNome, recursoDescrica
             <ul className="space-y-2 text-xs text-foreground">
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-emerald-600 shrink-0 font-bold" />
-                <span><b>5.000 leads / mês</b> (5x mais que o plano Básico)</span>
+                <span>
+                  <b>5.000 leads / mês</b> (5x mais que o plano Básico)
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-emerald-600 shrink-0 font-bold" />
-                <span><b>Prospecção em Instagram e LinkedIn</b> com dados enriquecidos</span>
+                <span>
+                  <b>Prospecção em Instagram e LinkedIn</b> com dados enriquecidos
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-emerald-600 shrink-0 font-bold" />
-                <span><b>Gerador de Propostas em PDF & Contratos</b> prontos para assinar</span>
+                <span>
+                  <b>Gerador de Propostas em PDF & Contratos</b> prontos para assinar
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-emerald-600 shrink-0 font-bold" />
-                <span><b>Campanhas e Automações de WhatsApp</b> integradas</span>
+                <span>
+                  <b>Campanhas e Automações de WhatsApp</b> integradas
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="h-4 w-4 text-emerald-600 shrink-0 font-bold" />
-                <span><b>Redesign Inteligente e Publicador de Sites</b></span>
+                <span>
+                  <b>Redesign Inteligente e Publicador de Sites</b>
+                </span>
               </li>
             </ul>
           </div>

@@ -94,7 +94,7 @@ const orderSchema = entitySchema.extend({
     z.object({
       productId: z.string().uuid(),
       quantity: z.number().int().positive(),
-    })
+    }),
   ),
   total: z.number().positive(),
 });

@@ -33,7 +33,7 @@ Collections have built-in mutation handling. Do NOT use `useMutation` + `invalid
 // WRONG
 const mutation = useMutation({
   mutationFn: async (data) => api.update(data),
-  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['items'] })
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ["items"] }),
 });
 
 // CORRECT
@@ -84,25 +84,19 @@ const collection = createCollection(
     schema: itemSchema,
 
     onInsert: async ({ transaction }) => {
-      await Promise.all(
-        transaction.mutations.map((m) => api.items.create(m.modified))
-      );
+      await Promise.all(transaction.mutations.map((m) => api.items.create(m.modified)));
     },
 
     onUpdate: async ({ transaction }) => {
       await Promise.all(
-        transaction.mutations.map((m) =>
-          api.items.update(m.original.id, m.changes)
-        )
+        transaction.mutations.map((m) => api.items.update(m.original.id, m.changes)),
       );
     },
 
     onDelete: async ({ transaction }) => {
-      await Promise.all(
-        transaction.mutations.map((m) => api.items.delete(m.original.id))
-      );
+      await Promise.all(transaction.mutations.map((m) => api.items.delete(m.original.id)));
     },
-  })
+  }),
 );
 ```
 
@@ -120,8 +114,7 @@ const itemsCollection = createCollection({ queryKey: ["items"] });
 
 function ProjectItems({ projectId }) {
   const { data } = useLiveQuery((q) =>
-    q.from({ item: itemsCollection })
-      .where(({ item }) => eq(item.projectId, projectId))
+    q.from({ item: itemsCollection }).where(({ item }) => eq(item.projectId, projectId)),
   );
 }
 ```
@@ -141,49 +134,51 @@ if (changes.archived !== undefined && changes.archived !== original.archived) { 
 ## Collection Setup
 
 ```typescript
-import { createCollection } from '@tanstack/react-db';
-import { queryCollectionOptions } from '@tanstack/query-db-collection';
-import { z } from 'zod';
+import { createCollection } from "@tanstack/react-db";
+import { queryCollectionOptions } from "@tanstack/query-db-collection";
+import { z } from "zod";
 
 const itemSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
-  status: z.enum(['active', 'archived']),
+  status: z.enum(["active", "archived"]),
 });
 
 const itemCollection = createCollection(
   queryCollectionOptions({
-    queryKey: ['items'],
-    queryFn: async () => (await fetch('/api/items')).json(),
+    queryKey: ["items"],
+    queryFn: async () => (await fetch("/api/items")).json(),
     queryClient,
     getKey: (item) => item.id,
     schema: itemSchema,
-  })
+  }),
 );
 ```
 
 ## Live Query Patterns
 
 ```typescript
-import { useLiveQuery } from '@tanstack/react-db';
-import { eq } from '@tanstack/db';
+import { useLiveQuery } from "@tanstack/react-db";
+import { eq } from "@tanstack/db";
 
 // Basic query
 const { data } = useLiveQuery((q) =>
-  q.from({ item: itemCollection })
-    .where(({ item }) => eq(item.status, 'active'))
-    .orderBy(({ item }) => item.createdAt, 'desc')
+  q
+    .from({ item: itemCollection })
+    .where(({ item }) => eq(item.status, "active"))
+    .orderBy(({ item }) => item.createdAt, "desc"),
 );
 
 // Query with joins
 const { data } = useLiveQuery((q) =>
-  q.from({ item: itemCollection })
-    .join({ user: userCollection }, ({ item, user }) => eq(item.userId, user.id), 'inner')
+  q
+    .from({ item: itemCollection })
+    .join({ user: userCollection }, ({ item, user }) => eq(item.userId, user.id), "inner")
     .select(({ item, user }) => ({
       id: item.id,
       name: item.name,
-      userName: user.name
-    }))
+      userName: user.name,
+    })),
 );
 ```
 
@@ -194,7 +189,7 @@ Mutations apply optimistically by default with automatic rollback on errors.
 ```typescript
 // Optimistic (default)
 collection.update(itemId, (draft) => {
-  draft.status = 'completed';
+  draft.status = "completed";
 });
 
 // Non-optimistic for critical operations
@@ -246,7 +241,7 @@ function ItemList() {
 
 ```typescript
 // WRONG - mixing paradigms
-const { data } = useQuery({ queryKey: ['items'] });
+const { data } = useQuery({ queryKey: ["items"] });
 collection.update(id, changes); // Which source of truth?
 
 // CORRECT - use collections consistently
@@ -277,12 +272,11 @@ function ItemList() {
 
 ```typescript
 const itemsWithStatus = useLiveQuery((q) =>
-  q.from({ item: itemCollection })
-    .select(({ item }) => ({
-      ...item,
-      isOverdue: item.dueDate < new Date(),
-      priority: calculatePriority(item),
-    }))
+  q.from({ item: itemCollection }).select(({ item }) => ({
+    ...item,
+    isOverdue: item.dueDate < new Date(),
+    priority: calculatePriority(item),
+  })),
 );
 ```
 
@@ -290,12 +284,13 @@ const itemsWithStatus = useLiveQuery((q) =>
 
 ```typescript
 const stats = useLiveQuery((q) =>
-  q.from({ item: itemCollection })
+  q
+    .from({ item: itemCollection })
     .groupBy(({ item }) => item.status)
     .select(({ item }) => ({
       status: item.status,
       count: count(),
-    }))
+    })),
 );
 ```
 
@@ -303,10 +298,11 @@ const stats = useLiveQuery((q) =>
 
 ```typescript
 const { data, hasMore, loadMore } = useLiveQuery((q) =>
-  q.from({ item: itemCollection })
-    .orderBy(({ item }) => item.createdAt, 'desc')
+  q
+    .from({ item: itemCollection })
+    .orderBy(({ item }) => item.createdAt, "desc")
     .limit(pageSize)
-    .offset(page * pageSize)
+    .offset(page * pageSize),
 );
 ```
 

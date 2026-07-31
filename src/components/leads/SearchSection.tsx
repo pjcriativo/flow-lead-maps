@@ -170,7 +170,9 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     );
   };
   const sorted = [...leads].filter(capturaOk).sort((a, b) => b.score - a.score);
-  const goldCount = sorted.filter((l) => (l.score_breakdown as ScoreBreakdown | null)?.is_gold).length;
+  const goldCount = sorted.filter(
+    (l) => (l.score_breakdown as ScoreBreakdown | null)?.is_gold,
+  ).length;
   const emailCount = sorted.filter((l) => l.email).length;
   const igCount = sorted.filter((l) => !!l.instagram_url).length;
 

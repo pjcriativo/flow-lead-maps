@@ -54,7 +54,7 @@ export type User = z.infer<typeof userSchema>;
 // For schemas with transforms, export both
 export const apiUserSchema = z.object({
   id: z.string(),
-  created_at: z.string().transform(s => new Date(s)),
+  created_at: z.string().transform((s) => new Date(s)),
 });
 
 export type ApiUserInput = z.input<typeof apiUserSchema>;
