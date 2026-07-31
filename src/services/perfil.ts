@@ -116,7 +116,7 @@ export async function atualizarPerfilUsuario(patch: {
   avatar_url?: string | null;
 }): Promise<void> {
   const id = await idDaOrg();
-  const updateData: Record<string, unknown> = {
+  const updateData: any = {
     updated_at: new Date().toISOString(),
   };
   if (patch.full_name !== undefined) updateData.full_name = patch.full_name;

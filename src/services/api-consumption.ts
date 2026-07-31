@@ -66,7 +66,7 @@ export async function registrarConsumoApi(dados: {
     const cotacaoDolar = 5.60;
     const costBrl = dados.cost_brl ?? (dados.cost_usd * cotacaoDolar);
 
-    await supabase.from("api_consumption_logs").insert({
+    await supabase.from<any, any>("api_consumption_logs").insert({
       user_id: userId,
       org_id: member?.org_id ?? null,
       service: dados.service,
@@ -89,7 +89,7 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
   dataLimite.setDate(dataLimite.getDate() - dias);
 
   const { data: logs, error } = await supabase
-    .from("api_consumption_logs")
+    .from<any, any>("api_consumption_logs")
     .select(`
       id, org_id, user_id, service, action, quantity, cost_usd, cost_brl, created_at,
       profiles:user_id(full_name, email, plan, monthly_lead_limit, leads_used_monthly)
