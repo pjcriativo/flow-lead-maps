@@ -117,7 +117,7 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
 
   let totalCostUsd = 0;
   let totalCostBrl = 0;
-  let totalRequests = logs.length;
+  const totalRequests = logs.length;
   let totalLeadsCrawled = 0;
 
   const usersMap = new Map<
