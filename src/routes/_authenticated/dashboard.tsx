@@ -719,4 +719,113 @@ function SettingsSection() {
     try {
       await salvarReplyTo(replyTo);
       toast.success("E-mail de respostas salvo — é nele que as respostas chegam.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar");
+    } finally {
+      setSalvando(null);
+    }
+  };
+
+  const replyInvalido = !!replyTo.trim() && !emailValido(replyTo);
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+        <p className="text-sm text-muted-foreground">Preferências do app.</p>
+      </div>
+
+      {/* Assinatura dos e-mails ({remetente} da proposta e do follow-up). Sem isto a
+          geração da proposta para: assinar com um nome inventado seria pior. */}
+      <div className="space-y-3 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div>
+          <Label htmlFor="remetente" className="text-sm font-medium">
+            Seu nome (assina os e-mails)
+          </Label>
+          <div className="text-xs text-muted-foreground">
+            Vai no fim da proposta e do follow-up. É um nome pessoal — quem recebe responde pra uma
+            pessoa, não pra uma empresa.
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            id="remetente"
+            placeholder={carregando ? "Carregando..." : "Ex.: Marcos Pereira"}
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            disabled={carregando}
+          />
+          <Button onClick={salvar} disabled={!!salvando || carregando || !nome.trim()}>
+            {salvando === "nome" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+          </Button>
+        </div>
+        {!carregando && !nome.trim() && (
+          <p className="text-xs text-amber-700">
+            Enquanto estiver vazio, a geração de propostas fica bloqueada.
+          </p>
+        )}
+      </div>
+
+      {/* Reply-To. NÃO é o remetente: o From fica no domínio verificado (trocá-lo pelo
+          e-mail pessoal, sem verificar o domínio, seria spoofing → spam). A UI precisa
+          deixar essa diferença explícita, senão o usuário acha que mudou o remetente. */}
+      <div className="space-y-3 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div>
+          <Label htmlFor="reply-to" className="text-sm font-medium">
+            E-mail para respostas
+          </Label>
+          <div className="text-xs text-muted-foreground">
+            As respostas dos leads chegam neste e-mail. Pode ser o seu e-mail de sempre — não
+            precisa ser do mesmo domínio.
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            id="reply-to"
+            type="email"
+            inputMode="email"
+            placeholder={carregando ? "Carregando..." : "Ex.: voce@suaempresa.com.br"}
+            value={replyTo}
+            onChange={(e) => setReplyTo(e.target.value)}
+            disabled={carregando}
+            aria-invalid={replyInvalido}
+          />
+          <Button
+            onClick={salvarResposta}
+            disabled={!!salvando || carregando || !replyTo.trim() || replyInvalido}
+          >
+            {salvando === "reply" ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+          </Button>
+        </div>
+        {replyInvalido && (
+          <p className="text-xs text-destructive">Este e-mail não parece válido.</p>
+        )}
+        {!carregando && !replyTo.trim() && (
+          <p className="text-xs text-amber-700">
+            Enquanto estiver vazio, o envio de propostas fica bloqueado — sem isto a resposta do
+            lead cai numa caixa que você não lê.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Os e-mails continuam saindo de{" "}
+          <b className="text-foreground">contato@flowgenius.com.br</b> (domínio verificado, para não
+          cair em spam). Só a <b className="text-foreground">resposta</b> vem para o endereço acima.
+        </p>
+      </div>
+
+      <div className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between rounded-md border border-border p-3">
+          <div>
+            <Label htmlFor="email-enrich" className="cursor-pointer text-sm font-medium">
+              Buscar e-mails por padrão
+            </Label>
+            <div className="text-xs text-muted-foreground">
+              Ativar "Buscar e-mails" (visita o site) em toda nova busca.
+            </div>
+          </div>
+          <Switch id="email-enrich" defaultChecked />
+        </div>
+      </div>
+    </div>
+  );
 }
