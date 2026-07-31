@@ -59,6 +59,7 @@ import {
   RatingCell,
   SiteCell,
   EmailCell,
+  InstagramCell,
   WhatsCell,
   MapsButton,
   Paginacao,
@@ -557,6 +558,7 @@ export function LeadsManager({
                     "WhatsApp",
                     "E-mail",
                     "Site",
+                    "Instagram",
                     "Status",
                     "Ações",
                   ].map((h) => (
@@ -611,6 +613,9 @@ export function LeadsManager({
                     </td>
                     <td className="px-4 py-3">
                       <SiteCell lead={l} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <InstagramCell lead={l} />
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={l.status} />

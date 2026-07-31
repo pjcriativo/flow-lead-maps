@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
           lat,
           lng,
           raioKm,
-          alvo: Math.ceil(limite * 1.6),
+          alvo: Math.ceil(limite * 2.5),
           limite,
           seen,
           log: (message) => send({ type: "log", message }),

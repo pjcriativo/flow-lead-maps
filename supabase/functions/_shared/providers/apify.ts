@@ -112,10 +112,18 @@ export const searchApify: ProviderSearch = async ({
   seen,
   log,
 }) => {
-  // Fonte PAGA: pede só o necessário (limite + pequena folga), nunca ~1.6x.
-  const maxPlaces = Math.min(limite + 5, 120);
+  // Garante margem suficiente de candidatos para atingir a meta exata do usuário
+  const maxPlaces = Math.max(Math.ceil(limite * 2.5), 150);
+  const searchStringsArray = Array.from(new Set([
+    nicho,
+    cidade ? `${nicho} em ${cidade}` : nicho,
+    `clínica de ${nicho}`,
+    `consultório de ${nicho}`,
+    `atendimento ${nicho}`,
+  ])).filter(Boolean);
+
   const input: Record<string, unknown> = {
-    searchStringsArray: [nicho],
+    searchStringsArray,
     maxCrawledPlacesPerSearch: maxPlaces,
     language: "pt-BR",
     skipClosedPlaces: false,

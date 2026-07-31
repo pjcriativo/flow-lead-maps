@@ -59,12 +59,14 @@ import {
   RatingCell,
   SiteCell,
   EmailCell,
+  InstagramCell,
   WhatsCell,
   MapsButton,
   UF_LIST,
   Paginacao,
   paginar,
   PAGE_SIZE,
+  getBreakdown,
 } from "./leads-shared";
 
 export function SearchSection({ onFinished }: { onFinished?: () => void }) {
@@ -591,6 +593,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               <Stat n={leads.length} label="leads" />
               <Stat n={goldCount} label="cliente-ouro" color="text-amber-600" divider />
               <Stat n={emailCount} label="e-mails" color="text-[#16A34A]" divider />
+              <Stat n={igCount} label="instagram" color="text-pink-600" divider />
             </div>
           </div>
 
@@ -707,6 +710,7 @@ function LiveTable({ leads }: { leads: Lead[] }) {
               "WhatsApp",
               "E-mail",
               "Site",
+              "Instagram",
               "Status",
               "",
             ].map((h) => (
@@ -747,6 +751,9 @@ function LiveTable({ leads }: { leads: Lead[] }) {
               </td>
               <td className="px-4 py-3">
                 <SiteCell lead={l} />
+              </td>
+              <td className="px-4 py-3">
+                <InstagramCell lead={l} />
               </td>
               <td className="px-4 py-3">
                 <StatusBadge status={l.status} />

@@ -254,28 +254,26 @@ const STATUS_STYLE: Record<string, string> = {
   nurture: "bg-slate-100 text-slate-600",
 };
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status }: { status?: string | null }) {
+  const s = status ?? "new";
+  const label = STATUS_LABELS[s] ?? s;
+  const style = STATUS_STYLE[s] ?? "bg-secondary text-muted-foreground";
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        STATUS_STYLE[status] ?? "bg-secondary text-muted-foreground",
-      )}
-    >
-      {STATUS_LABELS[status] ?? status}
+    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border border-border/40", style)}>
+      {label}
     </span>
   );
 }
 
 export function RatingCell({ lead }: { lead: Lead }) {
-  if (!lead.rating) return <span className="text-muted-foreground">—</span>;
+  if (lead.rating == null) return <span className="text-muted-foreground">—</span>;
   return (
-    <span className="inline-flex items-center gap-1 tabular-nums">
-      <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+    <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50/80 px-2 py-0.5 rounded-md border border-amber-200/60">
+      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500 shrink-0" />
       {lead.rating}
-      {lead.review_count ? (
-        <span className="text-xs text-muted-foreground">({lead.review_count})</span>
-      ) : null}
+      {lead.review_count != null && (
+        <span className="font-normal text-muted-foreground">({lead.review_count})</span>
+      )}
     </span>
   );
 }
@@ -288,7 +286,7 @@ export function siteHref(website?: string | null) {
 export function SiteCell({ lead }: { lead: Lead }) {
   if (!lead.website) return <span className="text-muted-foreground">—</span>;
   const bd = getBreakdown(lead);
-  const bad = bd?.bad_site;
+  const bad = bd?.bad_site || bd?.site_fora_do_ar;
   return (
     <a
       href={siteHref(lead.website)}
@@ -296,11 +294,13 @@ export function SiteCell({ lead }: { lead: Lead }) {
       rel="noopener noreferrer"
       title={bad ? "Site ruim: " + (bd?.bad_site_reasons ?? []).join("; ") : "Visitar site"}
       className={cn(
-        "inline-flex items-center gap-1 hover:underline",
-        bad ? "text-amber-700" : "text-primary",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors shadow-xs",
+        bad
+          ? "bg-amber-50 text-amber-700 border-amber-200/80 hover:bg-amber-100"
+          : "bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100 hover:text-primary",
       )}
     >
-      <Globe className="h-3.5 w-3.5" />
+      <Globe className="h-3.5 w-3.5 shrink-0 text-slate-500" />
       {bad ? "Site ruim" : "Visitar"}
     </a>
   );
@@ -309,16 +309,13 @@ export function SiteCell({ lead }: { lead: Lead }) {
 export function EmailCell({ lead }: { lead: Lead }) {
   if (!lead.email) return <span className="text-muted-foreground">—</span>;
   return (
-    // min-w-0 + truncate: sem isso o <a> é um item de flex que se recusa a encolher abaixo
-    // do conteúdo (min-width:auto) e o e-mail longo VAZA pra fora do card no Kanban.
-    // O ícone leva shrink-0 pra não ser espremido no lugar do texto.
     <a
       href={`mailto:${lead.email}`}
       title={lead.email}
-      className="inline-flex min-w-0 items-center gap-1 text-[#16A34A] hover:underline"
+      className="inline-flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200/80 hover:bg-blue-100 hover:text-blue-800 transition-colors shadow-xs"
     >
-      <Mail className="h-3.5 w-3.5 shrink-0" />
-      <span className="truncate">{lead.email}</span>
+      <Mail className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+      <span className="max-w-[130px] truncate">{lead.email}</span>
     </a>
   );
 }
@@ -330,15 +327,32 @@ export function waLink(whatsapp?: string | null) {
 export function WhatsCell({ lead }: { lead: Lead }) {
   if (!lead.whatsapp) return <span className="text-muted-foreground">—</span>;
   return (
-    // shrink-0: rótulo fixo e curto — quem cede espaço é o e-mail, não este.
     <a
       href={waLink(lead.whatsapp)}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex shrink-0 items-center gap-1 text-[#16A34A] hover:underline"
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/80 hover:bg-emerald-100 hover:text-emerald-800 transition-colors shadow-xs"
     >
-      <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+      <MessageCircle className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
       WhatsApp
+    </a>
+  );
+}
+
+export function InstagramCell({ lead }: { lead: Lead }) {
+  if (!lead.instagram_url) return <span className="text-muted-foreground">—</span>;
+  const match = lead.instagram_url.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
+  const handle = match ? `@${match[1]}` : "Instagram";
+  return (
+    <a
+      href={lead.instagram_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={lead.instagram_url}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium text-pink-700 bg-pink-50 border border-pink-200/80 hover:bg-pink-100 hover:text-pink-800 transition-colors shadow-xs"
+    >
+      <Instagram className="h-3.5 w-3.5 shrink-0 text-pink-600" />
+      <span className="max-w-[120px] truncate">{handle}</span>
     </a>
   );
 }
@@ -354,7 +368,7 @@ export function MapsButton({ lead }: { lead: Lead }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
     >
       <ExternalLink className="h-3.5 w-3.5" /> Maps
     </a>

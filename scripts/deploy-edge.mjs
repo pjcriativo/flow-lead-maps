@@ -63,12 +63,13 @@ console.log(`bundle ${slug}: ${(code.length / 1024).toFixed(0)}KB`);
 
 // verify_jwt: preserva o valor atual da função (se existir), a menos que a flag mude.
 let verifyJwt = true;
+let existente = null;
 try {
   const cur = await fetch(`https://api.supabase.com/v1/projects/${REF}/functions`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   }).then((r) => r.json());
-  const f = (Array.isArray(cur) ? cur : []).find((x) => x.slug === slug);
-  if (f) verifyJwt = !!f.verify_jwt;
+  existente = (Array.isArray(cur) ? cur : []).find((x) => x.slug === slug) ?? null;
+  if (existente) verifyJwt = !!existente.verify_jwt;
 } catch {
   /* mantém default */
 }
@@ -78,6 +79,13 @@ const meta = { entrypoint_path: "index.ts", name: slug, verify_jwt: verifyJwt };
 const form = new FormData();
 form.append("metadata", JSON.stringify(meta));
 form.append("file", new File([code], "index.ts", { type: "application/typescript" }));
+
+if (existente) {
+  await fetch(`https://api.supabase.com/v1/projects/${REF}/functions/${slug}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${TOKEN}` },
+  });
+}
 
 const up = await fetch(
   `https://api.supabase.com/v1/projects/${REF}/functions/deploy?slug=${encodeURIComponent(slug)}`,
