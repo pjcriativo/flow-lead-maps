@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import {
+  User,
   Users,
   Sheet as SheetIcon,
   Settings as SettingsIcon,
@@ -24,6 +25,7 @@ import {
   LifeBuoy,
   Bell,
 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -124,7 +126,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "publicar", label: "Publicar", Icon: Rocket },
   { id: "suporte", label: "Suporte", Icon: LifeBuoy },
   { id: "notificacoes", label: "Notificações", Icon: Bell },
-  { id: "settings", label: "Configurações", Icon: SettingsIcon },
+  { id: "settings", label: "Meu Perfil", Icon: User },
 ];
 
 function Dashboard() {
@@ -137,6 +139,7 @@ function Dashboard() {
   const [userReady, setUserReady] = useState(false);
   const [superAdmin, setSuperAdmin] = useState(false);
   const [naoLidas, setNaoLidas] = useState(0);
+  const [userProfile, setUserProfile] = useState<{ full_name: string; email: string; avatar_url: string; plan: string } | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -145,10 +148,19 @@ function Dashboard() {
         // porta do painel /admin — só aparece para quem tem o papel no banco (profiles)
         const { data: perfil } = await supabase
           .from("profiles")
-          .select("is_super_admin")
+          .select("full_name, email, avatar_url, plan, is_super_admin")
           .eq("id", data.user.id)
           .maybeSingle();
-        setSuperAdmin(perfil?.is_super_admin === true);
+
+        if (perfil) {
+          setUserProfile({
+            full_name: perfil.full_name ?? "",
+            email: perfil.email ?? data.user.email ?? "",
+            avatar_url: perfil.avatar_url ?? "",
+            plan: perfil.plan ?? "starter",
+          });
+          setSuperAdmin(perfil?.is_super_admin === true);
+        }
       }
       setUserReady(true);
     });
@@ -175,6 +187,13 @@ function Dashboard() {
 
   if (!userReady) return null;
 
+  const userIniciais = (userProfile?.full_name || userProfile?.email || "U")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+
   return (
     <div className="flex min-h-screen w-full bg-white text-foreground">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
@@ -189,7 +208,7 @@ function Dashboard() {
               className={cn(
                 "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                 section === item.id
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               )}
             >
@@ -203,26 +222,55 @@ function Dashboard() {
             </button>
           ))}
         </nav>
-        <div className="px-3 pb-2">
+
+        {/* Card do Usuário Logado no Rodapé da Sidebar */}
+        <div className="border-t border-sidebar-border p-3 space-y-2">
+          <button
+            type="button"
+            onClick={() => setSection("settings")}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-all border",
+              section === "settings"
+                ? "bg-sidebar-accent border-sidebar-border text-sidebar-accent-foreground shadow-xs"
+                : "border-transparent hover:bg-sidebar-accent/50 text-sidebar-foreground",
+            )}
+            title="Ver / Editar Meu Perfil"
+          >
+            <Avatar className="h-9 w-9 border border-sidebar-border shrink-0">
+              <AvatarImage src={userProfile?.avatar_url} />
+              <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs">
+                {userIniciais}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold leading-tight text-sidebar-foreground">
+                {userProfile?.full_name || "Meu Perfil"}
+              </p>
+              <p className="truncate text-[11px] text-sidebar-foreground/60">
+                {userProfile?.email || "Configurar perfil"}
+              </p>
+            </div>
+          </button>
+
           {superAdmin && (
             <Link
               to="/admin"
-              className="flex w-full items-center gap-3 rounded-md border border-gold/30 px-3 py-2 text-sm text-gold transition-colors hover:bg-sidebar-accent/60"
+              className="flex w-full items-center gap-3 rounded-md border border-gold/30 px-3 py-1.5 text-xs text-gold transition-colors hover:bg-sidebar-accent/60"
             >
-              <ShieldCheck className="h-4 w-4" />
+              <ShieldCheck className="h-3.5 w-3.5" />
               Painel Admin
             </Link>
           )}
           <button
             onClick={handleSignOut}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-xs text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3.5 w-3.5" />
             Sair
           </button>
-        </div>
-        <div className="border-t border-sidebar-border p-4 text-xs text-sidebar-foreground/50">
-          v1.0
+          <div className="border-t border-sidebar-border pt-2 text-[10px] text-sidebar-foreground/40 text-center">
+            v1.0
+          </div>
         </div>
       </aside>
 
