@@ -64,6 +64,95 @@ function obrigatorio(v: string, msg: string): string {
   return limpo;
 }
 
+export type PerfilUsuarioCompleto = {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  avatar_url: string;
+  plan: string;
+  plan_status: string;
+  acesso_liberado: boolean;
+  is_super_admin: boolean;
+  reply_to_email: string;
+  leads_used_monthly: number;
+  monthly_lead_limit: number;
+};
+
+export async function lerPerfilCompleto(): Promise<PerfilUsuarioCompleto> {
+  const { data: authData } = await supabase.auth.getUser();
+  const id = authData.user?.id;
+  if (!id) throw new Error("Não autenticado");
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, phone, avatar_url, plan, plan_status, acesso_liberado, is_super_admin, reply_to_email, leads_used_monthly, monthly_lead_limit")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const userEmail = authData.user?.email ?? data?.email ?? "";
+
+  return {
+    id,
+    email: userEmail,
+    full_name: (data?.full_name ?? "").trim(),
+    phone: (data?.phone ?? "").trim(),
+    avatar_url: (data?.avatar_url ?? "").trim(),
+    plan: data?.plan ?? "starter",
+    plan_status: data?.plan_status ?? "active",
+    acesso_liberado: !!data?.acesso_liberado,
+    is_super_admin: !!data?.is_super_admin,
+    reply_to_email: (data?.reply_to_email ?? "").trim(),
+    leads_used_monthly: data?.leads_used_monthly ?? 0,
+    monthly_lead_limit: data?.monthly_lead_limit ?? 500,
+  };
+}
+
+export async function atualizarPerfilUsuario(patch: {
+  full_name?: string;
+  phone?: string;
+  avatar_url?: string | null;
+}): Promise<void> {
+  const id = await idDaOrg();
+  const updateData: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (patch.full_name !== undefined) updateData.full_name = patch.full_name;
+  if (patch.phone !== undefined) updateData.phone = patch.phone;
+  if (patch.avatar_url !== undefined) updateData.avatar_url = patch.avatar_url;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("id", id)
+    .select("id");
+
+  if (error) throw error;
+  if (!data?.length) throw new Error("Perfil não encontrado para esta conta.");
+}
+
+export async function uploadAvatarUsuario(file: File): Promise<string> {
+  const id = await idDaOrg();
+  const ext = file.name.split(".").pop() ?? "png";
+  const filePath = `${id}/${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("avatars")
+    .upload(filePath, file, { upsert: true });
+
+  if (uploadError) throw uploadError;
+
+  const { data: publicData } = supabase.storage
+    .from("avatars")
+    .getPublicUrl(filePath);
+
+  const avatarUrl = publicData.publicUrl;
+  await atualizarPerfilUsuario({ avatar_url: avatarUrl });
+  return avatarUrl;
+}
+
 /** UPDATE (não upsert): a RLS de profiles tem SELECT e UPDATE, mas NÃO INSERT — um upsert
  * bateria em 42501. A linha existe: o trigger on_auth_user_created a cria. */
 async function gravar(patch: Record<string, string>): Promise<void> {

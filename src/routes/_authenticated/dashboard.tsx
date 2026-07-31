@@ -52,6 +52,7 @@ import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
 import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
+import { UserProfileSection } from "@/components/perfil/UserProfileSection";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
 import { lerConfigPublica } from "@/services/config-publica";
 import { setFusoHorario } from "@/lib/format";
@@ -297,7 +298,7 @@ function Dashboard() {
             setSheetVerified={setSheetVerified}
           />
         )}
-        {section === "settings" && <SettingsSection />}
+        {section === "settings" && <UserProfileSection />}
       </main>
     </div>
   );
