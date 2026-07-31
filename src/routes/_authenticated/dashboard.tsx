@@ -192,7 +192,8 @@ function Dashboard() {
     if (params.get("sheets_connected") === "true") setSection("sheets");
     // deep-link de seção (ex.: /dashboard?secao=automacao — usado pelo painel /admin)
     const secao = params.get("secao");
-    if (secao && NAV.some((n) => n.id === secao)) setSection(secao as Section);
+    if (secao === "configuracoes" || secao === "perfil") setSection("settings");
+    else if (secao && NAV.some((n) => n.id === secao)) setSection(secao as Section);
   }, []);
 
   const handleSignOut = async () => {
@@ -302,7 +303,7 @@ function Dashboard() {
         {NAV.map((item) => (
           <button
             key={item.id}
-            onClick={() => setSection(item.id)}
+            onClick={() => handleNavClick(item.id, item.label)}
             className={cn(
               "shrink-0 rounded-md px-3 py-1.5 text-xs",
               section === item.id
