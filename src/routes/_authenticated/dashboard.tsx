@@ -129,7 +129,6 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "publicar", label: "Publicar", Icon: Rocket },
   { id: "suporte", label: "Suporte", Icon: LifeBuoy },
   { id: "notificacoes", label: "Notificações", Icon: Bell },
-  { id: "settings", label: "Meu Perfil", Icon: User },
 ];
 
 function Dashboard() {
