@@ -477,30 +477,46 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
                   </p>
                 </div>
                 <div>
-                  <Label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Filtrar por captura
                   </Label>
                   <ToggleGroup
                     type="multiple"
                     value={filtros}
-                    onValueChange={setFiltros}
+                    onValueChange={(v) => setFiltros(v as ("telefone" | "site" | "instagram")[])}
                     variant="outline"
-                    className="justify-start"
+                    className="justify-start gap-1.5"
                   >
                     <ToggleGroupItem
                       value="telefone"
                       aria-label="Só com telefone"
-                      className="gap-1 px-3"
+                      className={cn(
+                        "gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium border transition-all duration-150 cursor-pointer",
+                        "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:font-semibold data-[state=on]:shadow-sm data-[state=on]:ring-2 data-[state=on]:ring-primary/30",
+                        "data-[state=off]:bg-card data-[state=off]:text-muted-foreground data-[state=off]:border-border data-[state=off]:hover:bg-secondary/60 data-[state=off]:hover:text-foreground",
+                      )}
                     >
                       <Phone className="h-3.5 w-3.5" /> Telefone
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="site" aria-label="Só com site" className="gap-1 px-3">
+                    <ToggleGroupItem
+                      value="site"
+                      aria-label="Só com site"
+                      className={cn(
+                        "gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium border transition-all duration-150 cursor-pointer",
+                        "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:font-semibold data-[state=on]:shadow-sm data-[state=on]:ring-2 data-[state=on]:ring-primary/30",
+                        "data-[state=off]:bg-card data-[state=off]:text-muted-foreground data-[state=off]:border-border data-[state=off]:hover:bg-secondary/60 data-[state=off]:hover:text-foreground",
+                      )}
+                    >
                       <Globe className="h-3.5 w-3.5" /> Site
                     </ToggleGroupItem>
                     <ToggleGroupItem
                       value="instagram"
                       aria-label="Só com Instagram"
-                      className="gap-1 px-3"
+                      className={cn(
+                        "gap-1.5 rounded-lg px-3.5 py-2 text-xs font-medium border transition-all duration-150 cursor-pointer",
+                        "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary data-[state=on]:font-semibold data-[state=on]:shadow-sm data-[state=on]:ring-2 data-[state=on]:ring-primary/30",
+                        "data-[state=off]:bg-card data-[state=off]:text-muted-foreground data-[state=off]:border-border data-[state=off]:hover:bg-secondary/60 data-[state=off]:hover:text-foreground",
+                      )}
                     >
                       <Instagram className="h-3.5 w-3.5" /> Instagram
                     </ToggleGroupItem>
