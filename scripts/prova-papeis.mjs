@@ -110,6 +110,7 @@ try {
     [vendId, "vendedor"],
     [gerId, "gerente"],
   ]) {
+    await admin.from("profiles").update({ acesso_liberado: true }).eq("id", uid);
     await admin
       .from("memberships")
       .upsert({ org_id: orgId, user_id: uid, papel }, { onConflict: "org_id,user_id" });

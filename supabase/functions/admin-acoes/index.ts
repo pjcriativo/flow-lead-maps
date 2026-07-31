@@ -182,11 +182,39 @@ Deno.serve(async (req) => {
         .from("profiles")
         .update({ acesso_liberado: liberado })
         .eq("id", userId)
-        .select("id, email, acesso_liberado")
+        .select("id, email, full_name, acesso_liberado")
         .maybeSingle();
 
       if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
       if (!alvo) return json({ ok: false, reason: "usuario_nao_encontrado" });
+
+      if (liberado) {
+        // Garantia secundária: se a conta não tiver org/membership, cria agora ao liberar
+        let { data: org } = await admin
+          .from("orgs")
+          .select("id")
+          .eq("dono_user_id", alvo.id)
+          .maybeSingle();
+
+        if (!org) {
+          const nome = String(alvo.full_name || "").trim() || String(alvo.email || "").split("@")[0] || "Organização";
+          const ins = await admin
+            .from("orgs")
+            .insert({ nome, dono_user_id: alvo.id })
+            .select("id")
+            .single();
+          org = ins.data;
+        }
+
+        if (org) {
+          await admin
+            .from("memberships")
+            .upsert(
+              { org_id: org.id, user_id: alvo.id, papel: "admin" },
+              { onConflict: "org_id,user_id" },
+            );
+        }
+      }
 
       return json({
         ok: true,
