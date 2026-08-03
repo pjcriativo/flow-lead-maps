@@ -258,6 +258,28 @@ Deno.serve(async (req) => {
       return json({ ok: true, user_id: alvo.id, email: alvo.email, plan: alvo.plan });
     }
 
+    // Exclusão de conta pelo admin — apaga do Auth (cascata via FK/trigger para profiles,
+    // memberships, orgs). Super admins nunca podem ser deletados por esta rota.
+    if (acao === "user_delete") {
+      const userId = String(b.user_id || "");
+      if (!userId) return json({ ok: false, reason: "usuario_invalido" });
+      // Nunca deletar outro super admin
+      const { data: alvoP } = await admin
+        .from("profiles")
+        .select("is_super_admin, email")
+        .eq("id", userId)
+        .maybeSingle();
+      if (alvoP?.is_super_admin === true)
+        return json({ ok: false, reason: "nao_pode_deletar_super_admin" });
+      // Limpa dados do usuário antes de deletar do auth
+      await admin.from("memberships").delete().eq("user_id", userId);
+      await admin.from("orgs").delete().eq("dono_user_id", userId);
+      await admin.from("profiles").delete().eq("id", userId);
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (error) return json({ ok: false, reason: "falha_deletar", detalhe: error.message });
+      return json({ ok: true, deletado: userId, email: alvoP?.email });
+    }
+
     // ── PLANOS (billing camada 1) ──
     if (acao === "plano_upsert") {
       const p = (b.plano ?? {}) as Record<string, unknown>;

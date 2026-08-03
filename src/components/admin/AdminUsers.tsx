@@ -4,10 +4,17 @@
 //  • Subscribers → CRUD manual (sem origem de captação automática); "Enviar e-mail" fica
 //                  desabilitado com o motivo (não existe motor de disparo em massa ainda).
 import { useEffect, useState } from "react";
-import { Check, Clock3, Loader2, LockKeyhole, Mail, Plus, ShieldCheck, ChevronDown } from "lucide-react";
+import { Check, Clock3, Loader2, LockKeyhole, Mail, Plus, ShieldCheck, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { adminAcao, type UsuarioPlataforma } from "@/services/admin";
 import { Button } from "@/components/ui/button";
+
+const PLANOS = [
+  { value: "basico", label: "Básico" },
+  { value: "pro", label: "Pro" },
+  { value: "agencia", label: "Agência" },
+  { value: "enterprise", label: "Enterprise" },
+];
 
 export function AdminAllUsers({
   usuarios,
@@ -20,16 +27,15 @@ export function AdminAllUsers({
   const [email, setEmail] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [alterandoId, setAlterandoId] = useState<string | null>(null);
-  // Estado do modal "Liberar com plano"
+  // Modal "Liberar com plano"
   const [liberarModal, setLiberarModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
   const [planSelecionado, setPlanSelecionado] = useState("pro");
+  // Modal confirmação de exclusão
+  const [deleteModal, setDeleteModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
 
-  const PLANOS = [
-    { value: "basico", label: "Básico" },
-    { value: "pro", label: "Pro" },
-    { value: "agencia", label: "Agência" },
-    { value: "enterprise", label: "Enterprise" },
-  ];
+  const pendentes = usuarios.filter(
+    (u) => !u.acesso_liberado && !u.is_super_admin,
+  );
 
   const adicionar = async () => {
     if (!email.includes("@")) {
@@ -85,7 +91,7 @@ export function AdminAllUsers({
         toast.error(`Não foi possível alterar o plano: ${r.reason ?? "erro"}`);
         return;
       }
-      toast.success(`Plano de ${usuario.email} atualizado para "${plan}".`);
+      toast.success(`Plano de ${usuario.email} → "${plan}".`);
       onMudou();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao alterar plano");
@@ -94,12 +100,31 @@ export function AdminAllUsers({
     }
   };
 
-  const pendentes = usuarios.filter(
-    (usuario) => !usuario.acesso_liberado && !usuario.is_super_admin,
-  );
+  const excluirConta = async (usuario: UsuarioPlataforma) => {
+    setAlterandoId(usuario.id);
+    try {
+      const r = await adminAcao("user_delete", { user_id: usuario.id });
+      if (!r.ok) {
+        toast.error(
+          r.reason === "nao_pode_deletar_super_admin"
+            ? "Não é possível excluir um super admin."
+            : `Erro ao excluir: ${r.reason ?? "erro"}`,
+        );
+        return;
+      }
+      toast.success(`Conta ${usuario.email} excluída permanentemente.`);
+      setDeleteModal(null);
+      onMudou();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao excluir conta");
+    } finally {
+      setAlterandoId(null);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
           <h2 className="font-serif text-xl">Todos os usuários</h2>
@@ -114,6 +139,8 @@ export function AdminAllUsers({
           <Plus className="h-3.5 w-3.5" /> Adicionar usuário
         </button>
       </div>
+
+      {/* Form adicionar */}
       {addOpen && (
         <div className="flex flex-wrap items-end gap-2 border-b border-border bg-secondary/20 px-5 py-3">
           <div className="flex-1">
@@ -121,6 +148,7 @@ export function AdminAllUsers({
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && adicionar()}
               placeholder="novo@empresa.com"
               className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
             />
@@ -134,6 +162,8 @@ export function AdminAllUsers({
           </button>
         </div>
       )}
+
+      {/* Tabela */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -142,38 +172,44 @@ export function AdminAllUsers({
               <th className="px-5 py-2.5 font-medium">Plano</th>
               <th className="px-5 py-2.5 font-medium">Acesso</th>
               <th className="px-5 py-2.5 font-medium">Entrou em</th>
-              <th className="px-5 py-2.5 text-right font-medium">Ação</th>
+              <th className="w-px whitespace-nowrap px-5 py-2.5 text-right font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
             {usuarios.map((u) => (
-              <tr key={u.email} className="border-b border-border last:border-0">
+              <tr key={u.id} className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors">
+                {/* Usuário */}
                 <td className="px-5 py-3 font-medium">{u.email}</td>
-                <td className="px-5 py-3 text-xs uppercase text-muted-foreground">
-                  {u.is_super_admin || !u.acesso_liberado ? (
-                    <span className="text-muted-foreground">{u.plan ?? "—"}</span>
-                  ) : (
-                    // Seletor de plano inline para usuários já liberados
+
+                {/* Plano — select inline p/ liberados, texto p/ demais */}
+                <td className="px-5 py-3">
+                  {u.is_super_admin ? (
+                    <span className="text-xs uppercase text-muted-foreground">—</span>
+                  ) : u.acesso_liberado ? (
                     <select
                       value={u.plan ?? "basico"}
                       disabled={alterandoId === u.id}
                       onChange={(e) => alterarPlano(u, e.target.value)}
-                      className="rounded border border-input bg-card px-1.5 py-0.5 text-xs font-medium focus:outline-none cursor-pointer"
+                      className="rounded-md border border-input bg-card px-2 py-1 text-xs font-medium focus:outline-none cursor-pointer capitalize disabled:opacity-50"
                       title="Alterar plano"
                     >
                       {PLANOS.map((p) => (
                         <option key={p.value} value={p.value}>{p.label}</option>
                       ))}
                     </select>
+                  ) : (
+                    <span className="text-xs uppercase text-muted-foreground">{u.plan ?? "—"}</span>
                   )}
                 </td>
+
+                {/* Acesso */}
                 <td className="px-5 py-3">
                   {u.is_super_admin ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                       <ShieldCheck className="size-3.5" /> Super admin
                     </span>
                   ) : u.acesso_liberado ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600">
                       <Check className="size-3.5" /> Liberado
                     </span>
                   ) : (
@@ -182,61 +218,86 @@ export function AdminAllUsers({
                     </span>
                   )}
                 </td>
-                <td className="px-5 py-3 text-muted-foreground">
+
+                {/* Data */}
+                <td className="px-5 py-3 text-muted-foreground text-xs">
                   {new Date(u.created_at).toLocaleDateString("pt-BR")}
                 </td>
-                <td className="px-5 py-3 text-right">
-                  {!u.is_super_admin && (
-                    u.acesso_liberado ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={alterandoId === u.id}
-                        onClick={() => alterarAcesso(u, false)}
-                      >
-                        {alterandoId === u.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
+
+                {/* Ações — coluna compacta (w-px + nowrap) */}
+                <td className="w-px whitespace-nowrap px-5 py-3">
+                  <div className="flex items-center justify-end gap-1.5">
+                    {!u.is_super_admin && (
+                      <>
+                        {/* Liberar / Bloquear */}
+                        {u.acesso_liberado ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={alterandoId === u.id}
+                            onClick={() => alterarAcesso(u, false)}
+                            className="gap-1.5"
+                          >
+                            {alterandoId === u.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <LockKeyhole className="size-3.5" />
+                            )}
+                            Bloquear
+                          </Button>
                         ) : (
-                          <LockKeyhole className="size-3.5" />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="default"
+                            disabled={alterandoId === u.id}
+                            onClick={() => { setPlanSelecionado("pro"); setLiberarModal({ usuario: u }); }}
+                            className="gap-1.5"
+                          >
+                            {alterandoId === u.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : (
+                              <Check className="size-3.5" />
+                            )}
+                            Liberar acesso
+                          </Button>
                         )}
-                        Bloquear
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="default"
-                        disabled={alterandoId === u.id}
-                        onClick={() => { setPlanSelecionado("pro"); setLiberarModal({ usuario: u }); }}
-                      >
-                        {alterandoId === u.id ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <Check className="size-3.5" />
-                        )}
-                        Liberar acesso
-                      </Button>
-                    )
-                  )}
+
+                        {/* Excluir */}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={alterandoId === u.id}
+                          onClick={() => setDeleteModal({ usuario: u })}
+                          className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          title="Excluir conta permanentemente"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
       <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
         Novos cadastros ficam pendentes até um administrador liberar o acesso manualmente.
       </p>
 
-      {/* Modal "Liberar acesso + escolher plano" */}
+      {/* ── Modal: Liberar acesso + escolher plano ── */}
       {liberarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl space-y-4">
             <div>
               <h3 className="font-serif text-lg font-semibold">Liberar acesso</h3>
               <p className="text-xs text-muted-foreground mt-1">
-                <b>{liberarModal.usuario.email}</b> — escolha o plano que o usuário receberá ao ser liberado.
+                Escolha o plano que <b>{liberarModal.usuario.email}</b> receberá ao ser liberado.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -265,7 +326,7 @@ export function AdminAllUsers({
             <div className="flex gap-2 pt-1">
               <Button
                 type="button"
-                className="flex-1"
+                className="flex-1 gap-1.5"
                 disabled={alterandoId === liberarModal.usuario.id}
                 onClick={async () => {
                   await alterarAcesso(liberarModal.usuario, true, planSelecionado);
@@ -273,9 +334,9 @@ export function AdminAllUsers({
                 }}
               >
                 {alterandoId === liberarModal.usuario.id ? (
-                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                  <Loader2 className="size-3.5 animate-spin" />
                 ) : (
-                  <Check className="size-3.5 mr-1.5" />
+                  <Check className="size-3.5" />
                 )}
                 Confirmar liberação
               </Button>
@@ -284,6 +345,50 @@ export function AdminAllUsers({
                 variant="outline"
                 onClick={() => setLiberarModal(null)}
                 disabled={alterandoId === liberarModal.usuario.id}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Confirmar exclusão de conta ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl border border-destructive/30 bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                <AlertTriangle className="size-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-semibold text-destructive">Excluir conta</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Esta ação é <b>irreversível</b>. A conta de{" "}
+                  <b>{deleteModal.usuario.email}</b> e todos os seus dados serão permanentemente removidos.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1 gap-1.5"
+                disabled={alterandoId === deleteModal.usuario.id}
+                onClick={() => excluirConta(deleteModal.usuario)}
+              >
+                {alterandoId === deleteModal.usuario.id ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="size-3.5" />
+                )}
+                Sim, excluir conta
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeleteModal(null)}
+                disabled={alterandoId === deleteModal.usuario.id}
               >
                 Cancelar
               </Button>
