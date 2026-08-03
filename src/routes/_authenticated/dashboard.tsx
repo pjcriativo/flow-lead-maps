@@ -129,6 +129,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "publicar", label: "Publicar", Icon: Rocket },
   { id: "suporte", label: "Suporte", Icon: LifeBuoy },
   { id: "notificacoes", label: "Notificações", Icon: Bell },
+  { id: "settings", label: "Meu Perfil", Icon: User },
 ];
 
 function Dashboard() {
@@ -232,7 +233,7 @@ function Dashboard() {
           <FlowLeadsLogo variant="dark" className="h-12 w-auto" />
         </Link>
         <nav className="flex-1 space-y-1 px-3 py-2">
-          {NAV.map((item) => {
+          {NAV.filter((item) => item.id !== "settings").map((item) => {
             const isLocked =
               restrictedSections.includes(item.id) &&
               !planPerms.canAccessPropostas &&

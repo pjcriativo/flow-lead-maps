@@ -4,7 +4,7 @@
 //  • Subscribers → CRUD manual (sem origem de captação automática); "Enviar e-mail" fica
 //                  desabilitado com o motivo (não existe motor de disparo em massa ainda).
 import { useEffect, useState } from "react";
-import { Check, Clock3, Loader2, LockKeyhole, Mail, Plus, ShieldCheck } from "lucide-react";
+import { Check, Clock3, Loader2, LockKeyhole, Mail, Plus, ShieldCheck, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { adminAcao, type UsuarioPlataforma } from "@/services/admin";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,16 @@ export function AdminAllUsers({
   const [email, setEmail] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [alterandoId, setAlterandoId] = useState<string | null>(null);
+  // Estado do modal "Liberar com plano"
+  const [liberarModal, setLiberarModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
+  const [planSelecionado, setPlanSelecionado] = useState("pro");
+
+  const PLANOS = [
+    { value: "basico", label: "Básico" },
+    { value: "pro", label: "Pro" },
+    { value: "agencia", label: "Agência" },
+    { value: "enterprise", label: "Enterprise" },
+  ];
 
   const adicionar = async () => {
     if (!email.includes("@")) {
@@ -44,25 +54,41 @@ export function AdminAllUsers({
     }
   };
 
-  const alterarAcesso = async (usuario: UsuarioPlataforma, liberado: boolean) => {
+  const alterarAcesso = async (usuario: UsuarioPlataforma, liberado: boolean, plan?: string) => {
     setAlterandoId(usuario.id);
     try {
-      const r = await adminAcao("user_access_set", {
-        user_id: usuario.id,
-        liberado,
-      });
+      const payload: Record<string, unknown> = { user_id: usuario.id, liberado };
+      if (liberado && plan) payload.plan = plan;
+      const r = await adminAcao("user_access_set", payload);
       if (!r.ok) {
         toast.error(`Não foi possível alterar o acesso: ${r.reason ?? "erro"}`);
         return;
       }
       toast.success(
         liberado
-          ? `Acesso liberado para ${usuario.email}.`
+          ? `Acesso liberado para ${usuario.email}${plan ? ` (plano ${plan})` : ""}.`
           : `Acesso bloqueado para ${usuario.email}.`,
       );
       onMudou();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao alterar acesso");
+    } finally {
+      setAlterandoId(null);
+    }
+  };
+
+  const alterarPlano = async (usuario: UsuarioPlataforma, plan: string) => {
+    setAlterandoId(usuario.id);
+    try {
+      const r = await adminAcao("user_plan_set", { user_id: usuario.id, plan });
+      if (!r.ok) {
+        toast.error(`Não foi possível alterar o plano: ${r.reason ?? "erro"}`);
+        return;
+      }
+      toast.success(`Plano de ${usuario.email} atualizado para "${plan}".`);
+      onMudou();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao alterar plano");
     } finally {
       setAlterandoId(null);
     }
@@ -124,7 +150,22 @@ export function AdminAllUsers({
               <tr key={u.email} className="border-b border-border last:border-0">
                 <td className="px-5 py-3 font-medium">{u.email}</td>
                 <td className="px-5 py-3 text-xs uppercase text-muted-foreground">
-                  {u.plan ?? "—"}
+                  {u.is_super_admin || !u.acesso_liberado ? (
+                    <span className="text-muted-foreground">{u.plan ?? "—"}</span>
+                  ) : (
+                    // Seletor de plano inline para usuários já liberados
+                    <select
+                      value={u.plan ?? "basico"}
+                      disabled={alterandoId === u.id}
+                      onChange={(e) => alterarPlano(u, e.target.value)}
+                      className="rounded border border-input bg-card px-1.5 py-0.5 text-xs font-medium focus:outline-none cursor-pointer"
+                      title="Alterar plano"
+                    >
+                      {PLANOS.map((p) => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                  )}
                 </td>
                 <td className="px-5 py-3">
                   {u.is_super_admin ? (
@@ -146,22 +187,37 @@ export function AdminAllUsers({
                 </td>
                 <td className="px-5 py-3 text-right">
                   {!u.is_super_admin && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={u.acesso_liberado ? "outline" : "default"}
-                      disabled={alterandoId === u.id}
-                      onClick={() => alterarAcesso(u, !u.acesso_liberado)}
-                    >
-                      {alterandoId === u.id ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : u.acesso_liberado ? (
-                        <LockKeyhole className="size-3.5" />
-                      ) : (
-                        <Check className="size-3.5" />
-                      )}
-                      {u.acesso_liberado ? "Bloquear" : "Liberar acesso"}
-                    </Button>
+                    u.acesso_liberado ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={alterandoId === u.id}
+                        onClick={() => alterarAcesso(u, false)}
+                      >
+                        {alterandoId === u.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <LockKeyhole className="size-3.5" />
+                        )}
+                        Bloquear
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="default"
+                        disabled={alterandoId === u.id}
+                        onClick={() => { setPlanSelecionado("pro"); setLiberarModal({ usuario: u }); }}
+                      >
+                        {alterandoId === u.id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Check className="size-3.5" />
+                        )}
+                        Liberar acesso
+                      </Button>
+                    )
                   )}
                 </td>
               </tr>
@@ -172,6 +228,69 @@ export function AdminAllUsers({
       <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
         Novos cadastros ficam pendentes até um administrador liberar o acesso manualmente.
       </p>
+
+      {/* Modal "Liberar acesso + escolher plano" */}
+      {liberarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl space-y-4">
+            <div>
+              <h3 className="font-serif text-lg font-semibold">Liberar acesso</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                <b>{liberarModal.usuario.email}</b> — escolha o plano que o usuário receberá ao ser liberado.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Plano
+              </label>
+              <select
+                value={planSelecionado}
+                onChange={(e) => setPlanSelecionado(e.target.value)}
+                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm focus:outline-none"
+              >
+                {PLANOS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground">
+                {planSelecionado === "basico"
+                  ? "Básico: acesso ao Google Maps e CRM. Recursos avançados bloqueados."
+                  : planSelecionado === "pro"
+                  ? "Pro: libera Instagram, LinkedIn, Propostas, Contratos, WhatsApp, Campanhas, Redesign e Publicar."
+                  : planSelecionado === "agencia"
+                  ? "Agência: mesmo que Pro, com maior capacidade e múltiplos usuários."
+                  : "Enterprise: acesso completo sem restrições."}
+              </p>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                type="button"
+                className="flex-1"
+                disabled={alterandoId === liberarModal.usuario.id}
+                onClick={async () => {
+                  await alterarAcesso(liberarModal.usuario, true, planSelecionado);
+                  setLiberarModal(null);
+                }}
+              >
+                {alterandoId === liberarModal.usuario.id ? (
+                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <Check className="size-3.5 mr-1.5" />
+                )}
+                Confirmar liberação
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLiberarModal(null)}
+                disabled={alterandoId === liberarModal.usuario.id}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

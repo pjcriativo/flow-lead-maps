@@ -141,6 +141,7 @@ export type AdminAcao =
   | "staff_remove"
   | "user_add"
   | "user_access_set"
+  | "user_plan_set"
   | "plano_upsert"
   | "plano_toggle"
   | "plano_delete"

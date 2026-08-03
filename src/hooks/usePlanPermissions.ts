@@ -45,14 +45,27 @@ export function usePlanPermissions(): PlanPermissions {
 
       const { data: perfil } = await supabase
         .from("profiles")
-        .select("plan, monthly_lead_limit, leads_used_monthly, is_super_admin")
+        .select("plan, monthly_lead_limit, leads_used_monthly, is_super_admin, acesso_liberado")
         .eq("id", data.user.id)
         .maybeSingle();
 
       const rawPlan = (perfil?.plan ?? "basico").toLowerCase();
       const isSuperAdmin = perfil?.is_super_admin === true;
+      // Fallback de segurança: se o admin liberou o usuário manualmente mas ainda não
+      // definiu o plano explicitamente (plan = null, "basico" ou "starter" — valor default
+      // gravado no cadastro), libera todos os recursos. A fonte definitiva do plano é
+      // profiles.plan — o admin deve sempre atribuir via AdminUsers (seletor de plano).
+      // Este fallback cobre dados antigos/migração e o plano "starter" padrão.
+      const PLANOS_DEFAULT = ["basico", "starter"];
+      const isAcessoLiberadoSemPlano =
+        perfil?.acesso_liberado === true &&
+        (!perfil?.plan || PLANOS_DEFAULT.includes(perfil.plan));
       const isProOrAbove =
-        isSuperAdmin || rawPlan === "pro" || rawPlan === "agencia" || rawPlan === "enterprise";
+        isSuperAdmin ||
+        isAcessoLiberadoSemPlano ||
+        rawPlan === "pro" ||
+        rawPlan === "agencia" ||
+        rawPlan === "enterprise";
 
       const limit = isSuperAdmin ? 999999 : (perfil?.monthly_lead_limit ?? 1000);
       const used = perfil?.leads_used_monthly ?? 0;

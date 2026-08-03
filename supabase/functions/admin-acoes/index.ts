@@ -176,13 +176,21 @@ Deno.serve(async (req) => {
     if (acao === "user_access_set") {
       const userId = String(b.user_id || "");
       const liberado = b.liberado === true;
+      // Plano opcional passado junto com a liberação (ex: "pro", "agencia")
+      const PLANOS_VALIDOS = ["basico", "pro", "agencia", "enterprise", "starter"];
+      const planInformado = String(b.plan || "").toLowerCase().trim();
       if (!userId) return json({ ok: false, reason: "usuario_invalido" });
+
+      const updatePayload: Record<string, unknown> = { acesso_liberado: liberado };
+      if (liberado && planInformado && PLANOS_VALIDOS.includes(planInformado)) {
+        updatePayload.plan = planInformado;
+      }
 
       const { data: alvo, error } = await admin
         .from("profiles")
-        .update({ acesso_liberado: liberado })
+        .update(updatePayload)
         .eq("id", userId)
-        .select("id, email, full_name, acesso_liberado")
+        .select("id, email, full_name, acesso_liberado, plan")
         .maybeSingle();
 
       if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
@@ -224,7 +232,30 @@ Deno.serve(async (req) => {
         user_id: alvo.id,
         email: alvo.email,
         acesso_liberado: alvo.acesso_liberado,
+        plan: alvo.plan,
       });
+    }
+
+    // Atribuição manual de plano (profiles.plan) pelo admin — independente de pagamento.
+    // Controla quais recursos o usuário vê em usePlanPermissions (pro, agencia, enterprise
+    // desbloqueiam Propostas, WhatsApp, Contratos, Redesign, Publicar etc.).
+    if (acao === "user_plan_set") {
+      const userId = String(b.user_id || "");
+      const plan = String(b.plan || "").toLowerCase().trim();
+      const PLANOS_VALIDOS = ["basico", "pro", "agencia", "enterprise", "starter"];
+      if (!userId) return json({ ok: false, reason: "usuario_invalido" });
+      if (!PLANOS_VALIDOS.includes(plan)) return json({ ok: false, reason: "plano_invalido" });
+
+      const { data: alvo, error } = await admin
+        .from("profiles")
+        .update({ plan })
+        .eq("id", userId)
+        .select("id, email, plan")
+        .maybeSingle();
+
+      if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
+      if (!alvo) return json({ ok: false, reason: "usuario_nao_encontrado" });
+      return json({ ok: true, user_id: alvo.id, email: alvo.email, plan: alvo.plan });
     }
 
     // ── PLANOS (billing camada 1) ──
