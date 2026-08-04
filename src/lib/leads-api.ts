@@ -97,6 +97,16 @@ export async function streamSearchLeads(
   });
 
   if (!res.ok || !res.body) {
+    if (res.status === 401) {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) {
+        await supabase.auth.signOut();
+        window.location.reload();
+        return;
+      }
+      throw new Error("Sua sessão havia expirado e foi renovada. Por favor, clique em Buscar leads novamente.");
+    }
+
     let msg = `Falha na busca (HTTP ${res.status})`;
     try {
       const j = await res.json();

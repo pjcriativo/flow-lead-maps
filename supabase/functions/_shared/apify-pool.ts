@@ -232,8 +232,8 @@ export async function startRunComPool(
       }
       if (classe === "invalida" || classe === "esgotada") {
         if (chave.id) {
-          await marcarChaveApify(admin, chave.id, classe);
-          await avisarMarcacao(admin, chave, classe);
+          // O admin solicitou que o status NÃO seja alterado automaticamente para esgotado.
+          // As chaves permanecem "ativas" no painel, mas o rodízio em memória pula para a próxima.
         } else {
           // chave única do secret — não há pool pra rotacionar
           await avisarSuperAdminsApify(
@@ -283,8 +283,7 @@ export async function tratarRunMorto(
   if (!esgotou) return "erro_real";
   const classe = credito.situacao === "invalida" ? "invalida" : "esgotada";
   if (chave.id) {
-    await marcarChaveApify(admin, chave.id, classe);
-    await avisarMarcacao(admin, chave, classe);
+    // A pedido do usuário, não desativamos a chave automaticamente.
     return "trocar_chave";
   }
   await avisarSuperAdminsApify(

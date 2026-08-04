@@ -33,8 +33,10 @@ export function classificarErroApify(status: number, corpo: any): ClasseErroApif
   if (status === 402) return "esgotada";
   if (tipo === "not-enough-usage-to-run-paid-actor") return "esgotada";
   if (status === 403) {
-    if (tipo === "platform-feature-disabled" || RE_ESGOTADO.test(msg)) return "esgotada";
-    return "outro"; // ex.: insufficient-permissions — permissão, não crédito
+    if (RE_ESGOTADO.test(msg)) return "esgotada";
+    // platform-feature-disabled (bloqueio por anti-spam da Apify) agora é 'outro'.
+    // Isso evita que a chave seja marcada como esgotada erroneamente e exibe o erro real.
+    return "outro";
   }
   if (status === 429 || tipo === "rate-limit-exceeded") return "passageira";
   if (tipo === "concurrent-runs-limit-exceeded") return "passageira";
