@@ -200,6 +200,7 @@ export async function startRunComPool(
   }
 
   let trocas = 0;
+  let ultimaFalha = "";
   for (const chave of pool.chaves) {
     for (let tentativa = 1; tentativa <= 2; tentativa++) {
       let resp: Response | null = null;
@@ -244,6 +245,7 @@ export async function startRunComPool(
           return { ok: false, reason: "pool_esgotado", detalhe, status };
         }
         trocas++;
+        ultimaFalha = detalhe;
         break; // próxima chave assume o MESMO start
       }
       return { ok: false, reason: "erro_apify", detalhe, status }; // "outro": não rotaciona
@@ -251,13 +253,13 @@ export async function startRunComPool(
   }
   await avisarSuperAdminsApify(
     admin,
-    "Todas as chaves Apify esgotadas",
-    "Todas as chaves do pool falharam por crédito/invalidez durante uma operação. Cadastre ou reative chaves em Configurações → Chaves e integrações.",
+    "Todas as chaves Apify falharam",
+    `Todas as chaves do pool falharam durante a operação. Último erro recebido da Apify: ${ultimaFalha || "Desconhecido"}`,
   );
   return {
     ok: false,
     reason: "pool_esgotado",
-    detalhe: "Todas as chaves Apify do pool estão esgotadas/indisponíveis.",
+    detalhe: ultimaFalha ? `Todas as chaves falharam. Motivo da Apify: ${ultimaFalha}` : "Todas as chaves Apify do pool estão esgotadas/indisponíveis.",
   };
 }
 
