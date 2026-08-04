@@ -29,8 +29,10 @@ import {
   Radar,
   ChevronDown,
   ChevronRight,
+  Lock,
   Tag,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ResponsiveContainer,
   LineChart,
@@ -247,8 +249,41 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
     </aside>
   );
 }
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LogOut, User, CheckCircle2 } from "lucide-react";
 
-function Topbar({ email }: { email: string }) {
+function Topbar({ email, onNavegar }: { email: string; onNavegar?: (t: TelaAdmin) => void }) {
+  const [avatar, setAvatar] = useState<string | null>(null);
+
+  const fetchAvatar = async () => {
+    const { data } = await supabase.auth.getUser();
+    setAvatar((data.user?.user_metadata?.avatar_url as string) || null);
+  };
+
+  useEffect(() => {
+    fetchAvatar();
+    window.addEventListener("storage", fetchAvatar);
+    return () => window.removeEventListener("storage", fetchAvatar);
+  }, []);
+
+  const handleSair = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/admin"; // força recarregar
+  };
+
+  const handlePerfil = () => {
+    if (onNavegar) onNavegar("configuracoes");
+    setTimeout(() => {
+      window.dispatchEvent(new Event("abrir-perfil-admin"));
+    }, 100);
+  };
   return (
     <header className="flex h-16 items-center gap-3 border-b border-border bg-card px-5">
       <div className="relative max-w-sm flex-1">
@@ -274,12 +309,47 @@ function Topbar({ email }: { email: string }) {
         >
           <Bell className="h-4 w-4" />
         </button>
-        <div className="ml-1 flex items-center gap-2 border-l border-border pl-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy font-serif text-sm text-gold">
-            {email.charAt(0).toUpperCase()}
-          </span>
-          <span className="hidden text-xs text-muted-foreground md:block">{email}</span>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="ml-1 flex items-center gap-2 border-l border-border pl-3 focus:outline-none">
+              <span className="flex h-8 w-8 overflow-hidden items-center justify-center rounded-full bg-navy font-serif text-sm text-gold ring-1 ring-border/50 transition-all hover:ring-gold/40">
+                {avatar ? (
+                  <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+                ) : (
+                  email.charAt(0).toUpperCase()
+                )}
+              </span>
+              <span className="hidden text-xs text-muted-foreground transition-colors hover:text-foreground md:block">
+                {email}
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">Super Admin</p>
+                <p className="text-xs leading-none text-muted-foreground">{email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handlePerfil} className="cursor-pointer">
+              <User className="mr-2 h-4 w-4" />
+              <span>Meu Perfil</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onNavegar?.("configuracoes")}
+              className="cursor-pointer"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Configurações</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSair} className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sair da conta</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
@@ -431,7 +501,7 @@ export function AdminPanel({ email }: { email: string }) {
       <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar tela={tela} onNavegar={setTela} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar email={email} />
+          <Topbar email={email} onNavegar={setTela} />
           <main className="mx-auto w-full max-w-[1100px] flex-1 space-y-5 p-5">
             {erro && (
               <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -464,7 +534,7 @@ export function AdminPanel({ email }: { email: string }) {
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar tela={tela} onNavegar={setTela} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar email={email} />
+        <Topbar email={email} onNavegar={setTela} />
         <main className="mx-auto w-full max-w-[1280px] flex-1 space-y-5 p-5">
           <div className="rounded-xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">

@@ -1087,12 +1087,15 @@ function SecaoPerfilAdmin() {
   const [carregando, setCarregando] = useState(true);
   const [salvandoNome, setSalvandoNome] = useState(false);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setEmailAdmin(data.user.email ?? "");
         setNome((data.user.user_metadata?.full_name as string | undefined) ?? "");
+        setAvatarUrl((data.user.user_metadata?.avatar_url as string | undefined) ?? "");
       }
       setCarregando(false);
     });
@@ -1112,6 +1115,51 @@ function SecaoPerfilAdmin() {
       toast.error(e instanceof Error ? e.message : "Falha ao salvar o nome.");
     } finally {
       setSalvandoNome(false);
+    }
+  };
+
+  const handleUploadFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Por favor, selecione uma imagem válida.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 2MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `admin_${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { avatar_url: data.publicUrl },
+      });
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(data.publicUrl);
+      toast.success("Foto de perfil atualizada!");
+      
+      // Força a atualização do menu superior dispatchando um evento de storage
+      window.dispatchEvent(new Event("storage"));
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao fazer upload da imagem");
+    } finally {
+      setUploadingAvatar(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -1147,9 +1195,23 @@ function SecaoPerfilAdmin() {
       {/* Cabeçalho */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <div className="flex items-center gap-4">
-          <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-gold/10 font-serif text-2xl text-gold">
-            {(nome || emailAdmin).charAt(0).toUpperCase()}
-          </span>
+          <div className="group relative h-16 w-16 overflow-hidden rounded-xl bg-gold/10 font-serif text-2xl text-gold ring-1 ring-border/50">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center">
+                {(nome || emailAdmin).charAt(0).toUpperCase()}
+              </span>
+            )}
+            <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+              {uploadingAvatar ? (
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              ) : (
+                <ImageIcon className="h-5 w-5 text-white" />
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={handleUploadFoto} disabled={uploadingAvatar} />
+            </label>
+          </div>
           <div>
             <p className="font-serif text-lg font-semibold text-foreground">
               {nome || "Super Admin"}
