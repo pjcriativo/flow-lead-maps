@@ -180,7 +180,7 @@ export const searchApify: ProviderSearch = async ({
         }
         throw new Error(
           r.reason === "pool_esgotado"
-            ? `Todas as chaves Apify esgotadas — cadastre/reative uma em Configurações → Chaves e integrações. (${r.detalhe})`
+            ? `Erro crítico da Apify: ${r.detalhe}`
             : `Apify start: ${r.detalhe}`,
         );
       }
