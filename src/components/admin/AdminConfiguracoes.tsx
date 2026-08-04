@@ -21,7 +21,12 @@ import {
   Save,
   ChevronRight,
   AlertTriangle,
+  UserCog,
+  Eye,
+  EyeOff,
+  Lock,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { adminAcao } from "@/services/admin";
 
@@ -102,9 +107,11 @@ type Secao =
   | "manutencao"
   | "plugins"
   | "idioma"
-  | "sociais";
+  | "sociais"
+  | "perfil";
 
 const NAV: { id: Secao; rotulo: string; Icon: typeof Settings2; emBreve?: boolean }[] = [
+  { id: "perfil", rotulo: "Meu Perfil", Icon: UserCog },
   { id: "basicas", rotulo: "Configurações básicas", Icon: Settings2 },
   { id: "logo", rotulo: "Logotipo e Favicon", Icon: ImageIcon },
   { id: "email", rotulo: "E-mail e Notificação", Icon: Mail },
@@ -1069,6 +1076,203 @@ function SecaoChaves({ aoMudar }: { aoMudar: () => void }) {
   );
 }
 
+/* ────────────────────────── Meu Perfil (super admin) ────────────────────── */
+
+function SecaoPerfilAdmin() {
+  const [emailAdmin, setEmailAdmin] = useState("");
+  const [nome, setNome] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [mostrar, setMostrar] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [salvandoNome, setSalvandoNome] = useState(false);
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setEmailAdmin(data.user.email ?? "");
+        setNome((data.user.user_metadata?.full_name as string | undefined) ?? "");
+      }
+      setCarregando(false);
+    });
+  }, []);
+
+  const handleSalvarNome = async () => {
+    if (!nome.trim()) {
+      toast.error("Digite um nome.");
+      return;
+    }
+    setSalvandoNome(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { full_name: nome.trim() } });
+      if (error) throw error;
+      toast.success("Nome atualizado com sucesso!");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar o nome.");
+    } finally {
+      setSalvandoNome(false);
+    }
+  };
+
+  const handleSalvarSenha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novaSenha) { toast.error("Digite a nova senha."); return; }
+    if (novaSenha.length < 8) { toast.error("A senha deve ter pelo menos 8 caracteres."); return; }
+    if (novaSenha !== confirmar) { toast.error("As senhas não coincidem."); return; }
+    setSalvandoSenha(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: novaSenha });
+      if (error) throw error;
+      toast.success("Senha alterada com sucesso!");
+      setNovaSenha("");
+      setConfirmar("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao alterar a senha.");
+    } finally {
+      setSalvandoSenha(false);
+    }
+  };
+
+  if (carregando) {
+    return (
+      <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div className="flex items-center gap-4">
+          <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-gold/10 font-serif text-2xl text-gold">
+            {(nome || emailAdmin).charAt(0).toUpperCase()}
+          </span>
+          <div>
+            <p className="font-serif text-lg font-semibold text-foreground">
+              {nome || "Super Admin"}
+            </p>
+            <p className="text-sm text-muted-foreground">{emailAdmin}</p>
+            <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-gold/10 px-2 py-0.5 text-[11px] font-semibold text-gold">
+              <ShieldCheck className="h-3 w-3" /> Super Admin
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Nome de exibição */}
+      <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <div className="flex items-center gap-3 border-b border-border/70 px-6 py-4">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold/10 text-gold">
+            <UserCog className="h-4.5 w-4.5" />
+          </span>
+          <div>
+            <h3 className="font-serif text-lg leading-tight">Informações pessoais</h3>
+            <p className="text-[11px] text-muted-foreground">Nome exibido no painel</p>
+          </div>
+        </div>
+        <div className="grid gap-4 p-6 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="mb-1.5 block text-[13px] font-medium text-foreground">E-mail</label>
+            <input
+              disabled
+              value={emailAdmin}
+              className="h-11 w-full cursor-not-allowed rounded-lg border border-input bg-secondary/40 px-3.5 text-sm text-muted-foreground"
+            />
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              O e-mail não pode ser alterado aqui. Use o painel do Supabase se necessário.
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1.5 block text-[13px] font-medium text-foreground">Nome de exibição</label>
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Seu nome"
+              className="h-11 w-full rounded-lg border border-input bg-background px-3.5 text-sm shadow-sm transition-all placeholder:text-muted-foreground/60 hover:border-gold/40 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              onClick={handleSalvarNome}
+              disabled={salvandoNome || !nome.trim()}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-gold px-5 text-sm font-semibold text-navy shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:opacity-60"
+            >
+              {salvandoNome ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar nome
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Alterar senha */}
+      <div className="rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+        <div className="flex items-center gap-3 border-b border-border/70 px-6 py-4">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold/10 text-gold">
+            <Lock className="h-4.5 w-4.5" />
+          </span>
+          <div>
+            <h3 className="font-serif text-lg leading-tight">Alterar senha</h3>
+            <p className="text-[11px] text-muted-foreground">Mínimo de 8 caracteres</p>
+          </div>
+        </div>
+        <form onSubmit={handleSalvarSenha} className="grid gap-5 p-6 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-foreground">Nova senha</label>
+            <div className="relative">
+              <input
+                type={mostrar ? "text" : "password"}
+                value={novaSenha}
+                onChange={(e) => setNovaSenha(e.target.value)}
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className="h-11 w-full rounded-lg border border-input bg-background px-3.5 pr-10 text-sm shadow-sm transition-all placeholder:text-muted-foreground/60 hover:border-gold/40 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25"
+              />
+              <button
+                type="button"
+                onClick={() => setMostrar((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {mostrar ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-foreground">Confirmar senha</label>
+            <input
+              type={mostrar ? "text" : "password"}
+              value={confirmar}
+              onChange={(e) => setConfirmar(e.target.value)}
+              autoComplete="new-password"
+              placeholder="••••••••"
+              className={`h-11 w-full rounded-lg border bg-background px-3.5 text-sm shadow-sm transition-all placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 ${
+                confirmar && confirmar !== novaSenha
+                  ? "border-destructive/60 focus:border-destructive focus:ring-destructive/20"
+                  : "border-input hover:border-gold/40 focus:border-gold focus:ring-gold/25"
+              }`}
+            />
+            {confirmar && confirmar !== novaSenha && (
+              <p className="mt-1 text-[11px] font-medium text-destructive">As senhas não coincidem.</p>
+            )}
+          </div>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              disabled={salvandoSenha || !novaSenha || novaSenha !== confirmar}
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-gold px-5 text-sm font-semibold text-navy shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:opacity-60"
+            >
+              {salvandoSenha ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+              Alterar senha
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 /* ────────────────────────────── página ────────────────────────────── */
 
 export function AdminConfiguracoes() {
@@ -1208,6 +1412,7 @@ export function AdminConfiguracoes() {
 
         {/* ── Col 2: conteúdo da seção ── */}
         <div className="space-y-5">
+          {secao === "perfil" && <SecaoPerfilAdmin />}
           {secao === "basicas" && (
             <>
               <CardSecao
