@@ -1367,6 +1367,10 @@ export function AdminConfiguracoes() {
       .catch((e) => setErro(e instanceof Error ? e.message : "erro"))
       .finally(() => setCarregando(false));
     carregarChaves();
+
+    const escutarPerfil = () => setSecao("perfil");
+    window.addEventListener("abrir-perfil-admin", escutarPerfil);
+    return () => window.removeEventListener("abrir-perfil-admin", escutarPerfil);
   }, []);
 
   const campo = (k: keyof Config) =>
