@@ -249,18 +249,11 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
     </aside>
   );
 }
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { LogOut, User, CheckCircle2 } from "lucide-react";
+import { LogOut, User, CheckCircle2, Settings } from "lucide-react";
 
 function Topbar({ email, onNavegar }: { email: string; onNavegar?: (t: TelaAdmin) => void }) {
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [menuAberto, setMenuAberto] = useState(false);
 
   const fetchAvatar = async () => {
     const { data } = await supabase.auth.getUser();
@@ -309,47 +302,67 @@ function Topbar({ email, onNavegar }: { email: string; onNavegar?: (t: TelaAdmin
         >
           <Bell className="h-4 w-4" />
         </button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="ml-1 flex items-center gap-2 border-l border-border pl-3 focus:outline-none">
-              <span className="flex h-8 w-8 overflow-hidden items-center justify-center rounded-full bg-navy font-serif text-sm text-gold ring-1 ring-border/50 transition-all hover:ring-gold/40">
-                {avatar ? (
-                  <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
-                ) : (
-                  email.charAt(0).toUpperCase()
-                )}
-              </span>
-              <span className="hidden text-xs text-muted-foreground transition-colors hover:text-foreground md:block">
-                {email}
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Super Admin</p>
-                <p className="text-xs leading-none text-muted-foreground">{email}</p>
+        <div className="relative">
+          <button 
+            type="button"
+            onClick={() => setMenuAberto(!menuAberto)}
+            className="ml-1 flex items-center gap-2 border-l border-border pl-3 focus:outline-none"
+          >
+            <span className="flex h-8 w-8 overflow-hidden items-center justify-center rounded-full bg-navy font-serif text-sm text-gold ring-1 ring-border/50 transition-all hover:ring-gold/40">
+              {avatar ? (
+                <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                email.charAt(0).toUpperCase()
+              )}
+            </span>
+            <span className="hidden text-xs text-muted-foreground transition-colors hover:text-foreground md:block">
+              {email}
+            </span>
+          </button>
+          
+          {menuAberto && (
+            <>
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setMenuAberto(false)}
+              ></div>
+              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
+                <div className="px-2 py-1.5 text-sm font-semibold font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">Super Admin</p>
+                    <p className="text-xs leading-none text-muted-foreground">{email}</p>
+                  </div>
+                </div>
+                <div className="-mx-1 my-1 h-px bg-muted"></div>
+                <button 
+                  type="button"
+                  onClick={() => { setMenuAberto(false); handlePerfil(); }} 
+                  className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Meu Perfil</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setMenuAberto(false); onNavegar?.("configuracoes"); }}
+                  className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Configurações</span>
+                </button>
+                <div className="-mx-1 my-1 h-px bg-muted"></div>
+                <button 
+                  type="button"
+                  onClick={() => { setMenuAberto(false); handleSair(); }} 
+                  className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sair da conta</span>
+                </button>
               </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handlePerfil} className="cursor-pointer">
-              <User className="mr-2 h-4 w-4" />
-              <span>Meu Perfil</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onNavegar?.("configuracoes")}
-              className="cursor-pointer"
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Configurações</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSair} className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Sair da conta</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
