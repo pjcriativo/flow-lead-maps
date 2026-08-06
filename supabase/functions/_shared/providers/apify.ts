@@ -10,6 +10,7 @@
 // falha de verdade se TODAS as chaves acabarem.
 import type { ProviderSearch, RawPlace } from "./types.ts";
 import { startRunComPool, tratarRunMorto, type ChaveApify } from "../apify-pool.ts";
+import { criarPlanoBuscaApify } from "../apify-search-plan.ts";
 
 const ACTOR = "compass~crawler-google-places"; // slug com ~ no path da API
 const API = "https://api.apify.com/v2";
@@ -89,15 +90,26 @@ export function setApifyTokenOverride(v: string | null): void {
   _apifyTokenCache = v;
 }
 
-/** Baixa os itens do dataset de um run (mesmo morto, o que foi escrito fica). Best-effort. */
-async function baixarDataset(datasetId: string, token: string, max: number): Promise<ApifyItem[]> {
+type DatasetResult = { items: ApifyItem[]; error: string | null };
+
+/** Baixa os itens do dataset de um run (mesmo morto, o que foi escrito fica). */
+async function baixarDataset(
+  datasetId: string,
+  token: string,
+  max: number,
+): Promise<DatasetResult> {
   try {
     const r = await fetch(
       `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=true&limit=${max}`,
     );
-    return (await r.json().catch(() => [])) as ApifyItem[];
-  } catch {
-    return [];
+    if (!r.ok) return { items: [], error: `dataset HTTP ${r.status}` };
+    const items = (await r.json().catch(() => [])) as ApifyItem[];
+    return { items, error: null };
+  } catch (error) {
+    return {
+      items: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -111,50 +123,40 @@ export const searchApify: ProviderSearch = async ({
   limite,
   seen,
   log,
+  reportUsage,
 }) => {
-  // Garante margem suficiente de candidatos para atingir a meta exata do usuário
-  const maxPlaces = Math.max(Math.ceil(limite * 2.5), 150);
-  const searchStringsArray = Array.from(
-    new Set([
-      nicho,
-      cidade ? `${nicho} em ${cidade}` : nicho,
-      `clínica de ${nicho}`,
-      `consultório de ${nicho}`,
-      `atendimento ${nicho}`,
-    ]),
-  ).filter(Boolean);
-
-  const input: Record<string, unknown> = {
-    searchStringsArray,
-    maxCrawledPlacesPerSearch: maxPlaces,
-    language: "pt-BR",
-    skipClosedPlaces: false,
-    // CUSTO MÍNIMO: nota + nº de avaliações vêm no lugar (agregados), mas NÃO
-    // puxamos reviews/fotos individuais nem contatos (nosso enrich faz o e-mail).
-    maxReviews: 0,
-    maxImages: 0,
-    maxQuestions: 0,
-    scrapeContacts: false,
-    scrapeReviewsPersonalData: false,
-    scrapeImageAuthors: false,
-    reviewsSort: "newest",
-  };
-  if (cidade) {
-    input.locationQuery = `${cidade}${uf ? ", " + uf : ""}, Brasil`;
-  } else if (lat != null && lng != null) {
-    input.customGeolocation = circulo(lat, lng, raioKm ?? 10);
-  }
-  const init: RequestInit = {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  };
-
   // Acumulado ATRAVÉS de restarts — o parcial de um run morto nunca se perde.
   const itensAcumulados: ApifyItem[] = [];
   let usdTotal = 0;
+  const custoMaximoBusca = criarPlanoBuscaApify(nicho, limite).maxTotalChargeUsd;
 
   for (let rodada = 1; rodada <= MAX_RUNS; rodada++) {
+    const itensRestantes = limite - itensAcumulados.length;
+    const custoRestante = Number((custoMaximoBusca - usdTotal).toFixed(4));
+    if (itensRestantes <= 0 || custoRestante <= 0) break;
+
+    const planoBusca = criarPlanoBuscaApify(nicho, itensRestantes);
+    const { input, maxPlaces, maxItems } = planoBusca;
+    const maxTotalChargeUsd = Math.min(planoBusca.maxTotalChargeUsd, custoRestante);
+    if (cidade) {
+      input.locationQuery = `${cidade}${uf ? ", " + uf : ""}, Brasil`;
+    } else if (lat != null && lng != null) {
+      input.customGeolocation = circulo(lat, lng, raioKm ?? 10);
+    }
+    const init: RequestInit = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    };
+    const montarUrl = (token: string) => {
+      const params = new URLSearchParams({
+        token,
+        maxItems: String(maxItems),
+        maxTotalChargeUsd: String(maxTotalChargeUsd),
+      });
+      return `${API}/acts/${ACTOR}/runs?${params.toString()}`;
+    };
+
     // ── START (com rodízio quando há contexto de pool) ──
     let chave: ChaveApify;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -165,11 +167,7 @@ export const searchApify: ProviderSearch = async ({
           ? `Apify: iniciando run (Google Maps) — até ${maxPlaces} lugares...`
           : `Apify: continuando a busca com a próxima chave do pool (rodada ${rodada})...`,
       );
-      const r = await startRunComPool(
-        _poolAdmin,
-        (t) => `${API}/acts/${ACTOR}/runs?token=${encodeURIComponent(t)}`,
-        init,
-      );
+      const r = await startRunComPool(_poolAdmin, montarUrl, init);
       if (!r.ok) {
         // só falha DE VERDADE se não sobrou chave nenhuma — e preservando o parcial
         if (itensAcumulados.length > 0) {
@@ -193,10 +191,7 @@ export const searchApify: ProviderSearch = async ({
       if (!token) throw new Error("APIFY_API_TOKEN não configurada no secret da Edge Function.");
       chave = { id: null, apelido: "chave única", token };
       log(`Apify: iniciando run (Google Maps) — até ${maxPlaces} lugares...`);
-      const startRes = await fetch(
-        `${API}/acts/${ACTOR}/runs?token=${encodeURIComponent(token)}`,
-        init,
-      );
+      const startRes = await fetch(montarUrl(token), init);
       startJson = await startRes.json().catch(() => ({}));
       if (!startRes.ok)
         throw new Error(`Apify start: ${startJson?.error?.message ?? "HTTP " + startRes.status}`);
@@ -210,10 +205,24 @@ export const searchApify: ProviderSearch = async ({
     const deadline = Date.now() + 130_000;
     let status = startJson.data?.status ?? "RUNNING";
     let usd = 0;
+    let abortamosNos = false;
     const TERMINAIS = ["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"];
     while (!TERMINAIS.includes(status)) {
       if (Date.now() > deadline) {
-        log("Apify: tempo limite — pegando o que já coletou");
+        log("Apify: tempo limite — abortando o run para impedir custo adicional");
+        const abortRes = await fetch(
+          `${API}/actor-runs/${runId}/abort?token=${encodeURIComponent(chave.token)}`,
+          { method: "POST" },
+        );
+        if (!abortRes.ok) {
+          throw new Error(
+            `Apify: não foi possível abortar o run ${runId} (HTTP ${abortRes.status})`,
+          );
+        }
+        const abortJson = await abortRes.json().catch(() => ({}));
+        status = abortJson.data?.status ?? "ABORTED";
+        usd = abortJson.data?.usageTotalUsd ?? usd;
+        abortamosNos = true;
         break;
       }
       await sleep(4000);
@@ -223,19 +232,57 @@ export const searchApify: ProviderSearch = async ({
       usd = sj.data?.usageTotalUsd ?? usd;
       log(`Apify: run ${status}${usd ? ` · custo ~US$ ${usd.toFixed(3)}` : ""}...`);
     }
+    // A leitura final reduz a defasagem do total agregado logo após o término do run.
+    const finalRes = await fetch(
+      `${API}/actor-runs/${runId}?token=${encodeURIComponent(chave.token)}`,
+    );
+    if (finalRes.ok) {
+      const finalJson = await finalRes.json().catch(() => ({}));
+      status = finalJson.data?.status ?? status;
+      usd = finalJson.data?.usageTotalUsd ?? usd;
+    } else {
+      log(
+        `Apify: leitura final do custo falhou (HTTP ${finalRes.status}); usando a última medição.`,
+      );
+    }
     usdTotal += usd;
 
     // ── DATASET: colhe o que este run escreveu (inclusive se morreu no meio) ──
-    const items = await baixarDataset(datasetId, chave.token, maxPlaces);
+    const dataset = await baixarDataset(datasetId, chave.token, maxPlaces);
+    const items = dataset.items;
     itensAcumulados.push(...items);
     log(
       `Apify: ${items.length} lugares no dataset${usd ? ` · custo do run ~US$ ${usd.toFixed(3)}` : ""}`,
     );
+    await reportUsage({
+      service: "apify_maps",
+      action: "search_run",
+      externalId: runId,
+      quantity: items.length,
+      costUsd: usd,
+      metadata: {
+        run_status: status,
+        dataset_id: datasetId,
+        key_label: chave.apelido,
+        cost_source: "apify_usage_total_usd",
+        dataset_error: dataset.error,
+      },
+    });
+    if (dataset.error) {
+      throw new Error(`Apify: custo registrado, mas falhou ao baixar o dataset: ${dataset.error}`);
+    }
+
+    if (abortamosNos) {
+      log(
+        `Apify: run abortado no tempo limite; entregando ${itensAcumulados.length} itens parciais.`,
+      );
+      break;
+    }
 
     // ── RUN MORTO? O status não diz o motivo — o árbitro (limites) decide ──
     if (status === "ABORTED" || status === "FAILED") {
       if (_poolAdmin) {
-        const veredito = await tratarRunMorto(_poolAdmin, chave, status, false);
+        const veredito = await tratarRunMorto(_poolAdmin, chave, status, abortamosNos);
         if (veredito === "trocar_chave") {
           log(
             `⚠️ Crédito da chave "${chave.apelido}" acabou NO MEIO da busca — parcial preservado (${itensAcumulados.length} itens), a próxima chave continua.`,

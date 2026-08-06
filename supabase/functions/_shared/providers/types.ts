@@ -40,6 +40,23 @@ export type ProviderParams = {
   seen: Set<string>;
   /** Log de progresso (vai pro stream NDJSON da UI). */
   log: (message: string) => void;
+  /** Livro-caixa do provedor pago. É chamado por run, inclusive quando não há lead inserido. */
+  reportUsage: (usage: ProviderUsage) => Promise<void>;
+};
+
+export type ProviderUsage = {
+  service: "apify_maps";
+  action: "search_run";
+  externalId: string;
+  quantity: number;
+  costUsd: number;
+  metadata: {
+    run_status: string;
+    dataset_id: string;
+    key_label: string;
+    cost_source: "apify_usage_total_usd";
+    dataset_error: string | null;
+  };
 };
 
 /** Assinatura única: buscarLeads(params) -> lugares normalizados. */

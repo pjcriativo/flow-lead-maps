@@ -162,6 +162,7 @@ export type AdminAcao =
   | "chaves_listar"
   | "chave_salvar"
   | "chaves_auditoria_listar"
+  | "api_consumo_resumo"
   | "apify_pool_listar"
   | "apify_chave_add"
   | "apify_chave_importar_secret"

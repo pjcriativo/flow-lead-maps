@@ -1,14 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   DollarSign,
   Activity,
-  Users,
   Zap,
   TrendingUp,
   BarChart3,
   RefreshCw,
   Search,
-  Filter,
   ShieldAlert,
 } from "lucide-react";
 import { obterResumoConsumoApi, type ApiUsageResumo } from "@/services/api-consumption";
@@ -31,6 +29,14 @@ const SERVICE_LABELS: Record<string, { label: string; badgeClass: string }> = {
     label: "Google Places API Direct",
     badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
   },
+  osm_free: {
+    label: "OpenStreetMap (sem custo)",
+    badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
+  },
+  geoapify_free: {
+    label: "Geoapify (franquia gratuita)",
+    badgeClass: "bg-cyan-100 text-cyan-800 border-cyan-200",
+  },
 };
 
 const PLAN_BADGES: Record<string, string> = {
@@ -39,29 +45,35 @@ const PLAN_BADGES: Record<string, string> = {
   pro: "bg-primary/10 text-primary border-primary/20 font-semibold",
   agencia: "bg-gold/15 text-navy font-bold border-gold/40",
   enterprise: "bg-gold/15 text-navy font-bold border-gold/40",
+  "super admin": "bg-blue-100 text-blue-800 border-blue-200 font-bold",
+  "sem plano": "bg-slate-100 text-slate-700 border-slate-200",
 };
 
 export function AdminApiUsageDashboard() {
   const [resumo, setResumo] = useState<ApiUsageResumo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
   const [dias, setDias] = useState(30);
   const [busca, setBusca] = useState("");
 
-  const carregarDados = async () => {
+  const carregarDados = useCallback(async () => {
     setLoading(true);
+    setErro(null);
     try {
       const data = await obterResumoConsumoApi(dias);
       setResumo(data);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(error);
+      setErro(message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [dias]);
 
   useEffect(() => {
-    carregarDados();
-  }, [dias]);
+    void carregarDados();
+  }, [carregarDados]);
 
   const topUsersFiltrados =
     resumo?.top_users.filter((u) => {
@@ -73,7 +85,18 @@ export function AdminApiUsageDashboard() {
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const usd = (v: number) =>
-    v.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 3 });
+    v.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 4,
+    });
+
+  const usoApify = resumo?.apify_account.usage_usd ?? 0;
+  const limiteApify = resumo?.apify_account.limit_usd ?? 0;
+  const saldoApify = resumo?.apify_account.remaining_usd ?? 0;
+  const custoApifyAtribuido = resumo?.attributed_apify_cost_usd ?? 0;
+  const diferencaSemUsuario = Math.max(0, usoApify - custoApifyAtribuido);
 
   return (
     <div className="space-y-6">
@@ -113,23 +136,49 @@ export function AdminApiUsageDashboard() {
         </div>
       </div>
 
+      {erro && (
+        <div
+          role="alert"
+          className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
+        >
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold">Não foi possível atualizar o consumo</p>
+            <p className="text-xs">{erro}</p>
+          </div>
+        </div>
+      )}
+
+      {resumo?.apify_account.sync_error && (
+        <div
+          role="alert"
+          className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
+        >
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold">A leitura ao vivo da Apify ficou incompleta</p>
+            <p className="text-xs">{resumo.apify_account.sync_error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Cards KPI Topo */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Custo Total de Infra (US$)
+              Uso real Apify no ciclo
             </span>
             <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
               <DollarSign className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-3">
-            <p className="text-2xl font-bold text-foreground">
-              {loading ? "..." : usd(resumo?.total_cost_usd ?? 0)}
-            </p>
+            <p className="text-2xl font-bold text-foreground">{loading ? "..." : usd(usoApify)}</p>
             <p className="mt-1 text-xs text-muted-foreground font-medium">
-              Aprox. {loading ? "..." : brl(resumo?.total_cost_brl ?? 0)} (Cotação 5.60)
+              {loading
+                ? "..."
+                : `${usd(usoApify)} de ${usd(limiteApify)} · saldo ${usd(saldoApify)}`}
             </p>
           </div>
         </div>
@@ -137,7 +186,7 @@ export function AdminApiUsageDashboard() {
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Total de Leads Extraídos
+              Itens cobrados pela Apify
             </span>
             <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
               <Zap className="h-5 w-5" />
@@ -148,7 +197,7 @@ export function AdminApiUsageDashboard() {
               {loading ? "..." : (resumo?.total_leads_crawled ?? 0).toLocaleString("pt-BR")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground font-medium">
-              Leads capturados no Google Maps
+              Itens dos runs registrados no período
             </p>
           </div>
         </div>
@@ -156,7 +205,7 @@ export function AdminApiUsageDashboard() {
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Requisições de API
+              Runs e chamadas registradas
             </span>
             <div className="rounded-lg bg-purple-100 p-2 text-purple-700">
               <Activity className="h-5 w-5" />
@@ -167,7 +216,7 @@ export function AdminApiUsageDashboard() {
               {loading ? "..." : (resumo?.total_requests ?? 0).toLocaleString("pt-BR")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground font-medium">
-              Chamadas efetuadas aos provedores
+              Livro-caixa no período selecionado
             </p>
           </div>
         </div>
@@ -194,6 +243,24 @@ export function AdminApiUsageDashboard() {
             </p>
           </div>
         </div>
+      </div>
+
+      <div
+        className={cn(
+          "rounded-xl border p-4 text-sm",
+          diferencaSemUsuario > 0.01
+            ? "border-amber-200 bg-amber-50 text-amber-900"
+            : "border-emerald-200 bg-emerald-50 text-emerald-900",
+        )}
+      >
+        <p className="font-bold">
+          Apify ao vivo: {usd(usoApify)} · atribuído aos usuários: {usd(custoApifyAtribuido)}
+        </p>
+        <p className="mt-1 text-xs">
+          {diferencaSemUsuario > 0.01
+            ? `${usd(diferencaSemUsuario)} ainda não está associado a um usuário. Os novos runs são conciliados pelo ID real da Apify.`
+            : "O consumo da conta e o custo atribuído aos usuários estão conciliados."}
+        </p>
       </div>
 
       {/* Breakdown por Serviço */}
@@ -262,6 +329,7 @@ export function AdminApiUsageDashboard() {
                 <th className="px-4 py-3">Plano Atual</th>
                 <th className="px-4 py-3 text-center">Leads Usados / Limite</th>
                 <th className="px-4 py-3 text-center">Chamadas API</th>
+                <th className="px-4 py-3 text-center">Itens cobrados</th>
                 <th className="px-4 py-3 text-right">Custo API (US$)</th>
                 <th className="px-4 py-3 text-right">Custo API (R$)</th>
               </tr>
@@ -285,10 +353,13 @@ export function AdminApiUsageDashboard() {
                   </td>
                   <td className="px-4 py-3 text-center font-medium">
                     <span className="font-bold text-foreground">{u.leads_used}</span> /{" "}
-                    {u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
+                    {u.monthly_limit === null || u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
                   </td>
                   <td className="px-4 py-3 text-center font-semibold text-foreground">
                     {u.requests_count}
+                  </td>
+                  <td className="px-4 py-3 text-center font-semibold text-foreground">
+                    {u.items_charged.toLocaleString("pt-BR")}
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-emerald-700">
                     {usd(u.total_cost_usd)}
@@ -300,7 +371,7 @@ export function AdminApiUsageDashboard() {
               ))}
               {topUsersFiltrados.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                     Nenhum cliente encontrado no período.
                   </td>
                 </tr>

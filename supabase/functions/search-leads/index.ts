@@ -20,6 +20,7 @@ import { geocodeCidade } from "../_shared/geocode.ts";
 import { orgDoUsuario, estadoConsumo, consumir } from "../_shared/limite.ts";
 import { resolverChave } from "../_shared/chaves.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
+import type { ProviderUsage } from "../_shared/providers/types.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
@@ -148,6 +149,30 @@ Deno.serve(async (req) => {
           limite,
           seen,
           log: (message) => send({ type: "log", message }),
+          reportUsage: async (usage: ProviderUsage) => {
+            const costBrl = usage.costUsd * 5.6;
+            const { error: usageError } = await admin.from("api_consumption_logs").upsert(
+              {
+                org_id: orgId,
+                user_id: userId,
+                service: usage.service,
+                action: usage.action,
+                external_id: usage.externalId,
+                quantity: usage.quantity,
+                cost_usd: usage.costUsd,
+                cost_brl: costBrl,
+                metadata: { nicho, cidade, fonte, ...usage.metadata },
+              },
+              { onConflict: "service,external_id" },
+            );
+            if (usageError) {
+              throw new Error(`Falha ao registrar custo real da Apify: ${usageError.message}`);
+            }
+            send({
+              type: "log",
+              message: `Custo real registrado: US$ ${usage.costUsd.toFixed(4)} (run ${usage.externalId})`,
+            });
+          },
         });
 
         send({ type: "log", message: `${candidates.length} candidatos únicos. Qualificando...` });
@@ -269,18 +294,6 @@ Deno.serve(async (req) => {
         // painel mostrar uso), mas nunca é bloqueado (limite null).
         if (orgId && inserted > 0) {
           await consumir(admin, orgId, "leads", inserted);
-          const costUsd = inserted * 0.001;
-          const costBrl = costUsd * 5.6;
-          await admin.from("api_consumption_logs").insert({
-            org_id: orgId,
-            user_id: userId,
-            service: "apify_maps",
-            action: "search_crawled",
-            quantity: inserted,
-            cost_usd: costUsd,
-            cost_brl: costBrl,
-            metadata: { nicho, cidade, fonte },
-          });
         }
 
         send({ type: "done", inserted, total: inserted, fonte });

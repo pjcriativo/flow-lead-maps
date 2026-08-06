@@ -178,7 +178,9 @@ Deno.serve(async (req) => {
       const liberado = b.liberado === true;
       // Plano opcional passado junto com a liberação (ex: "pro", "agencia")
       const PLANOS_VALIDOS = ["basico", "pro", "agencia", "enterprise", "starter"];
-      const planInformado = String(b.plan || "").toLowerCase().trim();
+      const planInformado = String(b.plan || "")
+        .toLowerCase()
+        .trim();
       if (!userId) return json({ ok: false, reason: "usuario_invalido" });
 
       const updatePayload: Record<string, unknown> = { acesso_liberado: liberado };
@@ -236,26 +238,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Atribuição manual de plano (profiles.plan) pelo admin — independente de pagamento.
-    // Controla quais recursos o usuário vê em usePlanPermissions (pro, agencia, enterprise
-    // desbloqueiam Propostas, WhatsApp, Contratos, Redesign, Publicar etc.).
+    // Atribuição manual de plano pelo admin. A RPC atualiza profiles.plan (permissões da UI)
+    // e orgs.plano_id (limites/consumo) na mesma transação.
     if (acao === "user_plan_set") {
       const userId = String(b.user_id || "");
-      const plan = String(b.plan || "").toLowerCase().trim();
+      const plan = String(b.plan || "")
+        .toLowerCase()
+        .trim();
       const PLANOS_VALIDOS = ["basico", "pro", "agencia", "enterprise", "starter"];
       if (!userId) return json({ ok: false, reason: "usuario_invalido" });
       if (!PLANOS_VALIDOS.includes(plan)) return json({ ok: false, reason: "plano_invalido" });
 
-      const { data: alvo, error } = await admin
-        .from("profiles")
-        .update({ plan })
-        .eq("id", userId)
-        .select("id, email, plan")
-        .maybeSingle();
-
+      const { data: resultado, error } = await admin.rpc("admin_set_user_plan", {
+        p_user: userId,
+        p_plan: plan,
+      });
       if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
-      if (!alvo) return json({ ok: false, reason: "usuario_nao_encontrado" });
-      return json({ ok: true, user_id: alvo.id, email: alvo.email, plan: alvo.plan });
+      if (!resultado?.ok)
+        return json({ ok: false, reason: resultado?.reason ?? "falha_atualizar" });
+      return json({ ok: true, ...resultado });
     }
 
     // Exclusão de conta pelo admin — apaga do Auth (cascata via FK/trigger para profiles,
@@ -384,16 +385,12 @@ Deno.serve(async (req) => {
     if (acao === "relatorios_ler") {
       const desde = typeof b.desde === "string" ? b.desde : null;
       const ate = typeof b.ate === "string" ? b.ate : null;
-      const filtroData = (q: ReturnType<typeof admin.from>) => {
-        let r = q;
-        if (desde) r = r.gte("created_at", desde);
-        if (ate) r = r.lte("created_at", ate);
-        return r;
-      };
-
-      const { data: leadsRows } = await filtroData(
-        admin.from("leads").select("origem_fonte, origem_estrategia, status, motivo_perda"),
-      );
+      let leadsQuery = admin
+        .from("leads")
+        .select("origem_fonte, origem_estrategia, status, motivo_perda");
+      if (desde) leadsQuery = leadsQuery.gte("created_at", desde);
+      if (ate) leadsQuery = leadsQuery.lte("created_at", ate);
+      const { data: leadsRows } = await leadsQuery;
       const porFonte = new Map<string, number>();
       const porEstrategia = new Map<string, number>();
       const porMotivo = new Map<string, number>();
@@ -404,14 +401,11 @@ Deno.serve(async (req) => {
         ganho = 0,
         perdido = 0;
       for (const r of leadsRows ?? []) {
-        const fonte = (r.origem_fonte as string | null) ?? "google_maps";
+        const fonte = typeof r.origem_fonte === "string" ? r.origem_fonte : "google_maps";
         porFonte.set(fonte, (porFonte.get(fonte) ?? 0) + 1);
-        if (r.origem_estrategia)
-          porEstrategia.set(
-            r.origem_estrategia as string,
-            (porEstrategia.get(r.origem_estrategia as string) ?? 0) + 1,
-          );
-        const st = r.status as string;
+        if (typeof r.origem_estrategia === "string")
+          porEstrategia.set(r.origem_estrategia, (porEstrategia.get(r.origem_estrategia) ?? 0) + 1);
+        const st = String(r.status ?? "");
         if (["new", "enriched"].includes(st)) novos++;
         if (!["new", "enriched"].includes(st)) contatados++;
         if (["proposta_enviada", "responded", "meeting", "won"].includes(st)) propostaEnviada++;
@@ -786,6 +780,232 @@ Deno.serve(async (req) => {
       if (!nome) return json({ ok: false, reason: "nome_obrigatorio" });
       const valor = await resolverChave(admin, nome);
       return json({ ok: true, configurada: !!valor, ultimos4: valor ? valor.slice(-4) : null });
+    }
+
+    if (acao === "api_consumo_resumo") {
+      const dias = Math.min(Math.max(Math.floor(Number(b.dias) || 30), 1), 365);
+      const desde = new Date(Date.now() - dias * 86_400_000).toISOString();
+      const mesRef = new Date().toISOString().slice(0, 7);
+
+      const [
+        logsResult,
+        profilesResult,
+        membershipsResult,
+        orgsResult,
+        plansResult,
+        consumoResult,
+      ] = await Promise.all([
+        admin
+          .from("api_consumption_logs")
+          .select(
+            "id, org_id, user_id, service, action, external_id, quantity, cost_usd, cost_brl, metadata, created_at",
+          )
+          .gte("created_at", desde)
+          .order("created_at", { ascending: false }),
+        admin.from("profiles").select("id, email, full_name, is_super_admin"),
+        admin.from("memberships").select("user_id, org_id, criada_em").order("criada_em"),
+        admin.from("orgs").select("id, nome, plano_id"),
+        admin.from("planos").select("id, nome, limite_leads"),
+        admin.from("consumo_org").select("org_id, leads").eq("mes_ref", mesRef),
+      ]);
+
+      const queryError = [
+        logsResult.error,
+        profilesResult.error,
+        membershipsResult.error,
+        orgsResult.error,
+        plansResult.error,
+        consumoResult.error,
+      ].find(Boolean);
+      if (queryError) {
+        return json({ ok: false, reason: "erro_consulta", detalhe: queryError.message }, 500);
+      }
+
+      const profiles = new Map(
+        (profilesResult.data ?? []).map((row: Rec) => [String(row.id), row]),
+      );
+      const membershipByUser = new Map<string, string>();
+      for (const row of membershipsResult.data ?? []) {
+        const userId = String(row.user_id);
+        if (!membershipByUser.has(userId)) membershipByUser.set(userId, String(row.org_id));
+      }
+      const orgs = new Map((orgsResult.data ?? []).map((row: Rec) => [String(row.id), row]));
+      const plans = new Map((plansResult.data ?? []).map((row: Rec) => [String(row.id), row]));
+      const leadsByOrg = new Map(
+        (consumoResult.data ?? []).map((row: Rec) => [String(row.org_id), Number(row.leads ?? 0)]),
+      );
+
+      type UserUsage = {
+        user_id: string;
+        user_name: string;
+        user_email: string;
+        plan: string;
+        monthly_limit: number | null;
+        leads_used: number;
+        total_cost_usd: number;
+        total_cost_brl: number;
+        requests_count: number;
+        items_charged: number;
+      };
+      type ServiceUsage = {
+        service: string;
+        requests_count: number;
+        cost_usd: number;
+        cost_brl: number;
+      };
+
+      const usersMap = new Map<string, UserUsage>();
+      const serviceMap = new Map<string, ServiceUsage>();
+      let attributedCostUsd = 0;
+      let attributedCostBrl = 0;
+      let totalItemsCharged = 0;
+
+      for (const log of logsResult.data ?? []) {
+        const service = String(log.service);
+        const costUsd = Number(log.cost_usd ?? 0);
+        const costBrl = Number(log.cost_brl ?? 0);
+        const quantity = Number(log.quantity ?? 0);
+        attributedCostUsd += costUsd;
+        attributedCostBrl += costBrl;
+        if (service === "apify_maps") totalItemsCharged += quantity;
+
+        const serviceUsage = serviceMap.get(service) ?? {
+          service,
+          requests_count: 0,
+          cost_usd: 0,
+          cost_brl: 0,
+        };
+        serviceUsage.requests_count += 1;
+        serviceUsage.cost_usd += costUsd;
+        serviceUsage.cost_brl += costBrl;
+        serviceMap.set(service, serviceUsage);
+
+        if (!log.user_id) continue;
+        const userId = String(log.user_id);
+        const profile = profiles.get(userId);
+        const orgId = log.org_id ? String(log.org_id) : membershipByUser.get(userId);
+        const org = orgId ? orgs.get(orgId) : undefined;
+        const plan = org?.plano_id ? plans.get(String(org.plano_id)) : undefined;
+        const isSuperAdmin = profile?.is_super_admin === true;
+        const userUsage = usersMap.get(userId) ?? {
+          user_id: userId,
+          user_name: String(profile?.full_name ?? org?.nome ?? "Usuário sem nome"),
+          user_email: String(profile?.email ?? "E-mail não encontrado"),
+          plan: isSuperAdmin ? "Super admin" : String(plan?.nome ?? "Sem plano"),
+          monthly_limit: isSuperAdmin ? null : Number(plan?.limite_leads ?? 0),
+          leads_used: orgId ? (leadsByOrg.get(orgId) ?? 0) : 0,
+          total_cost_usd: 0,
+          total_cost_brl: 0,
+          requests_count: 0,
+          items_charged: 0,
+        };
+        userUsage.total_cost_usd += costUsd;
+        userUsage.total_cost_brl += costBrl;
+        userUsage.requests_count += 1;
+        if (service === "apify_maps") userUsage.items_charged += quantity;
+        usersMap.set(userId, userUsage);
+      }
+
+      const { data: keyRows, error: keysError } = await admin
+        .from("apify_chaves")
+        .select("apelido, valor_cifrado, status")
+        .eq("status", "ativa")
+        .order("ordem");
+
+      const tokenRows: Array<{ label: string; token: string }> = [];
+      const accountErrors: string[] = [];
+      if (keysError) accountErrors.push(`pool: ${keysError.message}`);
+      for (const row of keyRows ?? []) {
+        try {
+          tokenRows.push({ label: String(row.apelido), token: await decifrar(row.valor_cifrado) });
+        } catch (error) {
+          accountErrors.push(
+            `${String(row.apelido)}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+      if (tokenRows.length === 0 && !keysError) {
+        const fallbackToken = await resolverChave(admin, "APIFY_API_TOKEN");
+        if (fallbackToken) tokenRows.push({ label: "chave única", token: fallbackToken });
+      }
+
+      const accounts: Array<{
+        label: string;
+        usage_usd: number;
+        limit_usd: number;
+        remaining_usd: number;
+      }> = [];
+      for (const row of tokenRows) {
+        try {
+          const response = await fetch(
+            `https://api.apify.com/v2/users/me/limits?token=${encodeURIComponent(row.token)}`,
+          );
+          const body = await response.json().catch(() => ({}));
+          const usage = body?.data?.current?.monthlyUsageUsd;
+          const limit = body?.data?.limits?.maxMonthlyUsageUsd;
+          if (!response.ok || typeof usage !== "number" || typeof limit !== "number") {
+            accountErrors.push(`${row.label}: resposta inválida (HTTP ${response.status})`);
+            continue;
+          }
+          accounts.push({
+            label: row.label,
+            usage_usd: usage,
+            limit_usd: limit,
+            remaining_usd: limit - usage,
+          });
+        } catch (error) {
+          accountErrors.push(
+            `${row.label}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+
+      const apifyUsageUsd = accounts.reduce((sum, account) => sum + account.usage_usd, 0);
+      const apifyLimitUsd = accounts.reduce((sum, account) => sum + account.limit_usd, 0);
+      const apifyRemainingUsd = accounts.reduce((sum, account) => sum + account.remaining_usd, 0);
+      const liveUsageAvailable = accounts.length > 0;
+      const apifyAttributed = serviceMap.get("apify_maps")?.cost_usd ?? 0;
+      const nonApifyAttributed = attributedCostUsd - apifyAttributed;
+      const totalCostUsd =
+        (liveUsageAvailable ? apifyUsageUsd : apifyAttributed) + nonApifyAttributed;
+      const totalCostBrl = totalCostUsd * 5.6;
+
+      const apifyService = serviceMap.get("apify_maps") ?? {
+        service: "apify_maps",
+        requests_count: 0,
+        cost_usd: 0,
+        cost_brl: 0,
+      };
+      if (liveUsageAvailable) {
+        apifyService.cost_usd = apifyUsageUsd;
+        apifyService.cost_brl = apifyUsageUsd * 5.6;
+        serviceMap.set("apify_maps", apifyService);
+      }
+
+      return json({
+        ok: true,
+        total_cost_usd: totalCostUsd,
+        total_cost_brl: totalCostBrl,
+        attributed_cost_usd: attributedCostUsd,
+        attributed_cost_brl: attributedCostBrl,
+        attributed_apify_cost_usd: apifyAttributed,
+        total_requests: (logsResult.data ?? []).length,
+        total_leads_crawled: totalItemsCharged,
+        top_users: [...usersMap.values()].sort(
+          (left, right) => right.total_cost_usd - left.total_cost_usd,
+        ),
+        service_breakdown: [...serviceMap.values()].sort(
+          (left, right) => right.cost_usd - left.cost_usd,
+        ),
+        apify_account: {
+          usage_usd: apifyUsageUsd,
+          limit_usd: apifyLimitUsd,
+          remaining_usd: apifyRemainingUsd,
+          synced_at: new Date().toISOString(),
+          accounts,
+          sync_error: accountErrors.length > 0 ? accountErrors.join(" | ") : null,
+        },
+      });
     }
 
     // ═══ POOL DE CHAVES APIFY (rodízio por esgotamento) ═══
