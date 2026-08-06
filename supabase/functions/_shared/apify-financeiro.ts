@@ -47,6 +47,11 @@ function numero(value: unknown, path: string): number {
   return value;
 }
 
+function numeroOpcional(value: unknown, padrao: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return padrao;
+}
+
 function texto(value: unknown, path: string): string {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Resposta Apify invalida: ${path} ausente`);
@@ -66,7 +71,7 @@ export function normalizarLimitesFinanceirosApify(json: unknown): LimitesFinance
   const current = objeto(data.current, "data.current");
   const cycle = objeto(data.monthlyUsageCycle, "data.monthlyUsageCycle");
   const usageUsd = numero(current.monthlyUsageUsd, "data.current.monthlyUsageUsd");
-  const hardLimitUsd = numero(limits.maxMonthlyUsageUsd, "data.limits.maxMonthlyUsageUsd");
+  const hardLimitUsd = numeroOpcional(limits.maxMonthlyUsageUsd, 999999);
 
   return {
     usageUsd,
@@ -93,7 +98,7 @@ export function normalizarContaFinanceiraApify(
   const data = objeto(root.data, "data");
   const plan = objeto(data.plan, "data.plan");
   const limites = normalizarLimitesFinanceirosApify(limitsJson);
-  const planCreditsUsd = numero(plan.monthlyUsageCreditsUsd, "data.plan.monthlyUsageCreditsUsd");
+  const planCreditsUsd = numeroOpcional(plan.monthlyUsageCreditsUsd, 0);
 
   return {
     accountId: texto(data.id, "data.id"),
