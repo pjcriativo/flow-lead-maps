@@ -35,16 +35,27 @@ export type ApiUsageResumo = {
     cost_brl: number;
   }>;
   apify_account: {
-    usage_usd: number;
-    limit_usd: number;
-    remaining_usd: number;
+    usage_usd: number | null;
+    limit_usd: number | null;
+    remaining_usd: number | null;
+    included_credits_usd: number | null;
+    included_credits_remaining_usd: number | null;
+    hard_limit_usd: number | null;
+    hard_remaining_usd: number | null;
     synced_at: string;
     reconciled_runs: number;
     accounts: Array<{
       label: string;
-      usage_usd: number;
-      limit_usd: number;
-      remaining_usd: number;
+      account_id: string;
+      username: string;
+      token_count: number;
+      usage_usd: number | null;
+      limit_usd: number | null;
+      remaining_usd: number | null;
+      included_credits_usd: number | null;
+      included_credits_remaining_usd: number | null;
+      hard_limit_usd: number | null;
+      hard_remaining_usd: number | null;
     }>;
     sync_error: string | null;
   };
@@ -57,6 +68,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function number(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function optionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function text(value: unknown, fallback: string): string {
@@ -97,9 +114,16 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
   const accounts = Array.isArray(apify.accounts)
     ? apify.accounts.filter(isRecord).map((account) => ({
         label: text(account.label, "Conta Apify"),
-        usage_usd: number(account.usage_usd),
-        limit_usd: number(account.limit_usd),
-        remaining_usd: number(account.remaining_usd),
+        account_id: text(account.account_id, "conta-desconhecida"),
+        username: text(account.username, "Conta Apify"),
+        token_count: number(account.token_count),
+        usage_usd: optionalNumber(account.usage_usd),
+        limit_usd: optionalNumber(account.limit_usd),
+        remaining_usd: optionalNumber(account.remaining_usd),
+        included_credits_usd: optionalNumber(account.included_credits_usd),
+        included_credits_remaining_usd: optionalNumber(account.included_credits_remaining_usd),
+        hard_limit_usd: optionalNumber(account.hard_limit_usd),
+        hard_remaining_usd: optionalNumber(account.hard_remaining_usd),
       }))
     : [];
 
@@ -120,9 +144,13 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
     top_users: topUsers,
     service_breakdown: serviceBreakdown,
     apify_account: {
-      usage_usd: number(apify.usage_usd),
-      limit_usd: number(apify.limit_usd),
-      remaining_usd: number(apify.remaining_usd),
+      usage_usd: optionalNumber(apify.usage_usd),
+      limit_usd: optionalNumber(apify.limit_usd),
+      remaining_usd: optionalNumber(apify.remaining_usd),
+      included_credits_usd: optionalNumber(apify.included_credits_usd),
+      included_credits_remaining_usd: optionalNumber(apify.included_credits_remaining_usd),
+      hard_limit_usd: optionalNumber(apify.hard_limit_usd),
+      hard_remaining_usd: optionalNumber(apify.hard_remaining_usd),
       synced_at: text(apify.synced_at, new Date(0).toISOString()),
       reconciled_runs: number(apify.reconciled_runs),
       accounts,

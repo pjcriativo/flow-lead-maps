@@ -4,7 +4,7 @@
 // onde cada um é lido está no help text; o que não tem base ainda fica "Em breve" com o
 // motivo, nunca decorativo. config_plataforma via config_ler/config_salvar; chaves de API
 // via cofre cifrado (chave_salvar — escrita-apenas, o valor nunca volta).
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Settings2,
   ImageIcon,
@@ -423,6 +423,15 @@ type ChavePoolApify = {
   testada_em: string | null;
   teste_ok: boolean | null;
   teste_detalhe: string | null;
+  conta_apify_username?: string | null;
+  conta_compartilhada_com?: string | null;
+  creditos_plano_usd?: number | null;
+  uso_mensal_usd?: number | null;
+  saldo_creditos_usd?: number | null;
+  limite_duro_usd?: number | null;
+  saldo_limite_usd?: number | null;
+  saldo_sincronizado_em?: string | null;
+  saude_live?: "ok" | "invalida" | "erro" | null;
 };
 type AuditoriaPool = { apelido: string; acao: string; alterado_em: string };
 type UltimaBusca = {
@@ -444,11 +453,70 @@ const STATUS_POOL: Record<string, { rotulo: string; cls: string }> = {
 /** Linha de status de teste — SEMPRE visível, nunca campo vazio e mudo. */
 function StatusTeste({ c }: { c: ChavePoolApify }) {
   if (c.teste_ok === true && c.testada_em) {
+    const financeiroCompleto =
+      typeof c.creditos_plano_usd === "number" &&
+      typeof c.uso_mensal_usd === "number" &&
+      typeof c.saldo_creditos_usd === "number" &&
+      typeof c.limite_duro_usd === "number" &&
+      typeof c.saldo_limite_usd === "number";
+    if (!financeiroCompleto) {
+      return (
+        <p className="mt-1 text-[11px] font-medium text-primary">
+          ✓ Testada em {new Date(c.testada_em).toLocaleString("pt-BR")}
+          {c.credito_estimado != null
+            ? ` · disponível medido: US$ ${Number(c.credito_estimado).toFixed(2)}`
+            : " · atualize para sincronizar os dados financeiros"}
+        </p>
+      );
+    }
+    const creditos = Number(c.creditos_plano_usd ?? 0);
+    const uso = Number(c.uso_mensal_usd ?? 0);
+    const saldoCreditos = Number(c.saldo_creditos_usd ?? 0);
+    const limite = Number(c.limite_duro_usd ?? 0);
+    const margemLimite = Number(c.saldo_limite_usd ?? c.credito_estimado ?? 0);
     return (
-      <p className="mt-1 text-[11px] font-medium text-[#15803D]">
-        ✓ Testada em {new Date(c.testada_em).toLocaleDateString("pt-BR")}
-        {c.credito_estimado != null && ` · crédito ~US$ ${Number(c.credito_estimado).toFixed(2)}`}
-      </p>
+      <div className="mt-1.5 space-y-1.5 text-[11px]">
+        <p className="font-medium text-primary">
+          ✓ Sincronizada com a Apify em {new Date(c.testada_em).toLocaleString("pt-BR")}
+          {c.conta_apify_username ? ` · conta ${c.conta_apify_username}` : ""}
+        </p>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+          <span>
+            Uso no ciclo: <strong className="text-foreground">US$ {uso.toFixed(2)}</strong> de{" "}
+            <strong className="text-foreground">US$ {limite.toFixed(2)}</strong>
+          </span>
+          <span>
+            Disponível até o bloqueio:{" "}
+            <strong className="text-foreground">US$ {margemLimite.toFixed(2)}</strong>
+          </span>
+          <span>
+            Créditos incluídos:{" "}
+            <strong className="text-foreground">US$ {creditos.toFixed(2)}</strong>
+          </span>
+          <span>
+            Saldo ainda incluído:{" "}
+            <strong className="text-foreground">US$ {saldoCreditos.toFixed(2)}</strong>
+          </span>
+        </div>
+        {saldoCreditos > margemLimite + 0.01 && (
+          <p className="rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-foreground">
+            Atenção: ainda há US$ {saldoCreditos.toFixed(2)} incluídos, mas o teto permite usar só
+            mais US$ {margemLimite.toFixed(2)}. Aumente o limite na Apify para liberar o restante.
+          </p>
+        )}
+        {limite > creditos + 0.01 && (
+          <p className="rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-foreground">
+            O teto permite US$ {(limite - creditos).toFixed(2)} além dos créditos incluídos; esse
+            excedente pode gerar cobrança na Apify.
+          </p>
+        )}
+        {c.conta_compartilhada_com && (
+          <p className="rounded-md border border-border bg-muted/40 px-2 py-1 text-muted-foreground">
+            Esta chave usa a mesma conta/saldo de “{c.conta_compartilhada_com}”; os valores não são
+            somados duas vezes no painel.
+          </p>
+        )}
+      </div>
     );
   }
   if (c.teste_ok === false && c.testada_em) {
@@ -468,7 +536,9 @@ function StatusTeste({ c }: { c: ChavePoolApify }) {
 
 function SecaoPoolApify() {
   const [chaves, setChaves] = useState<ChavePoolApify[] | null>(null);
-  const [ativas, setAtivas] = useState(0);
+  const [contasAtivas, setContasAtivas] = useState(0);
+  const [contasSaudeDesconhecida, setContasSaudeDesconhecida] = useState(0);
+  const [erroCarregar, setErroCarregar] = useState<string | null>(null);
   const [ultimaBusca, setUltimaBusca] = useState<UltimaBusca | null>(null);
   const [auditoria, setAuditoria] = useState<AuditoriaPool[]>([]);
   const [apelido, setApelido] = useState("");
@@ -487,17 +557,23 @@ function SecaoPoolApify() {
         : null;
   const tokenBloqueado = !!valorLimpo && (valorLimpo.includes("@") || /\s/.test(valorLimpo));
 
-  const carregar = () =>
-    adminAcao("apify_pool_listar").then((r) => {
-      if (!r.ok) return setChaves([]);
+  const carregar = useCallback(async () => {
+    setErroCarregar(null);
+    try {
+      const r = await adminAcao("apify_pool_listar");
+      if (!r.ok) throw new Error(r.detalhe || r.reason || "Falha ao ler o pool.");
       setChaves((r.chaves as ChavePoolApify[]) ?? []);
-      setAtivas(Number(r.ativas ?? 0));
+      setContasAtivas(Number(r.contas_ativas ?? r.ativas ?? 0));
+      setContasSaudeDesconhecida(Number(r.contas_saude_desconhecida ?? 0));
       setUltimaBusca((r.ultima_busca as UltimaBusca | null) ?? null);
       setAuditoria((r.auditoria as AuditoriaPool[]) ?? []);
-    });
-  useEffect(() => {
-    carregar();
+    } catch (error) {
+      setErroCarregar(error instanceof Error ? error.message : String(error));
+    }
   }, []);
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
 
   const acao = async (nome: string, payload: Record<string, unknown>, okMsg?: string) => {
     setOcupado(nome + JSON.stringify(payload));
@@ -533,10 +609,11 @@ function SecaoPoolApify() {
       }
       // TESTE AUTOMÁTICO: o resultado aparece na hora
       const teste = r.teste as
-        { situacao?: string; restante?: number; motivo?: string } | undefined;
+        | { situacao?: string; restante?: number; max?: number; uso?: number; motivo?: string }
+        | undefined;
       if (teste?.situacao === "ok")
         toast.success(
-          `Chave adicionada e testada ✓ — crédito ~US$ ${Number(teste.restante ?? 0).toFixed(2)}.`,
+          `Chave adicionada ✓ — US$ ${Number(teste.uso ?? 0).toFixed(2)} usados de US$ ${Number(teste.max ?? 0).toFixed(2)}; saldo US$ ${Number(teste.restante ?? 0).toFixed(2)}.`,
         );
       else if (teste?.situacao === "invalida")
         toast.error(`Chave adicionada, mas o teste FALHOU: ${teste.motivo ?? "token inválido"}.`);
@@ -559,9 +636,19 @@ function SecaoPoolApify() {
       if (!r.ok) {
         setResultadoLinha((t) => ({ ...t, [c.id]: `falha: ${r.reason}` }));
       } else if (r.situacao === "ok") {
+        const uso = Number(r.uso);
+        const limite = Number(r.max);
+        const restante = Number(r.restante);
+        if (![uso, limite, restante].every(Number.isFinite)) {
+          setResultadoLinha((t) => ({
+            ...t,
+            [c.id]: "✗ A Apify respondeu sem os valores financeiros esperados.",
+          }));
+          return;
+        }
         setResultadoLinha((t) => ({
           ...t,
-          [c.id]: `✓ Funciona — US$ ${Number(r.restante).toFixed(2)} de crédito restante (de US$ ${Number(r.max).toFixed(2)})`,
+          [c.id]: `✓ Funciona — US$ ${uso.toFixed(2)} usados de US$ ${limite.toFixed(2)}; disponível até o bloqueio US$ ${restante.toFixed(2)}`,
         }));
       } else {
         setResultadoLinha((t) => ({ ...t, [c.id]: `✗ ${String(r.motivo ?? r.situacao)}` }));
@@ -615,8 +702,9 @@ function SecaoPoolApify() {
         <div>
           <h3 className="font-serif text-lg leading-tight">Pool de chaves Apify</h3>
           <p className="text-[11px] text-muted-foreground">
-            Rodízio automático: esgotou o crédito → a próxima assume na hora, inclusive no meio de
-            uma busca. Valores cifrados; esgotada só volta quando você reativar.
+            Rodízio automático: atingiu o limite operacional → a próxima assume na hora, inclusive
+            no meio de uma busca. Saldos são consultados ao vivo; valores cifrados; uma chave só
+            volta ao rodízio quando você reativar.
           </p>
         </div>
       </div>
@@ -639,12 +727,22 @@ function SecaoPoolApify() {
         </p>
       )}
 
-      {chaves !== null && chaves.length > 0 && ativas <= 1 && (
+      {chaves !== null &&
+        chaves.length > 0 &&
+        contasSaudeDesconhecida === 0 &&
+        contasAtivas <= 1 && (
+          <p className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm text-foreground">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-gold" />
+            {contasAtivas === 0
+              ? "NENHUMA conta Apify ativa — as buscas estão PARADAS até cadastrar ou reativar uma chave."
+              : "Resta apenas 1 conta Apify com saldo independente — adicione uma chave de outra conta para o rodízio não parar."}
+          </p>
+        )}
+      {chaves !== null && contasSaudeDesconhecida > 0 && (
         <p className="mx-6 mt-4 flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 p-3 text-sm text-foreground">
           <AlertTriangle className="h-4 w-4 shrink-0 text-gold" />
-          {ativas === 0
-            ? "NENHUMA chave ativa — as buscas via Apify estão PARADAS até cadastrar/reativar uma chave."
-            : "Resta apenas 1 chave ativa no pool — cadastre a próxima para o rodízio não parar."}
+          Não foi possível confirmar agora a saúde de {contasSaudeDesconhecida} chave(s). O sistema
+          não as considera reserva confirmada até a Apify responder.
         </p>
       )}
       {nuncaTestadas > 0 && (
@@ -655,7 +753,12 @@ function SecaoPoolApify() {
             : `${nuncaTestadas} chaves nunca foram testadas — clique em Testar em cada uma (grátis).`}
         </p>
       )}
-      {chaves !== null && chaves.length === 0 && (
+      {erroCarregar && (
+        <p className="mx-6 mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-[12px] text-destructive">
+          Não foi possível carregar o pool: {erroCarregar}
+        </p>
+      )}
+      {chaves !== null && chaves.length === 0 && !erroCarregar && (
         <p className="mx-6 mt-4 rounded-xl border border-border bg-secondary/30 p-3 text-[12px] leading-relaxed text-muted-foreground">
           Pool vazio — o sistema usa a chave única do cofre (APIFY_API_TOKEN), sem rodízio. Cadastre
           2+ chaves abaixo para ligar a troca automática por esgotamento.
@@ -663,7 +766,7 @@ function SecaoPoolApify() {
       )}
 
       <div className="divide-y divide-border/70 px-6">
-        {chaves === null && (
+        {chaves === null && !erroCarregar && (
           <p className="py-6 text-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Carregando…
           </p>
@@ -700,10 +803,15 @@ function SecaoPoolApify() {
                       >
                         {st.rotulo}
                       </span>
+                      {c.saude_live && c.saude_live !== "ok" && (
+                        <span className="rounded-full border border-destructive/30 bg-destructive/5 px-2 py-0.5 text-[10px] font-medium text-destructive">
+                          Falha ao vivo
+                        </span>
+                      )}
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
                       Token ••••••••{c.ultimos4}
-                      {` · gasto acumulado US$ ${Number(c.gasto_acumulado).toFixed(2)}`}
+                      {` · gasto atribuído pelo Flow US$ ${Number(c.gasto_acumulado).toFixed(2)}`}
                       {c.ultimo_uso
                         ? ` · último uso ${new Date(c.ultimo_uso).toLocaleDateString("pt-BR")}`
                         : " · nunca usada em busca"}
@@ -723,7 +831,7 @@ function SecaoPoolApify() {
                     onClick={() => testar(c)}
                     disabled={!!ocupado}
                     className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:border-gold/50 hover:bg-gold/5 disabled:opacity-50"
-                    title="Valida o token e mede o crédito restante (chamada grátis)"
+                    title="Valida o token e sincroniza crédito, uso e limite (chamada grátis)"
                   >
                     {ocupado === "testar" + c.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

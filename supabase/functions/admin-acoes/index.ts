@@ -12,7 +12,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { cifrar, decifrar } from "../_shared/cofre.ts";
 import { resolverChave } from "../_shared/chaves.ts";
-import { creditoRestanteDeLimits } from "../_shared/apify-criterio.ts";
+import {
+  consultarContaFinanceiraApify,
+  deduplicarContasFinanceirasApify,
+  resumirContaFinanceiraApify,
+  type ContaFinanceiraApify,
+} from "../_shared/apify-financeiro.ts";
 import { buildApiUsagePeriodSummary } from "../_shared/api-usage-summary.ts";
 import { planApifyRunLedgerSync, type RemoteApifyRun } from "../_shared/apify-run-ledger.ts";
 
@@ -815,11 +820,7 @@ Deno.serve(async (req) => {
         admin.from("planos").select("id, nome, limite_leads"),
         admin.from("consumo_org").select("org_id, leads").eq("mes_ref", mesRef),
         admin.rpc("admin_api_lead_counts", { p_since: desde }),
-        admin
-          .from("apify_chaves")
-          .select("apelido, valor_cifrado, status")
-          .eq("status", "ativa")
-          .order("ordem"),
+        admin.from("apify_chaves").select("apelido, valor_cifrado, status").order("ordem"),
       ]);
 
       const queryError = [
@@ -839,6 +840,7 @@ Deno.serve(async (req) => {
       const accountErrors: string[] = [];
       if (keysResult.error) accountErrors.push(`pool: ${keysResult.error.message}`);
       for (const row of keysResult.data ?? []) {
+        if (row.status === "invalida") continue;
         try {
           tokenRows.push({ label: String(row.apelido), token: await decifrar(row.valor_cifrado) });
         } catch (error) {
@@ -847,7 +849,7 @@ Deno.serve(async (req) => {
           );
         }
       }
-      if (tokenRows.length === 0 && !keysResult.error) {
+      if ((keysResult.data?.length ?? 0) === 0 && !keysResult.error) {
         const fallbackToken = await resolverChave(admin, "APIFY_API_TOKEN");
         if (fallbackToken) tokenRows.push({ label: "chave única", token: fallbackToken });
       }
@@ -860,7 +862,11 @@ Deno.serve(async (req) => {
         for (let offset = 0; offset < 1_000; offset += 100) {
           try {
             const listResponse = await fetch(
-              `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?token=${encodeURIComponent(tokenRow.token)}&limit=100&offset=${offset}&desc=1`,
+              `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?limit=100&offset=${offset}&desc=1`,
+              {
+                headers: { Authorization: `Bearer ${tokenRow.token}` },
+                signal: AbortSignal.timeout(10_000),
+              },
             );
             const listBody = await listResponse.json().catch(() => ({}));
             if (!listResponse.ok || !Array.isArray(listBody?.data?.items)) {
@@ -943,7 +949,11 @@ Deno.serve(async (req) => {
         if (itemCount === 0 && run.defaultDatasetId && tokenRow) {
           try {
             const datasetResponse = await fetch(
-              `https://api.apify.com/v2/datasets/${encodeURIComponent(run.defaultDatasetId)}?token=${encodeURIComponent(tokenRow.token)}`,
+              `https://api.apify.com/v2/datasets/${encodeURIComponent(run.defaultDatasetId)}`,
+              {
+                headers: { Authorization: `Bearer ${tokenRow.token}` },
+                signal: AbortSignal.timeout(10_000),
+              },
             );
             if (datasetResponse.ok) {
               const datasetBody = await datasetResponse.json().catch(() => ({}));
@@ -1065,38 +1075,70 @@ Deno.serve(async (req) => {
 
       const accounts: Array<{
         label: string;
+        account_id: string;
+        username: string;
+        token_count: number;
         usage_usd: number;
         limit_usd: number;
         remaining_usd: number;
+        included_credits_usd: number;
+        included_credits_remaining_usd: number;
+        hard_limit_usd: number;
+        hard_remaining_usd: number;
       }> = [];
-      for (const row of tokenRows) {
-        try {
-          const response = await fetch(
-            `https://api.apify.com/v2/users/me/limits?token=${encodeURIComponent(row.token)}`,
-          );
-          const body = await response.json().catch(() => ({}));
-          const usage = body?.data?.current?.monthlyUsageUsd;
-          const limit = body?.data?.limits?.maxMonthlyUsageUsd;
-          if (!response.ok || typeof usage !== "number" || typeof limit !== "number") {
-            accountErrors.push(`${row.label}: resposta inválida (HTTP ${response.status})`);
-            continue;
-          }
-          accounts.push({
-            label: row.label,
-            usage_usd: usage,
-            limit_usd: limit,
-            remaining_usd: limit - usage,
-          });
-        } catch (error) {
-          accountErrors.push(
-            `${row.label}: ${error instanceof Error ? error.message : String(error)}`,
-          );
+      const consultasFinanceiras = await Promise.all(
+        tokenRows.map(async (row) => ({
+          row,
+          consulta: await consultarContaFinanceiraApify(row.token),
+        })),
+      );
+      const contasPorToken: Array<{ label: string; conta: ContaFinanceiraApify }> = [];
+      for (const { row, consulta } of consultasFinanceiras) {
+        if (consulta.situacao !== "ok") {
+          accountErrors.push(`${row.label}: ${consulta.motivo}`);
+          continue;
         }
+        contasPorToken.push({ label: row.label, conta: consulta.conta });
+      }
+      const contasUnicas = deduplicarContasFinanceirasApify(contasPorToken.map((row) => row.conta));
+      for (const conta of contasUnicas) {
+        const tokensDaConta = contasPorToken.filter(
+          (row) => row.conta.accountId === conta.accountId,
+        );
+        const resumoConta = resumirContaFinanceiraApify(conta);
+        accounts.push({
+          label: tokensDaConta.map((row) => row.label).join(" + "),
+          account_id: conta.accountId,
+          username: conta.username,
+          token_count: tokensDaConta.length,
+          usage_usd: resumoConta.usageUsd,
+          // Compatibilidade: estes campos sempre representaram o teto mensal da conta.
+          // A API oficial /limits devolve o mesmo valor exibido como "uso / limite" na Apify.
+          limit_usd: resumoConta.limitUsd,
+          remaining_usd: resumoConta.remainingUsd,
+          included_credits_usd: resumoConta.includedCreditsUsd,
+          included_credits_remaining_usd: resumoConta.includedCreditsRemainingUsd,
+          hard_limit_usd: conta.hardLimitUsd,
+          hard_remaining_usd: conta.hardRemainingUsd,
+        });
       }
 
       const apifyUsageUsd = accounts.reduce((sum, account) => sum + account.usage_usd, 0);
       const apifyLimitUsd = accounts.reduce((sum, account) => sum + account.limit_usd, 0);
       const apifyRemainingUsd = accounts.reduce((sum, account) => sum + account.remaining_usd, 0);
+      const apifyIncludedCreditsUsd = accounts.reduce(
+        (sum, account) => sum + account.included_credits_usd,
+        0,
+      );
+      const apifyIncludedCreditsRemainingUsd = accounts.reduce(
+        (sum, account) => sum + account.included_credits_remaining_usd,
+        0,
+      );
+      const apifyHardLimitUsd = accounts.reduce((sum, account) => sum + account.hard_limit_usd, 0);
+      const apifyHardRemainingUsd = accounts.reduce(
+        (sum, account) => sum + account.hard_remaining_usd,
+        0,
+      );
 
       return json({
         ok: true,
@@ -1120,6 +1162,10 @@ Deno.serve(async (req) => {
           usage_usd: apifyUsageUsd,
           limit_usd: apifyLimitUsd,
           remaining_usd: apifyRemainingUsd,
+          included_credits_usd: apifyIncludedCreditsUsd,
+          included_credits_remaining_usd: apifyIncludedCreditsRemainingUsd,
+          hard_limit_usd: apifyHardLimitUsd,
+          hard_remaining_usd: apifyHardRemainingUsd,
           synced_at: new Date().toISOString(),
           reconciled_runs: reconciledRuns,
           accounts,
@@ -1131,107 +1177,208 @@ Deno.serve(async (req) => {
     // ═══ POOL DE CHAVES APIFY (rodízio por esgotamento) ═══
     // O valor da chave NUNCA volta em nenhuma ação — só ultimos4/status/metadados.
 
-    // Testa uma chave contra GET /users/me/limits (grátis) e PERSISTE o resultado —
+    // Testa uma chave contra /users/me + /users/me/limits (grátis) e PERSISTE o resultado —
     // sucesso, falha COM O MOTIVO REAL da Apify, ou "resposta ilegível". Usado pelo botão
     // "Testar" e automaticamente ao adicionar.
     const testarChaveApify = async (id: string, tokenChave: string) => {
       const agora = new Date().toISOString();
       let resultado: Rec;
       let patch: Rec;
-      try {
-        const r = await fetch(
-          `https://api.apify.com/v2/users/me/limits?token=${encodeURIComponent(tokenChave)}`,
-        );
-        if (r.status === 401) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const corpo: any = await r.json().catch(() => ({}));
-          const motivo = String(corpo?.error?.message ?? "token inválido (401)");
-          patch = {
-            status: "invalida",
-            testada_em: agora,
-            teste_ok: false,
-            teste_detalhe: motivo,
-            atualizado_em: agora,
-          };
-          resultado = { ok: true, situacao: "invalida", motivo };
-        } else {
-          const j = await r.json().catch(() => ({}));
-          const restante = creditoRestanteDeLimits(j);
-          if (restante === null) {
-            const motivo = `resposta da Apify ilegível (HTTP ${r.status}) — não deu pra ler o crédito`;
-            patch = {
-              testada_em: agora,
-              teste_ok: false,
-              teste_detalhe: motivo,
-              atualizado_em: agora,
-            };
-            resultado = { ok: true, situacao: "ilegivel", motivo };
-          } else {
-            patch = {
-              testada_em: agora,
-              teste_ok: true,
-              teste_detalhe: null,
-              credito_estimado: restante,
-              atualizado_em: agora,
-            };
-            resultado = {
-              ok: true,
-              situacao: "ok",
-              restante,
-              max: j?.data?.limits?.maxMonthlyUsageUsd ?? null,
-              uso: j?.data?.current?.monthlyUsageUsd ?? null,
-            };
-          }
-        }
-      } catch (e) {
-        const motivo = `falha de rede ao testar: ${e instanceof Error ? e.message : String(e)}`;
+      const consulta = await consultarContaFinanceiraApify(tokenChave);
+      if (consulta.situacao === "invalida") {
+        patch = {
+          status: "invalida",
+          testada_em: agora,
+          teste_ok: false,
+          teste_detalhe: consulta.motivo,
+          atualizado_em: agora,
+        };
+        resultado = { ok: true, situacao: "invalida", motivo: consulta.motivo };
+      } else if (consulta.situacao === "erro") {
+        const motivo = `falha ao sincronizar conta Apify: ${consulta.motivo}`;
         patch = { testada_em: agora, teste_ok: false, teste_detalhe: motivo, atualizado_em: agora };
-        resultado = { ok: true, situacao: "rede", motivo };
+        resultado = { ok: true, situacao: "ilegivel", motivo };
+      } else {
+        const conta = consulta.conta;
+        patch = {
+          testada_em: agora,
+          teste_ok: true,
+          teste_detalhe: null,
+          // O campo legado alimenta o rodizio/painel e deve refletir quanto ainda pode ser
+          // consumido antes do bloqueio configurado, nao apenas os creditos incluidos no plano.
+          credito_estimado: conta.hardRemainingUsd,
+          atualizado_em: agora,
+        };
+        resultado = {
+          ok: true,
+          situacao: "ok",
+          restante: conta.hardRemainingUsd,
+          max: conta.hardLimitUsd,
+          uso: conta.usageUsd,
+          conta_apify_id: conta.accountId,
+          conta_apify_username: conta.username,
+          creditos_plano_usd: conta.planCreditsUsd,
+          uso_mensal_usd: conta.usageUsd,
+          saldo_creditos_usd: conta.planRemainingUsd,
+          limite_duro_usd: conta.hardLimitUsd,
+          saldo_limite_usd: conta.hardRemainingUsd,
+          ciclo_inicio: conta.cycleStartAt,
+          ciclo_fim: conta.cycleEndAt,
+          saldo_sincronizado_em: agora,
+        };
       }
-      await admin.from("apify_chaves").update(patch).eq("id", id);
+      const { error: persistenciaError } = await admin
+        .from("apify_chaves")
+        .update(patch)
+        .eq("id", id);
+      if (persistenciaError) {
+        return {
+          ok: false,
+          situacao: "persistencia",
+          motivo: `A Apify respondeu, mas nao foi possivel salvar o teste: ${persistenciaError.message}`,
+        };
+      }
       return resultado;
     };
 
     if (acao === "apify_pool_listar") {
-      const { data: chaves } = await admin
+      const { data: chaves, error: chavesError } = await admin
         .from("apify_chaves")
         .select(
-          "id, apelido, ultimos4, ordem, status, esgotada_em, ultimo_uso, credito_estimado, criado_em, testada_em, teste_ok, teste_detalhe",
+          "id, apelido, ultimos4, ordem, status, esgotada_em, ultimo_uso, credito_estimado, criado_em, testada_em, teste_ok, teste_detalhe, valor_cifrado",
         )
         .order("ordem", { ascending: true });
+      if (chavesError) {
+        return json(
+          {
+            ok: false,
+            reason: "erro_pool",
+            detalhe: `Falha ao ler o pool: ${chavesError.message}`,
+          },
+          500,
+        );
+      }
+      const sincronizadas = await Promise.all(
+        (chaves ?? []).map(async (chave: Rec) => {
+          const publica = { ...chave };
+          delete publica.valor_cifrado;
+          try {
+            const token = await decifrar(String(chave.valor_cifrado));
+            const consulta = await consultarContaFinanceiraApify(token);
+            if (consulta.situacao === "ok") {
+              const conta = consulta.conta;
+              const sincronizadaEm = new Date().toISOString();
+              return {
+                ...publica,
+                credito_estimado: conta.hardRemainingUsd,
+                testada_em: sincronizadaEm,
+                teste_ok: true,
+                teste_detalhe: null,
+                conta_apify_id: conta.accountId,
+                conta_apify_username: conta.username,
+                creditos_plano_usd: conta.planCreditsUsd,
+                uso_mensal_usd: conta.usageUsd,
+                saldo_creditos_usd: conta.planRemainingUsd,
+                limite_duro_usd: conta.hardLimitUsd,
+                saldo_limite_usd: conta.hardRemainingUsd,
+                ciclo_inicio: conta.cycleStartAt,
+                ciclo_fim: conta.cycleEndAt,
+                saldo_sincronizado_em: sincronizadaEm,
+                saude_live: "ok",
+              };
+            }
+            return {
+              ...publica,
+              testada_em: new Date().toISOString(),
+              teste_ok: false,
+              teste_detalhe: consulta.motivo,
+              saude_live: consulta.situacao,
+            };
+          } catch (error) {
+            return {
+              ...publica,
+              teste_ok: false,
+              teste_detalhe: `cofre ilegível: ${error instanceof Error ? error.message : String(error)}`,
+              saude_live: "erro",
+            };
+          }
+        }),
+      );
       // gasto acumulado por chave (livro-caixa)
-      const { data: gastos } = await admin
-        .from("redes_buscas")
-        .select("chave_apelido, custo_usd")
-        .not("chave_apelido", "is", null);
+      const [gastosResult, ultimaBuscaResult, auditoriaResult] = await Promise.all([
+        admin
+          .from("redes_buscas")
+          .select("chave_apelido, custo_usd")
+          .not("chave_apelido", "is", null),
+        admin
+          .from("redes_buscas")
+          .select("chave_apelido, fonte, estrategia, custo_usd, criado_em, status")
+          .not("chave_apelido", "is", null)
+          .order("criado_em", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        admin
+          .from("apify_chaves_auditoria")
+          .select("apelido, acao, alterado_por, alterado_em")
+          .order("alterado_em", { ascending: false })
+          .limit(20),
+      ]);
+      const poolQueryError = [
+        gastosResult.error,
+        ultimaBuscaResult.error,
+        auditoriaResult.error,
+      ].find(Boolean);
+      if (poolQueryError) {
+        return json(
+          {
+            ok: false,
+            reason: "erro_pool",
+            detalhe: `Falha ao completar os dados do pool: ${poolQueryError.message}`,
+          },
+          500,
+        );
+      }
+      const gastos = gastosResult.data;
+      const ultimaBusca = ultimaBuscaResult.data;
+      const auditoria = auditoriaResult.data;
       const gastoPorChave = new Map<string, number>();
       for (const g of gastos ?? [])
         gastoPorChave.set(
           g.chave_apelido as string,
           (gastoPorChave.get(g.chave_apelido as string) ?? 0) + Number(g.custo_usd ?? 0),
         );
-      // "está funcionando?" — a ÚLTIMA busca que gastou (o livro-caixa registra a chave)
-      const { data: ultimaBusca } = await admin
-        .from("redes_buscas")
-        .select("chave_apelido, fonte, estrategia, custo_usd, criado_em, status")
-        .not("chave_apelido", "is", null)
-        .order("criado_em", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const { data: auditoria } = await admin
-        .from("apify_chaves_auditoria")
-        .select("apelido, acao, alterado_por, alterado_em")
-        .order("alterado_em", { ascending: false })
-        .limit(20);
-      const lista = (chaves ?? []).map((c: Rec) => ({
-        ...c,
-        gasto_acumulado: gastoPorChave.get(String(c.apelido)) ?? 0,
-      }));
+      const primeiraChaveDaConta = new Map<string, string>();
+      const lista = sincronizadas.map((c: Rec) => {
+        const accountId = typeof c.conta_apify_id === "string" ? c.conta_apify_id : null;
+        const compartilhadaCom = accountId ? (primeiraChaveDaConta.get(accountId) ?? null) : null;
+        if (accountId && !compartilhadaCom) primeiraChaveDaConta.set(accountId, String(c.apelido));
+        return {
+          ...c,
+          conta_compartilhada_com: compartilhadaCom,
+          gasto_acumulado: gastoPorChave.get(String(c.apelido)) ?? 0,
+        };
+      });
       const ativas = lista.filter((c: Rec) => c.status === "ativa").length;
+      const contasAtivas = new Set(
+        lista
+          .filter(
+            (c: Rec) =>
+              c.status === "ativa" &&
+              c.saude_live === "ok" &&
+              Number(c.saldo_limite_usd) > 0.1 &&
+              typeof c.conta_apify_id === "string",
+          )
+          .map((c: Rec) => String(c.conta_apify_id)),
+      ).size;
+      const contasSaudeDesconhecida = lista.filter(
+        (c: Rec) => c.status === "ativa" && c.saude_live === "erro",
+      ).length;
       return json({
         ok: true,
         chaves: lista,
         ativas,
+        contas_ativas: contasAtivas,
+        contas_saude_desconhecida: contasSaudeDesconhecida,
         ultima_busca: ultimaBusca ?? null,
         auditoria: auditoria ?? [],
       });

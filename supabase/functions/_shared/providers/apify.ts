@@ -99,9 +99,9 @@ async function baixarDataset(
   max: number,
 ): Promise<DatasetResult> {
   try {
-    const r = await fetch(
-      `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(token)}&clean=true&limit=${max}`,
-    );
+    const r = await fetch(`${API}/datasets/${datasetId}/items?clean=true&limit=${max}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!r.ok) return { items: [], error: `dataset HTTP ${r.status}` };
     const items = (await r.json().catch(() => [])) as ApifyItem[];
     return { items, error: null };
@@ -153,9 +153,8 @@ export const searchApify: ProviderSearch = async ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     };
-    const montarUrl = (token: string) => {
+    const montarUrl = () => {
       const params = new URLSearchParams({
-        token,
         maxItems: String(maxItems),
         maxTotalChargeUsd: String(maxTotalChargeUsd),
       });
@@ -196,7 +195,10 @@ export const searchApify: ProviderSearch = async ({
       if (!token) throw new Error("APIFY_API_TOKEN não configurada no secret da Edge Function.");
       chave = { id: null, apelido: "chave única", token };
       log(`Apify: iniciando run (Google Maps) — até ${maxPlaces} lugares...`);
-      const startRes = await fetch(montarUrl(token), init);
+      const startRes = await fetch(montarUrl(), {
+        ...init,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
       startJson = await startRes.json().catch(() => ({}));
       if (!startRes.ok)
         throw new Error(`Apify start: ${startJson?.error?.message ?? "HTTP " + startRes.status}`);
@@ -232,10 +234,10 @@ export const searchApify: ProviderSearch = async ({
     while (!TERMINAIS.includes(status)) {
       if (Date.now() > deadline) {
         log("Apify: tempo limite — abortando o run para impedir custo adicional");
-        const abortRes = await fetch(
-          `${API}/actor-runs/${runId}/abort?token=${encodeURIComponent(chave.token)}`,
-          { method: "POST" },
-        );
+        const abortRes = await fetch(`${API}/actor-runs/${runId}/abort`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${chave.token}` },
+        });
         if (!abortRes.ok) {
           throw new Error(
             `Apify: não foi possível abortar o run ${runId} (HTTP ${abortRes.status})`,
@@ -248,16 +250,18 @@ export const searchApify: ProviderSearch = async ({
         break;
       }
       await sleep(4000);
-      const st = await fetch(`${API}/actor-runs/${runId}?token=${encodeURIComponent(chave.token)}`);
+      const st = await fetch(`${API}/actor-runs/${runId}`, {
+        headers: { Authorization: `Bearer ${chave.token}` },
+      });
       const sj = await st.json().catch(() => ({}));
       status = sj.data?.status ?? status;
       usd = sj.data?.usageTotalUsd ?? usd;
       log(`Apify: run ${status}${usd ? ` · custo ~US$ ${usd.toFixed(3)}` : ""}...`);
     }
     // A leitura final reduz a defasagem do total agregado logo após o término do run.
-    const finalRes = await fetch(
-      `${API}/actor-runs/${runId}?token=${encodeURIComponent(chave.token)}`,
-    );
+    const finalRes = await fetch(`${API}/actor-runs/${runId}`, {
+      headers: { Authorization: `Bearer ${chave.token}` },
+    });
     if (finalRes.ok) {
       const finalJson = await finalRes.json().catch(() => ({}));
       status = finalJson.data?.status ?? status;
@@ -273,9 +277,9 @@ export const searchApify: ProviderSearch = async ({
     itensAcumulados.push(...items);
     // Totais de uso da Apify são eventualmente consistentes. A leitura feita depois do
     // download do dataset costuma capturar o valor já consolidado sem atrasar a entrega.
-    const settledRes = await fetch(
-      `${API}/actor-runs/${runId}?token=${encodeURIComponent(chave.token)}`,
-    );
+    const settledRes = await fetch(`${API}/actor-runs/${runId}`, {
+      headers: { Authorization: `Bearer ${chave.token}` },
+    });
     if (settledRes.ok) {
       const settledJson = await settledRes.json().catch(() => ({}));
       status = settledJson.data?.status ?? status;

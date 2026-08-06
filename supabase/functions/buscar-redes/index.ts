@@ -90,7 +90,9 @@ const token = () => _apifyTokenCache ?? Deno.env.get("APIFY_API_TOKEN") ?? "";
 
 /** Existe/está acessível? NÃO roda o ator — só lê os metadados (grátis). */
 async function checarAtor(ator: string) {
-  const r = await fetch(`${API}/acts/${ator}?token=${encodeURIComponent(token())}`);
+  const r = await fetch(`${API}/acts/${ator}`, {
+    headers: { Authorization: `Bearer ${token()}` },
+  });
   if (!r.ok) return { ok: false, status: r.status };
   const j = await r.json().catch(() => ({}) as Rec);
   return {
@@ -294,9 +296,9 @@ Deno.serve(async (req) => {
 
     const colherDataset = async (dsId: string | null, tok: string) => {
       if (!dsId) return;
-      const dsRes = await fetch(
-        `${API}/datasets/${dsId}/items?token=${encodeURIComponent(tok)}&limit=${plano.maxItens}`,
-      ).catch(() => null);
+      const dsRes = await fetch(`${API}/datasets/${dsId}/items?limit=${plano.maxItens}`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      }).catch(() => null);
       const parcial: Rec[] = (await dsRes?.json().catch(() => [])) ?? [];
       itens.push(...parcial);
     };
@@ -304,8 +306,7 @@ Deno.serve(async (req) => {
     for (let rodada = 1; rodada <= MAX_RODADAS; rodada++) {
       const r = await startRunComPool(
         admin,
-        (t) =>
-          `${API}/acts/${cfg.ator}/runs?token=${encodeURIComponent(t)}&timeout=300&memory=1024`,
+        () => `${API}/acts/${cfg.ator}/runs?timeout=300&memory=1024`,
         initStart,
       );
       if (!r.ok) {
@@ -340,9 +341,9 @@ Deno.serve(async (req) => {
       let custoRodada = 0;
       for (let i = 0; i < 100; i++) {
         await new Promise((rr) => setTimeout(rr, 3000));
-        const st = await fetch(
-          `${API}/actor-runs/${runId}?token=${encodeURIComponent(chaveUsada.token)}`,
-        );
+        const st = await fetch(`${API}/actor-runs/${runId}`, {
+          headers: { Authorization: `Bearer ${chaveUsada.token}` },
+        });
         const sj = await st.json().catch(() => ({}) as Rec);
         status = sj?.data?.status ?? "UNKNOWN";
         custoRodada = Number(sj?.data?.usageTotalUsd ?? 0);
@@ -350,10 +351,10 @@ Deno.serve(async (req) => {
         if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
         // trava de segurança: se a BUSCA já passou do teto da rodada, aborta na hora
         if (custoTotal + custoRodada >= TETO_RODADA) {
-          await fetch(
-            `${API}/actor-runs/${runId}/abort?token=${encodeURIComponent(chaveUsada.token)}`,
-            { method: "POST" },
-          ).catch(() => {});
+          await fetch(`${API}/actor-runs/${runId}/abort`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${chaveUsada.token}` },
+          }).catch(() => {});
           await finalizar({
             status: "parada_teto",
             custo_usd: custoTotal + custoRodada,

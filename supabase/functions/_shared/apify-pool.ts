@@ -34,10 +34,19 @@ export type PoolApify = { chaves: ChaveApify[]; poolConfigurado: boolean };
 /** Chaves ATIVAS decifradas, na ordem do rodízio. poolConfigurado=false → caiu no secret. */
 export async function carregarPoolApify(admin: Admin): Promise<PoolApify> {
   try {
-    const { data: todas } = await admin
+    const { data: todas, error } = await admin
       .from("apify_chaves")
       .select("id, apelido, valor_cifrado, status, ordem")
       .order("ordem", { ascending: true });
+    if (error) {
+      console.error("[apify-pool] Falha ao carregar o pool:", error);
+      await avisarSuperAdminsApify(
+        admin,
+        "Falha ao carregar o pool Apify",
+        "O banco nao respondeu ao carregar as chaves. A busca foi interrompida para nao usar uma chave antiga fora do rodizio.",
+      );
+      return { chaves: [], poolConfigurado: true };
+    }
     const linhas = todas ?? [];
     if (linhas.length > 0) {
       const chaves: ChaveApify[] = [];
@@ -51,8 +60,14 @@ export async function carregarPoolApify(admin: Admin): Promise<PoolApify> {
       }
       return { chaves, poolConfigurado: true };
     }
-  } catch {
-    /* tabela indisponível → fallback */
+  } catch (error) {
+    console.error("[apify-pool] Excecao ao carregar o pool:", error);
+    await avisarSuperAdminsApify(
+      admin,
+      "Falha ao carregar o pool Apify",
+      "O banco nao respondeu ao carregar as chaves. A busca foi interrompida para nao usar uma chave antiga fora do rodizio.",
+    );
+    return { chaves: [], poolConfigurado: true };
   }
   const secret = await resolverChave(admin, "APIFY_API_TOKEN");
   return {
@@ -66,9 +81,9 @@ export async function marcarChaveApify(
   admin: Admin,
   id: string,
   status: "esgotada" | "invalida",
-): Promise<void> {
+): Promise<boolean> {
   const agora = new Date().toISOString();
-  const { data: linha } = await admin
+  const { data: linha, error } = await admin
     .from("apify_chaves")
     .update({
       status,
@@ -76,13 +91,96 @@ export async function marcarChaveApify(
       ...(status === "esgotada" ? { esgotada_em: agora } : {}),
     })
     .eq("id", id)
+    .eq("status", "ativa")
     .select("apelido")
     .maybeSingle();
+  if (error) {
+    await avisarSuperAdminsApify(
+      admin,
+      "Falha ao salvar a rotação Apify",
+      `A chave ${id} falhou, mas o banco não confirmou a mudança de status. A próxima busca tentará reconciliar novamente.`,
+    );
+    return false;
+  }
+  if (!linha) return false;
   await admin.from("apify_chaves_auditoria").insert({
-    apelido: linha?.apelido ?? id,
+    apelido: linha.apelido ?? id,
     acao: `${status}_automatico`,
     alterado_por: null,
   });
+  return true;
+}
+
+async function consultarIdContaApify(token: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${API}/users/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return null;
+    const body = await response.json().catch(() => ({}));
+    return typeof body?.data?.id === "string" ? body.data.id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Um saldo esgotado pertence a conta, nao ao token. Resolve identidade apenas na falha
+ * (zero custo/latencia no caminho feliz) e devolve as chaves que compartilham a conta.
+ * Se a Apify estiver indisponivel, falha aberto e marca somente a chave que comprovadamente falhou.
+ */
+export async function chavesDaMesmaContaApify(
+  chaveEsgotada: ChaveApify,
+  chaves: ChaveApify[],
+): Promise<ChaveApify[]> {
+  const candidatas = [chaveEsgotada, ...chaves.filter((chave) => chave.id !== chaveEsgotada.id)];
+  const identidades = await Promise.all(
+    candidatas.map(async (chave) => ({ chave, contaId: await consultarIdContaApify(chave.token) })),
+  );
+  const contaId = identidades[0]?.contaId ?? null;
+  if (!contaId) return [chaveEsgotada];
+  return identidades.filter((item) => item.contaId === contaId).map((item) => item.chave);
+}
+
+async function marcarContaApifyEsgotada(
+  admin: Admin,
+  chaveEsgotada: ChaveApify,
+  chaves: ChaveApify[],
+): Promise<Set<string>> {
+  const compartilhadas = await chavesDaMesmaContaApify(chaveEsgotada, chaves);
+  const ids = compartilhadas
+    .map((chave) => chave.id)
+    .filter((id): id is string => typeof id === "string");
+  const idsIgnorados = new Set(ids);
+  if (ids.length === 0) return idsIgnorados;
+  const agora = new Date().toISOString();
+  const { data: linhas, error } = await admin
+    .from("apify_chaves")
+    .update({ status: "esgotada", esgotada_em: agora, atualizado_em: agora })
+    .in("id", ids)
+    .eq("status", "ativa")
+    .select("id, apelido");
+  if (error) {
+    await avisarSuperAdminsApify(
+      admin,
+      "Falha ao salvar esgotamento da conta Apify",
+      "A busca pulou a conta sem saldo nesta execução, mas o banco não confirmou a atualização atômica das chaves. A próxima execução tentará reconciliar novamente.",
+    );
+    return idsIgnorados;
+  }
+  const alteradas = linhas ?? [];
+  if (alteradas.length > 0) {
+    await admin.from("apify_chaves_auditoria").insert(
+      alteradas.map((linha: { apelido?: string; id?: string }) => ({
+        apelido: linha.apelido ?? linha.id ?? "conta Apify",
+        acao: "esgotada_automatico",
+        alterado_por: null,
+      })),
+    );
+    await avisarMarcacao(admin, chaveEsgotada, "esgotada");
+  }
+  return idsIgnorados;
 }
 
 /** Aviso VISÍVEL aos super admins (reusa o sistema real de notificações in-app). */
@@ -127,9 +225,7 @@ async function avisarMarcacao(
   const cauda =
     restantes === 0
       ? "⚠️ NENHUMA chave ativa restante — as buscas via Apify vão PARAR até cadastrar/reativar uma chave."
-      : restantes === 1
-        ? `A próxima assumiu. ⚠️ Resta apenas 1 chave ativa no pool.`
-        : `A próxima assumiu automaticamente. Restam ${restantes} chaves ativas.`;
+      : "O rodízio seguirá automaticamente com as outras contas ativas do pool.";
   await avisarSuperAdminsApify(
     admin,
     `Chave Apify "${chave.apelido}" ${status === "esgotada" ? "esgotada" : "inválida"}`,
@@ -146,7 +242,10 @@ export async function verificarCreditoChave(
   | { situacao: "ilegivel" }
 > {
   try {
-    const r = await fetch(`${API}/users/me/limits?token=${encodeURIComponent(token)}`);
+    const r = await fetch(`${API}/users/me/limits`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5_000),
+    });
     if (r.status === 401) return { situacao: "invalida" };
     const j = await r.json().catch(() => ({}));
     const restante = creditoRestanteDeLimits(j);
@@ -173,13 +272,14 @@ export type ResultadoStart =
 
 /**
  * Executa UMA chamada de START (POST /acts/.../runs) com rodízio: tenta a chave corrente;
- * esgotada/inválida → marca, avisa e a PRÓXIMA tenta o MESMO start; passageira → 1 retry na
- * MESMA chave (backoff); outro erro → devolve sem rotacionar (é da operação, não da chave).
- * montarUrl recebe o token e devolve a URL completa (token vai na query, padrão do projeto).
+ * esgotada/inválida → marca, avisa e a PRÓXIMA tenta o MESMO start. Só repete na MESMA
+ * chave quando a Apify confirma que rejeitou o start por rate/concurrency limit. Rede,
+ * timeout e 5xx são ambíguos e não repetem POST; outro erro devolve sem rotacionar.
+ * montarUrl devolve somente a URL operacional; o token segue no header Authorization.
  */
 export async function startRunComPool(
   admin: Admin,
-  montarUrl: (token: string) => string,
+  montarUrl: () => string,
   init: RequestInit,
 ): Promise<ResultadoStart> {
   const pool = await carregarPoolApify(admin);
@@ -201,13 +301,17 @@ export async function startRunComPool(
 
   let trocas = 0;
   let ultimaFalha = "";
+  const idsIgnorados = new Set<string>();
   for (const chave of pool.chaves) {
+    if (chave.id && idsIgnorados.has(chave.id)) continue;
     for (let tentativa = 1; tentativa <= 2; tentativa++) {
       let resp: Response | null = null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let corpo: any = null;
       try {
-        resp = await fetch(montarUrl(chave.token), init);
+        const headers = new Headers(init.headers);
+        headers.set("Authorization", `Bearer ${chave.token}`);
+        resp = await fetch(montarUrl(), { ...init, headers });
       } catch (e) {
         corpo = e instanceof Error ? e.message : String(e);
       }
@@ -225,16 +329,26 @@ export async function startRunComPool(
       const detalhe = String(corpo?.error?.message ?? corpo ?? `HTTP ${status}`).slice(0, 300);
 
       if (classe === "passageira") {
-        if (tentativa === 1) {
+        const tipo = String(corpo?.error?.type ?? "").toLowerCase();
+        const rejeicaoConfirmada =
+          status === 429 ||
+          tipo === "rate-limit-exceeded" ||
+          tipo === "concurrent-runs-limit-exceeded";
+        if (tentativa === 1 && rejeicaoConfirmada) {
           await sleep(1500);
-          continue; // retry na MESMA chave — requisito da Etapa 2
+          continue;
         }
         return { ok: false, reason: "falha_passageira", detalhe, status };
       }
       if (classe === "invalida" || classe === "esgotada") {
         if (chave.id) {
-          await marcarChaveApify(admin, chave.id, classe);
-          await avisarMarcacao(admin, chave, classe);
+          if (classe === "esgotada") {
+            const idsConta = await marcarContaApifyEsgotada(admin, chave, pool.chaves);
+            for (const id of idsConta) idsIgnorados.add(id);
+          } else {
+            const marcou = await marcarChaveApify(admin, chave.id, classe);
+            if (marcou) await avisarMarcacao(admin, chave, classe);
+          }
         } else {
           // chave única do secret — não há pool pra rotacionar
           await avisarSuperAdminsApify(
@@ -287,8 +401,13 @@ export async function tratarRunMorto(
   if (!esgotou) return "erro_real";
   const classe = credito.situacao === "invalida" ? "invalida" : "esgotada";
   if (chave.id) {
-    await marcarChaveApify(admin, chave.id, classe);
-    await avisarMarcacao(admin, chave, classe);
+    if (classe === "esgotada") {
+      const pool = await carregarPoolApify(admin);
+      await marcarContaApifyEsgotada(admin, chave, pool.chaves);
+    } else {
+      const marcou = await marcarChaveApify(admin, chave.id, classe);
+      if (marcou) await avisarMarcacao(admin, chave, classe);
+    }
     return "trocar_chave";
   }
   await avisarSuperAdminsApify(

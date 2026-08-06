@@ -119,11 +119,7 @@ export async function coletarReviews(
             ? `Apify reviews: iniciando (place ${placeId}, até ${maxReviews} reviews)...`
             : `Apify reviews: refazendo com a próxima chave do pool (rodada ${rodada})...`,
         );
-        const r = await startRunComPool(
-          _poolAdmin,
-          (t) => `${API}/acts/${ACTOR}/runs?token=${encodeURIComponent(t)}`,
-          init,
-        );
+        const r = await startRunComPool(_poolAdmin, () => `${API}/acts/${ACTOR}/runs`, init);
         if (!r.ok) return { ...vazio, debug: `start: ${r.reason} — ${r.detalhe}` };
         chave = r.chave;
         sj = await r.resp.json().catch(() => ({}));
@@ -132,10 +128,10 @@ export async function coletarReviews(
         if (!token) return { ...vazio, debug: "sem APIFY_API_TOKEN" };
         chave = { id: null, apelido: "chave única", token };
         log(`Apify reviews: iniciando (place ${placeId}, até ${maxReviews} reviews)...`);
-        const startRes = await fetch(
-          `${API}/acts/${ACTOR}/runs?token=${encodeURIComponent(token)}`,
-          init,
-        );
+        const startRes = await fetch(`${API}/acts/${ACTOR}/runs`, {
+          ...init,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        });
         sj = await startRes.json().catch(() => ({}));
         if (!startRes.ok)
           return { ...vazio, debug: `start ${startRes.status}: ${sj?.error?.message ?? ""}` };
@@ -157,7 +153,9 @@ export async function coletarReviews(
         await sleep(4000);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const st: any = await (
-          await fetch(`${API}/actor-runs/${runId}?token=${encodeURIComponent(chave.token)}`)
+          await fetch(`${API}/actor-runs/${runId}`, {
+            headers: { Authorization: `Bearer ${chave.token}` },
+          })
         )
           .json()
           .catch(() => ({}));
@@ -180,9 +178,9 @@ export async function coletarReviews(
       // ── DATASET ──
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items: any[] = await (
-        await fetch(
-          `${API}/datasets/${datasetId}/items?token=${encodeURIComponent(chave.token)}&clean=true`,
-        )
+        await fetch(`${API}/datasets/${datasetId}/items?clean=true`, {
+          headers: { Authorization: `Bearer ${chave.token}` },
+        })
       )
         .json()
         .catch(() => []);

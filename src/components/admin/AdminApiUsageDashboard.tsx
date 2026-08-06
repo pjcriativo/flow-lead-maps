@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DollarSign,
   Activity,
@@ -55,19 +55,23 @@ export function AdminApiUsageDashboard() {
   const [erro, setErro] = useState<string | null>(null);
   const [dias, setDias] = useState(30);
   const [busca, setBusca] = useState("");
+  const requestIdRef = useRef(0);
 
   const carregarDados = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setErro(null);
+    setResumo(null);
     try {
       const data = await obterResumoConsumoApi(dias);
-      setResumo(data);
+      if (requestId === requestIdRef.current) setResumo(data);
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       const message = error instanceof Error ? error.message : String(error);
       console.error(error);
       setErro(message);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [dias]);
 
@@ -95,6 +99,19 @@ export function AdminApiUsageDashboard() {
   const usoApify = resumo?.apify_account.usage_usd ?? 0;
   const limiteApify = resumo?.apify_account.limit_usd ?? 0;
   const saldoApify = resumo?.apify_account.remaining_usd ?? 0;
+  const creditosIncluidosApify = resumo?.apify_account.included_credits_usd ?? 0;
+  const saldoCreditosIncluidosApify = resumo?.apify_account.included_credits_remaining_usd ?? 0;
+  const contasApify = resumo?.apify_account.accounts ?? [];
+  const leituraFinanceiraDisponivel =
+    contasApify.length > 0 &&
+    [
+      resumo?.apify_account.usage_usd,
+      resumo?.apify_account.limit_usd,
+      resumo?.apify_account.remaining_usd,
+      resumo?.apify_account.included_credits_usd,
+      resumo?.apify_account.included_credits_remaining_usd,
+    ].every((value) => typeof value === "number" && Number.isFinite(value));
+  const totalTokensApify = contasApify.reduce((total, conta) => total + conta.token_count, 0);
   const custoPeriodo = resumo?.total_cost_usd ?? 0;
   const maiorConsumidor = resumo?.top_users.find((user) => user.total_cost_usd > 0);
 
@@ -241,16 +258,42 @@ export function AdminApiUsageDashboard() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
-        <p className="font-bold">
-          Conta Apify — ciclo de cobrança atual: {usd(usoApify)} de {usd(limiteApify)} · saldo{" "}
-          {usd(saldoApify)}
+      <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-foreground">
+        {loading ? (
+          <p className="font-bold">Sincronizando a conta Apify…</p>
+        ) : leituraFinanceiraDisponivel ? (
+          <>
+            <p className="font-bold">
+              Apify ao vivo — uso no ciclo: {usd(usoApify)} de {usd(limiteApify)} · disponível até o
+              bloqueio: {usd(saldoApify)}
+            </p>
+            <p className="mt-1 font-medium">
+              Créditos incluídos no plano: {usd(creditosIncluidosApify)} · ainda incluídos:{" "}
+              {usd(saldoCreditosIncluidosApify)}
+            </p>
+          </>
+        ) : (
+          <p className="font-bold">Leitura financeira da Apify indisponível.</p>
+        )}
+        <p className="mt-1 text-xs text-muted-foreground">
+          Valores consultados pela API oficial da Apify e deduplicados por conta, não por token.
+          Eles pertencem ao ciclo mensal e não mudam com o filtro de dias; os demais indicadores
+          usam os runs do período selecionado. O total financeiro inclui as contas cadastradas,
+          mesmo que uma chave esteja desativada ou esgotada; a capacidade ativa do rodízio aparece
+          em Configurações.
         </p>
-        <p className="mt-1 text-xs">
-          Este total vem diretamente da Apify e pertence ao ciclo mensal da conta; ele não muda com
-          o filtro de dias acima. A tabela e os demais indicadores usam somente os runs do período
-          selecionado.
-        </p>
+        {leituraFinanceiraDisponivel && limiteApify > creditosIncluidosApify + 0.01 && (
+          <p className="mt-2 rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-xs">
+            O teto permite usar {usd(limiteApify - creditosIncluidosApify)} além dos créditos
+            incluídos; esse excedente pode gerar cobrança na Apify.
+          </p>
+        )}
+        {totalTokensApify > contasApify.length && (
+          <p className="mt-2 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground">
+            {totalTokensApify} tokens pertencem a {contasApify.length} conta(s) financeira(s);
+            saldos compartilhados foram contados uma única vez.
+          </p>
+        )}
       </div>
 
       {(resumo?.unattributed_cost_usd ?? 0) > 0 && (
