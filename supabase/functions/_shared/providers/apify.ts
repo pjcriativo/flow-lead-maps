@@ -10,7 +10,7 @@
 // falha de verdade se TODAS as chaves acabarem.
 import type { ProviderSearch, RawPlace } from "./types.ts";
 import { startRunComPool, tratarRunMorto, type ChaveApify } from "../apify-pool.ts";
-import { criarPlanoBuscaApify } from "../apify-search-plan.ts";
+import { criarPlanoBuscaApify, respeitarMinimoTetoRunApify } from "../apify-search-plan.ts";
 
 const ACTOR = "compass~crawler-google-places"; // slug com ~ no path da API
 const API = "https://api.apify.com/v2";
@@ -138,7 +138,9 @@ export const searchApify: ProviderSearch = async ({
 
     const planoBusca = criarPlanoBuscaApify(nicho, itensRestantes);
     const { input, maxPlaces, maxItems } = planoBusca;
-    const maxTotalChargeUsd = Math.min(planoBusca.maxTotalChargeUsd, custoRestante);
+    const maxTotalChargeUsd = respeitarMinimoTetoRunApify(
+      Math.min(planoBusca.maxTotalChargeUsd, custoRestante),
+    );
     if (usarAreaMapa && lat != null && lng != null) {
       input.customGeolocation = circulo(lat, lng, raioKm ?? 10);
     } else if (cidade) {

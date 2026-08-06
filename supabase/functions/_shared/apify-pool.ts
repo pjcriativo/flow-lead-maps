@@ -233,8 +233,8 @@ export async function startRunComPool(
       }
       if (classe === "invalida" || classe === "esgotada") {
         if (chave.id) {
-          // O admin solicitou que o status NÃO seja alterado automaticamente para esgotado.
-          // As chaves permanecem "ativas" no painel, mas o rodízio em memória pula para a próxima.
+          await marcarChaveApify(admin, chave.id, classe);
+          await avisarMarcacao(admin, chave, classe);
         } else {
           // chave única do secret — não há pool pra rotacionar
           await avisarSuperAdminsApify(
@@ -259,7 +259,9 @@ export async function startRunComPool(
   return {
     ok: false,
     reason: "pool_esgotado",
-    detalhe: ultimaFalha ? `Todas as chaves falharam. Motivo da Apify: ${ultimaFalha}` : "Todas as chaves Apify do pool estão esgotadas/indisponíveis.",
+    detalhe: ultimaFalha
+      ? `Todas as chaves falharam. Motivo da Apify: ${ultimaFalha}`
+      : "Todas as chaves Apify do pool estão esgotadas/indisponíveis.",
   };
 }
 
@@ -285,7 +287,8 @@ export async function tratarRunMorto(
   if (!esgotou) return "erro_real";
   const classe = credito.situacao === "invalida" ? "invalida" : "esgotada";
   if (chave.id) {
-    // A pedido do usuário, não desativamos a chave automaticamente.
+    await marcarChaveApify(admin, chave.id, classe);
+    await avisarMarcacao(admin, chave, classe);
     return "trocar_chave";
   }
   await avisarSuperAdminsApify(

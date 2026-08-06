@@ -4,7 +4,16 @@
 // Boundary IN: plano puro enviado ao endpoint de execução da Apify.
 // Boundary OUT: rede da Apify e persistência por usuário, verificadas na integração da Edge.
 import assert from "node:assert/strict";
-import { criarPlanoBuscaApify } from "../supabase/functions/_shared/apify-search-plan.ts";
+import {
+  criarPlanoBuscaApify,
+  respeitarMinimoTetoRunApify,
+} from "../supabase/functions/_shared/apify-search-plan.ts";
+
+assert.equal(
+  respeitarMinimoTetoRunApify(0.3),
+  0.5,
+  "uma rodada reiniciada tambem precisa respeitar o minimo aceito pelo Actor",
+);
 
 for (const limite of [1, 10, 50, 100]) {
   const plano = criarPlanoBuscaApify("Clínica veterinária", limite);
@@ -16,9 +25,10 @@ for (const limite of [1, 10, 50, 100]) {
     `a busca de ${limite} não pode ampliar o limite por termo`,
   );
   assert.equal(plano.maxItems, limite, `a cobrança de ${limite} deve ter teto de itens`);
-  assert.ok(
-    plano.maxTotalChargeUsd > 0 && plano.maxTotalChargeUsd <= limite * 0.004 + 0.0002,
-    `a busca de ${limite} deve ter teto financeiro no preço base mais a inicialização`,
+  assert.equal(
+    plano.maxTotalChargeUsd,
+    Math.max(0.5, Number((limite * 0.004 + 0.0002).toFixed(4))),
+    `a busca de ${limite} deve respeitar o mínimo de US$ 0,50 exigido pelo Actor sem ampliar itens`,
   );
   assert.equal(plano.input.scrapePlaceDetailPage, false, "detalhes pagos devem ficar desligados");
   assert.equal(plano.input.scrapeContacts, false, "contatos pagos devem ficar desligados");
