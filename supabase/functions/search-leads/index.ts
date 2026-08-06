@@ -11,6 +11,8 @@ import type { Fonte, ProviderSearch } from "../_shared/providers/types.ts";
 import { searchOsm } from "../_shared/providers/osm.ts";
 import { searchGeoapify, setGeoapifyKeyOverride } from "../_shared/providers/geoapify.ts";
 import { searchApify, setApifyPoolContext } from "../_shared/providers/apify.ts";
+import { searchApifyComCache } from "../_shared/apify-cache.ts";
+import { planejarColetaApify } from "../_shared/apify-economy.ts";
 import { searchPlaces } from "../_shared/providers/places.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
@@ -41,6 +43,8 @@ type Body = {
   lat?: number;
   lng?: number;
   raio_km?: number;
+  /** Distingue o pino manual das coordenadas automáticas da cidade. */
+  usar_area_mapa?: boolean;
 };
 
 Deno.serve(async (req) => {
@@ -93,6 +97,7 @@ Deno.serve(async (req) => {
   let lng = typeof body.lng === "number" ? body.lng : null;
   let raioKm = typeof body.raio_km === "number" ? body.raio_km : null;
   const porMapa = lat != null && lng != null;
+  const usarAreaMapa = body.usar_area_mapa === true && porMapa;
 
   if (!nicho || (!cidade && !porMapa)) {
     return json({ error: "Informe o nicho e a cidade (ou marque um ponto no mapa)." }, 400);
@@ -137,54 +142,14 @@ Deno.serve(async (req) => {
           .not("place_id", "is", null);
         const seen = new Set<string>((existing ?? []).map((r: { place_id: string }) => r.place_id));
 
-        // Fase 1: o provedor coleta candidatos normalizados (multi-query interna).
-        const candidates = await provider({
-          nicho,
-          cidade,
-          uf,
-          lat,
-          lng,
-          raioKm,
-          alvo: Math.ceil(limite * 2.5),
-          limite,
-          seen,
-          log: (message) => send({ type: "log", message }),
-          reportUsage: async (usage: ProviderUsage) => {
-            const costBrl = usage.costUsd * 5.6;
-            const { error: usageError } = await admin.from("api_consumption_logs").upsert(
-              {
-                org_id: orgId,
-                user_id: userId,
-                service: usage.service,
-                action: usage.action,
-                external_id: usage.externalId,
-                quantity: usage.quantity,
-                cost_usd: usage.costUsd,
-                cost_brl: costBrl,
-                metadata: { nicho, cidade, fonte, ...usage.metadata },
-              },
-              { onConflict: "service,external_id" },
-            );
-            if (usageError) {
-              throw new Error(`Falha ao registrar custo real da Apify: ${usageError.message}`);
-            }
-            send({
-              type: "log",
-              message: `Custo real registrado: US$ ${usage.costUsd.toFixed(4)} (run ${usage.externalId})`,
-            });
-          },
-        });
-
-        send({ type: "log", message: `${candidates.length} candidatos únicos. Qualificando...` });
-
-        // 📊 LIMITE DO PLANO (billing camada 2): quantos leads a org AINDA pode coletar no mês.
-        // super_admin/dono da plataforma = ilimitado (restante null). Bloqueia se já zerou;
-        // senão limita a rodada ao que resta (nunca estoura calado).
-        let tetoLeads = limite;
+        // Limite do plano vem ANTES de qualquer provedor pago: nunca compramos leads que a
+        // conta não poderá receber nesta rodada.
+        let restantePlano: number | null = null;
         if (orgId) {
           const st = await estadoConsumo(admin, orgId, "leads");
           if (st.limite != null) {
-            if ((st.restante ?? 0) <= 0) {
+            restantePlano = st.restante ?? 0;
+            if (restantePlano <= 0) {
               send({
                 type: "error",
                 message: `Limite de leads do seu plano atingido: ${st.usado}/${st.limite} neste mês. Faça upgrade do plano para coletar mais.`,
@@ -192,7 +157,6 @@ Deno.serve(async (req) => {
               controller.close();
               return;
             }
-            tetoLeads = Math.min(limite, st.restante ?? limite);
             if (st.perto)
               send({
                 type: "log",
@@ -200,11 +164,70 @@ Deno.serve(async (req) => {
               });
           }
         }
+        const planoColeta = planejarColetaApify({
+          solicitado: limite,
+          restantePlano,
+          profundidadeCache: 0,
+        });
+        const limiteEfetivo = planoColeta.limiteEfetivo;
+        if (limiteEfetivo < limite) {
+          send({
+            type: "log",
+            message: `Busca ajustada para ${limiteEfetivo} leads, exatamente o saldo disponível no plano.`,
+          });
+        }
+
+        const reportUsage = async (usage: ProviderUsage) => {
+          const costBrl = usage.costUsd * 5.6;
+          const { error: usageError } = await admin.from("api_consumption_logs").upsert(
+            {
+              org_id: orgId,
+              user_id: userId,
+              service: usage.service,
+              action: usage.action,
+              external_id: usage.externalId,
+              quantity: usage.quantity,
+              cost_usd: usage.costUsd,
+              cost_brl: costBrl,
+              metadata: { nicho, cidade, fonte, ...usage.metadata },
+            },
+            { onConflict: "service,external_id" },
+          );
+          if (usageError) {
+            throw new Error(`Falha ao registrar custo real da Apify: ${usageError.message}`);
+          }
+          send({
+            type: "log",
+            message: `Custo real registrado: US$ ${usage.costUsd.toFixed(4)} (run ${usage.externalId})`,
+          });
+        };
+
+        const providerParams = {
+          nicho,
+          cidade,
+          uf,
+          lat,
+          lng,
+          raioKm,
+          usarAreaMapa,
+          alvo: Math.ceil(limiteEfetivo * 2.5),
+          limite: limiteEfetivo,
+          log: (message: string) => send({ type: "log", message }),
+          reportUsage,
+        };
+        const collected =
+          fonte === "apify"
+            ? await searchApifyComCache({ ...providerParams, admin })
+            : await provider({ ...providerParams, seen });
+        const candidates =
+          fonte === "apify" ? collected.filter((place) => !seen.has(place.source_id)) : collected;
+
+        send({ type: "log", message: `${candidates.length} candidatos únicos. Qualificando...` });
 
         // Fase 2 (comum a toda fonte): enriquecer, pontuar e gravar.
         let inserted = 0;
         for (const p of candidates) {
-          if (inserted >= tetoLeads) break;
+          if (inserted >= limiteEfetivo) break;
 
           // Às vezes o "site" cadastrado é, na verdade, um perfil de Instagram/Facebook.
           let website = p.website;
@@ -287,7 +310,7 @@ Deno.serve(async (req) => {
           }
           inserted++;
           send({ type: "lead", lead: up });
-          send({ type: "progress", found: inserted, target: limite });
+          send({ type: "progress", found: inserted, target: limiteEfetivo });
         }
 
         // registra o consumo REAL do mês (só o que entrou). super_admin também conta (para o

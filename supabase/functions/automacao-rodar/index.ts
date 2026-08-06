@@ -14,7 +14,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
-import { searchApify } from "../_shared/providers/apify.ts";
+import { setApifyPoolContext } from "../_shared/providers/apify.ts";
+import { searchApifyComCache } from "../_shared/apify-cache.ts";
+import { orgDoUsuario } from "../_shared/limite.ts";
+import type { ProviderUsage } from "../_shared/providers/types.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
 import { firstBrWhatsapp } from "../_shared/phone.ts";
@@ -132,26 +135,59 @@ async function executarRodada(admin: Admin, userId: string, authHeader: string, 
 
   const { data: jaTem } = await admin.from("leads").select("place_id").eq("user_id", userId);
   const seen = new Set((jaTem ?? []).map((l: { place_id: string }) => l.place_id));
+  const orgId = receita.org_id ?? (await orgDoUsuario(admin, userId));
+  setApifyPoolContext(admin);
 
-  let candidatos: Awaited<ReturnType<typeof searchApify>> = [];
+  let gastoApifyRodada = 0;
+  let candidatos: Awaited<ReturnType<typeof searchApifyComCache>> = [];
   try {
-    candidatos = await searchApify({
+    candidatos = await searchApifyComCache({
+      admin,
       nicho: receita.nicho,
       cidade: receita.cidade,
-      uf: receita.uf ?? null,
+      uf: receita.uf ?? "",
       lat: null,
       lng: null,
       raioKm: null,
+      usarAreaMapa: false,
+      alvo: Math.ceil(plano.leadsPermitidos * 2.5),
       limite: plano.leadsPermitidos,
-      seen,
       log: () => {},
+      reportUsage: async (usage: ProviderUsage) => {
+        gastoApifyRodada += usage.costUsd;
+        const { error } = await admin.from("api_consumption_logs").upsert(
+          {
+            org_id: orgId,
+            user_id: userId,
+            service: usage.service,
+            action: usage.action,
+            external_id: usage.externalId,
+            quantity: usage.quantity,
+            cost_usd: usage.costUsd,
+            cost_brl: usage.costUsd * 5.6,
+            metadata: {
+              nicho: receita.nicho,
+              cidade: receita.cidade,
+              fonte: "apify",
+              automacao: true,
+              receita_id: receita.id,
+              rodada_id: rodadaId,
+              ...usage.metadata,
+            },
+          },
+          { onConflict: "service,external_id" },
+        );
+        if (error) throw new Error(`Falha ao registrar custo real da automação: ${error.message}`);
+      },
     });
   } catch (e) {
     return await finalizar("erro", {}, `busca falhou: ${e instanceof Error ? e.message : e}`);
   }
-  candidatos = candidatos.slice(0, plano.leadsPermitidos);
+  candidatos = candidatos
+    .filter((place) => !seen.has(place.source_id))
+    .slice(0, plano.leadsPermitidos);
 
-  let gastoRodada = candidatos.length * teto.custo_lead_usd;
+  let gastoRodada = gastoApifyRodada;
   let buscados = 0;
   let qualificados = 0;
   let descartados = 0;

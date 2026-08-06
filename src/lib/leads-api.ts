@@ -48,6 +48,8 @@ export type SearchParams = {
   lat?: number | null;
   lng?: number | null;
   raioKm?: number | null;
+  /** true quando a área veio de um pino manual e deve prevalecer sobre cidade/UF. */
+  usarAreaMapa?: boolean;
 };
 
 export type SearchEvent =
@@ -90,7 +92,12 @@ export async function streamSearchLeads(
       buscarEmails: params.buscarEmails,
       fonte: params.fonte,
       ...(params.lat != null && params.lng != null
-        ? { lat: params.lat, lng: params.lng, raio_km: params.raioKm ?? 10 }
+        ? {
+            lat: params.lat,
+            lng: params.lng,
+            raio_km: params.raioKm ?? 10,
+            usar_area_mapa: params.usarAreaMapa === true,
+          }
         : {}),
     }),
     signal,
@@ -104,7 +111,9 @@ export async function streamSearchLeads(
         window.location.reload();
         return;
       }
-      throw new Error("Sua sessão havia expirado e foi renovada. Por favor, clique em Buscar leads novamente.");
+      throw new Error(
+        "Sua sessão havia expirado e foi renovada. Por favor, clique em Buscar leads novamente.",
+      );
     }
 
     let msg = `Falha na busca (HTTP ${res.status})`;

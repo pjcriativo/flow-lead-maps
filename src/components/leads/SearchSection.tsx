@@ -228,7 +228,9 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
           limite,
           buscarEmails,
           fonte,
-          ...(usarMapa ? { lat: centro!.lat, lng: centro!.lng, raioKm: raio } : {}),
+          ...(usarMapa
+            ? { lat: centro!.lat, lng: centro!.lng, raioKm: raio, usarAreaMapa: pinManual }
+            : {}),
         },
         (ev: SearchEvent) => {
           switch (ev.type) {

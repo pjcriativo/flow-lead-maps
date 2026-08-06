@@ -120,6 +120,7 @@ export const searchApify: ProviderSearch = async ({
   lat,
   lng,
   raioKm,
+  usarAreaMapa,
   limite,
   seen,
   log,
@@ -138,7 +139,9 @@ export const searchApify: ProviderSearch = async ({
     const planoBusca = criarPlanoBuscaApify(nicho, itensRestantes);
     const { input, maxPlaces, maxItems } = planoBusca;
     const maxTotalChargeUsd = Math.min(planoBusca.maxTotalChargeUsd, custoRestante);
-    if (cidade) {
+    if (usarAreaMapa && lat != null && lng != null) {
+      input.customGeolocation = circulo(lat, lng, raioKm ?? 10);
+    } else if (cidade) {
       input.locationQuery = `${cidade}${uf ? ", " + uf : ""}, Brasil`;
     } else if (lat != null && lng != null) {
       input.customGeolocation = circulo(lat, lng, raioKm ?? 10);

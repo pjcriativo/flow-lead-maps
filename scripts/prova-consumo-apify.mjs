@@ -17,9 +17,13 @@ for (const limite of [1, 10, 50, 100]) {
   );
   assert.equal(plano.maxItems, limite, `a cobrança de ${limite} deve ter teto de itens`);
   assert.ok(
-    plano.maxTotalChargeUsd > 0 && plano.maxTotalChargeUsd <= limite * 0.005,
-    `a busca de ${limite} deve ter teto financeiro de US$ 0,005 por item`,
+    plano.maxTotalChargeUsd > 0 && plano.maxTotalChargeUsd <= limite * 0.004 + 0.0002,
+    `a busca de ${limite} deve ter teto financeiro no preço base mais a inicialização`,
   );
+  assert.equal(plano.input.scrapePlaceDetailPage, false, "detalhes pagos devem ficar desligados");
+  assert.equal(plano.input.scrapeContacts, false, "contatos pagos devem ficar desligados");
+  assert.equal(plano.input.maxReviews, 0, "reviews pagos devem ficar desligados");
+  assert.equal(plano.input.maxImages, 0, "imagens pagas devem ficar desligadas");
 }
 
 console.log("OK: orçamento Apify não multiplica termos, itens nem custo da busca.");

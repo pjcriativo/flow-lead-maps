@@ -32,6 +32,8 @@ export type ProviderParams = {
   lat: number | null;
   lng: number | null;
   raioKm: number | null;
+  /** true somente quando o usuário marcou uma área manual; nesse caso cidade não pode sobrescrevê-la. */
+  usarAreaMapa: boolean;
   /** Quantos candidatos coletar (a search-leads pede ~1.6x o limite). */
   alvo: number;
   /** Limite exato pedido pelo usuário (fontes PAGAS usam isto p/ não gastar à toa). */
