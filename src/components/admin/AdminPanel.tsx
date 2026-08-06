@@ -55,13 +55,14 @@ import { AdminAllUsers, AdminSubscribers } from "./AdminUsers";
 import { AdminPlanos } from "./AdminPlanos";
 import { AdminTickets } from "./AdminTickets";
 import { AdminRelatorios } from "./AdminRelatorios";
-import { AdminConfiguracoes } from "./AdminConfiguracoes";
+import { AdminConfiguracoes, AdminProfile } from "./AdminConfiguracoes";
 import { AdminNotificacoes } from "./AdminNotificacoes";
 import { AdminCms } from "./AdminCms";
 import { AdminPagamentos } from "./AdminPagamentos";
 import { AdminApiUsageDashboard } from "./AdminApiUsageDashboard";
 import { lerConfigPublica } from "@/services/config-publica";
 import { setFusoHorario } from "@/lib/format";
+import { lerPerfilCompleto } from "@/services/perfil";
 
 /* ─────────────────────────── moldura ─────────────────────────── */
 
@@ -75,6 +76,7 @@ type TelaAdmin =
   | "tickets"
   | "relatorios"
   | "api-usage"
+  | "profile"
   | "configuracoes"
   | "notificacoes"
   | "cms"
@@ -251,20 +253,21 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
 }
 import { LogOut, User, CheckCircle2, Settings } from "lucide-react";
 
-function Topbar({ email, onNavegar }: { email: string; onNavegar?: (t: TelaAdmin) => void }) {
-  const [avatar, setAvatar] = useState<string | null>(null);
+type PerfilTopo = {
+  nome: string;
+  avatarUrl: string;
+};
+
+function Topbar({
+  email,
+  perfil,
+  onNavegar,
+}: {
+  email: string;
+  perfil: PerfilTopo;
+  onNavegar: (t: TelaAdmin) => void;
+}) {
   const [menuAberto, setMenuAberto] = useState(false);
-
-  const fetchAvatar = async () => {
-    const { data } = await supabase.auth.getUser();
-    setAvatar((data.user?.user_metadata?.avatar_url as string) || null);
-  };
-
-  useEffect(() => {
-    fetchAvatar();
-    window.addEventListener("storage", fetchAvatar);
-    return () => window.removeEventListener("storage", fetchAvatar);
-  }, []);
 
   const handleSair = async () => {
     await supabase.auth.signOut();
@@ -272,10 +275,7 @@ function Topbar({ email, onNavegar }: { email: string; onNavegar?: (t: TelaAdmin
   };
 
   const handlePerfil = () => {
-    if (onNavegar) onNavegar("configuracoes");
-    setTimeout(() => {
-      window.dispatchEvent(new Event("abrir-perfil-admin"));
-    }, 100);
+    onNavegar("profile");
   };
   return (
     <header className="flex h-16 items-center gap-3 border-b border-border bg-card px-5">
@@ -303,57 +303,89 @@ function Topbar({ email, onNavegar }: { email: string; onNavegar?: (t: TelaAdmin
           <Bell className="h-4 w-4" />
         </button>
         <div className="relative">
-          <button 
+          <button
             type="button"
-            onClick={() => setMenuAberto(!menuAberto)}
+            aria-label="Abrir menu do perfil"
+            aria-haspopup="menu"
+            aria-expanded={menuAberto}
+            onClick={() => setMenuAberto((aberto) => !aberto)}
             className="ml-1 flex items-center gap-2 border-l border-border pl-3 focus:outline-none"
           >
             <span className="flex h-8 w-8 overflow-hidden items-center justify-center rounded-full bg-navy font-serif text-sm text-gold ring-1 ring-border/50 transition-all hover:ring-gold/40">
-              {avatar ? (
-                <img src={avatar} alt="Avatar" className="h-full w-full object-cover" />
+              {perfil.avatarUrl ? (
+                <img
+                  src={perfil.avatarUrl}
+                  alt="Foto do perfil"
+                  className="h-full w-full object-cover"
+                />
               ) : (
-                email.charAt(0).toUpperCase()
+                (perfil.nome || email).charAt(0).toUpperCase()
               )}
             </span>
-            <span className="hidden text-xs text-muted-foreground transition-colors hover:text-foreground md:block">
-              {email}
+            <span className="hidden text-left md:block">
+              <span className="block text-xs font-medium text-foreground">
+                {perfil.nome || "Super Admin"}
+              </span>
+              <span className="block max-w-52 truncate text-[11px] text-muted-foreground">
+                {email}
+              </span>
             </span>
+            <ChevronDown
+              className={cn(
+                "hidden h-3.5 w-3.5 text-muted-foreground transition-transform md:block",
+                menuAberto && "rotate-180",
+              )}
+            />
           </button>
-          
+
           {menuAberto && (
             <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setMenuAberto(false)}
-              ></div>
-              <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95">
+              <div className="fixed inset-0 z-40" onClick={() => setMenuAberto(false)} />
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-2 w-64 rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95"
+              >
                 <div className="px-2 py-1.5 text-sm font-semibold font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">Super Admin</p>
+                    <p className="text-sm font-medium leading-none">
+                      {perfil.nome || "Super Admin"}
+                    </p>
                     <p className="text-xs leading-none text-muted-foreground">{email}</p>
                   </div>
                 </div>
                 <div className="-mx-1 my-1 h-px bg-muted"></div>
-                <button 
+                <button
                   type="button"
-                  onClick={() => { setMenuAberto(false); handlePerfil(); }} 
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuAberto(false);
+                    handlePerfil();
+                  }}
                   className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <User className="mr-2 h-4 w-4" />
                   <span>Meu Perfil</span>
                 </button>
-                <button 
+                <button
                   type="button"
-                  onClick={() => { setMenuAberto(false); onNavegar?.("configuracoes"); }}
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuAberto(false);
+                    onNavegar("configuracoes");
+                  }}
                   className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Configurações</span>
                 </button>
                 <div className="-mx-1 my-1 h-px bg-muted"></div>
-                <button 
+                <button
                   type="button"
-                  onClick={() => { setMenuAberto(false); handleSair(); }} 
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuAberto(false);
+                    handleSair();
+                  }}
                   className="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
@@ -476,6 +508,7 @@ export function AdminPanel({ email }: { email: string }) {
   const [painel, setPainel] = useState<PainelAdmin | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [tela, setTela] = useState<TelaAdmin>("dashboard");
+  const [perfilTopo, setPerfilTopo] = useState<PerfilTopo>({ nome: "", avatarUrl: "" });
 
   const recarregar = () =>
     carregarPainelAdmin()
@@ -489,6 +522,15 @@ export function AdminPanel({ email }: { email: string }) {
       .catch((e) => vivo && setErro(e instanceof Error ? e.message : String(e)));
     // ⚙️ Configurações: fuso horário de exibição das datas do painel admin
     lerConfigPublica().then((c) => setFusoHorario(c.fuso_horario));
+    lerPerfilCompleto()
+      .then((perfil) => {
+        if (vivo) {
+          setPerfilTopo({ nome: perfil.full_name, avatarUrl: perfil.avatar_url });
+        }
+      })
+      .catch((e: unknown) => {
+        console.error("Falha ao carregar o perfil do super-admin:", e);
+      });
     return () => {
       vivo = false;
     };
@@ -514,7 +556,7 @@ export function AdminPanel({ email }: { email: string }) {
       <div className="flex min-h-screen bg-background text-foreground">
         <Sidebar tela={tela} onNavegar={setTela} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar email={email} onNavegar={setTela} />
+          <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
           <main className="mx-auto w-full max-w-[1100px] flex-1 space-y-5 p-5">
             {erro && (
               <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
@@ -533,6 +575,13 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "tickets" && <AdminTickets />}
             {tela === "relatorios" && <AdminRelatorios />}
             {tela === "api-usage" && <AdminApiUsageDashboard />}
+            {tela === "profile" && (
+              <AdminProfile
+                onProfileUpdated={(perfil) =>
+                  setPerfilTopo({ nome: perfil.fullName, avatarUrl: perfil.avatarUrl })
+                }
+              />
+            )}
             {tela === "configuracoes" && <AdminConfiguracoes />}
             {tela === "notificacoes" && <AdminNotificacoes />}
             {tela === "cms" && <AdminCms />}
@@ -547,7 +596,7 @@ export function AdminPanel({ email }: { email: string }) {
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar tela={tela} onNavegar={setTela} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar email={email} onNavegar={setTela} />
+        <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
         <main className="mx-auto w-full max-w-[1280px] flex-1 space-y-5 p-5">
           <div className="rounded-xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">

@@ -29,6 +29,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { adminAcao } from "@/services/admin";
+import { atualizarPerfilUsuario, lerPerfilCompleto, uploadAvatarUsuario } from "@/services/perfil";
 
 /* ─────────────────────────────── modelo ─────────────────────────────── */
 
@@ -107,11 +108,9 @@ type Secao =
   | "manutencao"
   | "plugins"
   | "idioma"
-  | "sociais"
-  | "perfil";
+  | "sociais";
 
 const NAV: { id: Secao; rotulo: string; Icon: typeof Settings2; emBreve?: boolean }[] = [
-  { id: "perfil", rotulo: "Meu Perfil", Icon: UserCog },
   { id: "basicas", rotulo: "Configurações básicas", Icon: Settings2 },
   { id: "logo", rotulo: "Logotipo e Favicon", Icon: ImageIcon },
   { id: "email", rotulo: "E-mail e Notificação", Icon: Mail },
@@ -1078,7 +1077,11 @@ function SecaoChaves({ aoMudar }: { aoMudar: () => void }) {
 
 /* ────────────────────────── Meu Perfil (super admin) ────────────────────── */
 
-function SecaoPerfilAdmin() {
+export function AdminProfile({
+  onProfileUpdated,
+}: {
+  onProfileUpdated?: (perfil: { fullName: string; avatarUrl: string }) => void;
+}) {
   const [emailAdmin, setEmailAdmin] = useState("");
   const [nome, setNome] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
@@ -1091,14 +1094,23 @@ function SecaoPerfilAdmin() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setEmailAdmin(data.user.email ?? "");
-        setNome((data.user.user_metadata?.full_name as string | undefined) ?? "");
-        setAvatarUrl((data.user.user_metadata?.avatar_url as string | undefined) ?? "");
-      }
-      setCarregando(false);
-    });
+    let ativo = true;
+    lerPerfilCompleto()
+      .then((perfil) => {
+        if (!ativo) return;
+        setEmailAdmin(perfil.email);
+        setNome(perfil.full_name);
+        setAvatarUrl(perfil.avatar_url);
+      })
+      .catch((e: unknown) => {
+        if (ativo) toast.error(e instanceof Error ? e.message : "Falha ao carregar o perfil.");
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   const handleSalvarNome = async () => {
@@ -1108,8 +1120,9 @@ function SecaoPerfilAdmin() {
     }
     setSalvandoNome(true);
     try {
-      const { error } = await supabase.auth.updateUser({ data: { full_name: nome.trim() } });
-      if (error) throw error;
+      const nomeLimpo = nome.trim();
+      await atualizarPerfilUsuario({ full_name: nomeLimpo });
+      onProfileUpdated?.({ fullName: nomeLimpo, avatarUrl });
       toast.success("Nome atualizado com sucesso!");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao salvar o nome.");
@@ -1133,30 +1146,12 @@ function SecaoPerfilAdmin() {
 
     setUploadingAvatar(true);
     try {
-      const ext = file.name.split(".").pop();
-      const fileName = `admin_${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { avatar_url: data.publicUrl },
-      });
-
-      if (updateError) throw updateError;
-
-      setAvatarUrl(data.publicUrl);
+      const publicUrl = await uploadAvatarUsuario(file);
+      setAvatarUrl(publicUrl);
+      onProfileUpdated?.({ fullName: nome.trim(), avatarUrl: publicUrl });
       toast.success("Foto de perfil atualizada!");
-      
-      // Força a atualização do menu superior dispatchando um evento de storage
-      window.dispatchEvent(new Event("storage"));
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao fazer upload da imagem");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao fazer upload da imagem");
     } finally {
       setUploadingAvatar(false);
       if (e.target) e.target.value = "";
@@ -1165,9 +1160,18 @@ function SecaoPerfilAdmin() {
 
   const handleSalvarSenha = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!novaSenha) { toast.error("Digite a nova senha."); return; }
-    if (novaSenha.length < 8) { toast.error("A senha deve ter pelo menos 8 caracteres."); return; }
-    if (novaSenha !== confirmar) { toast.error("As senhas não coincidem."); return; }
+    if (!novaSenha) {
+      toast.error("Digite a nova senha.");
+      return;
+    }
+    if (novaSenha.length < 8) {
+      toast.error("A senha deve ter pelo menos 8 caracteres.");
+      return;
+    }
+    if (novaSenha !== confirmar) {
+      toast.error("As senhas não coincidem.");
+      return;
+    }
     setSalvandoSenha(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: novaSenha });
@@ -1203,13 +1207,22 @@ function SecaoPerfilAdmin() {
                 {(nome || emailAdmin).charAt(0).toUpperCase()}
               </span>
             )}
-            <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+            <label
+              aria-label="Alterar foto do perfil"
+              className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+            >
               {uploadingAvatar ? (
                 <Loader2 className="h-5 w-5 animate-spin text-white" />
               ) : (
                 <ImageIcon className="h-5 w-5 text-white" />
               )}
-              <input type="file" accept="image/*" className="hidden" onChange={handleUploadFoto} disabled={uploadingAvatar} />
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleUploadFoto}
+                disabled={uploadingAvatar}
+              />
             </label>
           </div>
           <div>
@@ -1248,7 +1261,9 @@ function SecaoPerfilAdmin() {
             </p>
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1.5 block text-[13px] font-medium text-foreground">Nome de exibição</label>
+            <label className="mb-1.5 block text-[13px] font-medium text-foreground">
+              Nome de exibição
+            </label>
             <input
               value={nome}
               onChange={(e) => setNome(e.target.value)}
@@ -1262,7 +1277,11 @@ function SecaoPerfilAdmin() {
               disabled={salvandoNome || !nome.trim()}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-gold px-5 text-sm font-semibold text-navy shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:opacity-60"
             >
-              {salvandoNome ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {salvandoNome ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
               Salvar nome
             </button>
           </div>
@@ -1282,7 +1301,9 @@ function SecaoPerfilAdmin() {
         </div>
         <form onSubmit={handleSalvarSenha} className="grid gap-5 p-6 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-foreground">Nova senha</label>
+            <label className="mb-1.5 block text-[13px] font-medium text-foreground">
+              Nova senha
+            </label>
             <div className="relative">
               <input
                 type={mostrar ? "text" : "password"}
@@ -1302,7 +1323,9 @@ function SecaoPerfilAdmin() {
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-foreground">Confirmar senha</label>
+            <label className="mb-1.5 block text-[13px] font-medium text-foreground">
+              Confirmar senha
+            </label>
             <input
               type={mostrar ? "text" : "password"}
               value={confirmar}
@@ -1316,7 +1339,9 @@ function SecaoPerfilAdmin() {
               }`}
             />
             {confirmar && confirmar !== novaSenha && (
-              <p className="mt-1 text-[11px] font-medium text-destructive">As senhas não coincidem.</p>
+              <p className="mt-1 text-[11px] font-medium text-destructive">
+                As senhas não coincidem.
+              </p>
             )}
           </div>
           <div className="sm:col-span-2">
@@ -1325,7 +1350,11 @@ function SecaoPerfilAdmin() {
               disabled={salvandoSenha || !novaSenha || novaSenha !== confirmar}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-gold px-5 text-sm font-semibold text-navy shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:translate-y-0 disabled:opacity-60"
             >
-              {salvandoSenha ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+              {salvandoSenha ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Lock className="h-4 w-4" />
+              )}
               Alterar senha
             </button>
           </div>
@@ -1367,10 +1396,6 @@ export function AdminConfiguracoes() {
       .catch((e) => setErro(e instanceof Error ? e.message : "erro"))
       .finally(() => setCarregando(false));
     carregarChaves();
-
-    const escutarPerfil = () => setSecao("perfil");
-    window.addEventListener("abrir-perfil-admin", escutarPerfil);
-    return () => window.removeEventListener("abrir-perfil-admin", escutarPerfil);
   }, []);
 
   const campo = (k: keyof Config) =>
@@ -1478,7 +1503,6 @@ export function AdminConfiguracoes() {
 
         {/* ── Col 2: conteúdo da seção ── */}
         <div className="space-y-5">
-          {secao === "perfil" && <SecaoPerfilAdmin />}
           {secao === "basicas" && (
             <>
               <CardSecao
