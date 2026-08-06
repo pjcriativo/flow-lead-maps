@@ -21,7 +21,9 @@ export type ApifyRunLedgerAction =
   | { kind: "match_reconciliation"; logId: string; run: RemoteApifyRun }
   | { kind: "insert_unattributed"; run: RemoteApifyRun };
 
-const COST_TOLERANCE_USD = 0.0001;
+// A conciliação manual legada foi registrada com duas casas decimais; aceite até meio centavo
+// para ligá-la ao valor detalhado do run sem criar uma cobrança duplicada.
+const COST_TOLERANCE_USD = 0.005;
 
 function timestamp(value: string): number {
   const parsed = new Date(value).getTime();

@@ -173,7 +173,7 @@ test("liga reconciliação legada ao run real sem duplicar e mantém run desconh
       {
         id: "run-known-cost",
         status: "SUCCEEDED",
-        usageTotalUsd: 2.82,
+        usageTotalUsd: 2.8204,
         startedAt: "2026-08-06T12:40:00Z",
         finishedAt: "2026-08-06T12:42:00Z",
         defaultDatasetId: "dataset-1",
