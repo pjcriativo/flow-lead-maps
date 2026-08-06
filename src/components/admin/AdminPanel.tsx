@@ -251,7 +251,7 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
     </aside>
   );
 }
-import { LogOut, User, CheckCircle2, Settings } from "lucide-react";
+import { LogOut, User, CheckCircle2 } from "lucide-react";
 
 type PerfilTopo = {
   nome: string;
