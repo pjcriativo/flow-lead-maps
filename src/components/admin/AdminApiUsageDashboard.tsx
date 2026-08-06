@@ -103,6 +103,7 @@ export function AdminApiUsageDashboard() {
   const saldoCreditosIncluidosApify = resumo?.apify_account.included_credits_remaining_usd ?? 0;
   const contasApify = resumo?.apify_account.accounts ?? [];
   const leituraFinanceiraDisponivel =
+    resumo?.apify_account.financial_complete === true &&
     contasApify.length > 0 &&
     [
       resumo?.apify_account.usage_usd,
@@ -273,7 +274,18 @@ export function AdminApiUsageDashboard() {
             </p>
           </>
         ) : (
-          <p className="font-bold">Leitura financeira da Apify indisponível.</p>
+          <>
+            <p className="font-bold">Leitura financeira completa da Apify indisponível.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              O total foi ocultado para não apresentar como correto um valor parcial de apenas
+              algumas contas.
+            </p>
+            {resumo?.apify_account.financial_sync_error && (
+              <p className="mt-2 text-xs text-destructive">
+                {resumo.apify_account.financial_sync_error}
+              </p>
+            )}
+          </>
         )}
         <p className="mt-1 text-xs text-muted-foreground">
           Valores consultados pela API oficial da Apify e deduplicados por conta, não por token.

@@ -42,6 +42,8 @@ export type ApiUsageResumo = {
     included_credits_remaining_usd: number | null;
     hard_limit_usd: number | null;
     hard_remaining_usd: number | null;
+    financial_complete: boolean;
+    financial_sync_error: string | null;
     synced_at: string;
     reconciled_runs: number;
     accounts: Array<{
@@ -71,8 +73,9 @@ function number(value: unknown): number {
 }
 
 function optionalNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const parsed = Number(value.trim());
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -151,6 +154,9 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
       included_credits_remaining_usd: optionalNumber(apify.included_credits_remaining_usd),
       hard_limit_usd: optionalNumber(apify.hard_limit_usd),
       hard_remaining_usd: optionalNumber(apify.hard_remaining_usd),
+      financial_complete: apify.financial_complete === true,
+      financial_sync_error:
+        typeof apify.financial_sync_error === "string" ? apify.financial_sync_error : null,
       synced_at: text(apify.synced_at, new Date(0).toISOString()),
       reconciled_runs: number(apify.reconciled_runs),
       accounts,

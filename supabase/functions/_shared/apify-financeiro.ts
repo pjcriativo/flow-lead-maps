@@ -22,6 +22,10 @@ export type ResumoContaFinanceiraApify = {
   includedCreditsRemainingUsd: number;
 };
 
+export type ResumoFinanceiroConsolidadoApify = ResumoContaFinanceiraApify & {
+  accountCount: number;
+};
+
 export type ResultadoConsultaFinanceiraApify =
   | { situacao: "ok"; conta: ContaFinanceiraApify }
   | { situacao: "invalida"; motivo: string }
@@ -127,6 +131,37 @@ export function resumirContaFinanceiraApify(
     includedCreditsUsd: conta.planCreditsUsd,
     includedCreditsRemainingUsd: conta.planRemainingUsd,
   };
+}
+
+/** Soma somente contas financeiras distintas; tokens repetidos nunca multiplicam saldo/uso. */
+export function consolidarContasFinanceirasApify(
+  contas: ContaFinanceiraApify[],
+): ResumoFinanceiroConsolidadoApify {
+  const unicas = deduplicarContasFinanceirasApify(contas);
+  return unicas.reduce<ResumoFinanceiroConsolidadoApify>(
+    (total, conta) => {
+      const resumo = resumirContaFinanceiraApify(conta);
+      total.usageUsd = Number((total.usageUsd + resumo.usageUsd).toFixed(8));
+      total.limitUsd = Number((total.limitUsd + resumo.limitUsd).toFixed(8));
+      total.remainingUsd = Number((total.remainingUsd + resumo.remainingUsd).toFixed(8));
+      total.includedCreditsUsd = Number(
+        (total.includedCreditsUsd + resumo.includedCreditsUsd).toFixed(8),
+      );
+      total.includedCreditsRemainingUsd = Number(
+        (total.includedCreditsRemainingUsd + resumo.includedCreditsRemainingUsd).toFixed(8),
+      );
+      total.accountCount += 1;
+      return total;
+    },
+    {
+      usageUsd: 0,
+      limitUsd: 0,
+      remainingUsd: 0,
+      includedCreditsUsd: 0,
+      includedCreditsRemainingUsd: 0,
+      accountCount: 0,
+    },
+  );
 }
 
 async function respostaJson(response: Response, endpoint: string): Promise<unknown> {

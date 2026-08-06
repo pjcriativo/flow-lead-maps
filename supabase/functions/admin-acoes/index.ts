@@ -13,6 +13,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { cifrar, decifrar } from "../_shared/cofre.ts";
 import { resolverChave } from "../_shared/chaves.ts";
 import {
+  consolidarContasFinanceirasApify,
   consultarContaFinanceiraApify,
   deduplicarContasFinanceirasApify,
   resumirContaFinanceiraApify,
@@ -838,20 +839,35 @@ Deno.serve(async (req) => {
 
       const tokenRows: Array<{ label: string; token: string }> = [];
       const accountErrors: string[] = [];
-      if (keysResult.error) accountErrors.push(`pool: ${keysResult.error.message}`);
+      const financialAccountErrors: string[] = [];
+      if (keysResult.error) {
+        const detalhe = `pool: ${keysResult.error.message}`;
+        accountErrors.push(detalhe);
+        financialAccountErrors.push(detalhe);
+      }
       for (const row of keysResult.data ?? []) {
-        if (row.status === "invalida") continue;
+        if (row.status === "invalida") {
+          const detalhe = `${String(row.apelido)}: token marcado como invalido`;
+          accountErrors.push(detalhe);
+          financialAccountErrors.push(detalhe);
+          continue;
+        }
         try {
           tokenRows.push({ label: String(row.apelido), token: await decifrar(row.valor_cifrado) });
         } catch (error) {
-          accountErrors.push(
-            `${String(row.apelido)}: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          const detalhe = `${String(row.apelido)}: ${error instanceof Error ? error.message : String(error)}`;
+          accountErrors.push(detalhe);
+          financialAccountErrors.push(detalhe);
         }
       }
       if ((keysResult.data?.length ?? 0) === 0 && !keysResult.error) {
         const fallbackToken = await resolverChave(admin, "APIFY_API_TOKEN");
         if (fallbackToken) tokenRows.push({ label: "chave única", token: fallbackToken });
+      }
+      if (tokenRows.length === 0 && financialAccountErrors.length === 0) {
+        const detalhe = "nenhuma conta Apify configurada para sincronizacao";
+        accountErrors.push(detalhe);
+        financialAccountErrors.push(detalhe);
       }
 
       const logs = (logsResult.data ?? []).map((row: Rec) => ({ ...row }));
@@ -1095,7 +1111,9 @@ Deno.serve(async (req) => {
       const contasPorToken: Array<{ label: string; conta: ContaFinanceiraApify }> = [];
       for (const { row, consulta } of consultasFinanceiras) {
         if (consulta.situacao !== "ok") {
-          accountErrors.push(`${row.label}: ${consulta.motivo}`);
+          const detalhe = `${row.label}: ${consulta.motivo}`;
+          accountErrors.push(detalhe);
+          financialAccountErrors.push(detalhe);
           continue;
         }
         contasPorToken.push({ label: row.label, conta: consulta.conta });
@@ -1123,22 +1141,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      const apifyUsageUsd = accounts.reduce((sum, account) => sum + account.usage_usd, 0);
-      const apifyLimitUsd = accounts.reduce((sum, account) => sum + account.limit_usd, 0);
-      const apifyRemainingUsd = accounts.reduce((sum, account) => sum + account.remaining_usd, 0);
-      const apifyIncludedCreditsUsd = accounts.reduce(
-        (sum, account) => sum + account.included_credits_usd,
-        0,
-      );
-      const apifyIncludedCreditsRemainingUsd = accounts.reduce(
-        (sum, account) => sum + account.included_credits_remaining_usd,
-        0,
-      );
-      const apifyHardLimitUsd = accounts.reduce((sum, account) => sum + account.hard_limit_usd, 0);
-      const apifyHardRemainingUsd = accounts.reduce(
-        (sum, account) => sum + account.hard_remaining_usd,
-        0,
-      );
+      const consolidado = consolidarContasFinanceirasApify(contasPorToken.map((row) => row.conta));
+      const financialComplete =
+        tokenRows.length > 0 && financialAccountErrors.length === 0 && consolidado.accountCount > 0;
 
       return json({
         ok: true,
@@ -1159,13 +1164,18 @@ Deno.serve(async (req) => {
         top_users: periodSummary.users,
         service_breakdown: periodSummary.services,
         apify_account: {
-          usage_usd: apifyUsageUsd,
-          limit_usd: apifyLimitUsd,
-          remaining_usd: apifyRemainingUsd,
-          included_credits_usd: apifyIncludedCreditsUsd,
-          included_credits_remaining_usd: apifyIncludedCreditsRemainingUsd,
-          hard_limit_usd: apifyHardLimitUsd,
-          hard_remaining_usd: apifyHardRemainingUsd,
+          usage_usd: financialComplete ? consolidado.usageUsd : null,
+          limit_usd: financialComplete ? consolidado.limitUsd : null,
+          remaining_usd: financialComplete ? consolidado.remainingUsd : null,
+          included_credits_usd: financialComplete ? consolidado.includedCreditsUsd : null,
+          included_credits_remaining_usd: financialComplete
+            ? consolidado.includedCreditsRemainingUsd
+            : null,
+          hard_limit_usd: financialComplete ? consolidado.limitUsd : null,
+          hard_remaining_usd: financialComplete ? consolidado.remainingUsd : null,
+          financial_complete: financialComplete,
+          financial_sync_error:
+            financialAccountErrors.length > 0 ? financialAccountErrors.join(" | ") : null,
           synced_at: new Date().toISOString(),
           reconciled_runs: reconciledRuns,
           accounts,

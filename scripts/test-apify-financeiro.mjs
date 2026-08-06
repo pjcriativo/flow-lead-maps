@@ -24,6 +24,7 @@ const directory = mkdtempSync(join(tmpdir(), "apify-financeiro-"));
 const modulePath = join(directory, "apify-financeiro.mjs");
 writeFileSync(modulePath, output.outputFiles[0].text);
 const {
+  consolidarContasFinanceirasApify,
   consultarContaFinanceiraApify,
   deduplicarContasFinanceirasApify,
   normalizarContaFinanceiraApify,
@@ -80,6 +81,18 @@ assert.equal(deduplicated.length, 2, "dois tokens da mesma conta nao podem dobra
 assert.deepEqual(
   deduplicated.map((item) => item.accountId),
   ["account-1", "account-2"],
+);
+assert.deepEqual(
+  consolidarContasFinanceirasApify([account, duplicateToken, secondAccount]),
+  {
+    usageUsd: 9.3048,
+    limitUsd: 20,
+    remainingUsd: 10.6952,
+    includedCreditsUsd: 10,
+    includedCreditsRemainingUsd: 0.6952,
+    accountCount: 2,
+  },
+  "a agregacao usada pelo painel deve somar contas, nunca tokens repetidos",
 );
 
 assert.throws(

@@ -4,7 +4,7 @@
 // onde cada um é lido está no help text; o que não tem base ainda fica "Em breve" com o
 // motivo, nunca decorativo. config_plataforma via config_ler/config_salvar; chaves de API
 // via cofre cifrado (chave_salvar — escrita-apenas, o valor nunca volta).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Settings2,
   ImageIcon,
@@ -545,6 +545,7 @@ function SecaoPoolApify() {
   const [valor, setValor] = useState("");
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [resultadoLinha, setResultadoLinha] = useState<Record<string, string>>({});
+  const carregarRequestIdRef = useRef(0);
 
   // validação do token AO COLAR — e-mail/espaço não é token; o da Apify começa com apify_api_
   const valorLimpo = valor.trim();
@@ -558,9 +559,11 @@ function SecaoPoolApify() {
   const tokenBloqueado = !!valorLimpo && (valorLimpo.includes("@") || /\s/.test(valorLimpo));
 
   const carregar = useCallback(async () => {
+    const requestId = ++carregarRequestIdRef.current;
     setErroCarregar(null);
     try {
       const r = await adminAcao("apify_pool_listar");
+      if (requestId !== carregarRequestIdRef.current) return;
       if (!r.ok) throw new Error(r.detalhe || r.reason || "Falha ao ler o pool.");
       setChaves((r.chaves as ChavePoolApify[]) ?? []);
       setContasAtivas(Number(r.contas_ativas ?? r.ativas ?? 0));
@@ -568,6 +571,7 @@ function SecaoPoolApify() {
       setUltimaBusca((r.ultima_busca as UltimaBusca | null) ?? null);
       setAuditoria((r.auditoria as AuditoriaPool[]) ?? []);
     } catch (error) {
+      if (requestId !== carregarRequestIdRef.current) return;
       setErroCarregar(error instanceof Error ? error.message : String(error));
     }
   }, []);
