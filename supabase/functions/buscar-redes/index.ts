@@ -29,6 +29,7 @@ import {
   type ChaveApify,
 } from "../_shared/apify-pool.ts";
 import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
+import { orgDoUsuario } from "../_shared/limite.ts";
 
 const API = "https://api.apify.com/v2";
 
@@ -176,6 +177,8 @@ Deno.serve(async (req) => {
   if (!(await acessoFerramentaLiberado(userClient, userData.user.id)))
     return json({ error: "Acesso aguardando liberação do administrador" }, 403);
   const userId = userData.user.id;
+  const orgId = await orgDoUsuario(admin, userId);
+  if (!orgId) return json({ error: "Sua conta ainda não possui uma organização válida." }, 409);
 
   // ⚙️ CONFIGURAÇÕES (admin): teto de gasto override — null = usa o padrão de redes-teto.ts
   const configPlataforma = await lerConfigPlataforma(admin);
@@ -484,7 +487,9 @@ Deno.serve(async (req) => {
       });
       lead.score = sc.score;
       lead.score_breakdown = sc;
+      lead.org_id = orgId;
       lead.user_id = userId;
+      lead.assigned_to = userId;
       lead.sem_contato = !lead.email && !lead.whatsapp && !lead.phone && !lead.website;
       // Coleta PAGA não guarda peso morto: sem e-mail, WhatsApp, telefone nem site, o lead não
       // é acionável por nenhuma campanha nossa. Descarta em vez de encher a base (foi por isso
@@ -494,10 +499,12 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const { error } = await admin
+      const { data: insertedLead, error } = await admin
         .from("leads")
-        .upsert(lead, { onConflict: "user_id,place_id", ignoreDuplicates: false });
-      if (!error) inseridos++;
+        .upsert(lead, { onConflict: "org_id,place_id", ignoreDuplicates: true })
+        .select("id")
+        .maybeSingle();
+      if (!error && insertedLead) inseridos++;
     }
 
     const estourou = estourouColeta(custo, gastoMes, TETO_RODADA, TETO_MES);

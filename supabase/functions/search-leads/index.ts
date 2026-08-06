@@ -23,6 +23,7 @@ import { orgDoUsuario, estadoConsumo, consumir } from "../_shared/limite.ts";
 import { resolverChave } from "../_shared/chaves.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
 import type { ProviderUsage } from "../_shared/providers/types.ts";
+import { leadBusinessIdentity, loadSeenLeadIdentitiesForOrg } from "../_shared/lead-dedupe.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
@@ -74,6 +75,7 @@ Deno.serve(async (req) => {
   // com o admin client; sem pool configurado ele cai na chave única do cofre/secret.
   setApifyPoolContext(admin);
   const orgId = await orgDoUsuario(admin, userId);
+  if (!orgId) return json({ error: "Sua conta ainda não possui uma organização válida." }, 409);
 
   let body: Body;
   try {
@@ -134,13 +136,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        // ids já vistos pelo usuário (dedupe entre buscas)
-        const { data: existing } = await supabase
-          .from("leads")
-          .select("place_id")
-          .eq("user_id", userId)
-          .not("place_id", "is", null);
-        const seen = new Set<string>((existing ?? []).map((r: { place_id: string }) => r.place_id));
+        // Histórico permanente da CONTA inteira, paginado para não truncar em 1.000 linhas.
+        const seen = await loadSeenLeadIdentitiesForOrg(admin, orgId);
 
         // Limite do plano vem ANTES de qualquer provedor pago: nunca compramos leads que a
         // conta não poderá receber nesta rodada.
@@ -226,9 +223,29 @@ Deno.serve(async (req) => {
         const collected =
           fonte === "apify"
             ? await searchApifyComCache({ ...providerParams, admin })
-            : await provider({ ...providerParams, seen });
-        const candidates =
-          fonte === "apify" ? collected.filter((place) => !seen.has(place.source_id)) : collected;
+            : await provider({ ...providerParams, seen: new Set(seen.placeIds) });
+        const candidates = collected.filter((place) => {
+          const businessKey = leadBusinessIdentity(place.name, place.address);
+          if (
+            seen.placeIds.has(place.source_id) ||
+            (businessKey !== null && seen.businessKeys.has(businessKey))
+          ) {
+            return false;
+          }
+
+          // Deduplica também resultados repetidos dentro da própria resposta do provedor.
+          seen.placeIds.add(place.source_id);
+          if (businessKey !== null) seen.businessKeys.add(businessKey);
+          return true;
+        });
+
+        const alreadyKnown = collected.length - candidates.length;
+        if (alreadyKnown > 0) {
+          send({
+            type: "log",
+            message: `${alreadyKnown} estabelecimento(s) já pertenciam à conta e foram ignorados sem consumir o limite de leads.`,
+          });
+        }
 
         send({ type: "log", message: `${candidates.length} candidatos únicos. Qualificando...` });
 
@@ -280,7 +297,9 @@ Deno.serve(async (req) => {
           });
 
           const row = {
+            org_id: orgId,
             user_id: userId,
+            assigned_to: userId,
             place_id: p.source_id,
             business_name: p.name,
             address: p.address,
@@ -306,18 +325,25 @@ Deno.serve(async (req) => {
             enriched_at: buscarEmails && hasWebsite ? new Date().toISOString() : null,
           };
 
-          const { data: up, error: upErr } = await supabase
+          const { data: insertedLead, error: upErr } = await supabase
             .from("leads")
-            .upsert(row, { onConflict: "user_id,place_id" })
+            .upsert(row, { onConflict: "org_id,place_id", ignoreDuplicates: true })
             .select()
-            .single();
+            .maybeSingle();
 
           if (upErr) {
             send({ type: "log", message: `Falha ao gravar ${p.name}: ${upErr.message}` });
             continue;
           }
+          if (!insertedLead) {
+            send({
+              type: "log",
+              message: `${p.name} já existe nesta conta e não foi contabilizado novamente.`,
+            });
+            continue;
+          }
           inserted++;
-          send({ type: "lead", lead: up });
+          send({ type: "lead", lead: insertedLead });
           send({ type: "progress", found: inserted, target: limiteEfetivo });
         }
 
