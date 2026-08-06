@@ -186,7 +186,7 @@ export function AdminApiUsageDashboard() {
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Itens cobrados no período
+              Itens processados pela Apify
             </span>
             <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
               <Zap className="h-5 w-5" />
@@ -197,7 +197,7 @@ export function AdminApiUsageDashboard() {
               {loading ? "..." : (resumo?.total_leads_crawled ?? 0).toLocaleString("pt-BR")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground font-medium">
-              Itens dos runs registrados no período
+              Resultados processados nos runs; não são leads salvos
             </p>
           </div>
         </div>
@@ -312,6 +312,7 @@ export function AdminApiUsageDashboard() {
             <h3 className="text-base font-bold text-foreground">Consumo por Conta de Cliente</h3>
             <p className="text-xs text-muted-foreground">
               Todos os usuários do sistema; quem não consumiu no período aparece com valor zero.
+              Custos e chamadas consideram apenas runs com ID real registrado.
             </p>
           </div>
 
@@ -333,10 +334,11 @@ export function AdminApiUsageDashboard() {
               <tr>
                 <th className="px-4 py-3">Cliente / Conta</th>
                 <th className="px-4 py-3">Plano Atual</th>
-                <th className="px-4 py-3 text-center">Leads no mês / Limite</th>
+                <th className="px-4 py-3 text-center">Leads no período</th>
+                <th className="px-4 py-3 text-center">Uso no mês / Limite</th>
                 <th className="px-4 py-3 text-center">Chamadas API</th>
                 <th className="px-4 py-3 text-center">Itens cobrados</th>
-                <th className="px-4 py-3 text-right">Custo API (US$)</th>
+                <th className="px-4 py-3 text-right">Custo rastreado (US$)</th>
                 <th className="px-4 py-3 text-right">Custo API (R$)</th>
               </tr>
             </thead>
@@ -357,6 +359,14 @@ export function AdminApiUsageDashboard() {
                       {u.plan}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-center font-bold text-foreground">
+                    <p>{u.leads_generated_period.toLocaleString("pt-BR")}</p>
+                    {u.apify_leads_generated_period > 0 && (
+                      <p className="text-[10px] font-medium text-muted-foreground">
+                        {u.apify_leads_generated_period.toLocaleString("pt-BR")} via Apify
+                      </p>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-center font-medium">
                     <span className="font-bold text-foreground">{u.leads_used}</span> /{" "}
                     {u.monthly_limit === null || u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
@@ -368,7 +378,12 @@ export function AdminApiUsageDashboard() {
                     {u.items_charged.toLocaleString("pt-BR")}
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-emerald-700">
-                    {usd(u.total_cost_usd)}
+                    <p>{usd(u.total_cost_usd)}</p>
+                    {u.apify_leads_generated_period > 0 && u.requests_count === 0 && (
+                      <p className="text-[10px] font-medium text-amber-700">
+                        histórico legado sem custo recuperável
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-foreground">
                     {brl(u.total_cost_brl)}
@@ -382,6 +397,7 @@ export function AdminApiUsageDashboard() {
                     <p className="text-[11px] text-amber-800">Confirmado diretamente pela Apify</p>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">—</td>
+                  <td className="px-4 py-3 text-center text-muted-foreground">—</td>
                   <td className="px-4 py-3 text-center text-muted-foreground">—</td>
                   <td className="px-4 py-3 text-center font-semibold text-foreground">
                     {resumo?.unattributed_requests ?? 0}
@@ -399,7 +415,7 @@ export function AdminApiUsageDashboard() {
               )}
               {topUsersFiltrados.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                     Nenhum cliente encontrado no período.
                   </td>
                 </tr>

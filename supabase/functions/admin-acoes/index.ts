@@ -796,6 +796,7 @@ Deno.serve(async (req) => {
         orgsResult,
         plansResult,
         consumoResult,
+        leadCountsResult,
         keysResult,
       ] = await Promise.all([
         admin
@@ -813,6 +814,7 @@ Deno.serve(async (req) => {
         admin.from("orgs").select("id, nome, plano_id, dono_user_id"),
         admin.from("planos").select("id, nome, limite_leads"),
         admin.from("consumo_org").select("org_id, leads").eq("mes_ref", mesRef),
+        admin.rpc("admin_api_lead_counts", { p_since: desde }),
         admin
           .from("apify_chaves")
           .select("apelido, valor_cifrado, status")
@@ -827,6 +829,7 @@ Deno.serve(async (req) => {
         orgsResult.error,
         plansResult.error,
         consumoResult.error,
+        leadCountsResult.error,
       ].find(Boolean);
       if (queryError) {
         return json({ ok: false, reason: "erro_consulta", detalhe: queryError.message }, 500);
@@ -1040,6 +1043,14 @@ Deno.serve(async (req) => {
         orgConsumption: (consumoResult.data ?? []).map((row: Rec) => ({
           org_id: String(row.org_id),
           leads: Number.isFinite(Number(row.leads)) ? Number(row.leads) : 0,
+        })),
+        userLeadCounts: (leadCountsResult.data ?? []).map((row: Rec) => ({
+          user_id: String(row.user_id),
+          leads_period: Number.isFinite(Number(row.leads_period)) ? Number(row.leads_period) : 0,
+          leads_month: Number.isFinite(Number(row.leads_month)) ? Number(row.leads_month) : 0,
+          apify_leads_period: Number.isFinite(Number(row.apify_leads_period))
+            ? Number(row.apify_leads_period)
+            : 0,
         })),
         logs: logs.map((row: Rec) => ({
           user_id: typeof row.user_id === "string" ? row.user_id : null,

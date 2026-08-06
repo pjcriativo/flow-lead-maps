@@ -21,6 +21,8 @@ export type ApiUsageResumo = {
     plan: string;
     monthly_limit: number | null;
     leads_used: number;
+    leads_generated_period: number;
+    apify_leads_generated_period: number;
     total_cost_usd: number;
     total_cost_brl: number;
     requests_count: number;
@@ -73,6 +75,8 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
         plan: text(user.plan, "Sem plano"),
         monthly_limit: user.monthly_limit === null ? null : number(user.monthly_limit),
         leads_used: number(user.leads_used),
+        leads_generated_period: number(user.leads_generated_period),
+        apify_leads_generated_period: number(user.apify_leads_generated_period),
         total_cost_usd: number(user.total_cost_usd),
         total_cost_brl: number(user.total_cost_brl),
         requests_count: number(user.requests_count),

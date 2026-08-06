@@ -199,3 +199,21 @@ test("liga reconciliação legada ao run real sem duplicar e mantém run desconh
     ],
   );
 });
+
+test("separa leads do período do uso mensal do plano", () => {
+  const summary = buildApiUsagePeriodSummary({
+    profiles: [profiles[1]],
+    memberships: [{ user_id: "u-basic", org_id: "o-basic" }],
+    orgs: [{ id: "o-basic", nome: "Conta Basic", plano_id: "p-basic", dono_user_id: "u-basic" }],
+    plans: [{ id: "p-basic", nome: "Básico", limite_leads: 1500 }],
+    orgConsumption: [{ org_id: "o-basic", leads: 0 }],
+    userLeadCounts: [
+      { user_id: "u-basic", leads_period: 343, leads_month: 0, apify_leads_period: 293 },
+    ],
+    logs: [],
+  });
+
+  assert.equal(summary.users[0].leads_generated_period, 343);
+  assert.equal(summary.users[0].apify_leads_generated_period, 293);
+  assert.equal(summary.users[0].leads_used, 0);
+});

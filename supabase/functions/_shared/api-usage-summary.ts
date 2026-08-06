@@ -30,6 +30,13 @@ export type ApiUsageOrgConsumption = {
   leads: number | null;
 };
 
+export type ApiUsageUserLeadCount = {
+  user_id: string;
+  leads_period: number | null;
+  leads_month: number | null;
+  apify_leads_period: number | null;
+};
+
 export type ApiUsageLog = {
   user_id: string | null;
   org_id: string | null;
@@ -47,6 +54,8 @@ export type ApiUsageUserSummary = {
   plan: string;
   monthly_limit: number | null;
   leads_used: number;
+  leads_generated_period: number;
+  apify_leads_generated_period: number;
   total_cost_usd: number;
   total_cost_brl: number;
   requests_count: number;
@@ -66,6 +75,7 @@ type ApiUsagePeriodInput = {
   orgs: ApiUsageOrg[];
   plans: ApiUsagePlan[];
   orgConsumption: ApiUsageOrgConsumption[];
+  userLeadCounts?: ApiUsageUserLeadCount[];
   logs: ApiUsageLog[];
 };
 
@@ -107,6 +117,7 @@ export function buildApiUsagePeriodSummary({
   orgs,
   plans,
   orgConsumption,
+  userLeadCounts = [],
   logs,
 }: ApiUsagePeriodInput): ApiUsagePeriodSummary {
   const accountableLogs = logs.filter(
@@ -129,6 +140,16 @@ export function buildApiUsagePeriodSummary({
   const leadsByOrg = new Map(
     orgConsumption.map((consumption) => [consumption.org_id, finiteNumber(consumption.leads)]),
   );
+  const leadCountsByUser = new Map(
+    userLeadCounts.map((count) => [
+      count.user_id,
+      {
+        period: finiteNumber(count.leads_period),
+        month: finiteNumber(count.leads_month),
+        apifyPeriod: finiteNumber(count.apify_leads_period),
+      },
+    ]),
+  );
 
   const usersMap = new Map<string, ApiUsageUserSummary>();
   for (const profile of profiles) {
@@ -136,13 +157,16 @@ export function buildApiUsagePeriodSummary({
     const org = orgId ? orgsById.get(orgId) : undefined;
     const plan = org?.plano_id ? plansById.get(org.plano_id) : undefined;
     const isSuperAdmin = profile.is_super_admin === true;
+    const leadCounts = leadCountsByUser.get(profile.id) ?? { period: 0, month: 0, apifyPeriod: 0 };
     usersMap.set(profile.id, {
       user_id: profile.id,
       user_name: profile.full_name?.trim() || org?.nome?.trim() || "Usuário sem nome",
       user_email: profile.email?.trim() || "E-mail não encontrado",
       plan: isSuperAdmin ? "Super admin" : plan?.nome?.trim() || planLabel(profile.plan),
       monthly_limit: isSuperAdmin ? null : finiteNumber(plan?.limite_leads),
-      leads_used: orgId ? (leadsByOrg.get(orgId) ?? 0) : 0,
+      leads_used: Math.max(orgId ? (leadsByOrg.get(orgId) ?? 0) : 0, leadCounts.month),
+      leads_generated_period: leadCounts.period,
+      apify_leads_generated_period: leadCounts.apifyPeriod,
       total_cost_usd: 0,
       total_cost_brl: 0,
       requests_count: 0,
