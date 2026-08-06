@@ -19,6 +19,13 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { EstiloSitePublico } from "@/components/EstiloSitePublico";
 import { supabase } from "@/integrations/supabase/client";
 import { lerConfigPublica } from "@/services/config-publica";
+import {
+  ANNUAL_DISCOUNT_PERCENT,
+  DEFAULT_PRICING_PLANS,
+  calcularPrecoAnual,
+  formatarPrecoPlano,
+  type PricingPlan,
+} from "@/lib/pricing-plans";
 
 export const Route = createFileRoute("/pricing")({
   head: () => ({
@@ -32,7 +39,7 @@ export const Route = createFileRoute("/pricing")({
       { property: "og:title", content: "Preços do Flow Leads — Planos para todo time" },
       {
         property: "og:description",
-        content: "Planos Básico, Pro e Agência. Economize 50% na cobrança anual.",
+        content: `Planos Básico, Pro e Agência. Economize ${ANNUAL_DISCOUNT_PERCENT}% na cobrança anual.`,
       },
       { property: "og:url", content: "https://flowleads.com.br/pricing" },
     ],
@@ -41,67 +48,7 @@ export const Route = createFileRoute("/pricing")({
   component: PricingPage,
 });
 
-type Plan = {
-  name: string;
-  monthly: number;
-  yearly: number;
-  yearlyMonthly: string;
-  blurb: string;
-  cta: string;
-  popular?: boolean;
-  features: string[];
-};
-
-const PLANS: Plan[] = [
-  {
-    name: "Básico",
-    monthly: 49,
-    yearly: 294,
-    yearlyMonthly: "24,50",
-    blurb: "Para quem está começando a prospectar.",
-    cta: "Começar",
-    features: [
-      "1.000 leads / mês",
-      "Busca no Google Maps",
-      "Minhas Listas e Contatos",
-      "Pipeline de Vendas Kanban",
-      "Suporte padrão",
-    ],
-  },
-  {
-    name: "Pro",
-    monthly: 99,
-    yearly: 594,
-    yearlyMonthly: "49,50",
-    blurb: "O mais completo para escalar suas vendas.",
-    cta: "Começar",
-    popular: true,
-    features: [
-      "5.000 leads / mês",
-      "Busca (Maps, Instagram, LinkedIn)",
-      "CRM, Propostas e Contratos",
-      "Controle Financeiro",
-      "Campanhas e Automação de Whats",
-      "Publicação e Redesign de Sites",
-    ],
-  },
-  {
-    name: "Agência",
-    monthly: 597,
-    yearly: 3582,
-    yearlyMonthly: "298,50",
-    blurb: "Para agências e times de alta demanda.",
-    cta: "Começar",
-    features: [
-      "Leads ilimitados",
-      "Busca (Maps, Instagram, LinkedIn)",
-      "CRM, Propostas e Contratos",
-      "Controle Financeiro",
-      "Campanhas e Automação de Whats",
-      "Publicação e Redesign de Sites",
-    ],
-  },
-];
+const PLANS = DEFAULT_PRICING_PLANS;
 
 const COMPARISON: { label: string; values: (string | boolean)[] }[] = [
   { label: "Leads por mês", values: ["1.000", "5.000", "Ilimitados"] },
@@ -165,8 +112,7 @@ const FAQS = [
   },
   {
     question: "Como funciona o desconto do plano anual?",
-    answer:
-      "No plano anual, você paga os 12 meses de uma vez, mas com 50% de desconto sobre o valor mensal. É a opção ideal para times que desejam escalar com previsibilidade e economia.",
+    answer: `No plano anual, você paga os 12 meses de uma vez, mas com ${ANNUAL_DISCOUNT_PERCENT}% de desconto sobre o valor mensal. É a opção ideal para times que desejam escalar com previsibilidade e economia.`,
   },
   {
     question: "Preciso de um cartão de crédito para testar?",
@@ -175,7 +121,7 @@ const FAQS = [
   },
 ];
 
-function ehListaDePlanosValida(v: unknown): v is Plan[] {
+function ehListaDePlanosValida(v: unknown): v is PricingPlan[] {
   return (
     Array.isArray(v) &&
     v.length > 0 &&
@@ -183,16 +129,16 @@ function ehListaDePlanosValida(v: unknown): v is Plan[] {
       (p) =>
         p &&
         typeof p === "object" &&
-        typeof (p as Plan).name === "string" &&
-        typeof (p as Plan).monthly === "number" &&
-        Array.isArray((p as Plan).features),
+        typeof (p as PricingPlan).name === "string" &&
+        typeof (p as PricingPlan).monthly === "number" &&
+        Array.isArray((p as PricingPlan).features),
     )
   );
 }
 
 function PricingPage() {
   const [yearly, setYearly] = useState(false);
-  const [planos, setPlanos] = useState<Plan[]>(PLANS);
+  const [planos, setPlanos] = useState<PricingPlan[]>(PLANS);
   const [simbolo, setSimbolo] = useState("R$");
 
   useEffect(() => {
@@ -264,7 +210,7 @@ function PricingPage() {
               >
                 Anual
                 <span className="absolute -top-3 -right-2 flex items-center justify-center rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2 py-0.5 text-[10px] font-bold text-white shadow ring-2 ring-background animate-pulse">
-                  -50%
+                  -{ANNUAL_DISCOUNT_PERCENT}%
                 </span>
               </button>
             </div>
@@ -276,10 +222,13 @@ function PricingPage() {
       <section className="mx-auto max-w-7xl px-6 pb-20 z-10 relative">
         <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-3 lg:items-center">
           {planos.map((plan) => {
+            const anual = calcularPrecoAnual(plan.monthly);
             const price = yearly
-              ? `${simbolo} ${plan.yearlyMonthly}`
-              : `${simbolo} ${plan.monthly}`;
-            const sub = yearly ? `Cobrado ${simbolo} ${plan.yearly} / ano` : "Cobrado mensalmente";
+              ? `${simbolo} ${formatarPrecoPlano(anual.mensalEquivalente)}`
+              : `${simbolo} ${formatarPrecoPlano(plan.monthly)}`;
+            const sub = yearly
+              ? `Cobrado ${simbolo} ${formatarPrecoPlano(anual.totalAnual)} / ano`
+              : "Cobrado mensalmente";
             return (
               <div
                 key={plan.name}
@@ -403,8 +352,8 @@ function PricingPage() {
                             <span className="text-lg">{p.name}</span>
                             <span className="text-muted-foreground text-xs font-normal">
                               {yearly
-                                ? `${simbolo} ${p.yearlyMonthly}/mês`
-                                : `${simbolo} ${p.monthly}/mês`}
+                                ? `${simbolo} ${formatarPrecoPlano(calcularPrecoAnual(p.monthly).mensalEquivalente)}/mês`
+                                : `${simbolo} ${formatarPrecoPlano(p.monthly)}/mês`}
                             </span>
                           </div>
                         </th>

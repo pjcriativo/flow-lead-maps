@@ -289,13 +289,14 @@ export function AdminCms() {
       <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <h3 className="mb-1 font-serif text-lg">Planos exibidos em /pricing</h3>
         <p className="mb-3 text-[11px] text-muted-foreground">
-          Lista (JSON) dos 4 cards de plano mostrados na página de preços — mesmo formato usado no
-          código. Deixe em branco para manter os planos padrão do site.
+          Lista (JSON) dos cards mostrados na página de preços. Informe o mensal; o anual aplica
+          automaticamente o desconto exibido na página. Deixe em branco para manter os planos padrão
+          do site.
         </p>
         <textarea
           value={planosTexto}
           onChange={(e) => setPlanosTexto(e.target.value)}
-          placeholder='[{"name":"Básico","monthly":19,"yearly":182,"yearlyMonthly":"15,16","blurb":"...","cta":"Começar","features":["300 leads/mês"]}]'
+          placeholder='[{"name":"Básico","monthly":147,"blurb":"...","cta":"Começar","features":["1.000 leads/mês"]}]'
           rows={8}
           className="w-full rounded-md border border-input bg-card px-2 py-1.5 font-mono text-xs"
         />
