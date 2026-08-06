@@ -204,6 +204,23 @@ export const searchApify: ProviderSearch = async ({
     const datasetId = startJson.data?.defaultDatasetId;
     if (!runId || !datasetId) throw new Error("Apify: resposta de start inesperada");
 
+    // Vincula o run ao usuário antes do polling. Se a Edge for interrompida, o painel admin
+    // ainda consegue consultar este ID na Apify e reconciliar custo e quantidade reais.
+    await reportUsage({
+      service: "apify_maps",
+      action: "search_run",
+      externalId: runId,
+      quantity: 0,
+      costUsd: 0,
+      metadata: {
+        run_status: String(startJson.data?.status ?? "RUNNING"),
+        dataset_id: datasetId,
+        key_label: chave.apelido,
+        cost_source: "apify_usage_total_usd",
+        dataset_error: null,
+      },
+    });
+
     // ── POLL (preso à chave que iniciou — runId pertence àquela conta) ──
     const deadline = Date.now() + 130_000;
     let status = startJson.data?.status ?? "RUNNING";
@@ -248,12 +265,21 @@ export const searchApify: ProviderSearch = async ({
         `Apify: leitura final do custo falhou (HTTP ${finalRes.status}); usando a última medição.`,
       );
     }
-    usdTotal += usd;
-
     // ── DATASET: colhe o que este run escreveu (inclusive se morreu no meio) ──
     const dataset = await baixarDataset(datasetId, chave.token, maxPlaces);
     const items = dataset.items;
     itensAcumulados.push(...items);
+    // Totais de uso da Apify são eventualmente consistentes. A leitura feita depois do
+    // download do dataset costuma capturar o valor já consolidado sem atrasar a entrega.
+    const settledRes = await fetch(
+      `${API}/actor-runs/${runId}?token=${encodeURIComponent(chave.token)}`,
+    );
+    if (settledRes.ok) {
+      const settledJson = await settledRes.json().catch(() => ({}));
+      status = settledJson.data?.status ?? status;
+      usd = settledJson.data?.usageTotalUsd ?? usd;
+    }
+    usdTotal += usd;
     log(
       `Apify: ${items.length} lugares no dataset${usd ? ` · custo do run ~US$ ${usd.toFixed(3)}` : ""}`,
     );

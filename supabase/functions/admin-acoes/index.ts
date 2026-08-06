@@ -13,6 +13,8 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { cifrar, decifrar } from "../_shared/cofre.ts";
 import { resolverChave } from "../_shared/chaves.ts";
 import { creditoRestanteDeLimits } from "../_shared/apify-criterio.ts";
+import { buildApiUsagePeriodSummary } from "../_shared/api-usage-summary.ts";
+import { planApifyRunLedgerSync, type RemoteApifyRun } from "../_shared/apify-run-ledger.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
 type Rec = Record<string, unknown>;
@@ -794,6 +796,7 @@ Deno.serve(async (req) => {
         orgsResult,
         plansResult,
         consumoResult,
+        keysResult,
       ] = await Promise.all([
         admin
           .from("api_consumption_logs")
@@ -802,11 +805,19 @@ Deno.serve(async (req) => {
           )
           .gte("created_at", desde)
           .order("created_at", { ascending: false }),
-        admin.from("profiles").select("id, email, full_name, is_super_admin"),
+        admin
+          .from("profiles")
+          .select("id, email, full_name, is_super_admin, plan, created_at")
+          .order("created_at"),
         admin.from("memberships").select("user_id, org_id, criada_em").order("criada_em"),
-        admin.from("orgs").select("id, nome, plano_id"),
+        admin.from("orgs").select("id, nome, plano_id, dono_user_id"),
         admin.from("planos").select("id, nome, limite_leads"),
         admin.from("consumo_org").select("org_id, leads").eq("mes_ref", mesRef),
+        admin
+          .from("apify_chaves")
+          .select("apelido, valor_cifrado, status")
+          .eq("status", "ativa")
+          .order("ordem"),
       ]);
 
       const queryError = [
@@ -821,101 +832,10 @@ Deno.serve(async (req) => {
         return json({ ok: false, reason: "erro_consulta", detalhe: queryError.message }, 500);
       }
 
-      const profiles = new Map(
-        (profilesResult.data ?? []).map((row: Rec) => [String(row.id), row]),
-      );
-      const membershipByUser = new Map<string, string>();
-      for (const row of membershipsResult.data ?? []) {
-        const userId = String(row.user_id);
-        if (!membershipByUser.has(userId)) membershipByUser.set(userId, String(row.org_id));
-      }
-      const orgs = new Map((orgsResult.data ?? []).map((row: Rec) => [String(row.id), row]));
-      const plans = new Map((plansResult.data ?? []).map((row: Rec) => [String(row.id), row]));
-      const leadsByOrg = new Map(
-        (consumoResult.data ?? []).map((row: Rec) => [String(row.org_id), Number(row.leads ?? 0)]),
-      );
-
-      type UserUsage = {
-        user_id: string;
-        user_name: string;
-        user_email: string;
-        plan: string;
-        monthly_limit: number | null;
-        leads_used: number;
-        total_cost_usd: number;
-        total_cost_brl: number;
-        requests_count: number;
-        items_charged: number;
-      };
-      type ServiceUsage = {
-        service: string;
-        requests_count: number;
-        cost_usd: number;
-        cost_brl: number;
-      };
-
-      const usersMap = new Map<string, UserUsage>();
-      const serviceMap = new Map<string, ServiceUsage>();
-      let attributedCostUsd = 0;
-      let attributedCostBrl = 0;
-      let totalItemsCharged = 0;
-
-      for (const log of logsResult.data ?? []) {
-        const service = String(log.service);
-        const costUsd = Number(log.cost_usd ?? 0);
-        const costBrl = Number(log.cost_brl ?? 0);
-        const quantity = Number(log.quantity ?? 0);
-        attributedCostUsd += costUsd;
-        attributedCostBrl += costBrl;
-        if (service === "apify_maps") totalItemsCharged += quantity;
-
-        const serviceUsage = serviceMap.get(service) ?? {
-          service,
-          requests_count: 0,
-          cost_usd: 0,
-          cost_brl: 0,
-        };
-        serviceUsage.requests_count += 1;
-        serviceUsage.cost_usd += costUsd;
-        serviceUsage.cost_brl += costBrl;
-        serviceMap.set(service, serviceUsage);
-
-        if (!log.user_id) continue;
-        const userId = String(log.user_id);
-        const profile = profiles.get(userId);
-        const orgId = log.org_id ? String(log.org_id) : membershipByUser.get(userId);
-        const org = orgId ? orgs.get(orgId) : undefined;
-        const plan = org?.plano_id ? plans.get(String(org.plano_id)) : undefined;
-        const isSuperAdmin = profile?.is_super_admin === true;
-        const userUsage = usersMap.get(userId) ?? {
-          user_id: userId,
-          user_name: String(profile?.full_name ?? org?.nome ?? "Usuário sem nome"),
-          user_email: String(profile?.email ?? "E-mail não encontrado"),
-          plan: isSuperAdmin ? "Super admin" : String(plan?.nome ?? "Sem plano"),
-          monthly_limit: isSuperAdmin ? null : Number(plan?.limite_leads ?? 0),
-          leads_used: orgId ? (leadsByOrg.get(orgId) ?? 0) : 0,
-          total_cost_usd: 0,
-          total_cost_brl: 0,
-          requests_count: 0,
-          items_charged: 0,
-        };
-        userUsage.total_cost_usd += costUsd;
-        userUsage.total_cost_brl += costBrl;
-        userUsage.requests_count += 1;
-        if (service === "apify_maps") userUsage.items_charged += quantity;
-        usersMap.set(userId, userUsage);
-      }
-
-      const { data: keyRows, error: keysError } = await admin
-        .from("apify_chaves")
-        .select("apelido, valor_cifrado, status")
-        .eq("status", "ativa")
-        .order("ordem");
-
       const tokenRows: Array<{ label: string; token: string }> = [];
       const accountErrors: string[] = [];
-      if (keysError) accountErrors.push(`pool: ${keysError.message}`);
-      for (const row of keyRows ?? []) {
+      if (keysResult.error) accountErrors.push(`pool: ${keysResult.error.message}`);
+      for (const row of keysResult.data ?? []) {
         try {
           tokenRows.push({ label: String(row.apelido), token: await decifrar(row.valor_cifrado) });
         } catch (error) {
@@ -924,10 +844,213 @@ Deno.serve(async (req) => {
           );
         }
       }
-      if (tokenRows.length === 0 && !keysError) {
+      if (tokenRows.length === 0 && !keysResult.error) {
         const fallbackToken = await resolverChave(admin, "APIFY_API_TOKEN");
         if (fallbackToken) tokenRows.push({ label: "chave única", token: fallbackToken });
       }
+
+      const logs = (logsResult.data ?? []).map((row: Rec) => ({ ...row }));
+      const remoteRuns: RemoteApifyRun[] = [];
+      const remoteRunIds = new Set<string>();
+      const terminalStatuses = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
+      for (const tokenRow of tokenRows) {
+        for (let offset = 0; offset < 1_000; offset += 100) {
+          try {
+            const listResponse = await fetch(
+              `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?token=${encodeURIComponent(tokenRow.token)}&limit=100&offset=${offset}&desc=1`,
+            );
+            const listBody = await listResponse.json().catch(() => ({}));
+            if (!listResponse.ok || !Array.isArray(listBody?.data?.items)) {
+              accountErrors.push(
+                `${tokenRow.label}: histórico de runs inválido (HTTP ${listResponse.status})`,
+              );
+              break;
+            }
+            const items = listBody.data.items as Rec[];
+            let reachedOlderRun = false;
+            for (const item of items) {
+              const runId = typeof item.id === "string" ? item.id : null;
+              const startedAt = typeof item.startedAt === "string" ? item.startedAt : null;
+              const status = typeof item.status === "string" ? item.status : "UNKNOWN";
+              if (!runId || !startedAt) continue;
+              if (startedAt < desde) {
+                reachedOlderRun = true;
+                continue;
+              }
+              if (!terminalStatuses.has(status) || remoteRunIds.has(runId)) continue;
+              remoteRunIds.add(runId);
+              remoteRuns.push({
+                id: runId,
+                status,
+                usageTotalUsd: Number.isFinite(Number(item.usageTotalUsd))
+                  ? Number(item.usageTotalUsd)
+                  : 0,
+                startedAt,
+                finishedAt: typeof item.finishedAt === "string" ? item.finishedAt : null,
+                defaultDatasetId:
+                  typeof item.defaultDatasetId === "string" ? item.defaultDatasetId : null,
+                keyLabel: tokenRow.label,
+              });
+            }
+            if (items.length < 100 || reachedOlderRun) break;
+          } catch (error) {
+            accountErrors.push(
+              `${tokenRow.label}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            break;
+          }
+        }
+      }
+
+      const ledgerActions = planApifyRunLedgerSync(
+        logs
+          .filter((log) => log.service === "apify_maps")
+          .map((log) => ({
+            id: String(log.id),
+            action: String(log.action),
+            external_id: typeof log.external_id === "string" ? log.external_id : null,
+            cost_usd: Number(log.cost_usd ?? 0),
+            created_at: String(log.created_at),
+          })),
+        remoteRuns,
+      );
+
+      let reconciledRuns = 0;
+      for (const ledgerAction of ledgerActions) {
+        const { run } = ledgerAction;
+        const tokenRow = tokenRows.find((row) => row.label === run.keyLabel);
+        const existingLog =
+          ledgerAction.kind === "insert_unattributed"
+            ? undefined
+            : logs.find((log) => String(log.id) === ledgerAction.logId);
+        const existingMetadata: Rec =
+          existingLog?.metadata &&
+          typeof existingLog.metadata === "object" &&
+          !Array.isArray(existingLog.metadata)
+            ? { ...(existingLog.metadata as Rec) }
+            : {};
+        if (
+          ledgerAction.kind === "update_existing" &&
+          typeof existingMetadata.cost_reconciled_at === "string" &&
+          Math.abs(Number(existingLog?.cost_usd ?? 0) - run.usageTotalUsd) <= 0.0001
+        ) {
+          continue;
+        }
+        let itemCount = Number(existingLog?.quantity ?? 0);
+        if (itemCount === 0 && run.defaultDatasetId && tokenRow) {
+          try {
+            const datasetResponse = await fetch(
+              `https://api.apify.com/v2/datasets/${encodeURIComponent(run.defaultDatasetId)}?token=${encodeURIComponent(tokenRow.token)}`,
+            );
+            if (datasetResponse.ok) {
+              const datasetBody = await datasetResponse.json().catch(() => ({}));
+              const remoteItemCount = Number(datasetBody?.data?.itemCount);
+              if (Number.isFinite(remoteItemCount)) itemCount = remoteItemCount;
+            }
+          } catch (error) {
+            accountErrors.push(
+              `dataset ${run.defaultDatasetId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        }
+
+        const reconciledAt = new Date().toISOString();
+        const nextMetadata: Rec = {
+          ...existingMetadata,
+          run_status: run.status,
+          dataset_id: run.defaultDatasetId,
+          key_label: run.keyLabel,
+          started_at: run.startedAt,
+          finished_at: run.finishedAt,
+          cost_source: "apify_usage_total_usd",
+          cost_reconciled_at: reconciledAt,
+          attribution:
+            ledgerAction.kind === "insert_unattributed"
+              ? "legacy_run_without_user_link"
+              : "user_linked",
+        };
+        const payload: Rec = {
+          service: "apify_maps",
+          action:
+            ledgerAction.kind === "insert_unattributed"
+              ? "provider_run_unattributed"
+              : "search_run_reconciled",
+          external_id: run.id,
+          quantity: itemCount,
+          cost_usd: run.usageTotalUsd,
+          cost_brl: run.usageTotalUsd * 5.6,
+          metadata: nextMetadata,
+        };
+
+        if (ledgerAction.kind === "insert_unattributed") {
+          const { data: inserted, error: insertError } = await admin
+            .from("api_consumption_logs")
+            .insert({ ...payload, org_id: null, user_id: null, created_at: run.startedAt })
+            .select(
+              "id, org_id, user_id, service, action, external_id, quantity, cost_usd, cost_brl, metadata, created_at",
+            )
+            .single();
+          if (insertError) {
+            if (insertError.code !== "23505") {
+              accountErrors.push(`run ${run.id}: ${insertError.message}`);
+            }
+            continue;
+          }
+          logs.push(inserted as Rec);
+          reconciledRuns += 1;
+          continue;
+        }
+
+        const { error: updateError } = await admin
+          .from("api_consumption_logs")
+          .update(payload)
+          .eq("id", ledgerAction.logId);
+        if (updateError) {
+          accountErrors.push(`run ${run.id}: ${updateError.message}`);
+          continue;
+        }
+        if (existingLog) Object.assign(existingLog, payload);
+        reconciledRuns += 1;
+      }
+
+      const periodSummary = buildApiUsagePeriodSummary({
+        profiles: (profilesResult.data ?? []).map((row: Rec) => ({
+          id: String(row.id),
+          email: typeof row.email === "string" ? row.email : null,
+          full_name: typeof row.full_name === "string" ? row.full_name : null,
+          is_super_admin: row.is_super_admin === true,
+          plan: typeof row.plan === "string" ? row.plan : null,
+        })),
+        memberships: (membershipsResult.data ?? []).map((row: Rec) => ({
+          user_id: String(row.user_id),
+          org_id: String(row.org_id),
+          criada_em: typeof row.criada_em === "string" ? row.criada_em : null,
+        })),
+        orgs: (orgsResult.data ?? []).map((row: Rec) => ({
+          id: String(row.id),
+          nome: typeof row.nome === "string" ? row.nome : null,
+          plano_id: typeof row.plano_id === "string" ? row.plano_id : null,
+          dono_user_id: typeof row.dono_user_id === "string" ? row.dono_user_id : null,
+        })),
+        plans: (plansResult.data ?? []).map((row: Rec) => ({
+          id: String(row.id),
+          nome: typeof row.nome === "string" ? row.nome : null,
+          limite_leads: Number.isFinite(Number(row.limite_leads)) ? Number(row.limite_leads) : null,
+        })),
+        orgConsumption: (consumoResult.data ?? []).map((row: Rec) => ({
+          org_id: String(row.org_id),
+          leads: Number.isFinite(Number(row.leads)) ? Number(row.leads) : 0,
+        })),
+        logs: logs.map((row: Rec) => ({
+          user_id: typeof row.user_id === "string" ? row.user_id : null,
+          org_id: typeof row.org_id === "string" ? row.org_id : null,
+          service: String(row.service),
+          action: typeof row.action === "string" ? row.action : null,
+          quantity: Number.isFinite(Number(row.quantity)) ? Number(row.quantity) : 0,
+          cost_usd: Number.isFinite(Number(row.cost_usd)) ? Number(row.cost_usd) : 0,
+          cost_brl: Number.isFinite(Number(row.cost_brl)) ? Number(row.cost_brl) : 0,
+        })),
+      });
 
       const accounts: Array<{
         label: string;
@@ -963,45 +1086,31 @@ Deno.serve(async (req) => {
       const apifyUsageUsd = accounts.reduce((sum, account) => sum + account.usage_usd, 0);
       const apifyLimitUsd = accounts.reduce((sum, account) => sum + account.limit_usd, 0);
       const apifyRemainingUsd = accounts.reduce((sum, account) => sum + account.remaining_usd, 0);
-      const liveUsageAvailable = accounts.length > 0;
-      const apifyAttributed = serviceMap.get("apify_maps")?.cost_usd ?? 0;
-      const nonApifyAttributed = attributedCostUsd - apifyAttributed;
-      const totalCostUsd =
-        (liveUsageAvailable ? apifyUsageUsd : apifyAttributed) + nonApifyAttributed;
-      const totalCostBrl = totalCostUsd * 5.6;
-
-      const apifyService = serviceMap.get("apify_maps") ?? {
-        service: "apify_maps",
-        requests_count: 0,
-        cost_usd: 0,
-        cost_brl: 0,
-      };
-      if (liveUsageAvailable) {
-        apifyService.cost_usd = apifyUsageUsd;
-        apifyService.cost_brl = apifyUsageUsd * 5.6;
-        serviceMap.set("apify_maps", apifyService);
-      }
 
       return json({
         ok: true,
-        total_cost_usd: totalCostUsd,
-        total_cost_brl: totalCostBrl,
-        attributed_cost_usd: attributedCostUsd,
-        attributed_cost_brl: attributedCostBrl,
-        attributed_apify_cost_usd: apifyAttributed,
-        total_requests: (logsResult.data ?? []).length,
-        total_leads_crawled: totalItemsCharged,
-        top_users: [...usersMap.values()].sort(
-          (left, right) => right.total_cost_usd - left.total_cost_usd,
-        ),
-        service_breakdown: [...serviceMap.values()].sort(
-          (left, right) => right.cost_usd - left.cost_usd,
-        ),
+        period_days: dias,
+        period_started_at: desde,
+        total_cost_usd: periodSummary.totalCostUsd,
+        total_cost_brl: periodSummary.totalCostBrl,
+        attributed_cost_usd: periodSummary.totalCostUsd - periodSummary.unattributedCostUsd,
+        attributed_cost_brl: periodSummary.totalCostBrl - periodSummary.unattributedCostBrl,
+        attributed_apify_cost_usd:
+          periodSummary.attributedApifyCostUsd - periodSummary.unattributedApifyCostUsd,
+        unattributed_cost_usd: periodSummary.unattributedCostUsd,
+        unattributed_cost_brl: periodSummary.unattributedCostBrl,
+        unattributed_requests: periodSummary.unattributedRequests,
+        unattributed_items: periodSummary.unattributedItems,
+        total_requests: periodSummary.totalRequests,
+        total_leads_crawled: periodSummary.totalItemsCharged,
+        top_users: periodSummary.users,
+        service_breakdown: periodSummary.services,
         apify_account: {
           usage_usd: apifyUsageUsd,
           limit_usd: apifyLimitUsd,
           remaining_usd: apifyRemainingUsd,
           synced_at: new Date().toISOString(),
+          reconciled_runs: reconciledRuns,
           accounts,
           sync_error: accountErrors.length > 0 ? accountErrors.join(" | ") : null,
         },

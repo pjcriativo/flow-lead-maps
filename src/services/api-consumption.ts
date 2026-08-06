@@ -1,11 +1,17 @@
 import { adminAcao } from "@/services/admin";
 
 export type ApiUsageResumo = {
+  period_days: number;
+  period_started_at: string;
   total_cost_usd: number;
   total_cost_brl: number;
   attributed_cost_usd: number;
   attributed_cost_brl: number;
   attributed_apify_cost_usd: number;
+  unattributed_cost_usd: number;
+  unattributed_cost_brl: number;
+  unattributed_requests: number;
+  unattributed_items: number;
   total_requests: number;
   total_leads_crawled: number;
   top_users: Array<{
@@ -31,6 +37,7 @@ export type ApiUsageResumo = {
     limit_usd: number;
     remaining_usd: number;
     synced_at: string;
+    reconciled_runs: number;
     accounts: Array<{
       label: string;
       usage_usd: number;
@@ -93,11 +100,17 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
     : [];
 
   return {
+    period_days: number(result.period_days),
+    period_started_at: text(result.period_started_at, new Date(0).toISOString()),
     total_cost_usd: number(result.total_cost_usd),
     total_cost_brl: number(result.total_cost_brl),
     attributed_cost_usd: number(result.attributed_cost_usd),
     attributed_cost_brl: number(result.attributed_cost_brl),
     attributed_apify_cost_usd: number(result.attributed_apify_cost_usd),
+    unattributed_cost_usd: number(result.unattributed_cost_usd),
+    unattributed_cost_brl: number(result.unattributed_cost_brl),
+    unattributed_requests: number(result.unattributed_requests),
+    unattributed_items: number(result.unattributed_items),
     total_requests: number(result.total_requests),
     total_leads_crawled: number(result.total_leads_crawled),
     top_users: topUsers,
@@ -107,6 +120,7 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
       limit_usd: number(apify.limit_usd),
       remaining_usd: number(apify.remaining_usd),
       synced_at: text(apify.synced_at, new Date(0).toISOString()),
+      reconciled_runs: number(apify.reconciled_runs),
       accounts,
       sync_error: typeof apify.sync_error === "string" ? apify.sync_error : null,
     },

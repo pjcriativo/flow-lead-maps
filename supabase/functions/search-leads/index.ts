@@ -196,10 +196,18 @@ Deno.serve(async (req) => {
           if (usageError) {
             throw new Error(`Falha ao registrar custo real da Apify: ${usageError.message}`);
           }
-          send({
-            type: "log",
-            message: `Custo real registrado: US$ ${usage.costUsd.toFixed(4)} (run ${usage.externalId})`,
-          });
+          const runStatus = usage.metadata.run_status;
+          send(
+            runStatus === "RUNNING" || runStatus === "READY"
+              ? {
+                  type: "log",
+                  message: `Run Apify vinculado à sua conta: ${usage.externalId}`,
+                }
+              : {
+                  type: "log",
+                  message: `Custo real registrado: US$ ${usage.costUsd.toFixed(4)} (run ${usage.externalId})`,
+                },
+          );
         };
 
         const providerParams = {

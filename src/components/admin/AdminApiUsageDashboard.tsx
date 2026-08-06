@@ -95,8 +95,8 @@ export function AdminApiUsageDashboard() {
   const usoApify = resumo?.apify_account.usage_usd ?? 0;
   const limiteApify = resumo?.apify_account.limit_usd ?? 0;
   const saldoApify = resumo?.apify_account.remaining_usd ?? 0;
-  const custoApifyAtribuido = resumo?.attributed_apify_cost_usd ?? 0;
-  const diferencaSemUsuario = Math.max(0, usoApify - custoApifyAtribuido);
+  const custoPeriodo = resumo?.total_cost_usd ?? 0;
+  const maiorConsumidor = resumo?.top_users.find((user) => user.total_cost_usd > 0);
 
   return (
     <div className="space-y-6">
@@ -167,18 +167,18 @@ export function AdminApiUsageDashboard() {
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Uso real Apify no ciclo
+              Custo registrado no período
             </span>
             <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
               <DollarSign className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-3">
-            <p className="text-2xl font-bold text-foreground">{loading ? "..." : usd(usoApify)}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {loading ? "..." : usd(custoPeriodo)}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground font-medium">
-              {loading
-                ? "..."
-                : `${usd(usoApify)} de ${usd(limiteApify)} · saldo ${usd(saldoApify)}`}
+              Livro-caixa dos últimos {dias} dias
             </p>
           </div>
         </div>
@@ -186,7 +186,7 @@ export function AdminApiUsageDashboard() {
         <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Itens cobrados pela Apify
+              Itens cobrados no período
             </span>
             <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
               <Zap className="h-5 w-5" />
@@ -232,41 +232,47 @@ export function AdminApiUsageDashboard() {
           </div>
           <div className="mt-3">
             <p className="truncate text-base font-bold text-foreground">
-              {loading ? "..." : resumo?.top_users[0]?.user_name || "Nenhum no período"}
+              {loading ? "..." : maiorConsumidor?.user_name || "Nenhum no período"}
             </p>
             <p className="mt-1 text-xs font-semibold text-amber-700">
-              {loading
-                ? "..."
-                : resumo?.top_users[0]
-                  ? usd(resumo.top_users[0].total_cost_usd)
-                  : "US$ 0,00"}
+              {loading ? "..." : maiorConsumidor ? usd(maiorConsumidor.total_cost_usd) : "US$ 0,00"}
             </p>
           </div>
         </div>
       </div>
 
-      <div
-        className={cn(
-          "rounded-xl border p-4 text-sm",
-          diferencaSemUsuario > 0.01
-            ? "border-amber-200 bg-amber-50 text-amber-900"
-            : "border-emerald-200 bg-emerald-50 text-emerald-900",
-        )}
-      >
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
         <p className="font-bold">
-          Apify ao vivo: {usd(usoApify)} · atribuído aos usuários: {usd(custoApifyAtribuido)}
+          Conta Apify — ciclo de cobrança atual: {usd(usoApify)} de {usd(limiteApify)} · saldo{" "}
+          {usd(saldoApify)}
         </p>
         <p className="mt-1 text-xs">
-          {diferencaSemUsuario > 0.01
-            ? `${usd(diferencaSemUsuario)} ainda não está associado a um usuário. Os novos runs são conciliados pelo ID real da Apify.`
-            : "O consumo da conta e o custo atribuído aos usuários estão conciliados."}
+          Este total vem diretamente da Apify e pertence ao ciclo mensal da conta; ele não muda com
+          o filtro de dias acima. A tabela e os demais indicadores usam somente os runs do período
+          selecionado.
         </p>
       </div>
+
+      {(resumo?.unattributed_cost_usd ?? 0) > 0 && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
+        >
+          <p className="font-bold">
+            Consumo legado sem usuário identificado: {usd(resumo?.unattributed_cost_usd ?? 0)}
+          </p>
+          <p className="mt-1 text-xs">
+            A Apify confirmou esse custo e o run está no livro-caixa, mas a execução antiga não
+            gravou qual usuário iniciou a busca. O valor permanece separado para não atribuir gasto
+            à pessoa errada. Novos runs são vinculados ao usuário desde o início.
+          </p>
+        </div>
+      )}
 
       {/* Breakdown por Serviço */}
       <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-          Detalhamento por Provedor de API
+          Detalhamento por Provedor no Período
         </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {resumo?.service_breakdown.map((s) => {
@@ -305,7 +311,7 @@ export function AdminApiUsageDashboard() {
           <div>
             <h3 className="text-base font-bold text-foreground">Consumo por Conta de Cliente</h3>
             <p className="text-xs text-muted-foreground">
-              Ranking de contas por valor gasto em APIs externas.
+              Todos os usuários do sistema; quem não consumiu no período aparece com valor zero.
             </p>
           </div>
 
@@ -327,7 +333,7 @@ export function AdminApiUsageDashboard() {
               <tr>
                 <th className="px-4 py-3">Cliente / Conta</th>
                 <th className="px-4 py-3">Plano Atual</th>
-                <th className="px-4 py-3 text-center">Leads Usados / Limite</th>
+                <th className="px-4 py-3 text-center">Leads no mês / Limite</th>
                 <th className="px-4 py-3 text-center">Chamadas API</th>
                 <th className="px-4 py-3 text-center">Itens cobrados</th>
                 <th className="px-4 py-3 text-right">Custo API (US$)</th>
@@ -369,6 +375,28 @@ export function AdminApiUsageDashboard() {
                   </td>
                 </tr>
               ))}
+              {!busca.trim() && (resumo?.unattributed_cost_usd ?? 0) > 0 && (
+                <tr className="bg-amber-50/70">
+                  <td className="px-4 py-3 font-medium text-amber-950">
+                    <p className="font-semibold">Run legado sem usuário identificado</p>
+                    <p className="text-[11px] text-amber-800">Confirmado diretamente pela Apify</p>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">—</td>
+                  <td className="px-4 py-3 text-center text-muted-foreground">—</td>
+                  <td className="px-4 py-3 text-center font-semibold text-foreground">
+                    {resumo?.unattributed_requests ?? 0}
+                  </td>
+                  <td className="px-4 py-3 text-center font-semibold text-foreground">
+                    {(resumo?.unattributed_items ?? 0).toLocaleString("pt-BR")}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold text-amber-800">
+                    {usd(resumo?.unattributed_cost_usd ?? 0)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-foreground">
+                    {brl(resumo?.unattributed_cost_brl ?? 0)}
+                  </td>
+                </tr>
+              )}
               {topUsersFiltrados.length === 0 && !loading && (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
