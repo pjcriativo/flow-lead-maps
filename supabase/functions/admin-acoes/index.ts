@@ -1315,28 +1315,29 @@ Deno.serve(async (req) => {
         }),
       );
       // gasto acumulado por chave (livro-caixa: redes sociais + google maps)
-      const [gastosRedesResult, gastosMapsResult, ultimaBuscaResult, auditoriaResult] = await Promise.all([
-        admin
-          .from("redes_buscas")
-          .select("chave_apelido, custo_usd")
-          .not("chave_apelido", "is", null),
-        admin
-          .from("api_consumption_logs")
-          .select("metadata, cost_usd")
-          .eq("service", "apify_maps"),
-        admin
-          .from("redes_buscas")
-          .select("chave_apelido, fonte, estrategia, custo_usd, criado_em, status")
-          .not("chave_apelido", "is", null)
-          .order("criado_em", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        admin
-          .from("apify_chaves_auditoria")
-          .select("apelido, acao, alterado_por, alterado_em")
-          .order("alterado_em", { ascending: false })
-          .limit(20),
-      ]);
+      const [gastosRedesResult, gastosMapsResult, ultimaBuscaResult, auditoriaResult] =
+        await Promise.all([
+          admin
+            .from("redes_buscas")
+            .select("chave_apelido, custo_usd")
+            .not("chave_apelido", "is", null),
+          admin
+            .from("api_consumption_logs")
+            .select("metadata, cost_usd")
+            .eq("service", "apify_maps"),
+          admin
+            .from("redes_buscas")
+            .select("chave_apelido, fonte, estrategia, custo_usd, criado_em, status")
+            .not("chave_apelido", "is", null)
+            .order("criado_em", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          admin
+            .from("apify_chaves_auditoria")
+            .select("apelido, acao, alterado_por, alterado_em")
+            .order("alterado_em", { ascending: false })
+            .limit(20),
+        ]);
       const poolQueryError = [
         gastosRedesResult.error,
         gastosMapsResult.error,
@@ -1358,7 +1359,7 @@ Deno.serve(async (req) => {
       const ultimaBusca = ultimaBuscaResult.data;
       const auditoria = auditoriaResult.data;
       const gastoPorChave = new Map<string, number>();
-      
+
       for (const g of gastosRedes ?? []) {
         gastoPorChave.set(
           g.chave_apelido as string,
@@ -1367,12 +1368,9 @@ Deno.serve(async (req) => {
       }
       for (const g of gastosMaps ?? []) {
         // A API de consumo salva a chave em metadata.key_label
-        const apelido = (g.metadata as any)?.key_label;
+        const apelido = (g.metadata as Record<string, unknown>)?.key_label;
         if (apelido && typeof apelido === "string") {
-          gastoPorChave.set(
-            apelido,
-            (gastoPorChave.get(apelido) ?? 0) + Number(g.cost_usd ?? 0),
-          );
+          gastoPorChave.set(apelido, (gastoPorChave.get(apelido) ?? 0) + Number(g.cost_usd ?? 0));
         }
       }
       const primeiraChaveDaConta = new Map<string, string>();
