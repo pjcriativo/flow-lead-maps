@@ -24,7 +24,13 @@ const admin = createClient(URL_SB, SERVICE, opts);
 
 // Pegar um usuário com acesso liberado
 const { data: users } = await admin.auth.admin.listUsers({ page: 1, perPage: 50 });
-const targetUser = users?.users?.find(u => u.email && ["digitalads58@gmail.com", "gevieskiagency@gmail.com", "pjcriativoweb@gmail.com"].includes(u.email));
+const targetUser = users?.users?.find(
+  (u) =>
+    u.email &&
+    ["digitalads58@gmail.com", "gevieskiagency@gmail.com", "pjcriativoweb@gmail.com"].includes(
+      u.email,
+    ),
+);
 console.log(`Testando com usuário: ${targetUser?.email}`);
 
 const { data: lk } = await admin.auth.admin.generateLink({
@@ -62,7 +68,7 @@ console.log(`Status HTTP: ${res.status}`);
 
 // Ler NDJSON linha a linha
 const text = await res.text();
-const lines = text.split("\n").filter(l => l.trim());
+const lines = text.split("\n").filter((l) => l.trim());
 for (const line of lines) {
   try {
     const obj = JSON.parse(line);

@@ -14,11 +14,11 @@ async function run() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": "Bearer " + anonKey
+      Authorization: "Bearer " + anonKey,
     },
-    body: JSON.stringify({ acao: "apify_pool_listar" })
+    body: JSON.stringify({ acao: "apify_pool_listar" }),
   });
-  
+
   const json = await resp.json();
   console.log(JSON.stringify(json, null, 2));
 }

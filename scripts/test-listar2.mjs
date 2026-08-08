@@ -39,12 +39,16 @@ async function sessao(email) {
 
 async function run() {
   const jwt = await sessao("teste@teste.com"); // any super admin email
-  
+
   // Or just call the apify_pool_listar endpoint directly as a super admin
   console.log("Calling apify_pool_listar...");
-  
+
   // Actually, we need a real super admin email from the database
-  const { data: admins } = await admin.from("profiles").select("email").eq("is_super_admin", true).limit(1);
+  const { data: admins } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("is_super_admin", true)
+    .limit(1);
   if (!admins || admins.length === 0) {
     console.log("No super admin found!");
     return;

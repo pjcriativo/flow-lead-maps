@@ -165,7 +165,8 @@ export function AdminApiUsageDashboard() {
   const custoPeriodo = resumo?.total_cost_usd ?? 0;
   const maiorConsumidor = resumo?.top_users.find((user) => user.total_cost_usd > 0);
 
-  const percentageApify = limiteApify > 0 ? Math.min(100, Math.max(0, (usoApify / limiteApify) * 100)) : 0;
+  const percentageApify =
+    limiteApify > 0 ? Math.min(100, Math.max(0, (usoApify / limiteApify) * 100)) : 0;
 
   return (
     <div className="space-y-8 pb-10">
@@ -229,27 +230,36 @@ export function AdminApiUsageDashboard() {
                 <p className="text-sm text-muted-foreground">Sincronizando…</p>
               ) : leituraFinanceiraDisponivel ? (
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Uso no ciclo: <strong className="text-foreground">{usd(usoApify)}</strong> de {usd(limiteApify)}
+                  Uso no ciclo: <strong className="text-foreground">{usd(usoApify)}</strong> de{" "}
+                  {usd(limiteApify)}
                 </p>
               ) : (
-                <p className="text-sm text-muted-foreground mt-0.5">Leitura financeira parcial/indisponível</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Leitura financeira parcial/indisponível
+                </p>
               )}
             </div>
           </div>
-          
+
           {leituraFinanceiraDisponivel && (
             <div className="flex-1 w-full md:max-w-md">
               <div className="flex justify-between text-xs font-semibold mb-2">
-                <span className={percentageApify > 80 ? "text-destructive" : "text-muted-foreground"}>
+                <span
+                  className={percentageApify > 80 ? "text-destructive" : "text-muted-foreground"}
+                >
                   {percentageApify.toFixed(1)}% utilizado
                 </span>
                 <span className="text-muted-foreground">Disponível: {usd(saldoApify)}</span>
               </div>
               <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden">
-                <div 
+                <div
                   className={cn(
                     "h-full rounded-full transition-all duration-500",
-                    percentageApify > 90 ? "bg-destructive" : percentageApify > 75 ? "bg-amber-500" : "bg-emerald-500"
+                    percentageApify > 90
+                      ? "bg-destructive"
+                      : percentageApify > 75
+                        ? "bg-amber-500"
+                        : "bg-emerald-500",
                   )}
                   style={{ width: `${percentageApify}%` }}
                 />
@@ -355,7 +365,11 @@ export function AdminApiUsageDashboard() {
                 {loading ? "..." : maiorConsumidor?.user_name || "Nenhum no período"}
               </p>
               <p className="mt-1 text-sm font-bold text-amber-600">
-                {loading ? "..." : maiorConsumidor ? usd(maiorConsumidor.total_cost_usd) : "US$ 0,00"}
+                {loading
+                  ? "..."
+                  : maiorConsumidor
+                    ? usd(maiorConsumidor.total_cost_usd)
+                    : "US$ 0,00"}
               </p>
             </div>
           </div>
@@ -372,7 +386,9 @@ export function AdminApiUsageDashboard() {
           </div>
           <div className="h-[280px] w-full flex-1">
             {loading ? (
-              <div className="h-full flex items-center justify-center text-muted-foreground">Carregando...</div>
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                Carregando...
+              </div>
             ) : providerData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -391,7 +407,11 @@ export function AdminApiUsageDashboard() {
                   </Pie>
                   <RechartsTooltip
                     formatter={(value: number) => usd(value)}
-                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+                    }}
                   />
                   <Legend verticalAlign="bottom" height={36} iconType="circle" />
                 </PieChart>
@@ -412,19 +432,39 @@ export function AdminApiUsageDashboard() {
           </div>
           <div className="h-[280px] w-full flex-1">
             {loading ? (
-              <div className="h-full flex items-center justify-center text-muted-foreground">Carregando...</div>
+              <div className="h-full flex items-center justify-center text-muted-foreground">
+                Carregando...
+              </div>
             ) : topClientsData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topClientsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart
+                  data={topClientsData}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `$${v}`}
+                  />
                   <RechartsTooltip
                     cursor={{ fill: "rgba(0,0,0,0.02)" }}
                     formatter={(value: number) => usd(value)}
-                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+                    }}
                   />
-                  <Bar dataKey="cost" name="Custo API" fill="#0f172a" radius={[4, 4, 0, 0]} barSize={40} />
+                  <Bar
+                    dataKey="cost"
+                    name="Custo API"
+                    fill="#0f172a"
+                    radius={[4, 4, 0, 0]}
+                    barSize={40}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -487,7 +527,9 @@ export function AdminApiUsageDashboard() {
               {topUsersFiltrados.map((u) => (
                 <tr key={u.user_id} className="hover:bg-muted/30 transition-colors group">
                   <td className="px-6 py-4 font-medium text-foreground">
-                    <p className="font-bold text-sm group-hover:text-primary transition-colors">{u.user_name}</p>
+                    <p className="font-bold text-sm group-hover:text-primary transition-colors">
+                      {u.user_name}
+                    </p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{u.user_email}</p>
                   </td>
                   <td className="px-6 py-4">
@@ -504,7 +546,9 @@ export function AdminApiUsageDashboard() {
                     <span className="font-bold text-foreground text-sm">{u.leads_used}</span>
                     <span className="text-muted-foreground text-xs mx-1">/</span>
                     <span className="text-muted-foreground text-xs">
-                      {u.monthly_limit === null || u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
+                      {u.monthly_limit === null || u.monthly_limit >= 999999
+                        ? "∞"
+                        : u.monthly_limit}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center font-bold text-foreground">
@@ -515,7 +559,9 @@ export function AdminApiUsageDashboard() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <p className="font-black text-emerald-600 text-base">{usd(u.total_cost_usd)}</p>
-                    <p className="text-[11px] font-medium text-muted-foreground">{brl(u.total_cost_brl)}</p>
+                    <p className="text-[11px] font-medium text-muted-foreground">
+                      {brl(u.total_cost_brl)}
+                    </p>
                   </td>
                 </tr>
               ))}
@@ -533,7 +579,9 @@ export function AdminApiUsageDashboard() {
                     {(resumo?.unattributed_items ?? 0).toLocaleString("pt-BR")}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <p className="font-black text-amber-600 text-base">{usd(resumo?.unattributed_cost_usd ?? 0)}</p>
+                    <p className="font-black text-amber-600 text-base">
+                      {usd(resumo?.unattributed_cost_usd ?? 0)}
+                    </p>
                   </td>
                 </tr>
               )}

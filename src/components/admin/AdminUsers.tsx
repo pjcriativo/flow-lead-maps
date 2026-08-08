@@ -4,7 +4,17 @@
 //  • Subscribers → CRUD manual (sem origem de captação automática); "Enviar e-mail" fica
 //                  desabilitado com o motivo (não existe motor de disparo em massa ainda).
 import { useEffect, useState } from "react";
-import { Check, Clock3, Loader2, LockKeyhole, Mail, Plus, ShieldCheck, Trash2, AlertTriangle } from "lucide-react";
+import {
+  Check,
+  Clock3,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  AlertTriangle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { adminAcao, type UsuarioPlataforma } from "@/services/admin";
 import { Button } from "@/components/ui/button";
@@ -33,9 +43,7 @@ export function AdminAllUsers({
   // Modal confirmação de exclusão
   const [deleteModal, setDeleteModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
 
-  const pendentes = usuarios.filter(
-    (u) => !u.acesso_liberado && !u.is_super_admin,
-  );
+  const pendentes = usuarios.filter((u) => !u.acesso_liberado && !u.is_super_admin);
 
   const adicionar = async () => {
     if (!email.includes("@")) {
@@ -177,7 +185,10 @@ export function AdminAllUsers({
           </thead>
           <tbody>
             {usuarios.map((u) => (
-              <tr key={u.id} className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors">
+              <tr
+                key={u.id}
+                className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors"
+              >
                 {/* Usuário */}
                 <td className="px-5 py-3 font-medium">{u.email}</td>
 
@@ -194,7 +205,9 @@ export function AdminAllUsers({
                       title="Alterar plano"
                     >
                       {PLANOS.map((p) => (
-                        <option key={p.value} value={p.value}>{p.label}</option>
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
                       ))}
                     </select>
                   ) : (
@@ -252,7 +265,10 @@ export function AdminAllUsers({
                             size="sm"
                             variant="default"
                             disabled={alterandoId === u.id}
-                            onClick={() => { setPlanSelecionado("pro"); setLiberarModal({ usuario: u }); }}
+                            onClick={() => {
+                              setPlanSelecionado("pro");
+                              setLiberarModal({ usuario: u });
+                            }}
                             className="gap-1.5"
                           >
                             {alterandoId === u.id ? (
@@ -310,17 +326,19 @@ export function AdminAllUsers({
                 className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm focus:outline-none"
               >
                 {PLANOS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
                 ))}
               </select>
               <p className="text-[11px] text-muted-foreground">
                 {planSelecionado === "basico"
                   ? "Básico: acesso ao Google Maps e CRM. Recursos avançados bloqueados."
                   : planSelecionado === "pro"
-                  ? "Pro: libera Instagram, LinkedIn, Propostas, Contratos, WhatsApp, Campanhas, Redesign e Publicar."
-                  : planSelecionado === "agencia"
-                  ? "Agência: mesmo que Pro, com maior capacidade e múltiplos usuários."
-                  : "Enterprise: acesso completo sem restrições."}
+                    ? "Pro: libera Instagram, LinkedIn, Propostas, Contratos, WhatsApp, Campanhas, Redesign e Publicar."
+                    : planSelecionado === "agencia"
+                      ? "Agência: mesmo que Pro, com maior capacidade e múltiplos usuários."
+                      : "Enterprise: acesso completo sem restrições."}
               </p>
             </div>
             <div className="flex gap-2 pt-1">
@@ -364,8 +382,8 @@ export function AdminAllUsers({
               <div>
                 <h3 className="font-serif text-lg font-semibold text-destructive">Excluir conta</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Esta ação é <b>irreversível</b>. A conta de{" "}
-                  <b>{deleteModal.usuario.email}</b> e todos os seus dados serão permanentemente removidos.
+                  Esta ação é <b>irreversível</b>. A conta de <b>{deleteModal.usuario.email}</b> e
+                  todos os seus dados serão permanentemente removidos.
                 </p>
               </div>
             </div>

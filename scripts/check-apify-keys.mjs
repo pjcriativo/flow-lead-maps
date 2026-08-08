@@ -78,7 +78,9 @@ for (const c of pool.chaves ?? []) {
   if (c.status === "ativa") {
     const teste = await chamarJson({ acao: "apify_chave_testar", id: c.id });
     if (teste.situacao === "ok") {
-      console.log(`  ✅ Válida | Restante: US$ ${Number(teste.restante ?? 0).toFixed(4)} | Uso: US$ ${Number(teste.uso ?? 0).toFixed(4)} | Teto: US$ ${Number(teste.max ?? 0).toFixed(2)}`);
+      console.log(
+        `  ✅ Válida | Restante: US$ ${Number(teste.restante ?? 0).toFixed(4)} | Uso: US$ ${Number(teste.uso ?? 0).toFixed(4)} | Teto: US$ ${Number(teste.max ?? 0).toFixed(2)}`,
+      );
     } else {
       console.log(`  ❌ Situação: ${teste.situacao} | Detalhe: ${JSON.stringify(teste)}`);
     }

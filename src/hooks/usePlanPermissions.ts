@@ -58,8 +58,7 @@ export function usePlanPermissions(): PlanPermissions {
       // Este fallback cobre dados antigos/migração e o plano "starter" padrão.
       const PLANOS_DEFAULT = ["basico", "starter"];
       const isAcessoLiberadoSemPlano =
-        perfil?.acesso_liberado === true &&
-        (!perfil?.plan || PLANOS_DEFAULT.includes(perfil.plan));
+        perfil?.acesso_liberado === true && (!perfil?.plan || PLANOS_DEFAULT.includes(perfil.plan));
       const isProOrAbove =
         isSuperAdmin ||
         isAcessoLiberadoSemPlano ||
