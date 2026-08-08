@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   DollarSign,
   Activity,
@@ -8,34 +8,56 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
+  Server,
+  PieChart as PieChartIcon,
+  Users,
 } from "lucide-react";
 import { obterResumoConsumoApi, type ApiUsageResumo } from "@/services/api-consumption";
 import { cn } from "@/lib/utils";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
-const SERVICE_LABELS: Record<string, { label: string; badgeClass: string }> = {
+const SERVICE_LABELS: Record<string, { label: string; badgeClass: string; color: string }> = {
   apify_maps: {
     label: "Apify (Google Maps Extractor)",
     badgeClass: "bg-blue-100 text-blue-800 border-blue-200",
+    color: "#3b82f6", // blue-500
   },
   openai_enrichment: {
     label: "OpenAI (GPT-4o Site Enrichment)",
     badgeClass: "bg-purple-100 text-purple-800 border-purple-200",
+    color: "#a855f7", // purple-500
   },
   whatsapp_evolution: {
     label: "Evolution API (WhatsApp Disparos)",
     badgeClass: "bg-green-100 text-green-800 border-green-200",
+    color: "#22c55e", // green-500
   },
   google_places: {
     label: "Google Places API Direct",
     badgeClass: "bg-amber-100 text-amber-800 border-amber-200",
+    color: "#f59e0b", // amber-500
   },
   osm_free: {
     label: "OpenStreetMap (sem custo)",
     badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
+    color: "#64748b", // slate-500
   },
   geoapify_free: {
     label: "Geoapify (franquia gratuita)",
     badgeClass: "bg-cyan-100 text-cyan-800 border-cyan-200",
+    color: "#06b6d4", // cyan-500
   },
 };
 
@@ -79,12 +101,39 @@ export function AdminApiUsageDashboard() {
     void carregarDados();
   }, [carregarDados]);
 
-  const topUsersFiltrados =
-    resumo?.top_users.filter((u) => {
-      if (!busca.trim()) return true;
-      const b = busca.toLowerCase();
-      return u.user_name.toLowerCase().includes(b) || u.user_email.toLowerCase().includes(b);
-    }) ?? [];
+  const topUsersFiltrados = useMemo(() => {
+    return (
+      resumo?.top_users.filter((u) => {
+        if (!busca.trim()) return true;
+        const b = busca.toLowerCase();
+        return u.user_name.toLowerCase().includes(b) || u.user_email.toLowerCase().includes(b);
+      }) ?? []
+    );
+  }, [resumo, busca]);
+
+  // Chart Data Preparation
+  const providerData = useMemo(() => {
+    if (!resumo?.service_breakdown) return [];
+    return resumo.service_breakdown
+      .filter((s) => s.cost_usd > 0)
+      .map((s) => ({
+        name: SERVICE_LABELS[s.service]?.label || s.service,
+        value: Number(s.cost_usd.toFixed(2)),
+        color: SERVICE_LABELS[s.service]?.color || "#cbd5e1",
+      }));
+  }, [resumo]);
+
+  const topClientsData = useMemo(() => {
+    if (!resumo?.top_users) return [];
+    return [...resumo.top_users]
+      .sort((a, b) => b.total_cost_usd - a.total_cost_usd)
+      .slice(0, 5)
+      .filter((u) => u.total_cost_usd > 0)
+      .map((u) => ({
+        name: u.user_name.split(" ")[0],
+        cost: Number(u.total_cost_usd.toFixed(2)),
+      }));
+  }, [resumo]);
 
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -116,18 +165,18 @@ export function AdminApiUsageDashboard() {
   const custoPeriodo = resumo?.total_cost_usd ?? 0;
   const maiorConsumidor = resumo?.top_users.find((user) => user.total_cost_usd > 0);
 
+  const percentageApify = limiteApify > 0 ? Math.min(100, Math.max(0, (usoApify / limiteApify) * 100)) : 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-10">
       {/* Header & Filtros */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-6">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" /> Consumo de APIs & Análise Financeira por
-            Cliente
+          <h2 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+            <BarChart3 className="h-7 w-7 text-primary" /> Análise Financeira & API
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Acompanhe em tempo real o gasto de infraestrutura de cada conta (Apify, OpenAI,
-            WhatsApp) e a margem por cliente.
+          <p className="text-sm text-muted-foreground mt-1">
+            Dashboard consolidado de custos de infraestrutura e margem operacional por cliente.
           </p>
         </div>
 
@@ -135,7 +184,7 @@ export function AdminApiUsageDashboard() {
           <select
             value={dias}
             onChange={(e) => setDias(Number(e.target.value))}
-            className="h-10 rounded-lg border border-border bg-card px-3 text-sm font-medium shadow-xs focus:border-primary focus:outline-none"
+            className="h-10 rounded-xl border border-border/50 bg-secondary/50 px-4 text-sm font-semibold shadow-xs focus:border-primary focus:outline-none transition-all hover:bg-secondary"
           >
             <option value={7}>Últimos 7 dias</option>
             <option value={30}>Últimos 30 dias</option>
@@ -146,7 +195,7 @@ export function AdminApiUsageDashboard() {
           <button
             onClick={carregarDados}
             disabled={loading}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium hover:bg-muted shadow-xs transition-colors"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             Atualizar
@@ -157,321 +206,344 @@ export function AdminApiUsageDashboard() {
       {erro && (
         <div
           role="alert"
-          className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800"
+          className="flex gap-4 rounded-2xl border border-destructive/20 bg-destructive/10 p-5 text-destructive"
         >
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+          <ShieldAlert className="mt-0.5 h-6 w-6 shrink-0" />
           <div>
             <p className="text-sm font-bold">Não foi possível atualizar o consumo</p>
-            <p className="text-xs">{erro}</p>
+            <p className="text-sm mt-1">{erro}</p>
           </div>
         </div>
       )}
 
-      {resumo?.apify_account.sync_error && (
-        <div
-          role="alert"
-          className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900"
-        >
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <p className="text-sm font-bold">A leitura ao vivo da Apify ficou incompleta</p>
-            <p className="text-xs">{resumo.apify_account.sync_error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Cards KPI Topo */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Custo registrado no período
-            </span>
-            <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
-              <DollarSign className="h-5 w-5" />
+      {/* API Health Banner */}
+      <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-card to-card/50 p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-blue-500/10 text-blue-600">
+              <Server className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base">Status Financeiro Apify (Ao Vivo)</h3>
+              {loading ? (
+                <p className="text-sm text-muted-foreground">Sincronizando…</p>
+              ) : leituraFinanceiraDisponivel ? (
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Uso no ciclo: <strong className="text-foreground">{usd(usoApify)}</strong> de {usd(limiteApify)}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-0.5">Leitura financeira parcial/indisponível</p>
+              )}
             </div>
           </div>
-          <div className="mt-3">
-            <p className="text-2xl font-bold text-foreground">
-              {loading ? "..." : usd(custoPeriodo)}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground font-medium">
-              Livro-caixa dos últimos {dias} dias
-            </p>
-          </div>
+          
+          {leituraFinanceiraDisponivel && (
+            <div className="flex-1 w-full md:max-w-md">
+              <div className="flex justify-between text-xs font-semibold mb-2">
+                <span className={percentageApify > 80 ? "text-destructive" : "text-muted-foreground"}>
+                  {percentageApify.toFixed(1)}% utilizado
+                </span>
+                <span className="text-muted-foreground">Disponível: {usd(saldoApify)}</span>
+              </div>
+              <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden">
+                <div 
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500",
+                    percentageApify > 90 ? "bg-destructive" : percentageApify > 75 ? "bg-amber-500" : "bg-emerald-500"
+                  )}
+                  style={{ width: `${percentageApify}%` }}
+                />
+              </div>
+              {limiteApify > creditosIncluidosApify + 0.01 && (
+                <p className="text-[10px] text-muted-foreground mt-2 text-right">
+                  *Teto permite excedente (Risco de cobrança)
+                </p>
+              )}
+            </div>
+          )}
         </div>
+        {resumo?.apify_account.sync_error && (
+          <p className="mt-4 text-xs font-medium text-amber-600 bg-amber-500/10 p-2 rounded-lg inline-block">
+            Atenção: {resumo.apify_account.sync_error}
+          </p>
+        )}
+      </div>
 
-        <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Itens processados pela Apify
-            </span>
-            <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
-              <Zap className="h-5 w-5" />
+      {/* Cards KPI Premium */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-card to-card/40 p-6 shadow-sm transition-all hover:shadow-md hover:border-emerald-500/30 group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <DollarSign className="h-24 w-24 text-emerald-500" />
+          </div>
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="rounded-xl bg-emerald-500/10 p-3 text-emerald-600 shadow-inner">
+              <DollarSign className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Custo do Período
+              </p>
+              <p className="text-3xl font-black text-foreground mt-1">
+                {loading ? "..." : usd(custoPeriodo)}
+              </p>
             </div>
           </div>
-          <div className="mt-3">
-            <p className="text-2xl font-bold text-foreground">
-              {loading ? "..." : (resumo?.total_leads_crawled ?? 0).toLocaleString("pt-BR")}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground font-medium">
-              Resultados processados nos runs; não são leads salvos
-            </p>
-          </div>
+          <p className="mt-4 text-[11px] font-medium text-muted-foreground relative z-10">
+            Livro-caixa dos últimos {dias} dias
+          </p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Runs e chamadas registradas
-            </span>
-            <div className="rounded-lg bg-purple-100 p-2 text-purple-700">
-              <Activity className="h-5 w-5" />
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-card to-card/40 p-6 shadow-sm transition-all hover:shadow-md hover:border-blue-500/30 group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Zap className="h-24 w-24 text-blue-500" />
+          </div>
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="rounded-xl bg-blue-500/10 p-3 text-blue-600 shadow-inner">
+              <Zap className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Itens Processados
+              </p>
+              <p className="text-3xl font-black text-foreground mt-1">
+                {loading ? "..." : (resumo?.total_leads_crawled ?? 0).toLocaleString("pt-BR")}
+              </p>
             </div>
           </div>
-          <div className="mt-3">
-            <p className="text-2xl font-bold text-foreground">
-              {loading ? "..." : (resumo?.total_requests ?? 0).toLocaleString("pt-BR")}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground font-medium">
-              Livro-caixa no período selecionado
-            </p>
-          </div>
+          <p className="mt-4 text-[11px] font-medium text-muted-foreground relative z-10">
+            Processados na API no período
+          </p>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-5 shadow-xs transition-all hover:border-primary/40">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Maior Consumidor
-            </span>
-            <div className="rounded-lg bg-amber-100 p-2 text-amber-700">
-              <TrendingUp className="h-5 w-5" />
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-card to-card/40 p-6 shadow-sm transition-all hover:shadow-md hover:border-purple-500/30 group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Activity className="h-24 w-24 text-purple-500" />
+          </div>
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="rounded-xl bg-purple-500/10 p-3 text-purple-600 shadow-inner">
+              <Activity className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Runs Registrados
+              </p>
+              <p className="text-3xl font-black text-foreground mt-1">
+                {loading ? "..." : (resumo?.total_requests ?? 0).toLocaleString("pt-BR")}
+              </p>
             </div>
           </div>
-          <div className="mt-3">
-            <p className="truncate text-base font-bold text-foreground">
-              {loading ? "..." : maiorConsumidor?.user_name || "Nenhum no período"}
-            </p>
-            <p className="mt-1 text-xs font-semibold text-amber-700">
-              {loading ? "..." : maiorConsumidor ? usd(maiorConsumidor.total_cost_usd) : "US$ 0,00"}
-            </p>
+          <p className="mt-4 text-[11px] font-medium text-muted-foreground relative z-10">
+            Quantidade de chamadas efetuadas
+          </p>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-card to-card/40 p-6 shadow-sm transition-all hover:shadow-md hover:border-amber-500/30 group">
+          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <TrendingUp className="h-24 w-24 text-amber-500" />
+          </div>
+          <div className="flex flex-col justify-between h-full relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-amber-500/10 p-2 text-amber-600 shadow-inner">
+                <Users className="h-4 w-4" />
+              </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Top Consumidor
+              </p>
+            </div>
+            <div className="mt-3">
+              <p className="truncate text-lg font-black text-foreground">
+                {loading ? "..." : maiorConsumidor?.user_name || "Nenhum no período"}
+              </p>
+              <p className="mt-1 text-sm font-bold text-amber-600">
+                {loading ? "..." : maiorConsumidor ? usd(maiorConsumidor.total_cost_usd) : "US$ 0,00"}
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-foreground">
-        {loading ? (
-          <p className="font-bold">Sincronizando a conta Apify…</p>
-        ) : leituraFinanceiraDisponivel ? (
-          <>
-            <p className="font-bold">
-              Apify ao vivo — uso no ciclo: {usd(usoApify)} de {usd(limiteApify)} · disponível até o
-              bloqueio: {usd(saldoApify)}
-            </p>
-            <p className="mt-1 font-medium">
-              Créditos incluídos no plano: {usd(creditosIncluidosApify)} · ainda incluídos:{" "}
-              {usd(saldoCreditosIncluidosApify)}
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="font-bold">Leitura financeira completa da Apify indisponível.</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              O total foi ocultado para não apresentar como correto um valor parcial de apenas
-              algumas contas.
-            </p>
-            {resumo?.apify_account.financial_sync_error && (
-              <p className="mt-2 text-xs text-destructive">
-                {resumo.apify_account.financial_sync_error}
-              </p>
+      {/* Gráficos */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Gráfico 1: Provedores */}
+        <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 mb-6">
+            <PieChartIcon className="h-5 w-5 text-muted-foreground" />
+            <h3 className="text-base font-bold text-foreground">Distribuição por Provedor</h3>
+          </div>
+          <div className="h-[280px] w-full flex-1">
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground">Carregando...</div>
+            ) : providerData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={providerData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={100}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {providerData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip
+                    formatter={(value: number) => usd(value)}
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                Sem dados suficientes no período.
+              </div>
             )}
-          </>
-        )}
-        <p className="mt-1 text-xs text-muted-foreground">
-          Valores consultados pela API oficial da Apify e deduplicados por conta, não por token.
-          Eles pertencem ao ciclo mensal e não mudam com o filtro de dias; os demais indicadores
-          usam os runs do período selecionado. O total financeiro inclui as contas cadastradas,
-          mesmo que uma chave esteja desativada ou esgotada; a capacidade ativa do rodízio aparece
-          em Configurações.
-        </p>
-        {leituraFinanceiraDisponivel && limiteApify > creditosIncluidosApify + 0.01 && (
-          <p className="mt-2 rounded-md border border-gold/40 bg-gold/10 px-2 py-1 text-xs">
-            O teto permite usar {usd(limiteApify - creditosIncluidosApify)} além dos créditos
-            incluídos; esse excedente pode gerar cobrança na Apify.
-          </p>
-        )}
-        {totalTokensApify > contasApify.length && (
-          <p className="mt-2 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground">
-            {totalTokensApify} tokens pertencem a {contasApify.length} conta(s) financeira(s);
-            saldos compartilhados foram contados uma única vez.
-          </p>
-        )}
+          </div>
+        </div>
+
+        {/* Gráfico 2: Top Clientes */}
+        <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm flex flex-col">
+          <div className="flex items-center gap-2 mb-6">
+            <BarChart3 className="h-5 w-5 text-muted-foreground" />
+            <h3 className="text-base font-bold text-foreground">Top 5 Clientes (Custo US$)</h3>
+          </div>
+          <div className="h-[280px] w-full flex-1">
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground">Carregando...</div>
+            ) : topClientsData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topClientsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <RechartsTooltip
+                    cursor={{ fill: "rgba(0,0,0,0.02)" }}
+                    formatter={(value: number) => usd(value)}
+                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" }}
+                  />
+                  <Bar dataKey="cost" name="Custo API" fill="#0f172a" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                Nenhum consumo registrado.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {(resumo?.unattributed_cost_usd ?? 0) > 0 && (
-        <div
-          role="status"
-          className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
-        >
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-bold">
             Consumo legado sem usuário identificado: {usd(resumo?.unattributed_cost_usd ?? 0)}
           </p>
           <p className="mt-1 text-xs">
             A Apify confirmou esse custo e o run está no livro-caixa, mas a execução antiga não
             gravou qual usuário iniciou a busca. O valor permanece separado para não atribuir gasto
-            à pessoa errada. Novos runs são vinculados ao usuário desde o início.
+            à pessoa errada.
           </p>
         </div>
       )}
 
-      {/* Breakdown por Serviço */}
-      <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-          Detalhamento por Provedor no Período
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {resumo?.service_breakdown.map((s) => {
-            const meta = SERVICE_LABELS[s.service] ?? {
-              label: s.service,
-              badgeClass: "bg-gray-100 text-gray-800",
-            };
-            return (
-              <div key={s.service} className="rounded-lg border border-border/80 bg-background p-4">
-                <span
-                  className={cn(
-                    "inline-block rounded-full border px-2.5 py-0.5 text-[11px] font-semibold mb-2",
-                    meta.badgeClass,
-                  )}
-                >
-                  {meta.label}
-                </span>
-                <p className="text-xl font-bold text-foreground mt-1">{usd(s.cost_usd)}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {s.requests_count} chamadas · ({brl(s.cost_brl)})
-                </p>
-              </div>
-            );
-          })}
-          {(!resumo?.service_breakdown || resumo.service_breakdown.length === 0) && !loading && (
-            <p className="col-span-full text-xs text-muted-foreground py-4 text-center">
-              Nenhum log de consumo registrado no período selecionado.
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Tabela de Consumo por Cliente */}
-      <div className="rounded-xl border border-border bg-card shadow-xs">
-        <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between border-b">
+      {/* Tabela de Consumo por Cliente (Redesign) */}
+      <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between border-b bg-muted/20">
           <div>
-            <h3 className="text-base font-bold text-foreground">Consumo por Conta de Cliente</h3>
-            <p className="text-xs text-muted-foreground">
-              Todos os usuários do sistema; quem não consumiu no período aparece com valor zero.
-              Custos e chamadas consideram apenas runs com ID real registrado.
+            <h3 className="text-lg font-bold text-foreground">Relatório Detalhado por Cliente</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Visão completa de uso, chamadas e custos atribuidos.
             </p>
           </div>
 
-          <div className="relative min-w-64">
+          <div className="relative min-w-[280px]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar por cliente ou e-mail..."
-              className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-xs focus:border-primary focus:outline-none"
+              className="h-10 w-full rounded-xl border border-border/60 bg-background pl-10 pr-4 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-xs"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-muted/50 text-muted-foreground uppercase text-[10px] font-semibold border-b">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-muted/40 text-muted-foreground uppercase text-[11px] font-bold border-b tracking-wider">
               <tr>
-                <th className="px-4 py-3">Cliente / Conta</th>
-                <th className="px-4 py-3">Plano Atual</th>
-                <th className="px-4 py-3 text-center">Leads no período</th>
-                <th className="px-4 py-3 text-center">Uso no mês / Limite</th>
-                <th className="px-4 py-3 text-center">Chamadas API</th>
-                <th className="px-4 py-3 text-center">Itens cobrados</th>
-                <th className="px-4 py-3 text-right">Custo rastreado (US$)</th>
-                <th className="px-4 py-3 text-right">Custo API (R$)</th>
+                <th className="px-6 py-4">Cliente / Conta</th>
+                <th className="px-6 py-4">Plano</th>
+                <th className="px-6 py-4 text-center">Uso / Limite</th>
+                <th className="px-6 py-4 text-center">Runs</th>
+                <th className="px-6 py-4 text-center">Itens processados</th>
+                <th className="px-6 py-4 text-right">Custo Rastreado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/50">
               {topUsersFiltrados.map((u) => (
-                <tr key={u.user_id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-medium text-foreground">
-                    <p className="font-semibold">{u.user_name}</p>
-                    <p className="text-[11px] text-muted-foreground">{u.user_email}</p>
+                <tr key={u.user_id} className="hover:bg-muted/30 transition-colors group">
+                  <td className="px-6 py-4 font-medium text-foreground">
+                    <p className="font-bold text-sm group-hover:text-primary transition-colors">{u.user_name}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{u.user_email}</p>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-6 py-4">
                     <span
                       className={cn(
-                        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] uppercase font-bold",
+                        "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] uppercase font-bold shadow-xs",
                         PLAN_BADGES[u.plan.toLowerCase()] || PLAN_BADGES.starter,
                       )}
                     >
                       {u.plan}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center font-bold text-foreground">
-                    <p>{u.leads_generated_period.toLocaleString("pt-BR")}</p>
-                    {u.apify_leads_generated_period > 0 && (
-                      <p className="text-[10px] font-medium text-muted-foreground">
-                        {u.apify_leads_generated_period.toLocaleString("pt-BR")} via Apify
-                      </p>
-                    )}
+                  <td className="px-6 py-4 text-center font-medium">
+                    <span className="font-bold text-foreground text-sm">{u.leads_used}</span>
+                    <span className="text-muted-foreground text-xs mx-1">/</span>
+                    <span className="text-muted-foreground text-xs">
+                      {u.monthly_limit === null || u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-center font-medium">
-                    <span className="font-bold text-foreground">{u.leads_used}</span> /{" "}
-                    {u.monthly_limit === null || u.monthly_limit >= 999999 ? "∞" : u.monthly_limit}
-                  </td>
-                  <td className="px-4 py-3 text-center font-semibold text-foreground">
+                  <td className="px-6 py-4 text-center font-bold text-foreground">
                     {u.requests_count}
                   </td>
-                  <td className="px-4 py-3 text-center font-semibold text-foreground">
+                  <td className="px-6 py-4 text-center font-semibold text-foreground">
                     {u.items_charged.toLocaleString("pt-BR")}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-emerald-700">
-                    <p>{usd(u.total_cost_usd)}</p>
-                    {u.apify_leads_generated_period > 0 && u.requests_count === 0 && (
-                      <p className="text-[10px] font-medium text-amber-700">
-                        histórico legado sem custo recuperável
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">
-                    {brl(u.total_cost_brl)}
+                  <td className="px-6 py-4 text-right">
+                    <p className="font-black text-emerald-600 text-base">{usd(u.total_cost_usd)}</p>
+                    <p className="text-[11px] font-medium text-muted-foreground">{brl(u.total_cost_brl)}</p>
                   </td>
                 </tr>
               ))}
               {!busca.trim() && (resumo?.unattributed_cost_usd ?? 0) > 0 && (
-                <tr className="bg-amber-50/70">
-                  <td className="px-4 py-3 font-medium text-amber-950">
-                    <p className="font-semibold">Run legado sem usuário identificado</p>
-                    <p className="text-[11px] text-amber-800">Confirmado diretamente pela Apify</p>
+                <tr className="bg-amber-50/50">
+                  <td className="px-6 py-4 font-medium text-amber-950">
+                    <p className="font-bold">Run legado sem usuário</p>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">—</td>
-                  <td className="px-4 py-3 text-center text-muted-foreground">—</td>
-                  <td className="px-4 py-3 text-center text-muted-foreground">—</td>
-                  <td className="px-4 py-3 text-center font-semibold text-foreground">
+                  <td className="px-6 py-4 text-muted-foreground">—</td>
+                  <td className="px-6 py-4 text-center text-muted-foreground">—</td>
+                  <td className="px-6 py-4 text-center font-bold text-foreground">
                     {resumo?.unattributed_requests ?? 0}
                   </td>
-                  <td className="px-4 py-3 text-center font-semibold text-foreground">
+                  <td className="px-6 py-4 text-center font-semibold text-foreground">
                     {(resumo?.unattributed_items ?? 0).toLocaleString("pt-BR")}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-amber-800">
-                    {usd(resumo?.unattributed_cost_usd ?? 0)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">
-                    {brl(resumo?.unattributed_cost_brl ?? 0)}
+                  <td className="px-6 py-4 text-right">
+                    <p className="font-black text-amber-600 text-base">{usd(resumo?.unattributed_cost_usd ?? 0)}</p>
                   </td>
                 </tr>
               )}
               {topUsersFiltrados.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                    Nenhum cliente encontrado no período.
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Search className="h-8 w-8 text-muted-foreground/50" />
+                      <p>Nenhum cliente encontrado no período.</p>
+                    </div>
                   </td>
                 </tr>
               )}
