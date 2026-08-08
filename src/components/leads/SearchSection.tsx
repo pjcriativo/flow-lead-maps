@@ -243,11 +243,11 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               break;
             case "progress":
               setProgress({ found: ev.found, target: ev.target });
-              setStatus(`Qualificando... ${ev.found}/${ev.target} leads gravados`);
+              setStatus(`Qualificando... ${ev.found}/${ev.target} leads encontrados`);
               break;
             case "done":
-              setStatus(`Concluído — ${ev.inserted} leads gravados`);
-              pushLog(`✔ Concluído. ${ev.inserted} leads gravados no banco.`);
+              setStatus(`Concluído — ${ev.inserted} leads encontrados`);
+              pushLog(`✔ Concluído. ${ev.inserted} leads encontrados no banco.`);
               posthog.capture("search_leads_done", { inserted: ev.inserted });
               onFinished?.();
               break;

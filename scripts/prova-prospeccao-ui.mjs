@@ -143,9 +143,9 @@ await thumb.click();
 await thumb.press("Home"); // quantidade = mínimo (10)
 await page.waitForTimeout(1500); // debounce do geocode move o pino
 await page.getByRole("button", { name: "Buscar leads" }).click();
-await page.locator("text=/Concluído — \\d+ leads gravados/").waitFor({ timeout: 300000 });
+await page.locator("text=/Concluído — \\d+ leads encontrados/").waitFor({ timeout: 300000 });
 fatos.buscaMaps = (
-  await page.locator("text=/Concluído — \\d+ leads gravados/").first().textContent()
+  await page.locator("text=/Concluído — \\d+ leads encontrados/").first().textContent()
 )?.trim();
 fatos.linhasNaTabela = await page.locator("tbody tr").count();
 await shot("05-maps-busca-concluida.png");
@@ -160,5 +160,5 @@ const ok =
   fatos.igEstrategias === 10 &&
   fatos.ig3BotaoTravado &&
   fatos.liEstrategias === 10 &&
-  /\d+ leads gravados/.test(fatos.buscaMaps ?? "");
+  /\d+ leads encontrados/.test(fatos.buscaMaps ?? "");
 process.exit(ok ? 0 : 1);
