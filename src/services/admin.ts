@@ -37,6 +37,7 @@ export type AdminKpis = {
 export type UsuarioPlataforma = {
   id: string;
   email: string;
+  full_name?: string | null;
   plan: string | null;
   /** Nome real do plano do catálogo (ex: "Pro") — vem da org do usuário */
   plano_nome: string | null;

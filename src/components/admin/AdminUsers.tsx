@@ -4,7 +4,7 @@
 //                  por conta disponível para ajustes finos sem criar novo plano.
 //  • Subscribers → CRUD manual (sem origem de captação automática); "Enviar e-mail" fica
 //                  desabilitado com o motivo (não existe motor de disparo em massa ainda).
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Check,
   Clock3,
@@ -17,10 +17,14 @@ import {
   AlertTriangle,
   Zap,
   X,
+  Users,
+  Layers,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminAcao, type Plano, type UsuarioPlataforma } from "@/services/admin";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function AdminAllUsers({
   usuarios,
@@ -645,94 +649,274 @@ export function AdminAllUsers({
 export function AdminSubscribers({
   usuarios,
   planos,
+  onMudou,
 }: {
   usuarios: UsuarioPlataforma[];
   planos: Plano[];
+  onMudou?: () => void;
 }) {
-  const assinantesAtivos = usuarios.filter((u) => u.acesso_liberado && !u.is_super_admin);
+  const [busca, setBusca] = useState("");
+  const [filtroPlano, setFiltroPlano] = useState<string>("todos");
+
+  // Apenas clientes com acesso liberado (exclui super admin da lista de assinantes)
+  const assinantesAtivos = useMemo(() => {
+    return usuarios.filter((u) => u.acesso_liberado && !u.is_super_admin);
+  }, [usuarios]);
+
+  // Estatísticas calculadas
+  const stats = useMemo(() => {
+    let totalLeadsAlocados = 0;
+    let semLimiteCount = 0;
+    const porPlano: Record<string, number> = {};
+
+    for (const a of assinantesAtivos) {
+      const p = planos.find((pl) => pl.id === a.plano_id);
+      const limit = a.leads_override !== null ? a.leads_override : (p?.limite_leads ?? null);
+      if (limit === null) {
+        semLimiteCount++;
+      } else {
+        totalLeadsAlocados += limit;
+      }
+
+      const planoNome = a.plano_nome || a.plan || "Sem Plano";
+      porPlano[planoNome] = (porPlano[planoNome] || 0) + 1;
+    }
+
+    return { totalLeadsAlocados, semLimiteCount, porPlano };
+  }, [assinantesAtivos, planos]);
+
+  // Filtragem na busca e por plano
+  const assinantesFiltrados = useMemo(() => {
+    return assinantesAtivos.filter((a) => {
+      // Filtro de busca (nome ou email)
+      if (busca.trim()) {
+        const query = busca.toLowerCase();
+        const nome = (a.full_name || a.email.split("@")[0]).toLowerCase();
+        const email = a.email.toLowerCase();
+        if (!nome.includes(query) && !email.includes(query)) return false;
+      }
+      // Filtro de plano
+      if (filtroPlano !== "todos") {
+        const planoAtual = (a.plano_nome || a.plan || "sem_plano").toLowerCase();
+        if (planoAtual !== filtroPlano.toLowerCase()) return false;
+      }
+      return true;
+    });
+  }, [assinantesAtivos, busca, filtroPlano]);
+
+  const PLAN_BADGES: Record<string, string> = {
+    starter: "bg-slate-100 text-slate-700 border-slate-200",
+    básico: "bg-blue-50 text-blue-700 border-blue-200 font-semibold",
+    basico: "bg-blue-50 text-blue-700 border-blue-200 font-semibold",
+    pro: "bg-indigo-50 text-indigo-700 border-indigo-200 font-bold",
+    agência: "bg-amber-50 text-amber-800 border-amber-300 font-bold shadow-xs",
+    agencia: "bg-amber-50 text-amber-800 border-amber-300 font-bold shadow-xs",
+    enterprise: "bg-amber-50 text-amber-800 border-amber-300 font-bold shadow-xs",
+  };
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
-        <div>
-          <h2 className="font-serif text-xl">Assinantes Ativos</h2>
-          <p className="text-xs text-muted-foreground">
-            Todos os clientes da plataforma com acesso liberado e seus respectivos limites.
-          </p>
+    <div className="space-y-6">
+      {/* Cards de Métricas no Topo */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-emerald-500/10 p-2.5 text-emerald-600">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Assinantes Ativos
+              </p>
+              <p className="text-2xl font-black text-foreground">{assinantesAtivos.length}</p>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">Clientes com acesso liberado</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            disabled
-            title="Desabilitado: ainda não existe um motor de disparo em massa/newsletter. O envio chega numa próxima etapa."
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-border px-3 py-2 text-xs font-medium text-muted-foreground/60"
-          >
-            <Mail className="h-3.5 w-3.5" /> Enviar e-mail em massa
-          </button>
+
+        <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-blue-500/10 p-2.5 text-blue-600">
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Capacidade de Leads
+              </p>
+              <p className="text-2xl font-black text-foreground">
+                {stats.totalLeadsAlocados.toLocaleString("pt-BR")}
+                {stats.semLimiteCount > 0 && <span className="text-xs font-normal text-muted-foreground ml-1">(+∞)</span>}
+              </p>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">Soma das cotas mensais ativas</p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-amber-500/10 p-2.5 text-amber-600">
+              <Layers className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Mix de Planos
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {Object.entries(stats.porPlano).map(([plano, qtd]) => (
+                  <span key={plano} className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs font-medium">
+                    <span className="font-bold">{plano}:</span> {qtd}
+                  </span>
+                ))}
+                {Object.keys(stats.porPlano).length === 0 && (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">Distribuição atual da base</p>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border bg-secondary/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-5 py-3">E-mail</th>
-              <th className="px-5 py-3">Plano Atual</th>
-              <th className="px-5 py-3">Limite Leads</th>
-              <th className="px-5 py-3">Sites IA</th>
-              <th className="px-5 py-3">Campanhas</th>
-              <th className="px-5 py-3">WhatsApp</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {assinantesAtivos.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-muted-foreground">
-                  Nenhum assinante ativo no momento.
-                </td>
-              </tr>
-            )}
-            {assinantesAtivos.map((a) => {
-              const plano = planos.find((p) => p.id === a.plano_id);
-              
-              // Resolve leads limit (override takes precedence)
-              const limitLeads = a.leads_override !== null 
-                ? a.leads_override
-                : (plano?.limite_leads ?? null);
+      {/* Container Principal */}
+      <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+        {/* Header com Filtros e Busca */}
+        <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-serif text-xl font-bold">Assinantes Ativos</h2>
+            <p className="text-xs text-muted-foreground">
+              Visão consolidada de clientes, cotas de leads e serviços inclusos.
+            </p>
+          </div>
 
-              return (
-                <tr key={a.id} className="hover:bg-secondary/20 transition-colors">
-                  <td className="px-5 py-3 font-medium">{a.email}</td>
-                  <td className="px-5 py-3 text-muted-foreground font-medium uppercase text-xs">
-                    {a.plano_nome ?? a.plan ?? "Sem Plano"}
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    <span className="font-semibold text-foreground">
-                      {limitLeads !== null ? limitLeads.toLocaleString("pt-BR") : "Ilimitado"}
-                    </span>
-                    {a.leads_override !== null && (
-                      <span className="ml-1 text-[10px] text-gold uppercase tracking-wider font-semibold">Override</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    {plano?.limite_sites !== null && plano?.limite_sites !== undefined
-                      ? plano.limite_sites.toLocaleString("pt-BR")
-                      : "Ilimitado"}
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    {plano?.limite_campanhas !== null && plano?.limite_campanhas !== undefined
-                      ? plano.limite_campanhas.toLocaleString("pt-BR")
-                      : "Ilimitado"}
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    {plano?.limite_whatsapp !== null && plano?.limite_whatsapp !== undefined
-                      ? plano.limite_whatsapp.toLocaleString("pt-BR")
-                      : "Ilimitado"}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Campo de Busca */}
+            <div className="relative min-w-[240px] flex-1 sm:flex-none">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por cliente ou e-mail..."
+                className="h-9 w-full rounded-md border border-input bg-card pl-9 pr-3 text-xs focus:border-primary focus:outline-none"
+              />
+            </div>
+
+            {/* Filtro por Plano */}
+            <select
+              value={filtroPlano}
+              onChange={(e) => setFiltroPlano(e.target.value)}
+              className="h-9 rounded-md border border-input bg-card px-3 text-xs font-medium focus:border-primary focus:outline-none"
+            >
+              <option value="todos">Todos os Planos</option>
+              {planos.map((p) => (
+                <option key={p.id} value={p.nome}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+
+            <button
+              disabled
+              title="Em breve: envio de e-mail em massa/newsletter."
+              className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-muted-foreground/60"
+            >
+              <Mail className="h-3.5 w-3.5" /> E-mail em massa
+            </button>
+          </div>
+        </div>
+
+        {/* Tabela de Assinantes */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-secondary/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-5 py-3">Cliente / Conta</th>
+                <th className="px-5 py-3">Plano Atual</th>
+                <th className="px-5 py-3">Limite Leads</th>
+                <th className="px-5 py-3">Sites IA</th>
+                <th className="px-5 py-3">Campanhas</th>
+                <th className="px-5 py-3">WhatsApp Chips</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {assinantesFiltrados.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2">
+                      <Search className="h-6 w-6 text-muted-foreground/40" />
+                      <p>Nenhum assinante encontrado com os filtros atuais.</p>
+                    </div>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              )}
+              {assinantesFiltrados.map((a) => {
+                const plano = planos.find((p) => p.id === a.plano_id);
+                const nomeCliente = a.full_name || a.email.split("@")[0];
+                const planoNome = a.plano_nome ?? a.plan ?? "Sem Plano";
+
+                // Limite de leads (override toma precedência)
+                const limitLeads =
+                  a.leads_override !== null ? a.leads_override : (plano?.limite_leads ?? null);
+
+                return (
+                  <tr key={a.id} className="hover:bg-secondary/20 transition-colors">
+                    {/* Cliente / Conta (Nome em negrito + email) */}
+                    <td className="px-5 py-3.5 font-medium">
+                      <p className="font-bold text-foreground text-sm">{nomeCliente}</p>
+                      <p className="text-xs text-muted-foreground">{a.email}</p>
+                    </td>
+
+                    {/* Plano Atual (Badge colorida) */}
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] uppercase font-bold shadow-2xs",
+                          PLAN_BADGES[planoNome.toLowerCase()] || "bg-slate-100 text-slate-700 border-slate-200",
+                        )}
+                      >
+                        {planoNome}
+                      </span>
+                    </td>
+
+                    {/* Limite de Leads */}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-foreground text-sm">
+                          {limitLeads !== null ? limitLeads.toLocaleString("pt-BR") : "Ilimitado"}
+                        </span>
+                        {a.leads_override !== null && (
+                          <span className="inline-flex items-center rounded bg-gold/15 px-1.5 py-0.5 text-[10px] font-bold text-gold uppercase tracking-wider">
+                            Override
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Sites IA */}
+                    <td className="px-5 py-3.5 text-muted-foreground">
+                      {plano?.limite_sites !== null && plano?.limite_sites !== undefined
+                        ? plano.limite_sites.toLocaleString("pt-BR")
+                        : "Ilimitado"}
+                    </td>
+
+                    {/* Campanhas */}
+                    <td className="px-5 py-3.5 text-muted-foreground">
+                      {plano?.limite_campanhas !== null && plano?.limite_campanhas !== undefined
+                        ? plano.limite_campanhas.toLocaleString("pt-BR")
+                        : "Ilimitado"}
+                    </td>
+
+                    {/* WhatsApp */}
+                    <td className="px-5 py-3.5 text-muted-foreground">
+                      {plano?.limite_whatsapp !== null && plano?.limite_whatsapp !== undefined
+                        ? plano.limite_whatsapp.toLocaleString("pt-BR")
+                        : "Ilimitado"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
