@@ -570,7 +570,9 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "all-users" && (
               <AdminAllUsers usuarios={painel?.usuarios ?? []} onMudou={recarregar} />
             )}
-            {tela === "subscribers" && <AdminSubscribers />}
+            {tela === "subscribers" && (
+              <AdminSubscribers usuarios={painel?.usuarios ?? []} planos={painel?.planos ?? []} />
+            )}
             {tela === "plans" && <AdminPlanos planos={painel?.planos ?? []} onMudou={recarregar} />}
             {tela === "tickets" && <AdminTickets />}
             {tela === "relatorios" && <AdminRelatorios />}
