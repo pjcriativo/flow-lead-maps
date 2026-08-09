@@ -568,7 +568,11 @@ export function AdminPanel({ email }: { email: string }) {
               <AdminStaffs staffs={painel?.staffs ?? []} onMudou={recarregar} />
             )}
             {tela === "all-users" && (
-              <AdminAllUsers usuarios={painel?.usuarios ?? []} onMudou={recarregar} />
+              <AdminAllUsers 
+                usuarios={painel?.usuarios ?? []} 
+                planos={painel?.planos ?? []}
+                onMudou={recarregar} 
+              />
             )}
             {tela === "subscribers" && (
               <AdminSubscribers usuarios={painel?.usuarios ?? []} planos={painel?.planos ?? []} />
