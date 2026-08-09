@@ -184,15 +184,17 @@ Deno.serve(async (req) => {
     if (acao === "user_access_set") {
       const userId = String(b.user_id || "");
       const liberado = b.liberado === true;
-      // Plano opcional passado junto com a liberação (ex: "pro", "agencia")
+      // Plano opcional: aceita plano_id (UUID do catálogo) ou plan (slug legado)
       const PLANOS_VALIDOS = ["basico", "pro", "agencia", "enterprise", "starter"];
       const planInformado = String(b.plan || "")
         .toLowerCase()
         .trim();
+      const planoIdInformado = String(b.plano_id || "").trim();
       if (!userId) return json({ ok: false, reason: "usuario_invalido" });
 
       const updatePayload: Record<string, unknown> = { acesso_liberado: liberado };
-      if (liberado && planInformado && PLANOS_VALIDOS.includes(planInformado)) {
+      // Slug legado (compatibilidade)
+      if (liberado && planInformado && PLANOS_VALIDOS.includes(planInformado) && !planoIdInformado) {
         updatePayload.plan = planInformado;
       }
 
@@ -235,6 +237,14 @@ Deno.serve(async (req) => {
               { onConflict: "org_id,user_id" },
             );
         }
+
+        // Se informou plano_id UUID, aplica via RPC (atualiza profiles.plan + orgs.plano_id)
+        if (planoIdInformado) {
+          await admin.rpc("admin_set_user_plan", {
+            p_user: alvo.id,
+            p_plano_id: planoIdInformado,
+          });
+        }
       }
 
       return json({
@@ -246,20 +256,59 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Atribuição manual de plano pelo admin. A RPC atualiza profiles.plan (permissões da UI)
+    // Atribuição manual de plano pelo admin. Aceita plano_id (UUID do catálogo, preferido)
+    // ou plan (slug legado). A RPC atualiza profiles.plan (permissões da UI)
     // e orgs.plano_id (limites/consumo) na mesma transação.
     if (acao === "user_plan_set") {
       const userId = String(b.user_id || "");
-      const plan = String(b.plan || "")
+      const planoIdInformado = String(b.plano_id || "").trim();
+      const planSlug = String(b.plan || "")
         .toLowerCase()
         .trim();
-      const PLANOS_VALIDOS = ["basico", "pro", "agencia", "enterprise", "starter"];
       if (!userId) return json({ ok: false, reason: "usuario_invalido" });
-      if (!PLANOS_VALIDOS.includes(plan)) return json({ ok: false, reason: "plano_invalido" });
+      if (!planoIdInformado && !planSlug)
+        return json({ ok: false, reason: "plano_nao_informado" });
 
+      // UUID do catálogo (preferido) — nenhuma lista hardcoded
+      if (planoIdInformado) {
+        const { data: resultado, error } = await admin.rpc("admin_set_user_plan", {
+          p_user: userId,
+          p_plano_id: planoIdInformado,
+        });
+        if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
+        if (!resultado?.ok)
+          return json({ ok: false, reason: resultado?.reason ?? "falha_atualizar" });
+        return json({ ok: true, ...resultado });
+      }
+
+      // Slug legado (compatibilidade com clientes antigos)
+      const PLANOS_VALIDOS = ["basico", "pro", "agencia", "enterprise", "starter"];
+      if (!PLANOS_VALIDOS.includes(planSlug)) return json({ ok: false, reason: "plano_invalido" });
       const { data: resultado, error } = await admin.rpc("admin_set_user_plan", {
         p_user: userId,
-        p_plan: plan,
+        p_plan: planSlug,
+      });
+      if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
+      if (!resultado?.ok)
+        return json({ ok: false, reason: resultado?.reason ?? "falha_atualizar" });
+      return json({ ok: true, ...resultado });
+    }
+
+    // Override de limite de leads por conta — define orgs.limite_leads_override sem mudar o plano.
+    // null = remover override (volta a respeitar o plano). Só o admin pode setar.
+    if (acao === "user_leads_override") {
+      const userId = String(b.user_id || "");
+      if (!userId) return json({ ok: false, reason: "usuario_invalido" });
+      // Aceita null explícito (remover override) ou número
+      const override = b.limite === null || b.limite === undefined
+        ? null
+        : Number(b.limite);
+      if (override !== null && (isNaN(override) || override < 0))
+        return json({ ok: false, reason: "limite_invalido" });
+
+      const { data: resultado, error } = await admin.rpc("admin_set_org_leads_override", {
+        p_user: userId,
+        p_leads: override,
       });
       if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
       if (!resultado?.ok)

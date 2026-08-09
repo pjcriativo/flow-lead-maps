@@ -49,6 +49,18 @@ Deno.serve(async (req) => {
     (usuarios ?? []).map((u: Rec) => [String(u.id), String(u.email ?? "?")]),
   );
 
+  // Orgs dos donos — para enriquecer a lista de usuários com plano real e override de leads
+  const { data: orgsUsuarios } = await admin
+    .from("orgs")
+    .select("dono_user_id, plano_id, limite_leads_override");
+  // Mapeia dono_user_id -> {plano_id, leads_override}
+  const orgDe = new Map<string, { plano_id: string | null; leads_override: number | null }>(
+    (orgsUsuarios ?? []).map((o: Rec) => [
+      String(o.dono_user_id),
+      { plano_id: String(o.plano_id ?? "") || null, leads_override: o.limite_leads_override as number | null },
+    ]),
+  );
+
   // card real do dashboard: tickets abertos/em andamento, TODAS as orgs
   const { count: ticketsAbertos } = await admin
     .from("tickets")
@@ -255,14 +267,24 @@ Deno.serve(async (req) => {
       tetoMesUsd: 50,
       ticketsAbertos: ticketsAbertos ?? 0,
     },
-    usuarios: (usuarios ?? []).map((u: Rec) => ({
-      id: u.id,
-      email: u.email,
-      plan: u.plan,
-      created_at: u.created_at,
-      acesso_liberado: u.acesso_liberado,
-      is_super_admin: u.is_super_admin,
-    })),
+    usuarios: (usuarios ?? []).map((u: Rec) => {
+      const orgInfo = orgDe.get(String(u.id));
+      // Resolver nome do plano a partir do UUID (planosRows já foi buscado acima)
+      const planoRow = orgInfo?.plano_id
+        ? (planosRows.data ?? []).find((p: Rec) => String(p.id) === orgInfo.plano_id)
+        : null;
+      return {
+        id: u.id,
+        email: u.email,
+        plan: u.plan,
+        plano_nome: (planoRow?.nome as string) ?? null,
+        plano_id: orgInfo?.plano_id ?? null,
+        leads_override: orgInfo?.leads_override ?? null,
+        created_at: u.created_at,
+        acesso_liberado: u.acesso_liberado,
+        is_super_admin: u.is_super_admin,
+      };
+    }),
     statusCampanhas: [...campanhasStatus.entries()].map(([status, total]) => ({ status, total })),
     serie14d: [...porDia.values()],
     leadsRecentes: dono(leadsRec.data as Rec[]),

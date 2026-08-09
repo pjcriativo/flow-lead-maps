@@ -1,6 +1,7 @@
 // Telas USERS do painel admin.
 //  • All Users   → todas as contas da plataforma (profiles). Add User cria conta+org real.
-//                  Coluna SALDO existe mas mostra "—" (billing não existe → PROIBIDO saldo fake).
+//                  Planos carregados do catálogo real (sem lista hardcoded). Override de leads
+//                  por conta disponível para ajustes finos sem criar novo plano.
 //  • Subscribers → CRUD manual (sem origem de captação automática); "Enviar e-mail" fica
 //                  desabilitado com o motivo (não existe motor de disparo em massa ainda).
 import { useEffect, useState } from "react";
@@ -14,23 +15,20 @@ import {
   ShieldCheck,
   Trash2,
   AlertTriangle,
+  Zap,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { adminAcao, type UsuarioPlataforma } from "@/services/admin";
+import { adminAcao, type Plano, type UsuarioPlataforma } from "@/services/admin";
 import { Button } from "@/components/ui/button";
-
-const PLANOS = [
-  { value: "basico", label: "Básico" },
-  { value: "pro", label: "Pro" },
-  { value: "agencia", label: "Agência" },
-  { value: "enterprise", label: "Enterprise" },
-];
 
 export function AdminAllUsers({
   usuarios,
+  planos,
   onMudou,
 }: {
   usuarios: UsuarioPlataforma[];
+  planos: Plano[];
   onMudou: () => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
@@ -39,9 +37,22 @@ export function AdminAllUsers({
   const [alterandoId, setAlterandoId] = useState<string | null>(null);
   // Modal "Liberar com plano"
   const [liberarModal, setLiberarModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
-  const [planSelecionado, setPlanSelecionado] = useState("pro");
+  const [planoSelecionadoId, setPlanoSelecionadoId] = useState<string>("");
   // Modal confirmação de exclusão
   const [deleteModal, setDeleteModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
+  // Modal override de leads
+  const [overrideModal, setOverrideModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
+  const [overrideValor, setOverrideValor] = useState<string>("");
+
+  // Planos ativos do catálogo (ordenados)
+  const planosAtivos = planos.filter((p) => p.ativo);
+
+  // Inicializar plano padrão quando abrir modal
+  useEffect(() => {
+    if (liberarModal && planosAtivos.length > 0 && !planoSelecionadoId) {
+      setPlanoSelecionadoId(planosAtivos[0].id);
+    }
+  }, [liberarModal, planosAtivos, planoSelecionadoId]);
 
   const pendentes = usuarios.filter((u) => !u.acesso_liberado && !u.is_super_admin);
 
@@ -68,19 +79,25 @@ export function AdminAllUsers({
     }
   };
 
-  const alterarAcesso = async (usuario: UsuarioPlataforma, liberado: boolean, plan?: string) => {
+  const alterarAcesso = async (
+    usuario: UsuarioPlataforma,
+    liberado: boolean,
+    planoId?: string,
+  ) => {
     setAlterandoId(usuario.id);
     try {
       const payload: Record<string, unknown> = { user_id: usuario.id, liberado };
-      if (liberado && plan) payload.plan = plan;
+      // Passa UUID do plano do catálogo (preferido) ao liberar
+      if (liberado && planoId) payload.plano_id = planoId;
       const r = await adminAcao("user_access_set", payload);
       if (!r.ok) {
         toast.error(`Não foi possível alterar o acesso: ${r.reason ?? "erro"}`);
         return;
       }
+      const planoNome = planosAtivos.find((p) => p.id === planoId)?.nome;
       toast.success(
         liberado
-          ? `Acesso liberado para ${usuario.email}${plan ? ` (plano ${plan})` : ""}.`
+          ? `Acesso liberado para ${usuario.email}${planoNome ? ` (${planoNome})` : ""}.`
           : `Acesso bloqueado para ${usuario.email}.`,
       );
       onMudou();
@@ -91,18 +108,50 @@ export function AdminAllUsers({
     }
   };
 
-  const alterarPlano = async (usuario: UsuarioPlataforma, plan: string) => {
+  const alterarPlano = async (usuario: UsuarioPlataforma, planoId: string) => {
     setAlterandoId(usuario.id);
     try {
-      const r = await adminAcao("user_plan_set", { user_id: usuario.id, plan });
+      const r = await adminAcao("user_plan_set", { user_id: usuario.id, plano_id: planoId });
       if (!r.ok) {
         toast.error(`Não foi possível alterar o plano: ${r.reason ?? "erro"}`);
         return;
       }
-      toast.success(`Plano de ${usuario.email} → "${plan}".`);
+      const planoNome = planosAtivos.find((p) => p.id === planoId)?.nome ?? planoId;
+      toast.success(`Plano de ${usuario.email} → "${planoNome}".`);
       onMudou();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao alterar plano");
+    } finally {
+      setAlterandoId(null);
+    }
+  };
+
+  const salvarOverride = async () => {
+    if (!overrideModal) return;
+    const limite = overrideValor.trim() === "" ? null : Number(overrideValor);
+    if (limite !== null && (isNaN(limite) || limite < 0)) {
+      toast.error("Informe um número válido ou deixe em branco para remover o override.");
+      return;
+    }
+    setAlterandoId(overrideModal.usuario.id);
+    try {
+      const r = await adminAcao("user_leads_override", {
+        user_id: overrideModal.usuario.id,
+        limite,
+      });
+      if (!r.ok) {
+        toast.error(`Não foi possível salvar: ${r.reason ?? "erro"}`);
+        return;
+      }
+      toast.success(
+        limite === null
+          ? `Override removido para ${overrideModal.usuario.email} — voltará a usar o limite do plano.`
+          : `Limite de leads para ${overrideModal.usuario.email} → ${limite.toLocaleString("pt-BR")}.`,
+      );
+      setOverrideModal(null);
+      onMudou();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
     } finally {
       setAlterandoId(null);
     }
@@ -129,6 +178,9 @@ export function AdminAllUsers({
       setAlterandoId(null);
     }
   };
+
+  // Plano selecionado no modal de liberação
+  const planoSelecionado = planosAtivos.find((p) => p.id === planoSelecionadoId);
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
@@ -178,6 +230,7 @@ export function AdminAllUsers({
             <tr>
               <th className="px-5 py-2.5 font-medium">Usuário</th>
               <th className="px-5 py-2.5 font-medium">Plano</th>
+              <th className="px-5 py-2.5 font-medium">Leads</th>
               <th className="px-5 py-2.5 font-medium">Acesso</th>
               <th className="px-5 py-2.5 font-medium">Entrou em</th>
               <th className="w-px whitespace-nowrap px-5 py-2.5 text-right font-medium">Ações</th>
@@ -198,20 +251,68 @@ export function AdminAllUsers({
                     <span className="text-xs uppercase text-muted-foreground">—</span>
                   ) : u.acesso_liberado ? (
                     <select
-                      value={u.plan ?? "basico"}
-                      disabled={alterandoId === u.id}
+                      value={u.plano_id ?? ""}
+                      disabled={alterandoId === u.id || planosAtivos.length === 0}
                       onChange={(e) => alterarPlano(u, e.target.value)}
                       className="rounded-md border border-input bg-card px-2 py-1 text-xs font-medium focus:outline-none cursor-pointer capitalize disabled:opacity-50"
                       title="Alterar plano"
                     >
-                      {PLANOS.map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
+                      {/* Opção vazia se org ainda não tem plano_id */}
+                      {!u.plano_id && (
+                        <option value="">— sem plano —</option>
+                      )}
+                      {planosAtivos.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nome}
+                          {p.limite_leads !== null ? ` (${p.limite_leads.toLocaleString("pt-BR")}/mês)` : " (∞)"}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <span className="text-xs uppercase text-muted-foreground">{u.plan ?? "—"}</span>
+                    <span className="text-xs uppercase text-muted-foreground">
+                      {u.plano_nome ?? u.plan ?? "—"}
+                    </span>
+                  )}
+                </td>
+
+                {/* Limite de leads — mostra override quando presente */}
+                <td className="px-5 py-3">
+                  {u.is_super_admin ? (
+                    <span className="text-xs text-muted-foreground">∞</span>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">
+                        {u.leads_override !== null ? (
+                          <span className="font-semibold text-gold">
+                            {u.leads_override.toLocaleString("pt-BR")}
+                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">override</span>
+                          </span>
+                        ) : (
+                          <span>
+                            {(() => {
+                              const plano = planosAtivos.find((p) => p.id === u.plano_id);
+                              return plano
+                                ? plano.limite_leads !== null
+                                  ? plano.limite_leads.toLocaleString("pt-BR")
+                                  : "∞"
+                                : "—";
+                            })()}
+                          </span>
+                        )}
+                      </span>
+                      {u.acesso_liberado && !u.is_super_admin && (
+                        <button
+                          onClick={() => {
+                            setOverrideValor(u.leads_override !== null ? String(u.leads_override) : "");
+                            setOverrideModal({ usuario: u });
+                          }}
+                          title="Definir override de leads"
+                          className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/50 hover:text-gold hover:bg-gold/10 transition-colors"
+                        >
+                          <Zap className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
                   )}
                 </td>
 
@@ -266,7 +367,7 @@ export function AdminAllUsers({
                             variant="default"
                             disabled={alterandoId === u.id}
                             onClick={() => {
-                              setPlanSelecionado("pro");
+                              setPlanoSelecionadoId(planosAtivos[0]?.id ?? "");
                               setLiberarModal({ usuario: u });
                             }}
                             className="gap-1.5"
@@ -309,45 +410,87 @@ export function AdminAllUsers({
       {/* ── Modal: Liberar acesso + escolher plano ── */}
       {liberarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl space-y-4">
             <div>
               <h3 className="font-serif text-lg font-semibold">Liberar acesso</h3>
               <p className="text-xs text-muted-foreground mt-1">
                 Escolha o plano que <b>{liberarModal.usuario.email}</b> receberá ao ser liberado.
               </p>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Plano
-              </label>
-              <select
-                value={planSelecionado}
-                onChange={(e) => setPlanSelecionado(e.target.value)}
-                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm focus:outline-none"
-              >
-                {PLANOS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-muted-foreground">
-                {planSelecionado === "basico"
-                  ? "Básico: acesso ao Google Maps e CRM. Recursos avançados bloqueados."
-                  : planSelecionado === "pro"
-                    ? "Pro: libera Instagram, LinkedIn, Propostas, Contratos, WhatsApp, Campanhas, Redesign e Publicar."
-                    : planSelecionado === "agencia"
-                      ? "Agência: mesmo que Pro, com maior capacidade e múltiplos usuários."
-                      : "Enterprise: acesso completo sem restrições."}
+
+            {planosAtivos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum plano ativo no catálogo. Crie um plano antes de liberar usuários.
               </p>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Plano
+                  </label>
+                  <select
+                    value={planoSelecionadoId}
+                    onChange={(e) => setPlanoSelecionadoId(e.target.value)}
+                    className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm focus:outline-none"
+                  >
+                    {planosAtivos.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome} — R${" "}
+                        {Number(p.preco).toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                        /{p.periodo === "anual" ? "ano" : "mês"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Preview dos limites do plano selecionado */}
+                {planoSelecionado && (
+                  <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3 space-y-1">
+                    {planoSelecionado.descricao && (
+                      <p className="text-[12px] text-muted-foreground italic mb-2">
+                        {planoSelecionado.descricao}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[12px]">
+                      <span className="text-muted-foreground">Leads/mês:</span>
+                      <span className="font-semibold">
+                        {planoSelecionado.limite_leads !== null
+                          ? planoSelecionado.limite_leads.toLocaleString("pt-BR")
+                          : "∞"}
+                      </span>
+                      <span className="text-muted-foreground">Sites IA/mês:</span>
+                      <span className="font-semibold">
+                        {planoSelecionado.limite_sites !== null
+                          ? planoSelecionado.limite_sites.toLocaleString("pt-BR")
+                          : "∞"}
+                      </span>
+                      <span className="text-muted-foreground">Campanhas/mês:</span>
+                      <span className="font-semibold">
+                        {planoSelecionado.limite_campanhas !== null
+                          ? planoSelecionado.limite_campanhas.toLocaleString("pt-BR")
+                          : "∞"}
+                      </span>
+                      <span className="text-muted-foreground">WhatsApp chips:</span>
+                      <span className="font-semibold">
+                        {planoSelecionado.limite_whatsapp !== null
+                          ? planoSelecionado.limite_whatsapp.toLocaleString("pt-BR")
+                          : "∞"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
             <div className="flex gap-2 pt-1">
               <Button
                 type="button"
                 className="flex-1 gap-1.5"
-                disabled={alterandoId === liberarModal.usuario.id}
+                disabled={alterandoId === liberarModal.usuario.id || planosAtivos.length === 0}
                 onClick={async () => {
-                  await alterarAcesso(liberarModal.usuario, true, planSelecionado);
+                  await alterarAcesso(liberarModal.usuario, true, planoSelecionadoId || undefined);
                   setLiberarModal(null);
                 }}
               >
@@ -363,6 +506,87 @@ export function AdminAllUsers({
                 variant="outline"
                 onClick={() => setLiberarModal(null)}
                 disabled={alterandoId === liberarModal.usuario.id}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Override de limite de leads por conta ── */}
+      {overrideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl border border-gold/30 bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/10">
+                <Zap className="size-5 text-gold" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-semibold">Override de leads</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define um limite personalizado de leads para{" "}
+                  <b>{overrideModal.usuario.email}</b> sem mudar o plano.
+                  Deixe em branco para remover o override.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Limite de leads/mês
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min={0}
+                  value={overrideValor}
+                  onChange={(e) => setOverrideValor(e.target.value)}
+                  placeholder="Deixe vazio para usar o plano"
+                  className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-sm transition-all hover:border-gold/40 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25 pr-8"
+                />
+                {overrideValor && (
+                  <button
+                    onClick={() => setOverrideValor("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {overrideModal.usuario.plano_id && (() => {
+                const plano = planosAtivos.find((p) => p.id === overrideModal.usuario.plano_id);
+                return plano ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Limite do plano {plano.nome}:{" "}
+                    <b>
+                      {plano.limite_leads !== null
+                        ? plano.limite_leads.toLocaleString("pt-BR")
+                        : "∞"}
+                    </b>{" "}
+                    leads/mês
+                  </p>
+                ) : null;
+              })()}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                type="button"
+                className="flex-1 gap-1.5 bg-gold text-navy hover:bg-gold/90"
+                disabled={alterandoId === overrideModal.usuario.id}
+                onClick={salvarOverride}
+              >
+                {alterandoId === overrideModal.usuario.id ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Zap className="size-3.5" />
+                )}
+                Salvar override
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOverrideModal(null)}
+                disabled={alterandoId === overrideModal.usuario.id}
               >
                 Cancelar
               </Button>

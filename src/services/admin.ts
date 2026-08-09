@@ -38,6 +38,12 @@ export type UsuarioPlataforma = {
   id: string;
   email: string;
   plan: string | null;
+  /** Nome real do plano do catálogo (ex: "Pro") — vem da org do usuário */
+  plano_nome: string | null;
+  /** UUID do plano da org (orgs.plano_id) */
+  plano_id: string | null;
+  /** Override individual de limite de leads (orgs.limite_leads_override) */
+  leads_override: number | null;
   created_at: string;
   acesso_liberado: boolean;
   is_super_admin: boolean;
@@ -142,6 +148,7 @@ export type AdminAcao =
   | "user_add"
   | "user_access_set"
   | "user_plan_set"
+  | "user_leads_override"
   | "user_delete"
   | "plano_upsert"
   | "plano_toggle"
