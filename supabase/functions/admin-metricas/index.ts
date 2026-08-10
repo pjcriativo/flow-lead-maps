@@ -57,7 +57,10 @@ Deno.serve(async (req) => {
   const orgDe = new Map<string, { plano_id: string | null; leads_override: number | null }>(
     (orgsUsuarios ?? []).map((o: Rec) => [
       String(o.dono_user_id),
-      { plano_id: String(o.plano_id ?? "") || null, leads_override: o.limite_leads_override as number | null },
+      {
+        plano_id: String(o.plano_id ?? "") || null,
+        leads_override: o.limite_leads_override as number | null,
+      },
     ]),
   );
 

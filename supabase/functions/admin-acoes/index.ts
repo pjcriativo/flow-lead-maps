@@ -194,7 +194,12 @@ Deno.serve(async (req) => {
 
       const updatePayload: Record<string, unknown> = { acesso_liberado: liberado };
       // Slug legado (compatibilidade)
-      if (liberado && planInformado && PLANOS_VALIDOS.includes(planInformado) && !planoIdInformado) {
+      if (
+        liberado &&
+        planInformado &&
+        PLANOS_VALIDOS.includes(planInformado) &&
+        !planoIdInformado
+      ) {
         updatePayload.plan = planInformado;
       }
 
@@ -266,8 +271,7 @@ Deno.serve(async (req) => {
         .toLowerCase()
         .trim();
       if (!userId) return json({ ok: false, reason: "usuario_invalido" });
-      if (!planoIdInformado && !planSlug)
-        return json({ ok: false, reason: "plano_nao_informado" });
+      if (!planoIdInformado && !planSlug) return json({ ok: false, reason: "plano_nao_informado" });
 
       // UUID do catálogo (preferido) — nenhuma lista hardcoded
       if (planoIdInformado) {
@@ -300,9 +304,7 @@ Deno.serve(async (req) => {
       const userId = String(b.user_id || "");
       if (!userId) return json({ ok: false, reason: "usuario_invalido" });
       // Aceita null explícito (remover override) ou número
-      const override = b.limite === null || b.limite === undefined
-        ? null
-        : Number(b.limite);
+      const override = b.limite === null || b.limite === undefined ? null : Number(b.limite);
       if (override !== null && (isNaN(override) || override < 0))
         return json({ ok: false, reason: "limite_invalido" });
 

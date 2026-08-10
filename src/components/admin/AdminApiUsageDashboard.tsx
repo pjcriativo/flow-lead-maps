@@ -222,7 +222,9 @@ export function AdminApiUsageDashboard() {
       ];
     });
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -627,12 +629,18 @@ export function AdminApiUsageDashboard() {
                             {u.user_name}
                           </p>
                           {margemNegativa && (
-                            <span title="Custo de API excede a mensalidade do plano" className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold text-destructive">
+                            <span
+                              title="Custo de API excede a mensalidade do plano"
+                              className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold text-destructive"
+                            >
                               <AlertTriangle className="h-3 w-3" /> Prejuízo
                             </span>
                           )}
                           {altoConsumo && !margemNegativa && (
-                            <span title="Alto consumo de infraestrutura" className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-600">
+                            <span
+                              title="Alto consumo de infraestrutura"
+                              className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-600"
+                            >
                               Alto Consumo
                             </span>
                           )}
@@ -665,7 +673,9 @@ export function AdminApiUsageDashboard() {
                         {u.items_charged.toLocaleString("pt-BR")}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className="font-black text-foreground text-sm">{brl(u.total_cost_brl)}</p>
+                        <p className="font-black text-foreground text-sm">
+                          {brl(u.total_cost_brl)}
+                        </p>
                         <p className="text-[11px] font-medium text-muted-foreground">
                           {usd(u.total_cost_usd)}
                         </p>
@@ -673,7 +683,12 @@ export function AdminApiUsageDashboard() {
                       <td className="px-6 py-4 text-right">
                         {receitaEstBrl > 0 ? (
                           <div>
-                            <p className={cn("font-bold text-sm", margemLiquidaBrl >= 0 ? "text-emerald-600" : "text-destructive")}>
+                            <p
+                              className={cn(
+                                "font-bold text-sm",
+                                margemLiquidaBrl >= 0 ? "text-emerald-600" : "text-destructive",
+                              )}
+                            >
                               {brl(margemLiquidaBrl)}
                             </p>
                             <p className="text-[10px] text-muted-foreground">
@@ -692,28 +707,56 @@ export function AdminApiUsageDashboard() {
                         <td colSpan={8} className="px-10 py-4">
                           <div className="rounded-xl border border-border/40 bg-card p-4 space-y-3">
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                              <Activity className="h-3.5 w-3.5 text-primary" /> Detalhamento de Consumo de API por Serviço — {u.user_name}
+                              <Activity className="h-3.5 w-3.5 text-primary" /> Detalhamento de
+                              Consumo de API por Serviço — {u.user_name}
                             </p>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
                               <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">Google Maps (Apify)</p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">{u.leads_used} buscas</p>
-                                <p className="text-xs font-semibold text-blue-600">{usd(u.total_cost_usd * 0.75)}</p>
+                                <p className="text-[11px] text-muted-foreground font-medium">
+                                  Google Maps (Apify)
+                                </p>
+                                <p className="text-sm font-bold text-foreground mt-0.5">
+                                  {u.leads_used} buscas
+                                </p>
+                                <p className="text-xs font-semibold text-blue-600">
+                                  {usd(u.total_cost_usd * 0.75)}
+                                </p>
                               </div>
                               <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">OpenAI GPT-4o</p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">{u.items_charged} enriqueclmentos</p>
-                                <p className="text-xs font-semibold text-purple-600">{usd(u.total_cost_usd * 0.20)}</p>
+                                <p className="text-[11px] text-muted-foreground font-medium">
+                                  OpenAI GPT-4o
+                                </p>
+                                <p className="text-sm font-bold text-foreground mt-0.5">
+                                  {u.items_charged} enriqueclmentos
+                                </p>
+                                <p className="text-xs font-semibold text-purple-600">
+                                  {usd(u.total_cost_usd * 0.2)}
+                                </p>
                               </div>
                               <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">Evolution API (WA)</p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">{u.requests_count} disparos</p>
-                                <p className="text-xs font-semibold text-emerald-600">{usd(u.total_cost_usd * 0.05)}</p>
+                                <p className="text-[11px] text-muted-foreground font-medium">
+                                  Evolution API (WA)
+                                </p>
+                                <p className="text-sm font-bold text-foreground mt-0.5">
+                                  {u.requests_count} disparos
+                                </p>
+                                <p className="text-xs font-semibold text-emerald-600">
+                                  {usd(u.total_cost_usd * 0.05)}
+                                </p>
                               </div>
                               <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">Margem da Mensalidade</p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">{brl(receitaEstBrl)}</p>
-                                <p className={cn("text-xs font-bold", margemLiquidaBrl >= 0 ? "text-emerald-600" : "text-destructive")}>
+                                <p className="text-[11px] text-muted-foreground font-medium">
+                                  Margem da Mensalidade
+                                </p>
+                                <p className="text-sm font-bold text-foreground mt-0.5">
+                                  {brl(receitaEstBrl)}
+                                </p>
+                                <p
+                                  className={cn(
+                                    "text-xs font-bold",
+                                    margemLiquidaBrl >= 0 ? "text-emerald-600" : "text-destructive",
+                                  )}
+                                >
                                   {brl(margemLiquidaBrl)} líquido
                                 </p>
                               </div>

@@ -83,11 +83,7 @@ export function AdminAllUsers({
     }
   };
 
-  const alterarAcesso = async (
-    usuario: UsuarioPlataforma,
-    liberado: boolean,
-    planoId?: string,
-  ) => {
+  const alterarAcesso = async (usuario: UsuarioPlataforma, liberado: boolean, planoId?: string) => {
     setAlterandoId(usuario.id);
     try {
       const payload: Record<string, unknown> = { user_id: usuario.id, liberado };
@@ -262,13 +258,13 @@ export function AdminAllUsers({
                       title="Alterar plano"
                     >
                       {/* Opção vazia se org ainda não tem plano_id */}
-                      {!u.plano_id && (
-                        <option value="">— sem plano —</option>
-                      )}
+                      {!u.plano_id && <option value="">— sem plano —</option>}
                       {planosAtivos.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.nome}
-                          {p.limite_leads !== null ? ` (${p.limite_leads.toLocaleString("pt-BR")}/mês)` : " (∞)"}
+                          {p.limite_leads !== null
+                            ? ` (${p.limite_leads.toLocaleString("pt-BR")}/mês)`
+                            : " (∞)"}
                         </option>
                       ))}
                     </select>
@@ -289,7 +285,9 @@ export function AdminAllUsers({
                         {u.leads_override !== null ? (
                           <span className="font-semibold text-gold">
                             {u.leads_override.toLocaleString("pt-BR")}
-                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">override</span>
+                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                              override
+                            </span>
                           </span>
                         ) : (
                           <span>
@@ -307,7 +305,9 @@ export function AdminAllUsers({
                       {u.acesso_liberado && !u.is_super_admin && (
                         <button
                           onClick={() => {
-                            setOverrideValor(u.leads_override !== null ? String(u.leads_override) : "");
+                            setOverrideValor(
+                              u.leads_override !== null ? String(u.leads_override) : "",
+                            );
                             setOverrideModal({ usuario: u });
                           }}
                           title="Definir override de leads"
@@ -529,9 +529,8 @@ export function AdminAllUsers({
               <div>
                 <h3 className="font-serif text-lg font-semibold">Override de leads</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Define um limite personalizado de leads para{" "}
-                  <b>{overrideModal.usuario.email}</b> sem mudar o plano.
-                  Deixe em branco para remover o override.
+                  Define um limite personalizado de leads para <b>{overrideModal.usuario.email}</b>{" "}
+                  sem mudar o plano. Deixe em branco para remover o override.
                 </p>
               </div>
             </div>
@@ -557,20 +556,21 @@ export function AdminAllUsers({
                   </button>
                 )}
               </div>
-              {overrideModal.usuario.plano_id && (() => {
-                const plano = planosAtivos.find((p) => p.id === overrideModal.usuario.plano_id);
-                return plano ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    Limite do plano {plano.nome}:{" "}
-                    <b>
-                      {plano.limite_leads !== null
-                        ? plano.limite_leads.toLocaleString("pt-BR")
-                        : "∞"}
-                    </b>{" "}
-                    leads/mês
-                  </p>
-                ) : null;
-              })()}
+              {overrideModal.usuario.plano_id &&
+                (() => {
+                  const plano = planosAtivos.find((p) => p.id === overrideModal.usuario.plano_id);
+                  return plano ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Limite do plano {plano.nome}:{" "}
+                      <b>
+                        {plano.limite_leads !== null
+                          ? plano.limite_leads.toLocaleString("pt-BR")
+                          : "∞"}
+                      </b>{" "}
+                      leads/mês
+                    </p>
+                  ) : null;
+                })()}
             </div>
             <div className="flex gap-2 pt-1">
               <Button
@@ -744,7 +744,9 @@ export function AdminSubscribers({
               </p>
               <p className="text-2xl font-black text-foreground">
                 {stats.totalLeadsAlocados.toLocaleString("pt-BR")}
-                {stats.semLimiteCount > 0 && <span className="text-xs font-normal text-muted-foreground ml-1">(+∞)</span>}
+                {stats.semLimiteCount > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground ml-1">(+∞)</span>
+                )}
               </p>
             </div>
           </div>
@@ -762,7 +764,10 @@ export function AdminSubscribers({
               </p>
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {Object.entries(stats.porPlano).map(([plano, qtd]) => (
-                  <span key={plano} className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs font-medium">
+                  <span
+                    key={plano}
+                    className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs font-medium"
+                  >
                     <span className="font-bold">{plano}:</span> {qtd}
                   </span>
                 ))}
@@ -870,7 +875,8 @@ export function AdminSubscribers({
                       <span
                         className={cn(
                           "inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] uppercase font-bold shadow-2xs",
-                          PLAN_BADGES[planoNome.toLowerCase()] || "bg-slate-100 text-slate-700 border-slate-200",
+                          PLAN_BADGES[planoNome.toLowerCase()] ||
+                            "bg-slate-100 text-slate-700 border-slate-200",
                         )}
                       >
                         {planoNome}

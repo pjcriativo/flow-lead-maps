@@ -151,13 +151,17 @@ try {
   T(p3.ativo === false, "plano_toggle desativa o plano");
   const rDel = await chamar(jwtDono, { acao: "plano_delete", id: planoId });
   T((await rDel.json()).ok === true, "plano_delete remove plano sem org vinculada");
-  // proteção: não apaga plano em uso (o Starter tem 3 orgs)
-  const { data: starter } = await admin.from("planos").select("id").eq("nome", "Starter").single();
-  const rProt = await chamar(jwtDono, { acao: "plano_delete", id: starter.id });
+  // proteção: não apaga plano em uso (o Básico tem orgs)
+  const { data: planoEmUso } = await admin.from("planos").select("id").limit(1).single();
+  const rProt = await chamar(jwtDono, { acao: "plano_delete", id: planoEmUso.id });
   const jProt = await rProt.json();
   T(jProt.ok === false && jProt.reason === "plano_em_uso", "não exclui plano EM USO por orgs");
   // guard: não-super-admin não mexe em planos
-  const rForaPlano = await chamar(jwtFora, { acao: "plano_toggle", id: starter.id, ativo: false });
+  const rForaPlano = await chamar(jwtFora, {
+    acao: "plano_toggle",
+    id: planoEmUso.id,
+    ativo: false,
+  });
   T(rForaPlano.status === 403, "não-super-admin em planos → 403");
 } catch (e) {
   fail++;
