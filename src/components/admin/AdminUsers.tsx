@@ -37,6 +37,10 @@ export function AdminAllUsers({
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [busca, setBusca] = useState("");
+  const [filtroAcesso, setFiltroAcesso] = useState<
+    "todos" | "liberado" | "pendente" | "super_admin"
+  >("todos");
   const [ocupado, setOcupado] = useState(false);
   const [alterandoId, setAlterandoId] = useState<string | null>(null);
   // Modal "Liberar com plano"
@@ -58,7 +62,30 @@ export function AdminAllUsers({
     }
   }, [liberarModal, planosAtivos, planoSelecionadoId]);
 
-  const pendentes = usuarios.filter((u) => !u.acesso_liberado && !u.is_super_admin);
+  const pendentes = useMemo(
+    () => usuarios.filter((u) => !u.acesso_liberado && !u.is_super_admin),
+    [usuarios],
+  );
+  const liberados = useMemo(
+    () => usuarios.filter((u) => u.acesso_liberado && !u.is_super_admin),
+    [usuarios],
+  );
+  const superAdmins = useMemo(() => usuarios.filter((u) => u.is_super_admin), [usuarios]);
+
+  const usuariosFiltrados = useMemo(() => {
+    return usuarios.filter((u) => {
+      // Filtro de busca
+      if (busca.trim()) {
+        const q = busca.toLowerCase();
+        if (!u.email.toLowerCase().includes(q)) return false;
+      }
+      // Filtro de aba
+      if (filtroAcesso === "liberado") return u.acesso_liberado && !u.is_super_admin;
+      if (filtroAcesso === "pendente") return !u.acesso_liberado && !u.is_super_admin;
+      if (filtroAcesso === "super_admin") return u.is_super_admin;
+      return true;
+    });
+  }, [usuarios, busca, filtroAcesso]);
 
   const adicionar = async () => {
     if (!email.includes("@")) {
@@ -182,234 +209,365 @@ export function AdminAllUsers({
   // Plano selecionado no modal de liberação
   const planoSelecionado = planosAtivos.find((p) => p.id === planoSelecionadoId);
 
+  // Formata limite de leads de forma compacta e legível
+  const formatarLimiteCompacto = (n: number | null) => {
+    if (n === null) return "∞";
+    if (n >= 1000000)
+      return `${(n / 1000000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
+    if (n >= 1000) return `${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}k`;
+    return n.toLocaleString("pt-BR");
+  };
+
   return (
-    <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      {/* Header com Titulo e Botão */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border px-5 py-4 bg-card">
         <div>
-          <h2 className="font-serif text-xl">Todos os usuários</h2>
-          <p className="text-xs text-muted-foreground">
-            {usuarios.length} contas na plataforma · {pendentes.length} aguardando liberação.
+          <h2 className="font-serif text-xl font-semibold tracking-tight">Todos os usuários</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Gerencie acessos, planos e permissões de todos os usuários cadastrados na plataforma.
           </p>
         </div>
         <button
           onClick={() => setAddOpen((o) => !o)}
-          className="inline-flex items-center gap-1.5 rounded-md bg-navy px-3 py-2 text-xs font-semibold text-navy-foreground hover:bg-navy/90"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-all shrink-0 cursor-pointer"
         >
-          <Plus className="h-3.5 w-3.5" /> Adicionar usuário
+          <Plus className="h-4 w-4" /> Adicionar usuário
         </button>
+      </div>
+
+      {/* Barra de Filtros e Busca */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border bg-secondary/10 px-5 py-3">
+        {/* Pills de status */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+          <button
+            onClick={() => setFiltroAcesso("todos")}
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap cursor-pointer",
+              filtroAcesso === "todos"
+                ? "bg-primary text-primary-foreground shadow-xs font-semibold"
+                : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            Todos ({usuarios.length})
+          </button>
+          <button
+            onClick={() => setFiltroAcesso("liberado")}
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap cursor-pointer",
+              filtroAcesso === "liberado"
+                ? "bg-emerald-600 text-white shadow-xs font-semibold"
+                : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            Liberados ({liberados.length})
+          </button>
+          <button
+            onClick={() => setFiltroAcesso("pendente")}
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap cursor-pointer",
+              filtroAcesso === "pendente"
+                ? "bg-amber-600 text-white shadow-xs font-semibold"
+                : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            Pendentes ({pendentes.length})
+          </button>
+          <button
+            onClick={() => setFiltroAcesso("super_admin")}
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap cursor-pointer",
+              filtroAcesso === "super_admin"
+                ? "bg-blue-600 text-white shadow-xs font-semibold"
+                : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            Super Admins ({superAdmins.length})
+          </button>
+        </div>
+
+        {/* Input de Busca */}
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por e-mail..."
+            className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-7 text-xs focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+          />
+          {busca && (
+            <button
+              onClick={() => setBusca("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Form adicionar */}
       {addOpen && (
-        <div className="flex flex-wrap items-end gap-2 border-b border-border bg-secondary/20 px-5 py-3">
-          <div className="flex-1">
-            <label className="mb-1 block text-[11px] uppercase text-muted-foreground">E-mail</label>
+        <div className="flex flex-wrap items-end gap-3 border-b border-border bg-primary/5 px-5 py-3 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex-1 min-w-[220px]">
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              E-mail do novo usuário
+            </label>
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && adicionar()}
-              placeholder="novo@empresa.com"
-              className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
+              placeholder="novo.usuario@empresa.com"
+              className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
           <button
             onClick={adicionar}
             disabled={ocupado}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-gold px-4 text-xs font-semibold text-gold-foreground disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-gold px-4 text-xs font-semibold text-gold-foreground hover:bg-gold/90 transition-all disabled:opacity-60 cursor-pointer shadow-xs"
           >
             {ocupado && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Criar conta
+          </button>
+          <button
+            onClick={() => setAddOpen(false)}
+            className="inline-flex h-9 items-center px-3 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+          >
+            Cancelar
           </button>
         </div>
       )}
 
-      {/* Tabela */}
+      {/* Tabela Responsiva sem cortes */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <table className="w-full min-w-[950px] text-sm text-left border-collapse">
+          <thead className="border-b border-border bg-secondary/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
             <tr>
-              <th className="px-5 py-2.5 font-medium">Usuário</th>
-              <th className="px-5 py-2.5 font-medium">Plano</th>
-              <th className="px-5 py-2.5 font-medium">Leads</th>
-              <th className="px-5 py-2.5 font-medium">Acesso</th>
-              <th className="px-5 py-2.5 font-medium">Entrou em</th>
-              <th className="w-px whitespace-nowrap px-5 py-2.5 text-right font-medium">Ações</th>
+              <th className="px-5 py-3 font-semibold w-[32%] min-w-[260px]">Usuário</th>
+              <th className="px-4 py-3 font-semibold w-[22%] min-w-[190px]">Plano</th>
+              <th className="px-4 py-3 font-semibold w-[14%] min-w-[130px]">Leads / Mês</th>
+              <th className="px-4 py-3 font-semibold w-[13%] min-w-[120px]">Status</th>
+              <th className="px-4 py-3 font-semibold w-[11%] min-w-[100px]">Entrou em</th>
+              <th className="px-5 py-3 font-semibold text-right w-[8%] min-w-[150px]">Ações</th>
             </tr>
           </thead>
-          <tbody>
-            {usuarios.map((u) => (
-              <tr
-                key={u.id}
-                className="border-b border-border last:border-0 hover:bg-secondary/20 transition-colors"
-              >
-                {/* Usuário */}
-                <td className="px-5 py-3 font-medium">{u.email}</td>
-
-                {/* Plano — select inline p/ liberados, texto p/ demais */}
-                <td className="px-5 py-3">
-                  {u.is_super_admin ? (
-                    <span className="text-xs uppercase text-muted-foreground">—</span>
-                  ) : u.acesso_liberado ? (
-                    <select
-                      value={u.plano_id ?? ""}
-                      disabled={alterandoId === u.id || planosAtivos.length === 0}
-                      onChange={(e) => alterarPlano(u, e.target.value)}
-                      className="rounded-md border border-input bg-card px-2 py-1 text-xs font-medium focus:outline-none cursor-pointer capitalize disabled:opacity-50"
-                      title="Alterar plano"
-                    >
-                      {/* Opção vazia se org ainda não tem plano_id */}
-                      {!u.plano_id && <option value="">— sem plano —</option>}
-                      {planosAtivos.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nome}
-                          {p.limite_leads !== null
-                            ? ` (${p.limite_leads.toLocaleString("pt-BR")}/mês)`
-                            : " (∞)"}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="text-xs uppercase text-muted-foreground">
-                      {u.plano_nome ?? u.plan ?? "—"}
-                    </span>
-                  )}
-                </td>
-
-                {/* Limite de leads — mostra override quando presente */}
-                <td className="px-5 py-3">
-                  {u.is_super_admin ? (
-                    <span className="text-xs text-muted-foreground">∞</span>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">
-                        {u.leads_override !== null ? (
-                          <span className="font-semibold text-gold">
-                            {u.leads_override.toLocaleString("pt-BR")}
-                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">
-                              override
-                            </span>
-                          </span>
-                        ) : (
-                          <span>
-                            {(() => {
-                              const plano = planosAtivos.find((p) => p.id === u.plano_id);
-                              return plano
-                                ? plano.limite_leads !== null
-                                  ? plano.limite_leads.toLocaleString("pt-BR")
-                                  : "∞"
-                                : "—";
-                            })()}
-                          </span>
-                        )}
-                      </span>
-                      {u.acesso_liberado && !u.is_super_admin && (
-                        <button
-                          onClick={() => {
-                            setOverrideValor(
-                              u.leads_override !== null ? String(u.leads_override) : "",
-                            );
-                            setOverrideModal({ usuario: u });
-                          }}
-                          title="Definir override de leads"
-                          className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/50 hover:text-gold hover:bg-gold/10 transition-colors"
-                        >
-                          <Zap className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </td>
-
-                {/* Acesso */}
-                <td className="px-5 py-3">
-                  {u.is_super_admin ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                      <ShieldCheck className="size-3.5" /> Super admin
-                    </span>
-                  ) : u.acesso_liberado ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-600">
-                      <Check className="size-3.5" /> Liberado
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-                      <Clock3 className="size-3.5" /> Pendente
-                    </span>
-                  )}
-                </td>
-
-                {/* Data */}
-                <td className="px-5 py-3 text-muted-foreground text-xs">
-                  {new Date(u.created_at).toLocaleDateString("pt-BR")}
-                </td>
-
-                {/* Ações — coluna compacta (w-px + nowrap) */}
-                <td className="w-px whitespace-nowrap px-5 py-3">
-                  <div className="flex items-center justify-end gap-1.5">
-                    {!u.is_super_admin && (
-                      <>
-                        {/* Liberar / Bloquear */}
-                        {u.acesso_liberado ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={alterandoId === u.id}
-                            onClick={() => alterarAcesso(u, false)}
-                            className="gap-1.5"
-                          >
-                            {alterandoId === u.id ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <LockKeyhole className="size-3.5" />
-                            )}
-                            Bloquear
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="default"
-                            disabled={alterandoId === u.id}
-                            onClick={() => {
-                              setPlanoSelecionadoId(planosAtivos[0]?.id ?? "");
-                              setLiberarModal({ usuario: u });
-                            }}
-                            className="gap-1.5"
-                          >
-                            {alterandoId === u.id ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Check className="size-3.5" />
-                            )}
-                            Liberar acesso
-                          </Button>
-                        )}
-
-                        {/* Excluir */}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          disabled={alterandoId === u.id}
-                          onClick={() => setDeleteModal({ usuario: u })}
-                          className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          title="Excluir conta permanentemente"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </>
-                    )}
+          <tbody className="divide-y divide-border">
+            {usuariosFiltrados.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <Users className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm font-medium">Nenhum usuário encontrado</p>
+                    <p className="text-xs text-muted-foreground">
+                      Tente alterar os termos da busca ou filtro selecionado.
+                    </p>
                   </div>
                 </td>
               </tr>
-            ))}
+            ) : (
+              usuariosFiltrados.map((u) => {
+                const initial = u.email.charAt(0).toUpperCase();
+                return (
+                  <tr key={u.id} className="hover:bg-secondary/20 transition-colors group">
+                    {/* Usuário com Avatar */}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs ring-1 ring-primary/20">
+                          {initial}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="font-medium text-sm text-foreground truncate max-w-[240px]"
+                            title={u.email}
+                          >
+                            {u.email}
+                          </p>
+                          {u.full_name && (
+                            <p className="text-[11px] text-muted-foreground truncate">
+                              {u.full_name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Plano — select inline estilizado p/ liberados, badge p/ demais */}
+                    <td className="px-4 py-3.5">
+                      {u.is_super_admin ? (
+                        <span className="text-xs font-medium text-muted-foreground px-2 py-0.5 rounded bg-secondary/50">
+                          Ilimitado (Admin)
+                        </span>
+                      ) : u.acesso_liberado ? (
+                        <div className="relative max-w-[190px]">
+                          <select
+                            value={u.plano_id ?? ""}
+                            disabled={alterandoId === u.id || planosAtivos.length === 0}
+                            onChange={(e) => alterarPlano(u, e.target.value)}
+                            className="w-full truncate rounded-lg border border-input bg-background pl-2.5 pr-6 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer disabled:opacity-50 shadow-xs appearance-none"
+                            title="Alterar plano"
+                          >
+                            {!u.plano_id && <option value="">— Sem plano definido —</option>}
+                            {planosAtivos.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.nome}{" "}
+                                {p.limite_leads !== null
+                                  ? `(${formatarLimiteCompacto(p.limite_leads)}/mês)`
+                                  : "(∞)"}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <Layers className="h-3 w-3 opacity-60" />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
+                          {u.plano_nome ?? u.plan ?? "Sem plano"}
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Limite de leads — mostra override quando presente */}
+                    <td className="px-4 py-3.5">
+                      {u.is_super_admin ? (
+                        <span className="text-xs font-semibold text-muted-foreground">∞</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          {u.leads_override !== null ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-md bg-gold/15 border border-gold/30 px-2 py-0.5 text-xs font-semibold text-gold-foreground"
+                              title="Override individual ativo"
+                            >
+                              <Zap className="h-3 w-3 text-gold shrink-0" />
+                              {u.leads_override.toLocaleString("pt-BR")}
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-foreground">
+                              {(() => {
+                                const plano = planosAtivos.find((p) => p.id === u.plano_id);
+                                return plano
+                                  ? plano.limite_leads !== null
+                                    ? plano.limite_leads.toLocaleString("pt-BR")
+                                    : "∞"
+                                  : "—";
+                              })()}
+                            </span>
+                          )}
+                          {u.acesso_liberado && !u.is_super_admin && (
+                            <button
+                              onClick={() => {
+                                setOverrideValor(
+                                  u.leads_override !== null ? String(u.leads_override) : "",
+                                );
+                                setOverrideModal({ usuario: u });
+                              }}
+                              title="Configurar override de limite de leads"
+                              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-gold hover:bg-gold/15 transition-colors cursor-pointer"
+                            >
+                              <Zap className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Status de Acesso */}
+                    <td className="px-4 py-3.5">
+                      {u.is_super_admin ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
+                          <ShieldCheck className="size-3.5" /> Super Admin
+                        </span>
+                      ) : u.acesso_liberado ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                          <Check className="size-3.5" /> Liberado
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                          <Clock3 className="size-3.5" /> Pendente
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Data */}
+                    <td className="px-4 py-3.5 text-muted-foreground text-xs whitespace-nowrap">
+                      {new Date(u.created_at).toLocaleDateString("pt-BR")}
+                    </td>
+
+                    {/* Ações — Botoes alinhados e sem cortes */}
+                    <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {!u.is_super_admin && (
+                          <>
+                            {/* Liberar / Bloquear */}
+                            {u.acesso_liberado ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={alterandoId === u.id}
+                                onClick={() => alterarAcesso(u, false)}
+                                className="h-8 gap-1.5 text-xs font-medium cursor-pointer shadow-2xs"
+                              >
+                                {alterandoId === u.id ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <LockKeyhole className="size-3.5 text-muted-foreground" />
+                                )}
+                                Bloquear
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="default"
+                                disabled={alterandoId === u.id}
+                                onClick={() => {
+                                  setPlanoSelecionadoId(planosAtivos[0]?.id ?? "");
+                                  setLiberarModal({ usuario: u });
+                                }}
+                                className="h-8 gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-xs"
+                              >
+                                {alterandoId === u.id ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="size-3.5" />
+                                )}
+                                Liberar acesso
+                              </Button>
+                            )}
+
+                            {/* Excluir */}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={alterandoId === u.id}
+                              onClick={() => setDeleteModal({ usuario: u })}
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                              title="Excluir conta permanentemente"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
 
-      <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
-        Novos cadastros ficam pendentes até um administrador liberar o acesso manualmente.
-      </p>
+      <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground bg-secondary/10">
+        <span>
+          Novos cadastros ficam pendentes até um administrador liberar o acesso manualmente.
+        </span>
+        <span className="font-medium">
+          Exibindo {usuariosFiltrados.length} de {usuarios.length} usuários
+        </span>
+      </div>
 
       {/* ── Modal: Liberar acesso + escolher plano ── */}
       {liberarModal && (
