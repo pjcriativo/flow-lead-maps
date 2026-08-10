@@ -340,15 +340,15 @@ export function AdminAllUsers({
 
       {/* Tabela Responsiva sem cortes */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[950px] text-sm text-left border-collapse">
+        <table className="w-full text-sm text-left border-collapse">
           <thead className="border-b border-border bg-secondary/30 text-xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
             <tr>
-              <th className="px-5 py-3 font-semibold w-[32%] min-w-[260px]">Usuário</th>
-              <th className="px-4 py-3 font-semibold w-[22%] min-w-[190px]">Plano</th>
-              <th className="px-4 py-3 font-semibold w-[14%] min-w-[130px]">Leads / Mês</th>
-              <th className="px-4 py-3 font-semibold w-[13%] min-w-[120px]">Status</th>
-              <th className="px-4 py-3 font-semibold w-[11%] min-w-[100px]">Entrou em</th>
-              <th className="px-5 py-3 font-semibold text-right w-[8%] min-w-[150px]">Ações</th>
+              <th className="px-5 py-3 font-semibold text-left">Usuário</th>
+              <th className="px-4 py-3 font-semibold text-left">Plano</th>
+              <th className="px-4 py-3 font-semibold text-left">Leads / Mês</th>
+              <th className="px-4 py-3 font-semibold text-left">Status</th>
+              <th className="px-4 py-3 font-semibold text-left">Entrou em</th>
+              <th className="px-5 py-3 font-semibold text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -377,7 +377,7 @@ export function AdminAllUsers({
                         </div>
                         <div className="min-w-0 flex-1">
                           <p
-                            className="font-medium text-sm text-foreground truncate max-w-[240px]"
+                            className="font-medium text-sm text-foreground break-all"
                             title={u.email}
                           >
                             {u.email}

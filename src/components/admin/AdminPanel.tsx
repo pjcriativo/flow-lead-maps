@@ -557,7 +557,7 @@ export function AdminPanel({ email }: { email: string }) {
         <Sidebar tela={tela} onNavegar={setTela} />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
-          <main className="mx-auto w-full max-w-[1100px] flex-1 space-y-5 p-5">
+          <main className="w-full flex-1 space-y-5 p-6">
             {erro && (
               <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                 Falha ao carregar: {erro}
@@ -607,7 +607,7 @@ export function AdminPanel({ email }: { email: string }) {
       <Sidebar tela={tela} onNavegar={setTela} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
-        <main className="mx-auto w-full max-w-[1280px] flex-1 space-y-5 p-5">
+        <main className="w-full flex-1 space-y-5 p-6">
           <div className="rounded-xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">
               Visão geral
