@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   DollarSign,
   History,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ import {
   type Rodada,
   type NovaReceita,
 } from "@/services/automacao";
+import { listarChips } from "@/services/whatsapp";
 
 const PADRAO: NovaReceita = {
   nome: "",
@@ -366,6 +368,7 @@ function ReceitaDialog({
 }) {
   const [f, setF] = useState<NovaReceita>(PADRAO);
   const [salvando, setSalvando] = useState(false);
+  const [chipsCount, setChipsCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -389,6 +392,12 @@ function ReceitaDialog({
           }
         : PADRAO,
     );
+    listarChips()
+      .then((chips) => {
+        const conectados = chips.filter((c) => c.status === "conectado" && c.funcao === "disparo");
+        setChipsCount(conectados.length);
+      })
+      .catch(() => setChipsCount(0));
   }, [open, receita]);
 
   const set = (patch: Partial<NovaReceita>) => setF((x) => ({ ...x, ...patch }));
@@ -419,6 +428,14 @@ function ReceitaDialog({
           <DialogTitle>{receita ? "Editar receita" : "Nova receita"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {f.canal === "whatsapp" && chipsCount === 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-50 p-2.5 text-xs text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <span>
+                Nenhum chip de WhatsApp está conectado para disparo nesta organização. Conecte um chip na aba <b>WhatsApp</b> para disparar as abordagens desta receita.
+              </span>
+            </div>
+          )}
           <Campo label="Nome">
             <Input
               value={f.nome}

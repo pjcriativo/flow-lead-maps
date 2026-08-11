@@ -20,6 +20,9 @@ import {
   Lock,
   Unlock,
   AlertTriangle,
+  Eye,
+  MousePointerClick,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -72,16 +75,33 @@ const STATUS_STYLE: Record<PropostaStatus, string> = {
   respondida: "bg-green-100 text-green-800",
 };
 
-export function StatusPill({ status }: { status: PropostaStatus }) {
+export function StatusPill({ status, proposta }: { status: PropostaStatus; proposta?: Proposta }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        STATUS_STYLE[status],
+    <div className="flex flex-wrap items-center gap-1">
+      <span
+        className={cn(
+          "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+          STATUS_STYLE[status],
+        )}
+      >
+        {STATUS_LABEL[status]}
+      </span>
+      {proposta?.bounced_at && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800" title={`Bounce em ${formatData(proposta.bounced_at)}`}>
+          <AlertCircle className="h-3 w-3" /> Bounce
+        </span>
       )}
-    >
-      {STATUS_LABEL[status]}
-    </span>
+      {proposta?.clicada_em && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800" title={`Link clicado em ${formatData(proposta.clicada_em)}`}>
+          <MousePointerClick className="h-3 w-3" /> Clicada
+        </span>
+      )}
+      {proposta?.aberta_em && !proposta.clicada_em && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800" title={`E-mail aberto em ${formatData(proposta.aberta_em)}`}>
+          <Eye className="h-3 w-3" /> Aberta
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -294,7 +314,7 @@ export function PropostasSection() {
                     <td className="px-4 py-3 text-muted-foreground">{p.assunto}</td>
                     <td className="px-4 py-3 tabular-nums">{formatBRL(p.valor)}</td>
                     <td className="px-4 py-3">
-                      <StatusPill status={p.status} />
+                      <StatusPill status={p.status} proposta={p} />
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{formatData(p.criada_em)}</td>
                     <td className="px-4 py-3">

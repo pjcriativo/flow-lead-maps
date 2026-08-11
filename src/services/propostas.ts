@@ -24,11 +24,14 @@ type Row = {
   aprovada_em: string | null;
   enviada_em: string | null;
   respondida_em: string | null;
+  aberta_em?: string | null;
+  clicada_em?: string | null;
+  bounced_at?: string | null;
   leads?: { business_name: string; email: string | null } | null;
 };
 
 const SELECT =
-  "id, lead_id, assunto, corpo, valor, status, criada_em, aprovada_em, enviada_em, respondida_em, leads(business_name, email)";
+  "id, lead_id, assunto, corpo, valor, status, criada_em, aprovada_em, enviada_em, respondida_em, aberta_em, clicada_em, bounced_at, leads(business_name, email)";
 
 function toProposta(r: Row): Proposta {
   return {
@@ -44,6 +47,9 @@ function toProposta(r: Row): Proposta {
     aprovada_em: r.aprovada_em,
     enviada_em: r.enviada_em,
     respondida_em: r.respondida_em,
+    aberta_em: r.aberta_em ?? null,
+    clicada_em: r.clicada_em ?? null,
+    bounced_at: r.bounced_at ?? null,
   };
 }
 

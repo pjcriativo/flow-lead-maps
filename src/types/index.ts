@@ -35,6 +35,12 @@ export interface Proposta {
   aprovada_em: string | null;
   enviada_em: string | null;
   respondida_em: string | null;
+  /** ISO datetime — quando o destinatário abriu o e-mail (Resend webhook). */
+  aberta_em?: string | null;
+  /** ISO datetime — quando o destinatário clicou em um link (Resend webhook). */
+  clicada_em?: string | null;
+  /** ISO datetime — quando ocorreu erro de entrega (Resend webhook bounce). */
+  bounced_at?: string | null;
 }
 
 /** Campanha — agrupa a abordagem de uma LISTA num lote revisável. Nasce de uma

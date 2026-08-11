@@ -19,3 +19,8 @@
 
 - Antes de declarar que um bug no banco/RLS foi corrigido, execute consultas empíricas diretamente no PostgreSQL com `node scripts/sql.mjs` e rode a suíte de testes (`node scripts/prova-papeis.mjs`, `node scripts/test-approval-flow.mjs`).
 - Verifique que os contadores de registros orfãos (`org_id IS NULL`, `profiles_without_org`) são estritamente 0.
+
+## 4. Git Commit & Push Automático
+
+- **Sempre que concluir um conjunto de alterações ou tarefas**, faça `git add .`, `git commit -m "<mensagem clara>"` e `git push` automaticamente para manter o repositório sempre atualizado e sincronizado no GitHub.
+
