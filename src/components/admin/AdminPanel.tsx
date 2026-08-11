@@ -553,11 +553,11 @@ export function AdminPanel({ email }: { email: string }) {
 
   if (tela !== "dashboard") {
     return (
-      <div className="flex min-h-screen bg-background text-foreground">
+      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
         <Sidebar tela={tela} onNavegar={setTela} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
-          <main className="w-full flex-1 space-y-5 p-6">
+          <main className="w-full flex-1 overflow-y-auto space-y-5 p-6">
             {erro && (
               <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                 Falha ao carregar: {erro}
@@ -603,11 +603,11 @@ export function AdminPanel({ email }: { email: string }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       <Sidebar tela={tela} onNavegar={setTela} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
-        <main className="w-full flex-1 space-y-5 p-6">
+        <main className="w-full flex-1 overflow-y-auto space-y-5 p-6">
           <div className="rounded-xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">
               Visão geral
