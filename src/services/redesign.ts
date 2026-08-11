@@ -72,17 +72,10 @@ export async function listarLeadIdsComRedesign(): Promise<Set<string>> {
  * - Padrão (REDESIGN): se o lead tem site, raspa o atual e o refaz melhor.
  * - `novoDoZero`: ignora o site atual e cria um site NOVO só com os dados do Google. */
 export async function gerarRedesign(
-  leadId: string,
-  opts?: { novoDoZero?: boolean },
+  _leadId: string,
+  _opts?: { novoDoZero?: boolean },
 ): Promise<{ redesign: Redesign; usage: RedesignUsage; lead_nome: string }> {
-  const { data, error } = await supabase.functions.invoke("redesign-site", {
-    body: { lead_id: leadId, ignorar_site: !!opts?.novoDoZero },
-  });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((data as any)?.error) throw new Error((data as any).error);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return data as any;
+  throw new Error("Este recurso está sendo melhorado! Em breve você terá uma nova experiência incrível para conseguir mais clientes.");
 }
 
 /** Busca um redesign por id (com o nome do lead) — usado no preview da campanha. */

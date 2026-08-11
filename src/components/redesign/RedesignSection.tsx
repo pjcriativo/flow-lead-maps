@@ -14,6 +14,13 @@ import {
   X,
   Download,
   Globe,
+  Sparkles,
+  Rocket,
+  Zap,
+  ShieldCheck,
+  ArrowRight,
+  Construction,
+  Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -63,269 +70,104 @@ function expiraLabel(expira_em: string | null): { texto: string; vencido: boolea
 }
 
 export function RedesignSection({
-  focusLeadId,
-  onFocusConsumed,
-}: { focusLeadId?: string | null; onFocusConsumed?: () => void } = {}) {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [redesigns, setRedesigns] = useState<Redesign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [leadSel, setLeadSel] = useState<string>("");
-  const [gerando, setGerando] = useState(false);
-  const [aberto, setAberto] = useState<Redesign | null>(null);
-
-  const carregar = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [ls, rs] = await Promise.all([fetchLeads(), listarRedesigns()]);
-      setLeads(ls);
-      setRedesigns(rs);
-      if (!leadSel && ls.length) setLeadSel(ls.find((l) => l.website)?.id ?? ls[0].id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao carregar");
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => {
-    carregar();
-  }, []);
-
-  // Vindo de "Meus Leads" (link do card): abre o redesign daquele lead assim que a lista carrega.
-  useEffect(() => {
-    if (!focusLeadId || loading) return;
-    const alvo = redesigns.find((r) => r.lead_id === focusLeadId && r.html_gerado);
-    if (alvo) setAberto(alvo);
-    else setLeadSel(focusLeadId);
-    onFocusConsumed?.();
-  }, [focusLeadId, loading, redesigns]);
-
-  const nomeLead = (id: string) => leads.find((l) => l.id === id)?.business_name ?? "lead";
-
-  const handleGerar = async (leadId: string) => {
-    if (!leadId) return;
-    setGerando(true);
-    toast.info(`Gerando site de "${nomeLead(leadId)}"… pode levar 10–40s.`);
-    try {
-      const res = await gerarRedesign(leadId);
-      const u = res.usage;
-      const selo = [
-        `template "${u.template}"`,
-        u.fallback
-          ? "copy rule-based (IA off)"
-          : `${u.provider}/${u.modelo} · ~US$ ${u.custoUsd.toFixed(4)}`,
-        u.temNota ? "nota ✓" : "sem nota (prova social omitida)",
-        u.depoimentos ? `${u.depoimentos} depoimentos Google` : "sem depoimentos",
-        `${u.servicos} serviços ${u.servicosReais ? "(reais)" : "(genéricos)"}`,
-        u.heroReal ? `hero ${u.heroVar}: foto real` : `hero ${u.heroVar}: curado (${u.heroNicho})`,
-        u.galeria ? `galeria ${u.galeria}` : "sem galeria",
-        u.usouNota ? "nota ✓" : null,
-        u.usouWhatsapp ? "WhatsApp ✓" : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      toast.success(`Site gerado! ${selo}`, { duration: 9000 });
-      if (u.avisoGenerico) toast.warning(u.avisoGenerico, { duration: 9000 });
-      await carregar();
-      setAberto(res.redesign);
-    } catch (e) {
-      toast.error(`Falha ao gerar: ${e instanceof Error ? e.message : "erro"}`);
-    } finally {
-      setGerando(false);
-    }
-  };
-
-  const handleExcluir = async (r: Redesign) => {
-    if (!confirm(`Excluir o redesign de "${r.lead_nome ?? nomeLead(r.lead_id)}"?`)) return;
-    const prev = redesigns;
-    setRedesigns((p) => p.filter((x) => x.id !== r.id));
-    try {
-      await excluirRedesign(r.id);
-      toast.success("Redesign excluído.");
-    } catch (e) {
-      setRedesigns(prev);
-      toast.error(e instanceof Error ? e.message : "Falha ao excluir");
-    }
-  };
-
-  const leadsComSite = useMemo(() => leads.filter((l) => l.website), [leads]);
-
+  onIrParaCampanhas,
+}: {
+  focusLeadId?: string | null;
+  onFocusConsumed?: () => void;
+  onIrParaCampanhas?: () => void;
+} = {}) {
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Redesign</h1>
-          <p className="text-sm text-muted-foreground">
-            Gere o site novo do lead com IA e ajuste no editor.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={carregar}>
-          <RefreshCw className="h-4 w-4" /> Atualizar
-        </Button>
+    <div className="mx-auto max-w-4xl space-y-6 py-6 px-2">
+      {/* Badge Superior de Manutenção */}
+      <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-amber-600">
+        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+        Em Manutenção · Novo Motor em Breve
       </div>
 
-      {/* Gerar novo redesign */}
-      <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <h2 className="mb-2 text-sm font-semibold">Gerar novo redesign</h2>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[280px] flex-1">
-            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Lead
-            </label>
-            <Select value={leadSel} onValueChange={setLeadSel} disabled={gerando || !leads.length}>
-              <SelectTrigger aria-label="Escolher lead">
-                <SelectValue placeholder="Escolha um lead" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {leads.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.business_name}
-                    {l.website ? " · tem site" : " · sem site"}
-                    {l.rating ? ` · ★${l.rating}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            onClick={() => handleGerar(leadSel)}
-            disabled={gerando || !leadSel}
-            className="bg-primary font-semibold hover:bg-primary/90"
-          >
-            {gerando ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Gerando...
-              </>
-            ) : (
-              <>
-                <Wand2 className="h-4 w-4" /> Redesenhar
-              </>
-            )}
-          </Button>
+      {/* Cartão Principal de Manutenção */}
+      <div className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-b from-card via-card to-card/90 p-8 shadow-2xl md:p-12 text-center">
+        {/* Glows Decorativos de Fundo */}
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 -bottom-24 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" />
+
+        {/* Ícone de Construção/IA Animado */}
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 text-amber-500 shadow-inner border border-amber-500/20">
+          <Wand2 className="h-10 w-10 animate-bounce" />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {leadsComSite.length} leads com site (matéria-prima melhor). Custo por geração ~US$
-          0,01–0,05 (OpenAI).
+
+        {/* Título e Mensagem Obrigatória Solicitada pelo Usuário */}
+        <h1 className="mt-6 font-serif text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+          Este recurso está sendo melhorado!
+        </h1>
+
+        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
+          Em breve você terá uma <span className="font-semibold text-foreground">nova experiência incrível</span> para conseguir mais clientes. Estamos refazendo todo o nosso motor de criação de sites por Inteligência Artificial para entregar layouts ultra-modernos e de altíssima conversão!
         </p>
-      </div>
 
-      {loading ? (
-        <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
-        </div>
-      ) : error ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : redesigns.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-card p-16 text-center">
-          <Wand2 className="mx-auto h-8 w-8 text-muted-foreground" />
-          <h3 className="mt-4 font-semibold">Nenhum redesign ainda</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Escolha um lead acima e clique em Redesenhar.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {redesigns.map((r) => (
-            <div
-              key={r.id}
-              className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]"
-            >
-              <div className="h-40 overflow-hidden border-b border-border bg-white">
-                {r.html_gerado ? (
-                  <iframe
-                    title={`preview-${r.id}`}
-                    srcDoc={r.html_editado ?? r.html_gerado}
-                    className="pointer-events-none h-[500px] w-[1250px] origin-top-left scale-[0.32] border-0"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                    {r.status === "gerando"
-                      ? "gerando…"
-                      : r.status === "erro"
-                        ? "erro na geração"
-                        : "sem preview"}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-1 flex-col gap-2 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="font-semibold leading-tight text-foreground">
-                    {r.lead_nome ?? nomeLead(r.lead_id)}
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-xs font-medium",
-                      STATUS_STYLE[r.status],
-                    )}
-                  >
-                    {r.status}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {r.modelo ? `${r.modelo}` : ""}
-                  {r.custo_usd != null ? ` · ~US$ ${Number(r.custo_usd).toFixed(4)}` : ""}
-                  {r.gerado_em ? ` · ${formatDataHora(r.gerado_em)}` : ""}
-                </div>
-                {(() => {
-                  const exp = expiraLabel(r.expira_em);
-                  return exp ? (
-                    <div
-                      className={cn(
-                        "text-xs font-medium",
-                        exp.vencido ? "text-destructive" : "text-muted-foreground",
-                      )}
-                    >
-                      {exp.texto}
-                    </div>
-                  ) : null;
-                })()}
-                <div className="mt-auto flex items-center gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setAberto(r)}
-                    disabled={!r.html_gerado}
-                  >
-                    <Pencil className="h-4 w-4" /> Abrir editor
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    title="Redesenhar de novo"
-                    onClick={() => handleGerar(r.lead_id)}
-                    disabled={gerando}
-                  >
-                    <Wand2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    title="Excluir"
-                    onClick={() => handleExcluir(r)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
+        {/* Detalhes do Novo Motor */}
+        <div className="mt-10 grid gap-4 text-left sm:grid-cols-2">
+          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 font-bold text-base">
+              🚀
+            </span>
+            <div>
+              <div className="font-semibold text-sm text-foreground">Novo Motor de IA de Vendas</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Designs e copys hiper-persuasivos gerados sob medida para o segmento comercial de cada lead.
+              </p>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
 
-      {aberto && aberto.html_gerado && (
-        <EditorRedesign
-          redesign={aberto}
-          onClose={() => setAberto(null)}
-          onSaved={(html) => {
-            setRedesigns((prev) =>
-              prev.map((r) => (r.id === aberto.id ? { ...r, html_editado: html } : r)),
-            );
-          }}
-        />
-      )}
+          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 font-bold text-base">
+              🎨
+            </span>
+            <div>
+              <div className="font-semibold text-sm text-foreground">Editor Visual Drag & Drop</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Edição simplificada em tempo real de textos, fotos, botões e seções completas.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 font-bold text-base">
+              ⚡
+            </span>
+            <div>
+              <div className="font-semibold text-sm text-foreground">Carregamento Instantâneo</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Páginas 100% otimizadas para celulares com performance máxima nos testes do Google.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600 font-bold text-base">
+              📈
+            </span>
+            <div>
+              <div className="font-semibold text-sm text-foreground">Maior Taxa de Conversão</div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Estruturas validadas para transformar visitantes em reuniões e contratos fechados.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Botão de Redirecionamento */}
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+          {onIrParaCampanhas && (
+            <Button
+              size="lg"
+              className="bg-primary font-semibold hover:bg-primary/90"
+              onClick={onIrParaCampanhas}
+            >
+              <Sparkles className="mr-2 h-4 w-4" /> Ir para Disparos & Campanhas no WhatsApp
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
