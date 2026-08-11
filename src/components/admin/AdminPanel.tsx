@@ -138,8 +138,8 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
   const [aberto, setAberto] = useState<string | null>(grupoDaTela);
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
-      <div className="flex h-16 items-center border-b border-sidebar-border px-4">
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
+      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
         <FlowLeadsLogo variant="dark" className="h-7" />
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -237,7 +237,7 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
           );
         })}
       </nav>
-      <div className="border-t border-sidebar-border p-4">
+      <div className="shrink-0 border-t border-sidebar-border p-4">
         <Link
           to="/dashboard"
           className="flex items-center gap-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground"
