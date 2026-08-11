@@ -9,6 +9,7 @@ import { ArrowLeft, Eye, EyeOff, Sparkles } from "lucide-react";
 import { posthog } from "@/lib/posthog";
 import { lerConfigPublica } from "@/services/config-publica";
 import { z } from "zod";
+import { validarEmailAutentico } from "@/lib/email-validation";
 
 const authSearchSchema = z.object({
   mode: z.enum(["signin", "signup", "forgot"]).optional(),
@@ -22,6 +23,11 @@ const cadastroSchema = z
     phone: z.string().trim().min(8, "Informe um telefone/WhatsApp válido."),
     password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres."),
     confirmPassword: z.string(),
+  })
+  .refine((dados) => validarEmailAutentico(dados.email).valido, {
+    message:
+      "Endereço de e-mail inválido ou descartável (@teste, @fake, etc.). Utilize um e-mail autêntico.",
+    path: ["email"],
   })
   .refine((dados) => dados.password === dados.confirmPassword, {
     message: "As senhas não coincidem.",

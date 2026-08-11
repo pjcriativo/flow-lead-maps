@@ -21,6 +21,7 @@ import {
 } from "../_shared/apify-financeiro.ts";
 import { buildApiUsagePeriodSummary } from "../_shared/api-usage-summary.ts";
 import { planApifyRunLedgerSync, type RemoteApifyRun } from "../_shared/apify-run-ledger.ts";
+import { validarEmailAutentico } from "../_shared/email-validation.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
 type Rec = Record<string, unknown>;
@@ -143,7 +144,10 @@ Deno.serve(async (req) => {
       const email = String(b.email || "")
         .trim()
         .toLowerCase();
-      if (!email.includes("@")) return json({ ok: false, reason: "email_invalido" });
+      const valEmail = validarEmailAutentico(email);
+      if (!valEmail.valido) {
+        return json({ ok: false, reason: "email_invalido", detalhe: valEmail.motivo });
+      }
       let u = await acharUsuarioPorEmail(email);
       if (!u) {
         const { data: novo, error } = await admin.auth.admin.createUser({
@@ -214,6 +218,19 @@ Deno.serve(async (req) => {
       if (!alvo) return json({ ok: false, reason: "usuario_nao_encontrado" });
 
       if (liberado) {
+        const valEmail = validarEmailAutentico(alvo.email);
+        if (!valEmail.valido) {
+          // Reverte a alteração de acesso se o e-mail não for autêntico
+          await admin.from("profiles").update({ acesso_liberado: false }).eq("id", userId);
+          return json({
+            ok: false,
+            reason: "email_invalido",
+            detalhe:
+              valEmail.motivo ??
+              "Não é permitido liberar acesso a contas com e-mail de teste ou descartável.",
+          });
+        }
+
         // Garantia secundária: se a conta não tiver org/membership, cria agora ao liberar
         let { data: org } = await admin
           .from("orgs")

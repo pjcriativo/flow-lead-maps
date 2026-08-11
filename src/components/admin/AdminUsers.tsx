@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { adminAcao, type Plano, type UsuarioPlataforma } from "@/services/admin";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { validarEmailAutentico } from "@/lib/email-validation";
 
 export function AdminAllUsers({
   usuarios,
@@ -88,8 +89,9 @@ export function AdminAllUsers({
   }, [usuarios, busca, filtroAcesso]);
 
   const adicionar = async () => {
-    if (!email.includes("@")) {
-      toast.error("Informe um e-mail válido.");
+    const val = validarEmailAutentico(email);
+    if (!val.valido) {
+      toast.error(val.motivo ?? "Informe um e-mail válido.");
       return;
     }
     setOcupado(true);
