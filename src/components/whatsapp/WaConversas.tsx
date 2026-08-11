@@ -31,6 +31,7 @@ import {
   type WaConversa,
   type WaMensagem,
 } from "@/services/whatsapp";
+import { ComoFunciona } from "./ComoFunciona";
 
 function horaCurta(iso: string): string {
   const d = new Date(iso);
@@ -124,14 +125,9 @@ export function WaConversas() {
 
   const abrir = useCallback(async (numero: string) => {
     setAtivo(numero);
-    try {
-      setMensagens(await listarMensagens(numero));
-      await marcarConversaLida(numero);
-      setConversas((cs) => cs.map((c) => (c.numero === numero ? { ...c, nao_lidas: 0 } : c)));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao abrir conversa");
-    }
-  }, []);
+    setMensagens(await listarMensagens(numero));
+    marcarConversaLida(numero).then(carregarConversas);
+  }, [carregarConversas]);
 
   useEffect(() => {
     carregarConversas();
@@ -183,35 +179,92 @@ export function WaConversas() {
 
   if (conversas.length === 0)
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card py-16 text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-          <MessagesSquare className="h-7 w-7 text-muted-foreground" />
-        </span>
-        <div className="mt-1 font-semibold">Nenhuma conversa ainda</div>
-        <p className="max-w-sm text-sm text-muted-foreground">
-          Quando um lead responder ao seu WhatsApp, a conversa aparece aqui para você atender.
-          Conecte um chip na aba WhatsApp e dispare uma campanha para começar.
-        </p>
-        <Button variant="outline" size="sm" className="mt-2" onClick={carregarConversas}>
-          <RefreshCw className="h-4 w-4" /> Atualizar
-        </Button>
+      <div className="space-y-4">
+        <ComoFunciona
+          id="wa-conversas"
+          titulo="Guia da Central de Conversas & Atendimento SDR"
+          resumo="como receber e responder mensagens sem misturar com disparo"
+          itens={[
+            {
+              termo: "📌 1. Respostas Automáticas",
+              texto:
+                "As respostas dos leads aos seus disparos aparecem aqui automaticamente via webhook.",
+            },
+            {
+              termo: "📌 2. Papel do Agente SDR (IA)",
+              texto:
+                "O robô SDR analisa a mensagem do lead e gera um rascunho de resposta altamente persuasivo. Nada é enviado sem o seu clique.",
+            },
+            {
+              termo: "📌 3. Handoff Humano",
+              texto:
+                "Você pode editar o rascunho sugerido pela IA ou digitar sua própria mensagem no campo de chat.",
+            },
+            {
+              termo: "📌 4. Proteção do Número",
+              texto:
+                "Responder a conversas ativas no WhatsApp tem taxa de risco zero de bloqueio, pois o lead que iniciou a conversa.",
+            },
+          ]}
+        />
+        <div className="flex flex-col items-center gap-2 rounded-2xl border bg-card py-16 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <MessagesSquare className="h-7 w-7 text-muted-foreground" />
+          </span>
+          <div className="mt-1 font-semibold">Nenhuma conversa ainda</div>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Quando um lead responder ao seu WhatsApp, a conversa aparece aqui para você atender.
+            Conecte um chip na aba WhatsApp e dispare uma campanha para começar.
+          </p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={carregarConversas}>
+            <RefreshCw className="h-4 w-4" /> Atualizar
+          </Button>
+        </div>
       </div>
     );
 
   return (
-    <div className="grid h-[600px] grid-cols-[280px_1fr] overflow-hidden rounded-2xl border bg-card">
-      {/* Lista de conversas */}
-      <div className="flex flex-col border-r">
-        <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
-          <span className="flex items-center gap-1.5">
-            Conversas ({conversas.length})
-            {sugestoes.length > 0 && (
-              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                {sugestoes.length} rascunho(s)
-              </span>
-            )}
-          </span>
-          <span className="flex items-center gap-1">
+    <div className="space-y-4">
+      <ComoFunciona
+        id="wa-conversas"
+        titulo="Guia da Central de Conversas & Atendimento SDR"
+        resumo="como receber e responder mensagens sem misturar com disparo"
+        itens={[
+          {
+            termo: "📌 1. Lista de Conversas",
+            texto:
+              "Selecione um contato na coluna da esquerda para visualizar o histórico completo de bate-papo.",
+          },
+          {
+            termo: "📌 2. Rascunhos do Agente SDR (IA)",
+            texto:
+              "Clique no ícone de Varadinha/IA para que o robô analise o diálogo e sugira uma resposta perfeita.",
+          },
+          {
+            termo: "📌 3. Aprovar ou Editar",
+            texto:
+              "Revise a sugestão da IA. Clique em 'Aprovar & Enviar' para responder ou edite o texto livremente.",
+          },
+          {
+            termo: "📌 4. Proteção de Chip",
+            texto:
+              "Atender respostas pelo chip de 'Conversa' garante que seu WhatsApp principal continue saudável e ativo.",
+          },
+        ]}
+      />
+      <div className="grid h-[600px] grid-cols-[280px_1fr] overflow-hidden rounded-2xl border bg-card">
+        {/* Lista de conversas */}
+        <div className="flex flex-col border-r">
+          <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
+            <span className="flex items-center gap-1.5">
+              Conversas ({conversas.length})
+              {sugestoes.length > 0 && (
+                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                  {sugestoes.length} rascunho(s)
+                </span>
+              )}
+            </span>
+            <span className="flex items-center gap-1">
             {/* o agente só rascunha para conversa de LEAD — nunca para conversa pessoal */}
             <button
               onClick={pedirRascunho}
@@ -379,5 +432,6 @@ export function WaConversas() {
         </div>
       )}
     </div>
+  </div>
   );
 }

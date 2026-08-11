@@ -115,6 +115,8 @@ async function copiar(texto: string): Promise<boolean> {
   }
 }
 
+import { ComoFunciona } from "@/components/whatsapp/ComoFunciona";
+
 export function PropostasSection() {
   const [propostas, setPropostas] = useState<Proposta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -252,6 +254,39 @@ export function PropostasSection() {
           </Button>
         </div>
       </div>
+
+      <ComoFunciona
+        id="propostas-esteira"
+        titulo="Guia da Esteira de Propostas & Rastreamento de Leitura"
+        resumo="como preparar, aprovar e rastrear aberturas/cliques de e-mail e WhatsApp"
+        itens={[
+          {
+            termo: "📌 1. Gerar Proposta Comercial",
+            texto:
+              "Clique em '+ Gerar proposta'. O sistema busca leads com site publicado e cria a prévia com link exclusivo da landing page.",
+          },
+          {
+            termo: "📌 2. Melhora com IA (Refinar Copy)",
+            texto:
+              "Use o botão 'Melhorar com IA' no editor para que o assistente adeque o tom da proposta comercial ao nicho do lead.",
+          },
+          {
+            termo: "📌 3. Portão de Aprovação",
+            texto:
+              "Propostas no status 'Rascunho' não podem ser disparadas por e-mail/WhatsApp. Você deve aprovar o conteúdo primeiro.",
+          },
+          {
+            termo: "📌 4. Disparo por E-mail (Resend)",
+            texto:
+              "Ao enviar por e-mail, a proposta é entregue via integração oficial do Resend. O lead recebe o link com a prévia comercial.",
+          },
+          {
+            termo: "📌 5. Rastreamento de Webhooks (Etiquetas)",
+            texto:
+              "Acompanhe o status em tempo real: 'Aberta' (e-mail aberto), 'Clicada' (lead clicou na proposta) e 'Bounce' (endereço recusado).",
+          },
+        ]}
+      />
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">

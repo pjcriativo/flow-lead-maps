@@ -295,46 +295,48 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
 
       <ComoFunciona
         id="wa-chips"
-        titulo="O que cada botão faz aqui"
+        titulo="Guia Completo: Como conectar e gerenciar seus chips de WhatsApp"
+        resumo="diferença entre Disparo e Conversa, como parear sem erro e como funciona o rodízio"
         itens={[
           {
-            termo: "Conectar chip",
+            termo: "📌 1. Clique em '+ Conectar chip'",
             texto:
-              "adiciona um número novo. Você escolhe se ele nasce de disparo ou de conversa e pareia por código ou QR.",
+              "Clique no botão para iniciar o cadastro. Escolha se o chip será usado para 'Disparo' (envio em massa) ou 'Conversa' (atendimento/respostas).",
           },
           {
-            termo: "Disparo × Conversa",
+            termo: "📌 2. Conectar via Código (8 Dígitos)",
             texto:
-              "disparo manda mensagem fria pros leads (em rodízio, um por vez). Conversa só recebe e responde — nunca dispara frio, é o que protege o seu número principal.",
+              "Digite o número com DDD. No celular, vá em WhatsApp > Menu (3 pontos) > Aparelhos conectados > Conectar um aparelho > Conectar com código. Digite o código exibido na tela.",
           },
           {
-            termo: "Virar disparo / Virar conversa",
-            texto: "troca a função do chip. Um chip que já falou com o lead vira conversa sozinho.",
+            termo: "📌 3. Conectar via QR Code",
+            texto:
+              "Escolha a opção QR Code. No WhatsApp do seu celular, acesse Aparelhos conectados > Conectar um aparelho e aponte a câmera para o QR Code gerado.",
           },
           {
-            termo: "Setas ↑ ↓",
+            termo: "📌 4. Papel de Disparo × Conversa",
             texto:
-              "ordem do rodízio: o disparo #1 é usado primeiro; se ele bate o teto do dia, entra o #2.",
+              "Chips de 'Disparo' enviam propostas a frio em rodízio automatizado. Chips de 'Conversa' recebem e respondem às mensagens dos leads. Essa separação protege seu WhatsApp principal contra bloqueios.",
           },
           {
-            termo: "Verificar saúde",
+            termo: "📌 5. Rodízio Automático (Setas ↑ ↓)",
             texto:
-              "pergunta à Evolution se o chip ainda está logado. Se caiu de vez, ele é marcado queimado e o próximo assume automaticamente.",
+              "O sistema usa o chip #1 para disparos. Quando ele atinge a meta do dia, o sistema passa automaticamente para o chip #2 do rodízio.",
           },
           {
-            termo: "Ativar recebimento",
+            termo: "📌 6. Verificar Saúde do Chip",
             texto:
-              "faz as respostas dos leads caírem na aba Conversas. Só aparece em chip de conversa conectado.",
+              "Checa se a conexão com a Evolution API continua ativa. Se o chip for desconectado no celular, ele é sinalizado para você reconectar.",
           },
           {
-            termo: "Queimado",
+            termo: "📌 7. Marcar como Queimado",
             texto:
-              "tira o chip do rodízio SEM apagar nada — o histórico de envios continua ali. Use quando o número foi bloqueado.",
+              "Caso um número seja bloqueado pelo WhatsApp, marque-o como 'Queimado'. Ele sai do rodízio imediatamente sem perder o histórico de mensagens enviadas.",
           },
           {
-            termo: "Excluir (🗑)",
+            termo: "📌 8. Ativar Recebimento",
             texto:
-              "apaga o chip de vez. Recusa se ele já enviou (o histórico sumiria junto — nesse caso use Queimado) e pede confirmação extra se o número estiver pareado.",
+              "Em chips de 'Conversa', ativa a sincronização para que as mensagens dos leads caiam direto na aba Conversas do Flow Leads.",
           },
         ]}
       />

@@ -17,6 +17,7 @@ import { formatData } from "@/lib/format";
 import { estatisticasWa, enviadosPorCampanhaWa, type WaEstatisticas } from "@/services/whatsapp";
 import { listarCampanhas } from "@/services/campanhas";
 import type { Campanha } from "@/types";
+import { ComoFunciona } from "./ComoFunciona";
 
 export function WaPainel({
   onIrParaWhatsApp,
@@ -54,6 +55,39 @@ export function WaPainel({
 
   return (
     <div className="space-y-5">
+      <ComoFunciona
+        id="wa-painel"
+        titulo="Visão Geral do Módulo WhatsApp"
+        resumo="como funciona a estrutura de estatísticas e navegação"
+        itens={[
+          {
+            termo: "📌 Status de Conexão",
+            texto:
+              "Indica se há pelo menos 1 chip de WhatsApp ativo e pronto para uso no sistema.",
+          },
+          {
+            termo: "📌 Leads com WhatsApp",
+            texto:
+              "Número de prospectos na sua base que possuem telefone válido pronto para envio.",
+          },
+          {
+            termo: "📌 Campanhas Enviadas",
+            texto:
+              "Total de campanhas criadas e disparadas com sucesso pela sua equipe.",
+          },
+          {
+            termo: "📌 Conversas Ativas",
+            texto:
+              "Quantidade de bate-papos em andamento com leads que responderam aos seus envios.",
+          },
+          {
+            termo: "📌 Privacidade Server-Side",
+            texto:
+              "O robô roda no servidor seguro (Evolution API) e no banco isolado da sua empresa. Não é necessário manter seu computador ligado para os envios funcionarem.",
+          },
+        ]}
+      />
+
       {/* banner de conexão */}
       <button
         onClick={onIrParaWhatsApp}

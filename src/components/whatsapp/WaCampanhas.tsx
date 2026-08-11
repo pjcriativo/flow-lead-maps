@@ -516,47 +516,48 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
 
       <ComoFunciona
         id="wa-campanhas"
-        titulo="Como disparar sem tomar bloqueio"
-        resumo="o caminho é Preparar → Aprovar → Disparar"
+        titulo="Guia Passo a Passo: Como disparar campanhas no WhatsApp sem tomar bloqueio"
+        resumo="o fluxo é 1. Chip de Disparo → 2. Selecionar Leads → 3. Variações & Variáveis → 4. Preparar → 5. Aprovar → 6. Disparar"
         itens={[
           {
-            termo: "1. Selecionar",
+            termo: "📌 1. Conectar Chip de Disparo",
             texto:
-              "marque os leads da lista. Os filtros (segmento, cidade, bairro) ajudam a mirar; o limite corta o tamanho do lote.",
+              "Antes de iniciar, vá em WhatsApp > Chips e conecte pelo menos 1 número com papel 'Disparo'. O sistema fará o rodízio automático entre eles.",
           },
           {
-            termo: "2. Preparar",
+            termo: "📌 2. Selecionar Leads da Lista",
             texto:
-              "gera o site novo e a mensagem de cada lead escolhido — vira rascunho. Ainda não sai nada.",
+              "Use os filtros de cidade, segmento e bairro para filtrar os leads. Marque os quadradinhos da lista ou ajuste o 'Limite de leads' para cortar o tamanho do lote.",
           },
           {
-            termo: "3. Aprovar",
+            termo: "📌 3. Variáveis Inteligentes {{...}}",
             texto:
-              "publica o site e cria o link real da prévia. Só depois disso o lead entra na fila de envio.",
+              "Clique nas tags {{nome}}, {{cidade}}, {{nota}}, {{bairro}} ou {{link}} para personalizar a mensagem. O sistema insere dados reais do lead em cada disparo.",
           },
           {
-            termo: "4. Disparar Campanha",
+            termo: "📌 4. Variações da Mensagem (Anti-Bloqueio)",
             texto:
-              "envia SÓ o que você aprovou, um por um, com o intervalo escolhido. Nada sai sem passar pelos passos acima.",
+              "Cadastre no mínimo 2 a 3 variações da mesma mensagem (ex: Var #1, Var #2). O sistema alterna os textos a cada envio. Texto 100% idêntico para dezenas de contatos causa bloqueio imediato do chip pelo WhatsApp.",
           },
           {
-            termo: "Variações da mensagem",
+            termo: "📌 5. Intervalo Humano (Jitter)",
             texto:
-              "escreva a mesma ideia de jeitos diferentes. O sistema reveza e nunca manda a mesma duas vezes seguidas — texto idêntico pra todo mundo é o que mais derruba conta.",
+              "Configure o slider de intervalo entre 35s e 60s e mantenha a variação aleatória ativada. Enviar com intervalo variável simula a digitação de um operador humano real.",
           },
           {
-            termo: "Variáveis {{...}}",
+            termo: "📌 6. A Esteira (Preparar → Aprovar → Disparar)",
             texto:
-              "clique numa variável para inserir no texto onde está o cursor. {{bairro}} sai vazio quando o endereço não permite extrair, e {{nota}} só entra para quem tem nota real — nunca inventa.",
+              "O robô nunca envia direto. Primeiro clique em 'Preparar' (gera a página e o rascunho), depois em 'Aprovar' (publica o link e coloca na fila) e por fim em 'Disparar Campanha'.",
           },
           {
-            termo: "Intervalo + Variar",
+            termo: "📌 7. Salvar como Script",
             texto:
-              "tempo de espera entre uma mensagem e outra, com variação aleatória. Disparo com ritmo humano derruba menos chip.",
+              "Guarde suas mensagens de alta conversão (com todas as suas variações) para reutilizar em campanhas futuras em 1 clique na aba Scripts.",
           },
           {
-            termo: "Salvar como script",
-            texto: "guarda esse texto (com as variações) para reusar na próxima campanha.",
+            termo: "📌 8. Central de Conversas (Atendimento)",
+            texto:
+              "Quando o lead responder ao seu disparo, a conversa será redirecionada para a aba Conversas ou para o seu chip de Atendimento, protegendo seu chip de disparo.",
           },
         ]}
       />

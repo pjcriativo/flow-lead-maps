@@ -47,6 +47,7 @@ import {
   type NovaReceita,
 } from "@/services/automacao";
 import { listarChips } from "@/services/whatsapp";
+import { ComoFunciona } from "@/components/whatsapp/ComoFunciona";
 
 const PADRAO: NovaReceita = {
   nome: "",
@@ -137,6 +138,39 @@ export function AutomacaoSection({ onRevisar }: { onRevisar?: () => void }) {
           </Button>
         </div>
       </div>
+
+      <ComoFunciona
+        id="automacao-receitas"
+        titulo="Guia de Automação: Como criar receitas de busca e preparação automática"
+        resumo="o robô busca e prepara os rascunhos, mas NUNCA dispara sem a sua aprovação"
+        itens={[
+          {
+            termo: "📌 1. O que é uma Receita",
+            texto:
+              "Uma regra de busca e prospecção automatizada (ex: 'Dentistas em Curitiba com nota < 4.5'). Você configura 1 vez e o robô executa sob demanda.",
+          },
+          {
+            termo: "📌 2. Escolha do Canal (WhatsApp vs E-mail)",
+            texto:
+              "Defina se a receita preparará mensagens para WhatsApp ou E-mail. Para WhatsApp, certifique-se de que há 1 chip de Disparo conectado.",
+          },
+          {
+            termo: "📌 3. Filtros & Score Mínimo",
+            texto:
+              "O robô descarta leads sem telefone/e-mail e avalia o score de oportunidade antes de preparar o rascunho da proposta.",
+          },
+          {
+            termo: "📌 4. Teto de Gasto & Trava de Segurança",
+            texto:
+              "Cada rodada possui teto máximo de custo em dólar (ex: US$ 5/rodada) e limite de leads para proteger seu orçamento de APIs.",
+          },
+          {
+            termo: "📌 5. Revisão em Lote",
+            texto:
+              "Todos os rascunhos preparados pelo robô ficam na aba Campanhas ou Propostas para você revisar, aprovar e disparar.",
+          },
+        ]}
+      />
 
       {/* aviso de custo */}
       <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900">
