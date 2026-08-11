@@ -1038,11 +1038,20 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           </div>
           {/* o botão desabilitado se explica (EXCEÇÃO 2 — portão) */}
           {!disparando && (semChip || aprovadosProntos.length === 0) && (
-            <p className="text-center text-[11px] text-amber-700">
-              {semChip
-                ? "Conecte um chip de disparo (aba WhatsApp) para poder disparar."
-                : `Nada aprovado ainda (aprovados: 0). Selecione leads → Preparar → Aprovar → Disparar.`}
-            </p>
+            <div className="rounded-xl border border-amber-500/30 bg-amber-50/70 p-3 text-xs leading-relaxed text-amber-900 shadow-xs">
+              {semChip ? (
+                <span>⚠️ <b>Chip de Disparo Ausente:</b> Conecte um chip com o papel 'Disparo' na aba WhatsApp para habilitar o envio.</span>
+              ) : (
+                <div>
+                  💡 <b>Como ativar este botão para disparar:</b>
+                  <ol className="mt-1.5 list-decimal space-y-1 pl-4">
+                    <li>Selecione os leads desejados na lista à esquerda.</li>
+                    <li>Clique no botão <b>'Preparar'</b> (na caixa abaixo da lista) para gerar as prévias.</li>
+                    <li>Clique no botão <b>'Aprovar'</b> para publicar as landing pages e liberar o envio.</li>
+                  </ol>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
