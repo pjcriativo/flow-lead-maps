@@ -24,3 +24,13 @@
 
 - **Sempre que concluir um conjunto de alterações ou tarefas**, faça `git add .`, `git commit -m "<mensagem clara>"` e `git push` automaticamente para manter o repositório sempre atualizado e sincronizado no GitHub.
 
+## 5. Formato de Resposta em Relatório
+
+- **Sempre apresente respostas, análises e conclusões no formato de RELATÓRIO ESTRUTURADO**, utilizando markdown limpo com seções bem definidas:
+  - 📋 Resumo Executivo / Objetivos
+  - 🛠️ Arquivos & Recursos Modificados (com links clicáveis `file:///...`)
+  - 📊 Detalhamento Técnico das Funcionalidades
+  - 🧪 Testes & Validações Empíricas
+  - 🔄 Status de Sincronização (Git & Supabase)
+
+
