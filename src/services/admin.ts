@@ -45,6 +45,10 @@ export type UsuarioPlataforma = {
   plano_id: string | null;
   /** Override individual de limite de leads (orgs.limite_leads_override) */
   leads_override: number | null;
+  /** Override individual de limite de sites/redesigns (orgs.limite_sites_override) */
+  sites_override: number | null;
+  /** Redesigns/tokens bônus manuais concedidos pelo admin (orgs.sites_bonus) */
+  sites_bonus: number;
   created_at: string;
   acesso_liberado: boolean;
   is_super_admin: boolean;
@@ -150,6 +154,8 @@ export type AdminAcao =
   | "user_access_set"
   | "user_plan_set"
   | "user_leads_override"
+  | "user_sites_override"
+  | "user_sites_bonus"
   | "user_delete"
   | "plano_upsert"
   | "plano_toggle"

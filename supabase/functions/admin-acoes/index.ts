@@ -335,6 +335,42 @@ Deno.serve(async (req) => {
       return json({ ok: true, ...resultado });
     }
 
+    // Override de limite de sites (redesign) por conta — define orgs.limite_sites_override.
+    // null = remover override (volta a respeitar o plano).
+    if (acao === "user_sites_override") {
+      const userId = String(b.user_id || "");
+      if (!userId) return json({ ok: false, reason: "usuario_invalido" });
+      const override = b.limite === null || b.limite === undefined ? null : Number(b.limite);
+      if (override !== null && (isNaN(override) || override < 0))
+        return json({ ok: false, reason: "limite_invalido" });
+
+      const { data: resultado, error } = await admin.rpc("admin_set_org_sites_override", {
+        p_user: userId,
+        p_sites: override,
+      });
+      if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
+      if (!resultado?.ok)
+        return json({ ok: false, reason: resultado?.reason ?? "falha_atualizar" });
+      return json({ ok: true, ...resultado });
+    }
+
+    // Adição de redesigns bônus manuais pelo admin — define orgs.sites_bonus.
+    if (acao === "user_sites_bonus") {
+      const userId = String(b.user_id || "");
+      if (!userId) return json({ ok: false, reason: "usuario_invalido" });
+      const bonus = Number(b.bonus ?? 0);
+      if (isNaN(bonus) || bonus < 0) return json({ ok: false, reason: "bonus_invalido" });
+
+      const { data: resultado, error } = await admin.rpc("admin_set_org_sites_bonus", {
+        p_user: userId,
+        p_bonus: bonus,
+      });
+      if (error) return json({ ok: false, reason: "falha_atualizar", detalhe: error.message });
+      if (!resultado?.ok)
+        return json({ ok: false, reason: resultado?.reason ?? "falha_atualizar" });
+      return json({ ok: true, ...resultado });
+    }
+
     // Exclusão de conta pelo admin — apaga do Auth (cascata via FK/trigger para profiles,
     // memberships, orgs). Super admins nunca podem ser deletados por esta rota.
     if (acao === "user_delete") {

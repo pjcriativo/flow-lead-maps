@@ -70,104 +70,428 @@ function expiraLabel(expira_em: string | null): { texto: string; vencido: boolea
 }
 
 export function RedesignSection({
+  focusLeadId,
+  onFocusConsumed,
   onIrParaCampanhas,
 }: {
   focusLeadId?: string | null;
   onFocusConsumed?: () => void;
   onIrParaCampanhas?: () => void;
 } = {}) {
+  const [redesigns, setRedesigns] = useState<Redesign[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [consumo, setConsumo] = useState<EstadoConsumoSites>({
+    usado: 0,
+    limite: null,
+    restante: null,
+    perto: false,
+  });
+  const [carregando, setCarregando] = useState(true);
+  const [gerando, setGerando] = useState(false);
+  const [leadIdSelecionado, setLeadIdSelecionado] = useState<string>("");
+  const [novoDoZero, setNovoDoZero] = useState(false);
+  const [editando, setEditando] = useState<Redesign | null>(null);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+
+  const carregarDados = async () => {
+    setCarregando(true);
+    try {
+      const [listRd, listLeads, cota] = await Promise.all([
+        listarRedesigns(),
+        fetchLeads(),
+        obterConsumoSites(),
+      ]);
+      setRedesigns(listRd);
+      setLeads(listLeads);
+      setConsumo(cota);
+
+      if (focusLeadId) {
+        setLeadIdSelecionado(focusLeadId);
+        onFocusConsumed?.();
+      } else if (listLeads.length > 0 && !leadIdSelecionado) {
+        setLeadIdSelecionado(listLeads[0].id);
+      }
+    } catch (e) {
+      toast.error("Erro ao carregar dados de redesign: " + (e instanceof Error ? e.message : ""));
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const atingiuLimite = consumo.limite !== null && consumo.usado >= consumo.limite;
+
+  const handleGerar = async () => {
+    if (!leadIdSelecionado) {
+      toast.error("Selecione um lead para gerar o redesign.");
+      return;
+    }
+    if (atingiuLimite) {
+      toast.error(
+        `Limite do plano atingido (${consumo.usado}/${consumo.limite} redesigns). Solicite mais ao suporte/admin.`,
+      );
+      return;
+    }
+
+    setGerando(true);
+    try {
+      const resp = await gerarRedesign(leadIdSelecionado, { novoDoZero });
+      toast.success(`Redesign gerado com sucesso para ${resp.lead_nome}!`);
+      await carregarDados();
+      if (resp.redesign) {
+        setEditando(resp.redesign);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("Falha ao gerar redesign: " + msg);
+    } finally {
+      setGerando(false);
+    }
+  };
+
+  const handleExcluir = async (id: string) => {
+    setExcluindoId(id);
+    try {
+      await excluirRedesign(id);
+      toast.success("Redesign excluído.");
+      setRedesigns((list) => list.filter((r) => r.id !== id));
+    } catch (e) {
+      toast.error("Falha ao excluir redesign.");
+    } finally {
+      setExcluindoId(null);
+    }
+  };
+
+  const leadSelecionadoObj = useMemo(
+    () => leads.find((l) => l.id === leadIdSelecionado),
+    [leads, leadIdSelecionado],
+  );
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6 py-6 px-2">
-      {/* Badge Superior de Manutenção */}
-      <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider text-amber-600">
-        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-        Em Manutenção · Novo Motor em Breve
+    <div className="mx-auto max-w-6xl space-y-6 py-6 px-4">
+      {/* Header da Seção */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+              Redesign de Site por IA
+            </h1>
+            <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 text-xs font-semibold text-purple-600 dark:text-purple-400">
+              <Sparkles className="h-3 w-3" /> IA de Vendas
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Gere landing pages hiper-persuasivas com matérias-primas e depoimentos reais do seu lead.
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={carregarDados}
+          disabled={carregando}
+          className="gap-1.5 shrink-0"
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", carregando && "animate-spin")} />
+          Atualizar dados
+        </Button>
       </div>
 
-      {/* Cartão Principal de Manutenção */}
-      <div className="relative overflow-hidden rounded-3xl border border-amber-500/20 bg-gradient-to-b from-card via-card to-card/90 p-8 shadow-2xl md:p-12 text-center">
-        {/* Glows Decorativos de Fundo */}
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-24 -bottom-24 h-72 w-72 rounded-full bg-violet-500/10 blur-3xl" />
-
-        {/* Ícone de Construção/IA Animado */}
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 text-amber-500 shadow-inner border border-amber-500/20">
-          <Wand2 className="h-10 w-10 animate-bounce" />
-        </div>
-
-        {/* Título e Mensagem Obrigatória Solicitada pelo Usuário */}
-        <h1 className="mt-6 font-serif text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          Este recurso está sendo melhorado!
-        </h1>
-
-        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
-          Em breve você terá uma <span className="font-semibold text-foreground">nova experiência incrível</span> para conseguir mais clientes. Estamos refazendo todo o nosso motor de criação de sites por Inteligência Artificial para entregar layouts ultra-modernos e de altíssima conversão!
-        </p>
-
-        {/* Detalhes do Novo Motor */}
-        <div className="mt-10 grid gap-4 text-left sm:grid-cols-2">
-          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 font-bold text-base">
-              🚀
-            </span>
+      {/* Widget de Gestão de Cota por Plano */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-600 font-bold">
+              <Wand2 className="h-5 w-5" />
+            </div>
             <div>
-              <div className="font-semibold text-sm text-foreground">Novo Motor de IA de Vendas</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Designs e copys hiper-persuasivos gerados sob medida para o segmento comercial de cada lead.
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-foreground">
+                  Consumo do Plano: Redesigns de Site
+                </span>
+                {consumo.limite === null ? (
+                  <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-bold text-emerald-600">
+                    Ilimitado (Admin)
+                  </span>
+                ) : atingiuLimite ? (
+                  <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs font-bold text-red-600">
+                    Limite Atingido
+                  </span>
+                ) : (
+                  <span className="rounded bg-purple-500/15 px-2 py-0.5 text-xs font-bold text-purple-600">
+                    {consumo.restante} restante{consumo.restante !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {consumo.limite === null
+                  ? "Sua conta tem permissão ilimitada para gerar sites por IA."
+                  : `Você utilizou ${consumo.usado} de ${consumo.limite} redesigns disponíveis no ciclo atual.`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 font-bold text-base">
-              🎨
-            </span>
-            <div>
-              <div className="font-semibold text-sm text-foreground">Editor Visual Drag & Drop</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Edição simplificada em tempo real de textos, fotos, botões e seções completas.
+          {consumo.limite !== null && (
+            <div className="text-right sm:shrink-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Uso Mensal
+              </span>
+              <p className="text-lg font-bold tracking-tight text-foreground">
+                {consumo.usado} <span className="text-xs font-normal text-muted-foreground">/ {consumo.limite}</span>
               </p>
             </div>
-          </div>
-
-          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 font-bold text-base">
-              ⚡
-            </span>
-            <div>
-              <div className="font-semibold text-sm text-foreground">Carregamento Instantâneo</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Páginas 100% otimizadas para celulares com performance máxima nos testes do Google.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3.5 rounded-2xl border border-border/70 bg-muted/40 p-4.5 transition hover:border-amber-500/40">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600 font-bold text-base">
-              📈
-            </span>
-            <div>
-              <div className="font-semibold text-sm text-foreground">Maior Taxa de Conversão</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Estruturas validadas para transformar visitantes em reuniões e contratos fechados.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Botão de Redirecionamento */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          {onIrParaCampanhas && (
-            <Button
-              size="lg"
-              className="bg-primary font-semibold hover:bg-primary/90"
-              onClick={onIrParaCampanhas}
-            >
-              <Sparkles className="mr-2 h-4 w-4" /> Ir para Disparos & Campanhas no WhatsApp
-            </Button>
           )}
         </div>
+
+        {/* Barra de Progresso */}
+        {consumo.limite !== null && (
+          <div className="space-y-1">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+              <div
+                className={cn(
+                  "h-full transition-all duration-500 rounded-full",
+                  atingiuLimite
+                    ? "bg-red-500"
+                    : consumo.perto
+                    ? "bg-amber-500"
+                    : "bg-purple-600",
+                )}
+                style={{
+                  width: `${Math.min(100, (consumo.usado / consumo.limite) * 100)}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Alerta quando o limite é atingido */}
+        {atingiuLimite && (
+          <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-700 dark:text-red-300">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
+            <div>
+              <p className="font-semibold">Limite de redesigns atingido para o seu plano!</p>
+              <p className="mt-0.5">
+                Você consumiu todos os {consumo.limite} redesigns de site do seu plano neste mês. Entre em contato com o suporte/administrador para adicionar redesigns bônus ou faça upgrade do seu plano.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Painel de Gerador de Redesign */}
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-md space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-lg font-semibold tracking-tight">Gerar Novo Redesign</h2>
+          <span className="text-xs text-muted-foreground">
+            Duração estimada: 10 a 40 segundos
+          </span>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3 items-end">
+          {/* Seletor de Lead */}
+          <div className="md:col-span-2 space-y-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Selecione o Lead
+            </label>
+            <select
+              value={leadIdSelecionado}
+              onChange={(e) => setLeadIdSelecionado(e.target.value)}
+              disabled={gerando || leads.length === 0}
+              className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 disabled:opacity-50"
+            >
+              {leads.length === 0 ? (
+                <option value="">Nenhum lead encontrado nas suas listas</option>
+              ) : (
+                leads.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.business_name} {l.website ? `(${l.website})` : "— (Sem site)"}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          {/* Botão de Ação */}
+          <div>
+            <Button
+              onClick={handleGerar}
+              disabled={gerando || !leadIdSelecionado || atingiuLimite}
+              className="h-10 w-full gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              {gerando ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Gerando site...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="h-4 w-4" /> Gerar Redesign
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Opção Novo do Zero */}
+        <div className="flex items-center gap-2 pt-1">
+          <input
+            type="checkbox"
+            id="novoDoZero"
+            checked={novoDoZero}
+            onChange={(e) => setNovoDoZero(e.target.checked)}
+            disabled={gerando}
+            className="rounded border-input text-purple-600 focus:ring-purple-500 cursor-pointer"
+          />
+          <label
+            htmlFor="novoDoZero"
+            className="text-xs text-muted-foreground cursor-pointer select-none"
+          >
+            Gerar site NOVO do zero (ignorar o conteúdo do site atual se houver e usar dados do Google)
+          </label>
+        </div>
+
+        {/* Info do lead selecionado */}
+        {leadSelecionadoObj && (
+          <div className="rounded-xl border border-border/70 bg-secondary/30 p-3 text-xs space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-foreground">{leadSelecionadoObj.business_name}</span>
+              <span className="text-muted-foreground">{leadSelecionadoObj.category ?? "Geral"}</span>
+            </div>
+            <p className="text-muted-foreground truncate">
+              {leadSelecionadoObj.website
+                ? `Site atual: ${leadSelecionadoObj.website}`
+                : "Sem site cadastrado (será gerado do zero a partir do Google Maps)"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Lista de Redesigns Gerados */}
+      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden space-y-0">
+        <div className="border-b border-border px-6 py-4 flex items-center justify-between bg-card">
+          <div>
+            <h2 className="font-serif text-lg font-semibold">Redesigns Criados</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Histórico de sites gerados por IA para os seus leads.
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground">
+            Total: {redesigns.length}
+          </span>
+        </div>
+
+        {carregando ? (
+          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
+            <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+            <p className="text-xs">Carregando sites gerados...</p>
+          </div>
+        ) : redesigns.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center text-muted-foreground gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600">
+              <Wand2 className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Nenhum redesign criado ainda</p>
+              <p className="text-xs text-muted-foreground max-w-sm mt-1">
+                Selecione um lead acima e clique em "Gerar Redesign com IA" para criar a primeira landing page.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {redesigns.map((rd) => {
+              const exp = expiraLabel(rd.expira_em);
+              return (
+                <div
+                  key={rd.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-4 hover:bg-secondary/20 transition-colors"
+                >
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-semibold text-sm text-foreground">
+                        {rd.lead_nome ?? "Lead sem nome"}
+                      </span>
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider",
+                          STATUS_STYLE[rd.status],
+                        )}
+                      >
+                        {rd.status}
+                      </span>
+                      {exp && (
+                        <span
+                          className={cn(
+                            "text-[11px] font-medium px-2 py-0.5 rounded",
+                            exp.vencido
+                              ? "bg-red-500/10 text-red-600"
+                              : "bg-amber-500/10 text-amber-600",
+                          )}
+                        >
+                          {exp.texto}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                      <span>Gerado em: {formatDataHora(rd.criado_em)}</span>
+                      {rd.site_original_url && (
+                        <a
+                          href={rd.site_original_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <Globe className="h-3 w-3" /> Site original
+                        </a>
+                      )}
+                      {rd.modelo && <span>Modelo: {rd.modelo}</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => setEditando(rd)}
+                      disabled={rd.status !== "pronto" && !rd.html_gerado}
+                      className="gap-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Visualizar & Editar
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleExcluir(rd.id)}
+                      disabled={excluindoId === rd.id}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      title="Excluir redesign"
+                    >
+                      {excluindoId === rd.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Editor Redesign Modal */}
+      {editando && (
+        <EditorRedesign
+          redesign={editando}
+          onClose={() => setEditando(null)}
+          onSaved={() => carregarDados()}
+        />
+      )}
     </div>
   );
 }

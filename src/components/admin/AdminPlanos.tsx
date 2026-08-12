@@ -218,7 +218,7 @@ export function AdminPlanos({ planos, onMudou }: { planos: Plano[]; onMudou: () 
                   </td>
                   <td className="px-6 py-4 align-top">
                     <LinhaLimite rotulo="Leads" valor={p.limite_leads} />
-                    <LinhaLimite rotulo="Sites IA" valor={p.limite_sites} />
+                    <LinhaLimite rotulo="Redesigns de Site" valor={p.limite_sites} />
                     <LinhaLimite rotulo="Campanhas" valor={p.limite_campanhas} />
                   </td>
                   <td className="px-6 py-4 align-top">
@@ -400,7 +400,7 @@ function PlanoForm({
           onChange={(v) => set({ limite_leads: numOrNull(v) })}
         />
         <LimiteInput
-          rotulo="Sites IA"
+          rotulo="Redesigns de Site"
           valor={plano.limite_sites}
           onChange={(v) => set({ limite_sites: numOrNull(v) })}
         />

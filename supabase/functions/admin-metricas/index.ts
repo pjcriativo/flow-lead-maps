@@ -49,17 +49,27 @@ Deno.serve(async (req) => {
     (usuarios ?? []).map((u: Rec) => [String(u.id), String(u.email ?? "?")]),
   );
 
-  // Orgs dos donos — para enriquecer a lista de usuários com plano real e override de leads
+  // Orgs dos donos — para enriquecer a lista de usuários com plano real, overrides e bônus
   const { data: orgsUsuarios } = await admin
     .from("orgs")
-    .select("dono_user_id, plano_id, limite_leads_override");
-  // Mapeia dono_user_id -> {plano_id, leads_override}
-  const orgDe = new Map<string, { plano_id: string | null; leads_override: number | null }>(
+    .select("dono_user_id, plano_id, limite_leads_override, limite_sites_override, sites_bonus");
+  // Mapeia dono_user_id -> {plano_id, leads_override, sites_override, sites_bonus}
+  const orgDe = new Map<
+    string,
+    {
+      plano_id: string | null;
+      leads_override: number | null;
+      sites_override: number | null;
+      sites_bonus: number;
+    }
+  >(
     (orgsUsuarios ?? []).map((o: Rec) => [
       String(o.dono_user_id),
       {
         plano_id: String(o.plano_id ?? "") || null,
         leads_override: o.limite_leads_override as number | null,
+        sites_override: o.limite_sites_override as number | null,
+        sites_bonus: (o.sites_bonus as number) ?? 0,
       },
     ]),
   );
@@ -284,6 +294,8 @@ Deno.serve(async (req) => {
         plano_nome: (planoRow?.nome as string) ?? null,
         plano_id: orgInfo?.plano_id ?? null,
         leads_override: orgInfo?.leads_override ?? null,
+        sites_override: orgInfo?.sites_override ?? null,
+        sites_bonus: orgInfo?.sites_bonus ?? 0,
         created_at: u.created_at,
         acesso_liberado: u.acesso_liberado,
         is_super_admin: u.is_super_admin,

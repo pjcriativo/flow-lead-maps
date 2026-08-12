@@ -20,6 +20,7 @@ import {
   Users,
   Layers,
   Search,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminAcao, type Plano, type UsuarioPlataforma } from "@/services/admin";
@@ -52,6 +53,10 @@ export function AdminAllUsers({
   // Modal override de leads
   const [overrideModal, setOverrideModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
   const [overrideValor, setOverrideValor] = useState<string>("");
+  // Modal override e bônus de sites (redesign)
+  const [sitesModal, setSitesModal] = useState<{ usuario: UsuarioPlataforma } | null>(null);
+  const [sitesOverrideValor, setSitesOverrideValor] = useState<string>("");
+  const [sitesBonusValor, setSitesBonusValor] = useState<string>("");
 
   // Planos ativos do catálogo (ordenados)
   const planosAtivos = planos.filter((p) => p.ativo);
@@ -178,6 +183,43 @@ export function AdminAllUsers({
           : `Limite de leads para ${overrideModal.usuario.email} → ${limite.toLocaleString("pt-BR")}.`,
       );
       setOverrideModal(null);
+      onMudou();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
+    } finally {
+      setAlterandoId(null);
+    }
+  };
+
+  const salvarSitesConfig = async () => {
+    if (!sitesModal) return;
+    const limite = sitesOverrideValor.trim() === "" ? null : Number(sitesOverrideValor);
+    if (limite !== null && (isNaN(limite) || limite < 0)) {
+      toast.error("Informe um limite de sites válido ou deixe em branco.");
+      return;
+    }
+    const bonus = sitesBonusValor.trim() === "" ? 0 : Number(sitesBonusValor);
+    if (isNaN(bonus) || bonus < 0) {
+      toast.error("Informe um valor de bônus válido (>= 0).");
+      return;
+    }
+
+    setAlterandoId(sitesModal.usuario.id);
+    try {
+      const r1 = await adminAcao("user_sites_override", {
+        user_id: sitesModal.usuario.id,
+        limite,
+      });
+      const r2 = await adminAcao("user_sites_bonus", {
+        user_id: sitesModal.usuario.id,
+        bonus,
+      });
+      if (!r1.ok || !r2.ok) {
+        toast.error(`Falha ao salvar configurações de redesign de site.`);
+        return;
+      }
+      toast.success(`Configurações de redesign salvas para ${sitesModal.usuario.email}.`);
+      setSitesModal(null);
       onMudou();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
@@ -348,6 +390,7 @@ export function AdminAllUsers({
               <th className="px-5 py-3 font-semibold text-left">Usuário</th>
               <th className="px-4 py-3 font-semibold text-left">Plano</th>
               <th className="px-4 py-3 font-semibold text-left">Leads / Mês</th>
+              <th className="px-4 py-3 font-semibold text-left">Sites IA / Mês</th>
               <th className="px-4 py-3 font-semibold text-left">Status</th>
               <th className="px-4 py-3 font-semibold text-left">Entrou em</th>
               <th className="px-5 py-3 font-semibold text-right">Ações</th>
@@ -356,7 +399,7 @@ export function AdminAllUsers({
           <tbody className="divide-y divide-border">
             {usuariosFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Users className="h-8 w-8 text-muted-foreground/40" />
                     <p className="text-sm font-medium">Nenhum usuário encontrado</p>
@@ -467,6 +510,58 @@ export function AdminAllUsers({
                               className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-gold hover:bg-gold/15 transition-colors cursor-pointer"
                             >
                               <Zap className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Limite de sites (redesign) — mostra override e bônus quando presentes */}
+                    <td className="px-4 py-3.5">
+                      {u.is_super_admin ? (
+                        <span className="text-xs font-semibold text-muted-foreground">∞</span>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col">
+                            {u.sites_override !== null ? (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-md bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 text-xs font-semibold text-purple-700 dark:text-purple-300"
+                                title="Override individual de redesigns de site ativo"
+                              >
+                                <Wand2 className="h-3 w-3 text-purple-600 shrink-0" />
+                                {u.sites_override.toLocaleString("pt-BR")}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium text-foreground">
+                                {(() => {
+                                  const plano = planosAtivos.find((p) => p.id === u.plano_id);
+                                  return plano
+                                    ? plano.limite_sites !== null
+                                      ? plano.limite_sites.toLocaleString("pt-BR")
+                                      : "∞"
+                                    : "—";
+                                })()}
+                              </span>
+                            )}
+                            {u.sites_bonus > 0 && (
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                +{u.sites_bonus} bônus
+                              </span>
+                            )}
+                          </div>
+                          {u.acesso_liberado && !u.is_super_admin && (
+                            <button
+                              onClick={() => {
+                                setSitesOverrideValor(
+                                  u.sites_override !== null ? String(u.sites_override) : "",
+                                );
+                                setSitesBonusValor(u.sites_bonus ? String(u.sites_bonus) : "0");
+                                setSitesModal({ usuario: u });
+                              }}
+                              title="Configurar limite e bônus manuais de redesign de site"
+                              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:text-purple-600 hover:bg-purple-500/15 transition-colors cursor-pointer"
+                            >
+                              <Wand2 className="h-3 w-3" />
                             </button>
                           )}
                         </div>
@@ -746,11 +841,99 @@ export function AdminAllUsers({
                 )}
                 Salvar override
               </Button>
+      {/* ── Modal: Redesign Sites IA (Override + Bônus) ── */}
+      {sitesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-xl border border-purple-500/30 bg-card p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-500/10">
+                <Wand2 className="size-5 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-serif text-lg font-semibold">Redesign de Sites IA</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Gerencie a cota e adicione tokens/redesigns bônus manuais para <b>{sitesModal.usuario.email}</b>.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Limite individual / Mês (Override)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    value={sitesOverrideValor}
+                    onChange={(e) => setSitesOverrideValor(e.target.value)}
+                    placeholder="Deixe vazio para usar o limite do plano"
+                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 pr-8"
+                  />
+                  {sitesOverrideValor && (
+                    <button
+                      onClick={() => setSitesOverrideValor("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {sitesModal.usuario.plano_id &&
+                  (() => {
+                    const plano = planosAtivos.find((p) => p.id === sitesModal.usuario.plano_id);
+                    return plano ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Limite do plano {plano.nome}:{" "}
+                        <b>
+                          {plano.limite_sites !== null
+                            ? plano.limite_sites.toLocaleString("pt-BR")
+                            : "∞"}
+                        </b>{" "}
+                        sites/mês
+                      </p>
+                    ) : null;
+                  })()}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Redesigns Bônus Manuais (Tokens Extras)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={sitesBonusValor}
+                  onChange={(e) => setSitesBonusValor(e.target.value)}
+                  placeholder="0"
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Estes redesigns extras são somados à cota mensal do plano ou ao override.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                type="button"
+                className="flex-1 gap-1.5 bg-purple-600 text-white hover:bg-purple-700"
+                disabled={alterandoId === sitesModal.usuario.id}
+                onClick={salvarSitesConfig}
+              >
+                {alterandoId === sitesModal.usuario.id ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Wand2 className="size-3.5" />
+                )}
+                Salvar alterações
+              </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOverrideModal(null)}
-                disabled={alterandoId === overrideModal.usuario.id}
+                onClick={() => setSitesModal(null)}
+                disabled={alterandoId === sitesModal.usuario.id}
               >
                 Cancelar
               </Button>

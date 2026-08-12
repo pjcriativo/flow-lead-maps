@@ -68,14 +68,33 @@ export async function listarLeadIdsComRedesign(): Promise<Set<string>> {
   return new Set((data ?? []).map((r: any) => r.lead_id as string));
 }
 
+export type EstadoConsumoSites = {
+  usado: number;
+  limite: number | null;
+  restante: number | null;
+  perto: boolean;
+};
+
+/** Consulta a cota e o estado de consumo de redesigns de site do usuário. */
+export async function obterConsumoSites(): Promise<EstadoConsumoSites> {
+  const { data, error } = await supabase.rpc("meu_estado_consumo", { p_recurso: "sites" });
+  if (error || !data) return { usado: 0, limite: null, restante: null, perto: false };
+  return data as EstadoConsumoSites;
+}
+
 /** Gera o site do lead via IA (10-40s).
  * - Padrão (REDESIGN): se o lead tem site, raspa o atual e o refaz melhor.
  * - `novoDoZero`: ignora o site atual e cria um site NOVO só com os dados do Google. */
 export async function gerarRedesign(
-  _leadId: string,
-  _opts?: { novoDoZero?: boolean },
+  leadId: string,
+  opts?: { novoDoZero?: boolean },
 ): Promise<{ redesign: Redesign; usage: RedesignUsage; lead_nome: string }> {
-  throw new Error("Este recurso está sendo melhorado! Em breve você terá uma nova experiência incrível para conseguir mais clientes.");
+  const { data, error } = await supabase.functions.invoke("redesign-site", {
+    body: { lead_id: leadId, ignorar_site: opts?.novoDoZero },
+  });
+  if (error) throw new Error(error.message ?? "Falha ao chamar o gerador de redesign");
+  if (data?.error) throw new Error(String(data.error));
+  return data as { redesign: Redesign; usage: RedesignUsage; lead_nome: string };
 }
 
 /** Busca um redesign por id (com o nome do lead) — usado no preview da campanha. */
