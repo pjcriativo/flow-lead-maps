@@ -841,6 +841,18 @@ export function AdminAllUsers({
                 )}
                 Salvar override
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOverrideModal(null)}
+                disabled={alterandoId === overrideModal.usuario.id}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Modal: Redesign Sites IA (Override + Bônus) ── */}
       {sitesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
