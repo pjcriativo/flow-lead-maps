@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Construction,
   Bot,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,14 @@ import { cn } from "@/lib/utils";
 import { formatDataHora } from "@/lib/format";
 import { fetchLeads, type Lead } from "@/lib/leads-api";
 import type { Redesign, RedesignStatus } from "@/types";
-import { listarRedesigns, gerarRedesign, salvarEdicao, excluirRedesign } from "@/services/redesign";
+import {
+  listarRedesigns,
+  gerarRedesign,
+  salvarEdicao,
+  excluirRedesign,
+  obterConsumoSites,
+  type EstadoConsumoSites,
+} from "@/services/redesign";
 
 const STATUS_STYLE: Record<RedesignStatus, string> = {
   pendente: "bg-secondary text-muted-foreground",

@@ -77,7 +77,8 @@ export type EstadoConsumoSites = {
 
 /** Consulta a cota e o estado de consumo de redesigns de site do usuário. */
 export async function obterConsumoSites(): Promise<EstadoConsumoSites> {
-  const { data, error } = await supabase.rpc("meu_estado_consumo", { p_recurso: "sites" });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc("meu_estado_consumo", { p_recurso: "sites" });
   if (error || !data) return { usado: 0, limite: null, restante: null, perto: false };
   return data as EstadoConsumoSites;
 }
