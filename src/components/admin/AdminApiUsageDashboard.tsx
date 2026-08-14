@@ -371,7 +371,7 @@ export function AdminApiUsageDashboard() {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Itens Processados
+                Itens cobrados pela Apify
               </p>
               <p className="text-3xl font-black text-foreground mt-1">
                 {loading ? "..." : (resumo?.total_leads_crawled ?? 0).toLocaleString("pt-BR")}
@@ -379,7 +379,7 @@ export function AdminApiUsageDashboard() {
             </div>
           </div>
           <p className="mt-4 text-[11px] font-medium text-muted-foreground relative z-10">
-            Processados na API no período
+            Soma exata de itens informada nos runs do período
           </p>
         </div>
 
