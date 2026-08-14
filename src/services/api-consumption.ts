@@ -19,6 +19,7 @@ export type ApiUsageResumo = {
     user_name: string;
     user_email: string;
     plan: string;
+    monthly_revenue_brl: number;
     monthly_limit: number | null;
     leads_used: number;
     leads_generated_period: number;
@@ -27,6 +28,13 @@ export type ApiUsageResumo = {
     total_cost_brl: number;
     requests_count: number;
     items_charged: number;
+    services: Array<{
+      service: string;
+      requests_count: number;
+      quantity: number;
+      cost_usd: number;
+      cost_brl: number;
+    }>;
   }>;
   service_breakdown: Array<{
     service: string;
@@ -93,6 +101,7 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
         user_name: text(user.user_name, "Usuário sem nome"),
         user_email: text(user.user_email, "E-mail não encontrado"),
         plan: text(user.plan, "Sem plano"),
+        monthly_revenue_brl: number(user.monthly_revenue_brl),
         monthly_limit: user.monthly_limit === null ? null : number(user.monthly_limit),
         leads_used: number(user.leads_used),
         leads_generated_period: number(user.leads_generated_period),
@@ -101,6 +110,15 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
         total_cost_brl: number(user.total_cost_brl),
         requests_count: number(user.requests_count),
         items_charged: number(user.items_charged),
+        services: Array.isArray(user.services)
+          ? user.services.filter(isRecord).map((service) => ({
+              service: text(service.service, "unknown"),
+              requests_count: number(service.requests_count),
+              quantity: number(service.quantity),
+              cost_usd: number(service.cost_usd),
+              cost_brl: number(service.cost_brl),
+            }))
+          : [],
       }))
     : [];
 

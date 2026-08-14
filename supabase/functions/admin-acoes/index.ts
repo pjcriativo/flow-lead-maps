@@ -21,6 +21,7 @@ import {
 } from "../_shared/apify-financeiro.ts";
 import { buildApiUsagePeriodSummary } from "../_shared/api-usage-summary.ts";
 import { planApifyRunLedgerSync, type RemoteApifyRun } from "../_shared/apify-run-ledger.ts";
+import { collectUniqueOffsetPages } from "../_shared/offset-pagination.ts";
 import { validarEmailAutentico } from "../_shared/email-validation.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
@@ -896,8 +897,36 @@ Deno.serve(async (req) => {
 
     if (acao === "api_consumo_resumo") {
       const dias = Math.min(Math.max(Math.floor(Number(b.dias) || 30), 1), 365);
-      const desde = new Date(Date.now() - dias * 86_400_000).toISOString();
-      const mesRef = new Date().toISOString().slice(0, 7);
+      const snapshotAt = new Date().toISOString();
+      const desde = new Date(new Date(snapshotAt).getTime() - dias * 86_400_000).toISOString();
+      const mesRef = snapshotAt.slice(0, 7);
+      const carregarLogsConsumo = async () => {
+        try {
+          const data = await collectUniqueOffsetPages(
+            async (offset, limit) => {
+              const pagina = await admin
+                .from("api_consumption_logs")
+                .select(
+                  "id, org_id, user_id, service, action, external_id, quantity, cost_usd, cost_brl, metadata, created_at",
+                )
+                .gte("created_at", desde)
+                .lte("created_at", snapshotAt)
+                .order("created_at", { ascending: true })
+                .order("id", { ascending: true })
+                .range(offset, offset + limit - 1);
+              if (pagina.error) throw pagina.error;
+              return { items: (pagina.data ?? []) as Rec[] };
+            },
+            (row) => String(row.id),
+          );
+          return { data, error: null };
+        } catch (error) {
+          return {
+            data: null,
+            error: { message: error instanceof Error ? error.message : String(error) },
+          };
+        }
+      };
 
       const [
         logsResult,
@@ -909,20 +938,14 @@ Deno.serve(async (req) => {
         leadCountsResult,
         keysResult,
       ] = await Promise.all([
-        admin
-          .from("api_consumption_logs")
-          .select(
-            "id, org_id, user_id, service, action, external_id, quantity, cost_usd, cost_brl, metadata, created_at",
-          )
-          .gte("created_at", desde)
-          .order("created_at", { ascending: false }),
+        carregarLogsConsumo(),
         admin
           .from("profiles")
           .select("id, email, full_name, is_super_admin, plan, created_at")
           .order("created_at"),
         admin.from("memberships").select("user_id, org_id, criada_em").order("criada_em"),
         admin.from("orgs").select("id, nome, plano_id, dono_user_id"),
-        admin.from("planos").select("id, nome, limite_leads"),
+        admin.from("planos").select("id, nome, limite_leads, preco"),
         admin.from("consumo_org").select("org_id, leads").eq("mes_ref", mesRef),
         admin.rpc("admin_api_lead_counts", { p_since: desde }),
         admin.from("apify_chaves").select("apelido, valor_cifrado, status").order("ordem"),
@@ -979,55 +1002,59 @@ Deno.serve(async (req) => {
       const remoteRunIds = new Set<string>();
       const terminalStatuses = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
       for (const tokenRow of tokenRows) {
-        for (let offset = 0; offset < 1_000; offset += 100) {
-          try {
-            const listResponse = await fetch(
-              `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?limit=100&offset=${offset}&desc=1`,
-              {
-                headers: { Authorization: `Bearer ${tokenRow.token}` },
-                signal: AbortSignal.timeout(10_000),
-              },
-            );
-            const listBody = await listResponse.json().catch(() => ({}));
-            if (!listResponse.ok || !Array.isArray(listBody?.data?.items)) {
-              accountErrors.push(
-                `${tokenRow.label}: histórico de runs inválido (HTTP ${listResponse.status})`,
-              );
-              break;
-            }
-            const items = listBody.data.items as Rec[];
-            let reachedOlderRun = false;
-            for (const item of items) {
-              const runId = typeof item.id === "string" ? item.id : null;
-              const startedAt = typeof item.startedAt === "string" ? item.startedAt : null;
-              const status = typeof item.status === "string" ? item.status : "UNKNOWN";
-              if (!runId || !startedAt) continue;
-              if (startedAt < desde) {
-                reachedOlderRun = true;
-                continue;
-              }
-              if (!terminalStatuses.has(status) || remoteRunIds.has(runId)) continue;
-              remoteRunIds.add(runId);
-              remoteRuns.push({
-                id: runId,
-                status,
-                usageTotalUsd: Number.isFinite(Number(item.usageTotalUsd))
-                  ? Number(item.usageTotalUsd)
-                  : 0,
-                startedAt,
-                finishedAt: typeof item.finishedAt === "string" ? item.finishedAt : null,
-                defaultDatasetId:
-                  typeof item.defaultDatasetId === "string" ? item.defaultDatasetId : null,
-                keyLabel: tokenRow.label,
+        try {
+          const items = await collectUniqueOffsetPages(
+            async (offset, limit) => {
+              const params = new URLSearchParams({
+                limit: String(limit),
+                offset: String(offset),
+                startedAfter: desde,
+                startedBefore: snapshotAt,
               });
+              const listResponse = await fetch(
+                `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?${params.toString()}`,
+                {
+                  headers: { Authorization: `Bearer ${tokenRow.token}` },
+                  signal: AbortSignal.timeout(10_000),
+                },
+              );
+              const listBody = await listResponse.json().catch(() => ({}));
+              if (!listResponse.ok || !Array.isArray(listBody?.data?.items)) {
+                throw new Error(`histórico de runs inválido (HTTP ${listResponse.status})`);
+              }
+              const total = Number(listBody.data.total);
+              return {
+                items: listBody.data.items as Rec[],
+                total: Number.isSafeInteger(total) && total >= 0 ? total : null,
+              };
+            },
+            (item) => String(item.id),
+          );
+          for (const item of items) {
+            const runId = typeof item.id === "string" ? item.id : null;
+            const startedAt = typeof item.startedAt === "string" ? item.startedAt : null;
+            const status = typeof item.status === "string" ? item.status : "UNKNOWN";
+            if (!runId || !startedAt || !terminalStatuses.has(status) || remoteRunIds.has(runId)) {
+              continue;
             }
-            if (items.length < 100 || reachedOlderRun) break;
-          } catch (error) {
-            accountErrors.push(
-              `${tokenRow.label}: ${error instanceof Error ? error.message : String(error)}`,
-            );
-            break;
+            remoteRunIds.add(runId);
+            remoteRuns.push({
+              id: runId,
+              status,
+              usageTotalUsd: Number.isFinite(Number(item.usageTotalUsd))
+                ? Number(item.usageTotalUsd)
+                : 0,
+              startedAt,
+              finishedAt: typeof item.finishedAt === "string" ? item.finishedAt : null,
+              defaultDatasetId:
+                typeof item.defaultDatasetId === "string" ? item.defaultDatasetId : null,
+              keyLabel: tokenRow.label,
+            });
           }
+        } catch (error) {
+          accountErrors.push(
+            `${tokenRow.label}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
 
@@ -1169,6 +1196,7 @@ Deno.serve(async (req) => {
           id: String(row.id),
           nome: typeof row.nome === "string" ? row.nome : null,
           limite_leads: Number.isFinite(Number(row.limite_leads)) ? Number(row.limite_leads) : null,
+          preco: Number.isFinite(Number(row.preco)) ? Number(row.preco) : null,
         })),
         orgConsumption: (consumoResult.data ?? []).map((row: Rec) => ({
           org_id: String(row.org_id),
@@ -1419,33 +1447,42 @@ Deno.serve(async (req) => {
         }),
       );
       // gasto acumulado por chave (livro-caixa: redes sociais + google maps)
-      const [gastosRedesResult, gastosMapsResult, ultimaBuscaResult, auditoriaResult] =
-        await Promise.all([
-          admin
-            .from("redes_buscas")
-            .select("chave_apelido, custo_usd")
-            .not("chave_apelido", "is", null),
-          admin
-            .from("api_consumption_logs")
-            .select("metadata, cost_usd")
-            .eq("service", "apify_maps"),
-          admin
-            .from("redes_buscas")
-            .select("chave_apelido, fonte, estrategia, custo_usd, criado_em, status")
-            .not("chave_apelido", "is", null)
-            .order("criado_em", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          admin
-            .from("apify_chaves_auditoria")
-            .select("apelido, acao, alterado_por, alterado_em")
-            .order("alterado_em", { ascending: false })
-            .limit(20),
-        ]);
+      const [
+        gastosRedesResult,
+        gastosMapsResult,
+        ultimaBuscaRedesResult,
+        ultimaBuscaMapsResult,
+        auditoriaResult,
+      ] = await Promise.all([
+        admin
+          .from("redes_buscas")
+          .select("chave_apelido, custo_usd")
+          .not("chave_apelido", "is", null),
+        admin.from("api_consumption_logs").select("metadata, cost_usd").eq("service", "apify_maps"),
+        admin
+          .from("redes_buscas")
+          .select("chave_apelido, fonte, estrategia, custo_usd, criado_em, status")
+          .not("chave_apelido", "is", null)
+          .order("criado_em", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        admin
+          .from("api_consumption_logs")
+          .select("metadata, action, cost_usd, created_at")
+          .eq("service", "apify_maps")
+          .order("created_at", { ascending: false })
+          .limit(20),
+        admin
+          .from("apify_chaves_auditoria")
+          .select("apelido, acao, alterado_por, alterado_em")
+          .order("alterado_em", { ascending: false })
+          .limit(20),
+      ]);
       const poolQueryError = [
         gastosRedesResult.error,
         gastosMapsResult.error,
-        ultimaBuscaResult.error,
+        ultimaBuscaRedesResult.error,
+        ultimaBuscaMapsResult.error,
         auditoriaResult.error,
       ].find(Boolean);
       if (poolQueryError) {
@@ -1460,9 +1497,34 @@ Deno.serve(async (req) => {
       }
       const gastosRedes = gastosRedesResult.data;
       const gastosMaps = gastosMapsResult.data;
-      const ultimaBusca = ultimaBuscaResult.data;
       const auditoria = auditoriaResult.data;
       const gastoPorChave = new Map<string, number>();
+
+      const ultimaBuscaMapsRow = (ultimaBuscaMapsResult.data ?? []).find((row: Rec) => {
+        const metadata = row.metadata as Record<string, unknown> | null;
+        return typeof metadata?.key_label === "string";
+      });
+      const ultimaBuscaMaps = ultimaBuscaMapsRow
+        ? {
+            chave_apelido: String(
+              (ultimaBuscaMapsRow.metadata as Record<string, unknown>).key_label,
+            ),
+            fonte: "google_maps",
+            estrategia: String(ultimaBuscaMapsRow.action ?? "search_run"),
+            custo_usd: Number(ultimaBuscaMapsRow.cost_usd ?? 0),
+            criado_em: String(ultimaBuscaMapsRow.created_at),
+            status: String(
+              (ultimaBuscaMapsRow.metadata as Record<string, unknown>).status ?? "concluída",
+            ),
+          }
+        : null;
+      const ultimaBusca = [ultimaBuscaRedesResult.data, ultimaBuscaMaps]
+        .filter((row): row is Rec => Boolean(row))
+        .sort(
+          (left, right) =>
+            new Date(String(right.criado_em)).getTime() -
+            new Date(String(left.criado_em)).getTime(),
+        )[0];
 
       for (const g of gastosRedes ?? []) {
         gastoPorChave.set(

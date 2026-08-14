@@ -217,3 +217,67 @@ test("separa leads do período do uso mensal do plano", () => {
   assert.equal(summary.users[0].apify_leads_generated_period, 293);
   assert.equal(summary.users[0].leads_used, 0);
 });
+
+test("detalha por usuario o custo real de cada servico e a mensalidade do plano", () => {
+  const summary = buildApiUsagePeriodSummary({
+    profiles: [profiles[2]],
+    memberships: [{ user_id: "u-pro", org_id: "o-pro" }],
+    orgs: [{ id: "o-pro", nome: "Conta Pro", plano_id: "p-pro", dono_user_id: "u-pro" }],
+    plans: [{ id: "p-pro", nome: "Pro", limite_leads: 5000, preco: 297 }],
+    orgConsumption: [{ org_id: "o-pro", leads: 42 }],
+    logs: [
+      {
+        user_id: "u-pro",
+        org_id: "o-pro",
+        service: "apify_maps",
+        action: "search_run_reconciled",
+        quantity: 50,
+        cost_usd: 0.2,
+        cost_brl: 1.12,
+      },
+      {
+        user_id: "u-pro",
+        org_id: "o-pro",
+        service: "openai_enrichment",
+        action: "enrich",
+        quantity: 3,
+        cost_usd: 0.03,
+        cost_brl: 0.168,
+      },
+      {
+        user_id: "u-pro",
+        org_id: "o-pro",
+        service: "whatsapp_evolution",
+        action: "send",
+        quantity: 2,
+        cost_usd: 0,
+        cost_brl: 0,
+      },
+    ],
+  });
+
+  assert.equal(summary.users[0].monthly_revenue_brl, 297);
+  assert.deepEqual(summary.users[0].services, [
+    {
+      service: "apify_maps",
+      requests_count: 1,
+      quantity: 50,
+      cost_usd: 0.2,
+      cost_brl: 1.12,
+    },
+    {
+      service: "openai_enrichment",
+      requests_count: 1,
+      quantity: 3,
+      cost_usd: 0.03,
+      cost_brl: 0.168,
+    },
+    {
+      service: "whatsapp_evolution",
+      requests_count: 1,
+      quantity: 2,
+      cost_usd: 0,
+      cost_brl: 0,
+    },
+  ]);
+});

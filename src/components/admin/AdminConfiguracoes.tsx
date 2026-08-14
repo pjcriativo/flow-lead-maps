@@ -617,7 +617,7 @@ function SecaoPoolApify() {
         | undefined;
       if (teste?.situacao === "ok")
         toast.success(
-          `Chave adicionada ✓ — US$ ${Number(teste.uso ?? 0).toFixed(2)} usados de US$ ${Number(teste.max ?? 0).toFixed(2)}; saldo US$ ${Number(teste.restante ?? 0).toFixed(2)}.`,
+          `Chave adicionada ✓ — US$ ${Number(teste.uso ?? 0).toFixed(2)} usados de US$ ${Number(teste.max ?? 0).toFixed(2)}; disponível até o bloqueio: US$ ${Number(teste.restante ?? 0).toFixed(2)}.`,
         );
       else if (teste?.situacao === "invalida")
         toast.error(`Chave adicionada, mas o teste FALHOU: ${teste.motivo ?? "token inválido"}.`);
@@ -720,9 +720,15 @@ function SecaoPoolApify() {
           <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-semibold text-gold">
             chave: {ultimaBusca.chave_apelido}
           </span>{" "}
-          · {ultimaBusca.fonte === "ia_site" ? "Site por IA" : ultimaBusca.fonte} (
-          {ultimaBusca.estrategia}) · {new Date(ultimaBusca.criado_em).toLocaleString("pt-BR")} ·
-          US$ {Number(ultimaBusca.custo_usd ?? 0).toFixed(4)} · {ultimaBusca.status}
+          ·{" "}
+          {ultimaBusca.fonte === "ia_site"
+            ? "Site por IA"
+            : ultimaBusca.fonte === "google_maps"
+              ? "Google Maps"
+              : ultimaBusca.fonte}{" "}
+          ({ultimaBusca.estrategia === "search_run" ? "busca de leads" : ultimaBusca.estrategia}) ·{" "}
+          {new Date(ultimaBusca.criado_em).toLocaleString("pt-BR")} · US${" "}
+          {Number(ultimaBusca.custo_usd ?? 0).toFixed(4)} · {ultimaBusca.status}
           <span className="text-muted-foreground">
             {" "}
             — o histórico completo (com a chave de cada linha) está no Painel, em "Buscas e gerações
@@ -815,7 +821,7 @@ function SecaoPoolApify() {
                     </p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
                       Token ••••••••{c.ultimos4}
-                      {` · gasto atribuído pelo Flow US$ ${Number(c.gasto_acumulado).toFixed(2)}`}
+                      {` · gasto atribuído somente às operações registradas pelo Flow US$ ${Number(c.gasto_acumulado).toFixed(2)}`}
                       {c.ultimo_uso
                         ? ` · último uso ${new Date(c.ultimo_uso).toLocaleDateString("pt-BR")}`
                         : " · nunca usada em busca"}

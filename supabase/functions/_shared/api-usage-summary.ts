@@ -23,6 +23,7 @@ export type ApiUsagePlan = {
   id: string;
   nome: string | null;
   limite_leads: number | null;
+  preco: number | null;
 };
 
 export type ApiUsageOrgConsumption = {
@@ -52,6 +53,7 @@ export type ApiUsageUserSummary = {
   user_name: string;
   user_email: string;
   plan: string;
+  monthly_revenue_brl: number;
   monthly_limit: number | null;
   leads_used: number;
   leads_generated_period: number;
@@ -60,6 +62,15 @@ export type ApiUsageUserSummary = {
   total_cost_brl: number;
   requests_count: number;
   items_charged: number;
+  services: ApiUsageUserServiceSummary[];
+};
+
+export type ApiUsageUserServiceSummary = {
+  service: string;
+  requests_count: number;
+  quantity: number;
+  cost_usd: number;
+  cost_brl: number;
 };
 
 export type ApiUsageServiceSummary = {
@@ -163,6 +174,7 @@ export function buildApiUsagePeriodSummary({
       user_name: profile.full_name?.trim() || org?.nome?.trim() || "Usuário sem nome",
       user_email: profile.email?.trim() || "E-mail não encontrado",
       plan: isSuperAdmin ? "Super admin" : plan?.nome?.trim() || planLabel(profile.plan),
+      monthly_revenue_brl: isSuperAdmin ? 0 : finiteNumber(plan?.preco),
       monthly_limit: isSuperAdmin ? null : finiteNumber(plan?.limite_leads),
       leads_used: Math.max(orgId ? (leadsByOrg.get(orgId) ?? 0) : 0, leadCounts.month),
       leads_generated_period: leadCounts.period,
@@ -171,6 +183,7 @@ export function buildApiUsagePeriodSummary({
       total_cost_brl: 0,
       requests_count: 0,
       items_charged: 0,
+      services: [],
     });
   }
 
@@ -219,8 +232,25 @@ export function buildApiUsagePeriodSummary({
     user.total_cost_brl += costBrl;
     user.requests_count += 1;
     if (log.service === "apify_maps") user.items_charged += quantity;
+
+    const existingUserService = user.services.find((item) => item.service === log.service);
+    const userService = existingUserService ?? {
+      service: log.service,
+      requests_count: 0,
+      quantity: 0,
+      cost_usd: 0,
+      cost_brl: 0,
+    };
+    userService.requests_count += 1;
+    userService.quantity += quantity;
+    userService.cost_usd += costUsd;
+    userService.cost_brl += costBrl;
+    if (!existingUserService) user.services.push(userService);
   }
 
+  for (const user of usersMap.values()) {
+    user.services.sort((left, right) => right.cost_usd - left.cost_usd);
+  }
   const users = [...usersMap.values()].sort(
     (left, right) => right.total_cost_usd - left.total_cost_usd,
   );

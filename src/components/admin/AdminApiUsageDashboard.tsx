@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   DollarSign,
   Activity,
@@ -75,18 +75,6 @@ const PLAN_BADGES: Record<string, string> = {
   enterprise: "bg-gold/15 text-navy font-bold border-gold/40",
   "super admin": "bg-blue-100 text-blue-800 border-blue-200 font-bold",
   "sem plano": "bg-slate-100 text-slate-700 border-slate-200",
-};
-
-// Estimativa de receita por mensalidade de plano (BRL/mês)
-const PLAN_REVENUES_BRL: Record<string, number> = {
-  basico: 97,
-  básico: 97,
-  pro: 197,
-  agencia: 497,
-  agência: 497,
-  enterprise: 997,
-  starter: 0,
-  "super admin": 0,
 };
 
 export function AdminApiUsageDashboard() {
@@ -194,23 +182,27 @@ export function AdminApiUsageDashboard() {
       "Cliente",
       "Email",
       "Plano",
-      "Leads Usados",
+      "Leads Gerados no Período",
+      "Leads Apify no Período",
+      "Uso no Mês",
       "Limite Mensal",
       "Runs API",
-      "Itens Processados",
+      "Itens Apify Cobrados",
       "Custo USD",
       "Custo BRL",
-      "Receita Est. BRL",
-      "Margem Est. BRL",
+      "Receita Proporcional ao Período BRL",
+      "Margem Estimada no Período BRL",
     ];
 
     const rows = resumo.top_users.map((u) => {
-      const receitaBrl = PLAN_REVENUES_BRL[u.plan.toLowerCase()] || 0;
+      const receitaBrl = u.monthly_revenue_brl * (dias / 30);
       const margemBrl = receitaBrl - u.total_cost_brl;
       return [
         `"${u.user_name}"`,
         `"${u.user_email}"`,
         `"${u.plan}"`,
+        u.leads_generated_period,
+        u.apify_leads_generated_period,
         u.leads_used,
         u.monthly_limit ?? "Ilimitado",
         u.requests_count,
@@ -594,25 +586,24 @@ export function AdminApiUsageDashboard() {
                 <th className="px-4 py-4 w-8" />
                 <th className="px-6 py-4">Cliente / Conta</th>
                 <th className="px-6 py-4">Plano</th>
-                <th className="px-6 py-4 text-center">Uso / Limite</th>
+                <th className="px-6 py-4 text-center">Leads gerados / uso mensal</th>
                 <th className="px-6 py-4 text-center">Runs API</th>
-                <th className="px-6 py-4 text-center">Itens Processados</th>
+                <th className="px-6 py-4 text-center">Itens Apify cobrados</th>
                 <th className="px-6 py-4 text-right">Custo Infra (BRL / USD)</th>
-                <th className="px-6 py-4 text-right">Margem Est.</th>
+                <th className="px-6 py-4 text-right">Margem est. no período</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
               {topUsersFiltrados.map((u) => {
-                const receitaEstBrl = PLAN_REVENUES_BRL[u.plan.toLowerCase()] || 0;
+                const receitaEstBrl = u.monthly_revenue_brl * (dias / 30);
                 const margemLiquidaBrl = receitaEstBrl - u.total_cost_brl;
                 const altoConsumo = u.total_cost_usd > 10;
                 const margemNegativa = receitaEstBrl > 0 && margemLiquidaBrl < 0;
                 const isExpanded = expandedUser === u.user_id;
 
                 return (
-                  <>
+                  <Fragment key={u.user_id}>
                     <tr
-                      key={u.user_id}
                       onClick={() => setExpandedUser(isExpanded ? null : u.user_id)}
                       className="hover:bg-muted/30 transition-colors group cursor-pointer"
                     >
@@ -658,13 +649,18 @@ export function AdminApiUsageDashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center font-medium">
-                        <span className="font-bold text-foreground text-sm">{u.leads_used}</span>
-                        <span className="text-muted-foreground text-xs mx-1">/</span>
-                        <span className="text-muted-foreground text-xs">
-                          {u.monthly_limit === null || u.monthly_limit >= 999999
-                            ? "∞"
-                            : u.monthly_limit}
-                        </span>
+                        <p className="font-bold text-foreground text-sm">
+                          {u.leads_generated_period.toLocaleString("pt-BR")}
+                          <span className="ml-1 text-[10px] font-medium text-muted-foreground">
+                            em {dias}d
+                          </span>
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          mês: {u.leads_used.toLocaleString("pt-BR")} /{" "}
+                          {u.monthly_limit === null
+                            ? "ilimitado"
+                            : u.monthly_limit.toLocaleString("pt-BR")}
+                        </p>
                       </td>
                       <td className="px-6 py-4 text-center font-bold text-foreground">
                         {u.requests_count}
@@ -710,66 +706,75 @@ export function AdminApiUsageDashboard() {
                               <Activity className="h-3.5 w-3.5 text-primary" /> Detalhamento de
                               Consumo de API por Serviço — {u.user_name}
                             </p>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1">
-                              <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">
-                                  Google Maps (Apify)
-                                </p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">
-                                  {u.leads_used} buscas
-                                </p>
-                                <p className="text-xs font-semibold text-blue-600">
-                                  {usd(u.total_cost_usd * 0.75)}
-                                </p>
-                              </div>
-                              <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">
-                                  OpenAI GPT-4o
-                                </p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">
-                                  {u.items_charged} enriqueclmentos
-                                </p>
-                                <p className="text-xs font-semibold text-purple-600">
-                                  {usd(u.total_cost_usd * 0.2)}
-                                </p>
-                              </div>
-                              <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">
-                                  Evolution API (WA)
-                                </p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">
-                                  {u.requests_count} disparos
-                                </p>
-                                <p className="text-xs font-semibold text-emerald-600">
-                                  {usd(u.total_cost_usd * 0.05)}
-                                </p>
-                              </div>
-                              <div className="rounded-lg bg-secondary/50 p-3">
-                                <p className="text-[11px] text-muted-foreground font-medium">
-                                  Margem da Mensalidade
-                                </p>
-                                <p className="text-sm font-bold text-foreground mt-0.5">
-                                  {brl(receitaEstBrl)}
-                                </p>
-                                <p
-                                  className={cn(
-                                    "text-xs font-bold",
-                                    margemLiquidaBrl >= 0 ? "text-emerald-600" : "text-destructive",
-                                  )}
-                                >
-                                  {brl(margemLiquidaBrl)} líquido
-                                </p>
-                              </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Valores vindos dos lançamentos reais do livro-caixa no período
+                              selecionado.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 pt-1">
+                              {u.services.length > 0 ? (
+                                u.services.map((service) => {
+                                  const serviceInfo = SERVICE_LABELS[service.service];
+                                  return (
+                                    <div
+                                      key={service.service}
+                                      className="rounded-lg bg-secondary/50 p-3"
+                                    >
+                                      <p className="text-[11px] text-muted-foreground font-medium">
+                                        {serviceInfo?.label ?? service.service}
+                                      </p>
+                                      <p className="text-sm font-bold text-foreground mt-0.5">
+                                        {service.requests_count.toLocaleString("pt-BR")}{" "}
+                                        {service.requests_count === 1 ? "run" : "runs"} ·{" "}
+                                        {service.quantity.toLocaleString("pt-BR")} unidades
+                                      </p>
+                                      <p
+                                        className="text-xs font-semibold"
+                                        style={{ color: serviceInfo?.color ?? "#64748b" }}
+                                      >
+                                        {usd(service.cost_usd)} · {brl(service.cost_brl)}
+                                      </p>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="rounded-lg bg-secondary/50 p-3 text-xs text-muted-foreground sm:col-span-2">
+                                  Nenhum lançamento de API atribuído a este usuário no período.
+                                </div>
+                              )}
+                              {receitaEstBrl > 0 && (
+                                <div className="rounded-lg bg-secondary/50 p-3">
+                                  <p className="text-[11px] text-muted-foreground font-medium">
+                                    Receita proporcional ({dias}d)
+                                  </p>
+                                  <p className="text-sm font-bold text-foreground mt-0.5">
+                                    {brl(receitaEstBrl)}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    mensalidade: {brl(u.monthly_revenue_brl)}
+                                  </p>
+                                  <p
+                                    className={cn(
+                                      "text-xs font-bold",
+                                      margemLiquidaBrl >= 0
+                                        ? "text-emerald-600"
+                                        : "text-destructive",
+                                    )}
+                                  >
+                                    {brl(margemLiquidaBrl)} líquido
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
               {!busca.trim() && (resumo?.unattributed_cost_usd ?? 0) > 0 && (
                 <tr className="bg-amber-50/50">
+                  <td className="px-4 py-4" />
                   <td className="px-6 py-4 font-medium text-amber-950">
                     <p className="font-bold">Run legado sem usuário</p>
                   </td>
@@ -786,11 +791,12 @@ export function AdminApiUsageDashboard() {
                       {usd(resumo?.unattributed_cost_usd ?? 0)}
                     </p>
                   </td>
+                  <td className="px-6 py-4 text-right text-muted-foreground">—</td>
                 </tr>
               )}
               {topUsersFiltrados.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Search className="h-8 w-8 text-muted-foreground/50" />
                       <p>Nenhum cliente encontrado no período.</p>
