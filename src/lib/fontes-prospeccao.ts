@@ -278,7 +278,50 @@ export type Estrategia = {
 };
 
 export const ESTRATEGIAS: Estrategia[] = [
-  // ───────────── INSTAGRAM ─────────────
+  // ───────────── INSTAGRAM (ATIVAS) ─────────────
+  {
+    id: "IG-5",
+    fonte: "instagram",
+    titulo: "Sem site na bio",
+    descricao: "Perfil comercial que não tem link de site — o alvo perfeito do nosso produto.",
+    campos: ["nicho", "cidade", "minSeguidores", "soComerciais"],
+    viabilidade: "viavel",
+    pluga: "Filtro NOSSO sobre os perfis coletados (bio sem link, ou link que não é site próprio).",
+    coleta: true,
+  },
+  {
+    id: "IG-7",
+    fonte: "instagram",
+    titulo: "Alto engajamento, baixa presença",
+    descricao: "Muita interação para poucos seguidores — negócio bom que ninguém achou ainda.",
+    campos: ["nicho", "cidade", "minSeguidores"],
+    viabilidade: "viavel",
+    pluga: "Cálculo NOSSO (curtidas+comentários ÷ seguidores) sobre os posts já coletados.",
+    coleta: true,
+  },
+  {
+    id: "IG-8",
+    fonte: "instagram",
+    titulo: "Localização + categoria",
+    descricao: "Cruza a cidade com a categoria que a conta comercial declara.",
+    campos: ["cidade", "categoria", "soComerciais"],
+    viabilidade: "viavel",
+    pluga: "Filtro NOSSO por categoria do perfil comercial, sobre a coleta por local.",
+    coleta: true,
+  },
+  {
+    id: "IG-9",
+    fonte: "instagram",
+    titulo: "Anunciantes do nicho",
+    descricao: "Quem já paga anúncio — tem verba e prova que investe em marketing.",
+    campos: ["nicho", "cidade"],
+    viabilidade: "viavel",
+    pluga:
+      "Biblioteca de Anúncios da Meta (pública) — fonte separada e mais estável que o scraper.",
+    coleta: true,
+  },
+
+  // ───────────── INSTAGRAM (EM BREVE) ─────────────
   {
     id: "IG-1",
     fonte: "instagram",
@@ -320,16 +363,6 @@ export const ESTRATEGIAS: Estrategia[] = [
     pluga: "Apify: ator de post/comment scraper → autores dos comentários.",
   },
   {
-    id: "IG-5",
-    fonte: "instagram",
-    titulo: "Sem site na bio",
-    descricao: "Perfil comercial que não tem link de site — o alvo perfeito do nosso produto.",
-    campos: ["nicho", "cidade", "minSeguidores", "soComerciais"],
-    viabilidade: "viavel",
-    pluga: "Filtro NOSSO sobre os perfis coletados (bio sem link, ou link que não é site próprio).",
-    coleta: true,
-  },
-  {
     id: "IG-6",
     fonte: "instagram",
     titulo: "Conta comercial nova",
@@ -338,37 +371,6 @@ export const ESTRATEGIAS: Estrategia[] = [
     viabilidade: "planejado",
     nota: "O Instagram não expõe data de criação da conta. Só dá para estimar por sinais fracos (poucos posts).",
     pluga: "Sem fonte direta: dependeria de heurística (nº de posts / data do 1º post).",
-  },
-  {
-    id: "IG-7",
-    fonte: "instagram",
-    titulo: "Alto engajamento, baixa presença",
-    descricao: "Muita interação para poucos seguidores — negócio bom que ninguém achou ainda.",
-    campos: ["nicho", "cidade", "minSeguidores"],
-    viabilidade: "viavel",
-    pluga: "Cálculo NOSSO (curtidas+comentários ÷ seguidores) sobre os posts já coletados.",
-    coleta: true,
-  },
-  {
-    id: "IG-8",
-    fonte: "instagram",
-    titulo: "Localização + categoria",
-    descricao: "Cruza a cidade com a categoria que a conta comercial declara.",
-    campos: ["cidade", "categoria", "soComerciais"],
-    viabilidade: "viavel",
-    pluga: "Filtro NOSSO por categoria do perfil comercial, sobre a coleta por local.",
-    coleta: true,
-  },
-  {
-    id: "IG-9",
-    fonte: "instagram",
-    titulo: "Anunciantes do nicho",
-    descricao: "Quem já paga anúncio — tem verba e prova que investe em marketing.",
-    campos: ["nicho", "cidade"],
-    viabilidade: "viavel",
-    pluga:
-      "Biblioteca de Anúncios da Meta (pública) — fonte separada e mais estável que o scraper.",
-    coleta: true,
   },
   {
     id: "IG-10",
