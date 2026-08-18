@@ -44,11 +44,14 @@ import {
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
 import { FonteSelector, FormEstrategias } from "./FonteProspeccao";
+import { buscarRedes } from "@/services/whatsapp";
 import {
   valoresPadrao,
   estrategiasDe,
   type FonteProspeccao,
   type ValoresBusca,
+  type Estrategia,
+  type PedidoBusca,
 } from "@/lib/fontes-prospeccao";
 import { geocodeCidade } from "@/lib/geo";
 import { criarListaComLeads, nomeAutoLista } from "@/lib/lists-api";
@@ -304,6 +307,80 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     }
   };
 
+  const handleBuscarRedes = async (estrategia: Estrategia, pedido: PedidoBusca) => {
+    setRunning(true);
+    setLeads([]);
+    setLogs([]);
+    setPagina(1);
+    setProgress({ found: 0, target: pedido.limite });
+    insertedIdsRef.current = [];
+
+    setStatus(`Iniciando coletor na ${estrategia.fonte}... isso pode levar alguns minutos.`);
+    pushLog(`⏳ Chamando robô coletor para a estratégia ${estrategia.id}...`);
+
+    try {
+      const r = await buscarRedes(estrategia.id, pedido.campos, pedido.limite);
+      if (!r.ok) {
+        const msg = r.reason === "teto" ? `Teto de gasto: ${r.motivo}` : `Falha: ${r.reason}`;
+        setStatus(msg);
+        pushLog(`✖ ${msg}`);
+        return;
+      }
+
+      pushLog(`✔ Coleta concluída. Custo: US$ ${(r.custo ?? 0).toFixed(4)}.`);
+      if (r.avisoChaves) pushLog(`⚠️ ${r.avisoChaves}`);
+      
+      const qtdInseridos = r.inseridos ?? 0;
+      if (qtdInseridos > 0) {
+        setStatus(`Buscando os ${qtdInseridos} novos leads no banco...`);
+        const { data: novosLeads } = await supabase
+          .from("leads")
+          .select("*, score_breakdown")
+          .eq("origem_fonte", estrategia.fonte)
+          .eq("origem_estrategia", estrategia.id)
+          .order("created_at", { ascending: false })
+          .limit(qtdInseridos);
+          
+        if (novosLeads) {
+          setLeads(novosLeads as Lead[]);
+          insertedIdsRef.current = novosLeads.map((l) => l.id);
+        }
+      }
+
+      setStatus(`Concluído — ${qtdInseridos} leads inseridos (${r.encontrados} encontrados, ${r.descartados} s/ contato)`);
+      posthog.capture("search_redes_done", { estrategia: estrategia.id, inseridos: qtdInseridos, custo: r.custo });
+
+      const ids = insertedIdsRef.current;
+      if (ids.length > 0) {
+        try {
+          const nichoStr = String(pedido.campos.nicho ?? pedido.campos.setor ?? pedido.campos.termo ?? estrategia.id);
+          const cidadeStr = String(pedido.campos.cidade ?? pedido.campos.regiao ?? "");
+          const nome = nomeAutoLista(nichoStr, cidadeStr, "");
+          const lista = await criarListaComLeads({
+            name: nome,
+            niche: nichoStr,
+            city: cidadeStr,
+            uf: "",
+            fonte: estrategia.fonte as FonteBusca,
+            radius: 0,
+            leadIds: ids,
+          });
+          pushLog(`🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`);
+        } catch (le) {
+          const msg = le instanceof Error ? le.message : "erro";
+          pushLog(`⚠️ Leads salvos, mas falhou ao criar a lista: ${msg}`);
+        }
+      }
+      onFinished?.();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setStatus(`Erro: ${msg}`);
+      pushLog(`ERRO: ${msg}`);
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const handleCancelar = () => {
     abortRef.current?.abort();
     setRunning(false);
@@ -327,6 +404,8 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               onEstrategia={setEstrIg}
               valores={valIg}
               onValores={setValIg}
+              onBuscar={handleBuscarRedes}
+              isBuscaRunning={running}
             />
           )}
           {fonteProsp === "linkedin" && (
@@ -336,6 +415,8 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               onEstrategia={setEstrLi}
               valores={valLi}
               onValores={setValLi}
+              onBuscar={handleBuscarRedes}
+              isBuscaRunning={running}
             />
           )}
           {noMaps && (
@@ -586,8 +667,8 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         </div>
       </div>
 
-      {/* Resultados ao vivo — só na fonte que coleta de verdade (as outras não têm o que mostrar) */}
-      {noMaps && (
+      {/* Resultados ao vivo — disponivel para todas as fontes agora */}
+      {(noMaps || leads.length > 0 || running) && (
         <div className="overflow-hidden rounded-2xl border-2 border-border bg-card shadow-[var(--shadow-card)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
             <div className="flex items-center gap-3">
@@ -675,7 +756,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
         </div>
       )}
 
-      {noMaps && (running || logs.length > 0) && <LogDrawer logs={logs} logRef={logRef} />}
+      {(running || logs.length > 0) && <LogDrawer logs={logs} logRef={logRef} />}
 
       {/* Atribuição exigida pela licença ODbL do OpenStreetMap */}
       {noMaps && (

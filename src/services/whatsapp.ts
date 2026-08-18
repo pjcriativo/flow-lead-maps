@@ -500,6 +500,7 @@ export type ColetaRedes = {
   teto?: { rodada: number; mes: number };
   estourou?: boolean;
   detalhe?: string;
+  avisoChaves?: string;
 };
 
 /** Roda a coleta REAL de uma estratégia. O servidor aplica o teto de gasto (US$/rodada e US$/mês). */

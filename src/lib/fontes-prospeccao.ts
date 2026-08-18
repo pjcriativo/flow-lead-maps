@@ -46,7 +46,7 @@ export const FONTES: Record<FonteProspeccao, MetaFonte> = {
     label: "Instagram",
     resumo: "Perfis comerciais por descoberta — quem vive de rede social e não tem site.",
     busca: "busca PERFIL por descoberta",
-    estado: "em_breve",
+    estado: "ativa",
     extrai: [
       "@ do perfil",
       "bio",

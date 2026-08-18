@@ -266,6 +266,8 @@ export function FormEstrategias({
   onEstrategia: (id: string) => void;
   valores: ValoresBusca;
   onValores: (v: ValoresBusca) => void;
+  onBuscar?: (estrategia: Estrategia, pedido: PedidoBusca) => void;
+  isBuscaRunning?: boolean;
 }) {
   const f = FONTES[fonte];
   const lista = useMemo(() => estrategiasDe(fonte), [fonte]);
@@ -280,6 +282,11 @@ export function FormEstrategias({
   const [resultado, setResultado] = useState<string | null>(null);
 
   const coletar = async () => {
+    if (onBuscar) {
+      onBuscar(atual, pedido);
+      return;
+    }
+    
     setRodando(true);
     setResultado(null);
     try {
@@ -477,11 +484,11 @@ export function FormEstrategias({
         {atual.coleta ? (
           <Button
             className="h-10 min-w-[190px] font-semibold"
-            disabled={!camposOk || rodando}
+            disabled={!camposOk || rodando || isBuscaRunning}
             onClick={coletar}
             title={camposOk ? "Coleta real — respeita o teto de gasto" : "Complete os campos"}
           >
-            {rodando ? (
+            {rodando || isBuscaRunning ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Search className="h-4 w-4" />
