@@ -2,6 +2,7 @@
 // (só UI + mock por ora). Consome SOMENTE os tipos centrais (@/types) via a
 // camada de serviço (@/services/contratos) — nunca o mock direto.
 import { useEffect, useMemo, useState } from "react";
+import DOMPurify from "dompurify";
 import {
   Loader2,
   RefreshCw,
@@ -275,7 +276,7 @@ function PreviewContratoDialog({
         {/* Preview do documento */}
         <div
           className="prose-contrato max-h-[55vh] overflow-y-auto rounded-lg border border-border bg-white p-6 text-sm leading-relaxed text-slate-800 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-4 [&_h3]:font-semibold [&_p]:mb-2"
-          dangerouslySetInnerHTML={{ __html: contrato.conteudo_html }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contrato.conteudo_html) }}
         />
         <DialogFooter className="gap-2 sm:justify-between">
           <Button variant="outline" onClick={baixar}>

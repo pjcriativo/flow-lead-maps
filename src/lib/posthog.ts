@@ -55,7 +55,8 @@ export function initPostHog() {
     return origIdentify(distinctId, props, ...rest);
   }) as typeof posthog.identify;
 
-  if (typeof window !== "undefined") {
+  // 🔒 HARDENING: expor posthog/debug SOMENTE em dev (não em produção).
+  if (typeof window !== "undefined" && import.meta.env.DEV) {
     const w = window as unknown as {
       __phDebug?: (on: boolean) => void;
       posthog?: typeof posthog;

@@ -22,7 +22,7 @@ const SELECT =
   "id, lead_id, assunto, corpo, valor, status, criada_em, enviada_em, respondida_em, email_message_id, email_para, leads(business_name)";
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
   const authHeader = req.headers.get("Authorization") ?? "";

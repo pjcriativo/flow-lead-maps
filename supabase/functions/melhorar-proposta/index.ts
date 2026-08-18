@@ -46,7 +46,7 @@ PODE: melhorar ritmo, cortar repetição, tornar uma frase mais concreta, corrig
 Responda APENAS um JSON válido: {"assunto":"...","corpo":"..."}`;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
   // service_role: ia_uso não é escrita pelo cliente (senão ele zeraria a própria cota).

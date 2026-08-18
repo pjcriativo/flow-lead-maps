@@ -49,7 +49,7 @@ type Body = {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
 
   return new Response(stream, {
     headers: {
-      ...corsHeaders,
+      ...corsHeaders(req),
       "Content-Type": "application/x-ndjson; charset=utf-8",
       "Cache-Control": "no-cache",
     },

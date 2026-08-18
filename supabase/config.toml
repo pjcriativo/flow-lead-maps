@@ -2,6 +2,13 @@
 # project_id = ref do projeto (usado por `supabase link` / deploy).
 project_id = "lyitsavnqwtsoouhcjie"
 
+# ─────────────────────────────────────────────────────────────
+# 🔒 DECLARAÇÃO EXPLÍCITA de verify_jwt para TODAS as funções.
+# Não depender do default do Supabase (que pode mudar).
+# ─────────────────────────────────────────────────────────────
+
+# ── FUNÇÕES AUTENTICADAS (JWT obrigatório) ──────────────────
+
 [functions.search-leads]
 # Busca de leads via Google Places. Recebe o JWT do usuário (RLS).
 verify_jwt = true
@@ -13,3 +20,85 @@ verify_jwt = true
 [functions.redesign-site]
 # Gera o site novo do lead via IA (OpenAI). Recebe o JWT do usuário.
 verify_jwt = true
+
+[functions.send-proposal]
+# Envia proposta por e-mail. JWT obrigatório.
+verify_jwt = true
+
+[functions.send-proposal-wa]
+# Envia proposta via WhatsApp. JWT obrigatório.
+verify_jwt = true
+
+[functions.melhorar-proposta]
+# Melhora a proposta via IA. JWT obrigatório.
+verify_jwt = true
+
+[functions.sdr-sugerir]
+# Sugestões de SDR (IA). JWT obrigatório.
+verify_jwt = true
+
+[functions.lead-atribuir]
+# Atribuição de lead. JWT obrigatório.
+verify_jwt = true
+
+[functions.wa-connect]
+# Pareia instância WhatsApp. JWT obrigatório.
+verify_jwt = true
+
+[functions.wa-chips]
+# Gerencia chips de WhatsApp. JWT obrigatório.
+verify_jwt = true
+
+[functions.wa-send-test]
+# Envia mensagem de teste via WhatsApp. JWT obrigatório.
+verify_jwt = true
+
+[functions.wa-responder]
+# Responde mensagem WhatsApp. JWT obrigatório.
+verify_jwt = true
+
+[functions.buscar-redes]
+# Busca em redes sociais (IG/LinkedIn). JWT obrigatório.
+verify_jwt = true
+
+[functions.automacao-rodar]
+# Roda automação de prospecção. JWT obrigatório.
+verify_jwt = true
+
+[functions.admin-acoes]
+# Ações administrativas. JWT obrigatório (+ guard is_super_admin).
+verify_jwt = true
+
+[functions.admin-metricas]
+# Métricas do painel admin. JWT obrigatório (+ guard is_super_admin).
+verify_jwt = true
+
+[functions.test-apify]
+# Teste de chaves Apify. JWT obrigatório.
+verify_jwt = true
+
+[functions.test-crypto]
+# Teste de criptografia. JWT obrigatório.
+verify_jwt = true
+
+# ── FUNÇÕES PÚBLICAS (sem JWT) ──────────────────────────────
+
+[functions.wa-webhook]
+# Webhook da Evolution API. PÚBLICO — anti-spoof via ?k=WA_WEBHOOK_SECRET.
+verify_jwt = false
+
+[functions.resend-webhook]
+# Webhook do Resend. PÚBLICO — anti-spoof via assinatura HMAC Svix.
+verify_jwt = false
+
+[functions.opt-out]
+# Descadastro LGPD. PÚBLICO — validado via opt_out_token por lead.
+verify_jwt = false
+
+[functions.follow-up-cron]
+# Cron job de follow-up. PÚBLICO — chamado pelo Supabase Cron, sem usuário.
+verify_jwt = false
+
+[functions.expirar-sites]
+# Cron job para expirar sites. PÚBLICO — chamado pelo Supabase Cron.
+verify_jwt = false

@@ -15,6 +15,7 @@ dist
 
 # Arquivos sensíveis / não versionar
 contas.txt
+test-keys.ts
 *.zip
 
 # Material de referência/andaime — NÃO versionar, NÃO faz parte do projeto.

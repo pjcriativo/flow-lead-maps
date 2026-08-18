@@ -31,7 +31,7 @@ function soDigitos(jidOuNumero: string): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   const url = new URL(req.url);
   const k = url.searchParams.get("k");
 
