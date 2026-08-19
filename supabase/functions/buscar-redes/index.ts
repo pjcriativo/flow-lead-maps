@@ -31,6 +31,14 @@ import {
   type ChaveApify,
 } from "../_shared/apify-pool.ts";
 import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
+import {
+  calcularScoreInstagram,
+  motivoRejeicaoInstagram,
+  perfilTemLocalidade,
+  perfilTemNicho,
+  temSiteProprioInstagram,
+  type InstagramRejectionReason,
+} from "../../../src/lib/instagram-search.ts";
 import { consumir, estadoConsumo, orgDoUsuario } from "../_shared/limite.ts";
 import { liberarCacheRedes, prepararCacheRedes, salvarCacheRedes } from "../_shared/redes-cache.ts";
 
@@ -39,6 +47,14 @@ const API = "https://api.apify.com/v2";
 /** Ator da Apify por estratégia. Só as 5 VIÁVEIS estão aqui — as frágeis/planejadas não
  *  entram até valerem o gasto. Quem não está no mapa é recusado antes de qualquer chamada. */
 const ATOR: Record<string, { ator: string; monta: (c: Rec) => Rec }> = {
+  "IG-LOCAL": {
+    ator: "apify~instagram-scraper",
+    monta: (c) => ({
+      search: `${c.nicho ?? ""} ${c.cidade ?? ""}`.trim(),
+      searchType: "user",
+      resultsType: "details",
+    }),
+  },
   // Instagram — o mesmo ator oficial cobre hashtag/busca; o filtro fino é NOSSO.
   "IG-5": {
     ator: "apify~instagram-scraper",
@@ -460,44 +476,74 @@ Deno.serve(async (req) => {
     }
     const custo = custoTotal;
 
-    // ---------- MESMO PIPELINE: vira `leads`, passa pelo MESMO score ----------
+    // Cada fonte tem sua própria régua. Instagram mede aderência ao pedido; Maps mede
+    // oportunidade digital. Misturar as duas escalas produzia o mesmo score em todos os perfis.
     let inseridos = 0;
-    let descartados = 0;
+    let aprovados = 0;
+    let duplicados = 0;
+    const leadIds: string[] = [];
+    const rejeitados: Record<string, number> = {};
+    const registrarRejeicao = (motivo: InstagramRejectionReason | "sem_contato" | "erro_banco") => {
+      rejeitados[motivo] = (rejeitados[motivo] ?? 0) + 1;
+    };
     for (const it of itens.slice(0, plano.maxItens)) {
       const txt = JSON.stringify(it);
       let lead: Rec | null = null;
 
       if (estrategia.fonte === "instagram") {
         const username = it.username ?? it.ownerUsername ?? null;
-        if (!username) continue;
         const bio = it.biography ?? it.bio ?? "";
         const link = it.externalUrl ?? it.website ?? null;
-        const temSiteProprio = ehSiteProprio(link);
-        // IG-5 "sem site na bio": descarta só quem tem SITE PRÓPRIO. Link de WhatsApp ou
-        // linktree NÃO é site — esse perfil é exatamente o alvo.
-        if (estrategiaId === "IG-5" && temSiteProprio) continue;
-        // só conta contas comerciais quando o dono pediu isso
-        if (campos.soComerciais && it.isBusinessAccount === false) continue;
+        const temSiteProprio = temSiteProprioInstagram(link);
+        const email = it.businessEmail ?? achaEmail(bio) ?? null;
+        const whatsapp = it.businessPhoneNumber ?? whatsDoLink(link) ?? achaWhats(bio) ?? null;
+        const temContatoExterno = !!email || !!whatsapp || temSiteProprio;
+        const perfil = { ...it, username };
+        const filtros = {
+          nicho: String(campos.nicho ?? campos.categoria ?? ""),
+          cidade: String(campos.cidade ?? ""),
+          minSeguidores: Number(campos.minSeguidores ?? 0),
+          soComerciais: Boolean(campos.soComerciais),
+          exigirLocalidade:
+            campos.exigirLocalidade === undefined
+              ? estrategiaId === "IG-LOCAL"
+              : Boolean(campos.exigirLocalidade),
+          semSiteProprio: estrategiaId === "IG-5" || Boolean(campos.semSiteProprio),
+          exigirContatoExterno: Boolean(campos.exigirContatoExterno),
+        };
+        const motivo = motivoRejeicaoInstagram(perfil, filtros, temContatoExterno);
+        if (motivo) {
+          registrarRejeicao(motivo);
+          continue;
+        }
+        const localidadeConfirmada = perfilTemLocalidade(perfil, filtros.cidade);
+        const nichoConfirmado = perfilTemNicho(perfil, filtros.nicho);
+        const seguidores = Number(it.followersCount ?? 0);
         lead = perfilParaLead(
           {
-            username,
+            username: String(username),
             nome: it.fullName ?? it.name ?? null,
             bio,
             linkBio: temSiteProprio ? link : null,
-            email: it.businessEmail ?? achaEmail(bio) ?? null,
-            whatsapp: it.businessPhoneNumber ?? whatsDoLink(link) ?? achaWhats(bio) ?? null,
+            email,
+            whatsapp,
             categoria: it.businessCategoryName ?? it.category ?? null,
-            cidade: String(campos.cidade ?? "") || null,
-            seguidores: Number(it.followersCount ?? 0) || null,
+            cidade: localidadeConfirmada ? String(campos.cidade ?? "") || null : null,
+            seguidores: seguidores || null,
           },
           estrategiaId,
         );
-        // IG-7 "alto engajamento, baixa presença": cálculo NOSSO sobre o que veio.
-        if (estrategiaId === "IG-7") {
-          const seg = Number(it.followersCount ?? 0);
-          const minSeg = Number(campos.minSeguidores ?? 0);
-          if (seg < minSeg) continue;
-        }
+        lead.state = localidadeConfirmada ? String(campos.uf ?? "") || null : null;
+        const aderencia = calcularScoreInstagram({
+          temNicho: nichoConfirmado,
+          temLocalidade: localidadeConfirmada,
+          comercial: it.isBusinessAccount === true,
+          temContatoExterno,
+          semSiteProprio: !temSiteProprio,
+          seguidores,
+        });
+        lead.score = aderencia.score;
+        lead.score_breakdown = aderencia.breakdown;
       } else {
         // LI-4 busca EMPRESA (não pessoa): o lead é a empresa. owner_name/cargo ficam vazios —
         // gravar o nome da empresa como "dono" seria mentir sobre quem é o contato.
@@ -523,39 +569,48 @@ Deno.serve(async (req) => {
       }
       if (!lead) continue;
 
-      // MESMO score do Maps — nada de régua paralela.
-      const sc = computeScore({
-        hasWebsite: !!lead.website,
-        site: null,
-        hasInstagram: !!lead.instagram_url,
-        hasFacebook: false,
-        hasWhatsapp: !!lead.whatsapp,
-        hasPhone: !!lead.phone,
-        hasEmail: !!lead.email,
-        rating: null,
-        reviewCount: null,
-      });
-      lead.score = sc.score;
-      lead.score_breakdown = sc;
+      if (estrategia.fonte !== "instagram") {
+        const sc = computeScore({
+          hasWebsite: !!lead.website,
+          site: null,
+          hasInstagram: !!lead.instagram_url,
+          hasFacebook: false,
+          hasWhatsapp: !!lead.whatsapp,
+          hasPhone: !!lead.phone,
+          hasEmail: !!lead.email,
+          rating: null,
+          reviewCount: null,
+        });
+        lead.score = sc.score;
+        lead.score_breakdown = sc;
+      }
       lead.org_id = orgId;
       lead.user_id = userId;
       lead.assigned_to = userId;
-      lead.sem_contato = !lead.email && !lead.whatsapp && !lead.phone && !lead.website;
-      // Coleta PAGA não guarda peso morto: sem e-mail, WhatsApp, telefone nem site, o lead não
-      // é acionável por nenhuma campanha nossa. Descarta em vez de encher a base (foi por isso
-      // que 101 leads sem canal foram apagados).
+      // O perfil do Instagram é um canal acionável por DM. Contato externo é um filtro opcional,
+      // não uma condição escondida para o lead existir.
+      lead.sem_contato =
+        !lead.instagram_url && !lead.email && !lead.whatsapp && !lead.phone && !lead.website;
       if (lead.sem_contato) {
-        descartados++;
+        registrarRejeicao("sem_contato");
         continue;
       }
 
+      aprovados++;
       const { data: insertedLead, error } = await admin
         .from("leads")
         .upsert(lead, { onConflict: "org_id,place_id", ignoreDuplicates: true })
         .select("id")
         .maybeSingle();
-      if (!error && insertedLead) inseridos++;
+      if (error) registrarRejeicao("erro_banco");
+      else if (insertedLead) {
+        inseridos++;
+        leadIds.push(insertedLead.id);
+      } else duplicados++;
     }
+
+    const analisados = Math.min(itens.length, plano.maxItens);
+    const descartados = Object.values(rejeitados).reduce((total, valor) => total + valor, 0);
 
     if (inseridos > 0) await consumir(admin, orgId, "leads", inseridos);
 
@@ -563,7 +618,7 @@ Deno.serve(async (req) => {
     await finalizar({
       status: estourou ? "parada_teto" : "concluida",
       custo_usd: custo,
-      encontrados: itens.length,
+      encontrados: analisados,
       inseridos,
       // 📒 livro-caixa agora registra QUAL chave gastou + o rastro do rodízio
       chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
@@ -586,9 +641,17 @@ Deno.serve(async (req) => {
             name: itens[0].name ?? null,
           }
         : null,
-      encontrados: itens.length,
+      encontrados: analisados,
       inseridos,
       descartados,
+      leadIds,
+      resumo: {
+        analisados,
+        aprovados,
+        novos: inseridos,
+        duplicados,
+        rejeitados,
+      },
       custo,
       gastoMesDepois: gastoMes + custo,
       teto: { rodada: TETO_RODADA, mes: TETO_MES },

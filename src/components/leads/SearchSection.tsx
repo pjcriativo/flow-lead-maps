@@ -44,7 +44,9 @@ import {
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
 import { FonteSelector, FormEstrategias } from "./FonteProspeccao";
-import { buscarRedes } from "@/services/whatsapp";
+import { buscarRedes, type ColetaRedes } from "@/services/whatsapp";
+import { InstagramSearchPanel } from "./instagram/InstagramSearchPanel";
+import { InstagramResultsTable, InstagramRunSummary } from "./instagram/InstagramResults";
 import {
   valoresPadrao,
   estrategiasDe,
@@ -104,11 +106,10 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [fonteProsp, setFonteProsp] = useState<FonteProspeccao>("google_maps");
   // estratégia escolhida e valores dos campos — um estado por rede (trocar de fonte não perde o
   // que já foi preenchido na outra).
-  const [estrIg, setEstrIg] = useState<string>(() => estrategiasDe("instagram")[0].id);
   const [estrLi, setEstrLi] = useState<string>(() => estrategiasDe("linkedin")[0].id);
-  const [valIg, setValIg] = useState<ValoresBusca>(valoresPadrao);
   const [valLi, setValLi] = useState<ValoresBusca>(valoresPadrao);
   const noMaps = fonteProsp === "google_maps";
+  const isInstagram = fonteProsp === "instagram";
 
   // Geocodifica a cidade e centraliza o mapa/pino nela (pino automático).
   const geocodar = async (c: string, u: string) => {
@@ -145,6 +146,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [status, setStatus] = useState("Pronto");
+  const [instagramResumo, setInstagramResumo] = useState<ColetaRedes["resumo"]>(undefined);
   const [progress, setProgress] = useState({ found: 0, target: 0 });
   const abortRef = useRef<AbortController | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -191,6 +193,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     }
     setRunning(true);
     setLeads([]);
+    setInstagramResumo(undefined);
     setLogs([]);
     setPagina(1);
     setProgress({ found: 0, target: limite });
@@ -310,6 +313,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const handleBuscarRedes = async (estrategia: Estrategia, pedido: PedidoBusca) => {
     setRunning(true);
     setLeads([]);
+    setInstagramResumo(undefined);
     setLogs([]);
     setPagina(1);
     setProgress({ found: 0, target: pedido.limite });
@@ -339,16 +343,15 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
       );
       if (r.avisoChaves) pushLog(`⚠️ ${r.avisoChaves}`);
 
+      setInstagramResumo(r.resumo);
       const qtdInseridos = r.inseridos ?? 0;
-      if (qtdInseridos > 0) {
+      const idsRetornados = r.leadIds ?? [];
+      if (idsRetornados.length > 0) {
         setStatus(`Buscando os ${qtdInseridos} novos leads no banco...`);
         const { data: novosLeads } = await supabase
           .from("leads")
           .select("*, score_breakdown")
-          .eq("origem_fonte", estrategia.fonte)
-          .eq("origem_estrategia", estrategia.id)
-          .order("created_at", { ascending: false })
-          .limit(qtdInseridos);
+          .in("id", idsRetornados);
 
         if (novosLeads) {
           setLeads(novosLeads as Lead[]);
@@ -357,7 +360,9 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
       }
 
       setStatus(
-        `Concluído — ${qtdInseridos} leads inseridos (${r.encontrados} encontrados, ${r.descartados} s/ contato)`,
+        r.resumo
+          ? `Concluído — ${r.resumo.novos} novos leads de ${r.resumo.analisados} perfis analisados`
+          : `Concluído — ${qtdInseridos} leads inseridos de ${r.encontrados ?? 0} perfis analisados`,
       );
       posthog.capture("search_redes_done", {
         estrategia: estrategia.id,
@@ -372,12 +377,13 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
             pedido.campos.nicho ?? pedido.campos.setor ?? pedido.campos.termo ?? estrategia.id,
           );
           const cidadeStr = String(pedido.campos.cidade ?? pedido.campos.regiao ?? "");
-          const nome = nomeAutoLista(nichoStr, cidadeStr, "");
+          const ufStr = String(pedido.campos.uf ?? "");
+          const nome = nomeAutoLista(nichoStr, cidadeStr, ufStr);
           const lista = await criarListaComLeads({
             name: nome,
             niche: nichoStr,
             city: cidadeStr,
-            uf: "",
+            uf: ufStr,
             fonte: estrategia.fonte as FonteBusca,
             radius: 0,
             leadIds: ids,
@@ -417,15 +423,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
 
         <div key={fonteProsp} className="mt-4 animate-in fade-in duration-300">
           {fonteProsp === "instagram" && (
-            <FormEstrategias
-              fonte="instagram"
-              estrategiaId={estrIg}
-              onEstrategia={setEstrIg}
-              valores={valIg}
-              onValores={setValIg}
-              onBuscar={handleBuscarRedes}
-              isBuscaRunning={running}
-            />
+            <InstagramSearchPanel running={running} onBuscar={handleBuscarRedes} />
           )}
           {fonteProsp === "linkedin" && (
             <FormEstrategias
@@ -687,7 +685,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
       </div>
 
       {/* Resultados ao vivo — disponivel para todas as fontes agora */}
-      {(noMaps || leads.length > 0 || running) && (
+      {(noMaps || leads.length > 0 || running || !!instagramResumo) && (
         <div className="overflow-hidden rounded-2xl border-2 border-border bg-card shadow-[var(--shadow-card)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
             <div className="flex items-center gap-3">
@@ -708,13 +706,23 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
                 {status}
               </span>
             </div>
-            <div className="flex items-center gap-4">
-              <Stat n={leads.length} label="leads" />
-              <Stat n={goldCount} label="cliente-ouro" color="text-amber-600" divider />
-              <Stat n={emailCount} label="e-mails" color="text-[#16A34A]" divider />
-              <Stat n={igCount} label="instagram" color="text-pink-600" divider />
-            </div>
+            {isInstagram && instagramResumo ? (
+              <div className="flex items-center gap-4">
+                <Stat n={instagramResumo.analisados} label="analisados" />
+                <Stat n={instagramResumo.aprovados} label="relevantes" divider />
+                <Stat n={instagramResumo.novos} label="novos" color="text-primary" divider />
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <Stat n={leads.length} label="leads" />
+                <Stat n={goldCount} label="cliente-ouro" color="text-amber-600" divider />
+                <Stat n={emailCount} label="e-mails" color="text-[#16A34A]" divider />
+                <Stat n={igCount} label="instagram" color="text-pink-600" divider />
+              </div>
+            )}
           </div>
+
+          {isInstagram && <InstagramRunSummary resumo={instagramResumo} />}
 
           {running && (
             <div className="h-1 w-full overflow-hidden bg-secondary">
@@ -753,7 +761,11 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
 
           {sorted.length > 0 ? (
             <>
-              <LiveTable leads={paginados} />
+              {isInstagram ? (
+                <InstagramResultsTable leads={paginados} />
+              ) : (
+                <LiveTable leads={paginados} />
+              )}
               {sorted.length > PAGE_SIZE && (
                 <Paginacao total={sorted.length} page={paginaEfetiva} onPage={setPagina} />
               )}
@@ -770,7 +782,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               </button>
             </div>
           ) : (
-            <EmptyState running={running} />
+            <EmptyState running={running} fonte={fonteProsp} />
           )}
         </div>
       )}
@@ -888,7 +900,7 @@ function LiveTable({ leads }: { leads: Lead[] }) {
   );
 }
 
-function EmptyState({ running }: { running: boolean }) {
+function EmptyState({ running, fonte }: { running: boolean; fonte: FonteProspeccao }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-8 py-16 text-center">
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-primary">
@@ -896,12 +908,22 @@ function EmptyState({ running }: { running: boolean }) {
       </div>
       <div>
         <div className="text-base font-semibold">
-          {running ? "Buscando no Google Places…" : "Pronto para prospectar"}
+          {running
+            ? fonte === "instagram"
+              ? "Analisando perfis no Instagram…"
+              : "Buscando negócios…"
+            : fonte === "instagram"
+              ? "Pronto para descobrir perfis"
+              : "Pronto para prospectar"}
         </div>
         <div className="mt-1 text-sm text-muted-foreground">
           {running
-            ? "Os leads aparecem aqui, já com score, conforme são qualificados."
-            : "Informe nicho, cidade e UF, e clique em Buscar leads."}
+            ? fonte === "instagram"
+              ? "A busca pode levar alguns minutos. Os motivos de descarte serão mostrados ao concluir."
+              : "Os leads aparecem aqui, já com score, conforme são qualificados."
+            : fonte === "instagram"
+              ? "Selecione nicho, estado e cidade para começar."
+              : "Informe nicho, cidade e UF, e clique em Buscar leads."}
         </div>
       </div>
     </div>

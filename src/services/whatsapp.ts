@@ -502,6 +502,14 @@ export type ColetaRedes = {
   detalhe?: string;
   avisoChaves?: string;
   cacheHit?: boolean;
+  leadIds?: string[];
+  resumo?: {
+    analisados: number;
+    aprovados: number;
+    novos: number;
+    duplicados: number;
+    rejeitados: Record<string, number>;
+  };
 };
 
 /** Roda a coleta REAL de uma estratégia. O servidor aplica o teto de gasto (US$/rodada e US$/mês). */

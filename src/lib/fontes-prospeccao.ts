@@ -274,6 +274,16 @@ export type Estrategia = {
 };
 
 export const ESTRATEGIAS: Estrategia[] = [
+  {
+    id: "IG-LOCAL",
+    fonte: "instagram",
+    titulo: "Perfis locais relevantes",
+    descricao: "Encontra e qualifica perfis do nicho na cidade escolhida.",
+    campos: ["nicho", "cidade", "minSeguidores", "soComerciais"],
+    viabilidade: "viavel",
+    pluga: "Busca de perfis do Instagram com validação própria de nicho e localidade.",
+    coleta: true,
+  },
   // ───────────── INSTAGRAM (ATIVAS) ─────────────
   {
     id: "IG-5",
