@@ -39,3 +39,6 @@ build-*.log
 lint-*.txt
 
 .vercel
+
+.vercel
+.env*
