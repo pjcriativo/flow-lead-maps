@@ -23,10 +23,10 @@ function itensDoCache<T>(valor: unknown, limite: number): T[] {
   return Array.isArray(valor) ? (valor as T[]).slice(0, limite) : [];
 }
 
-function cacheFresco(row: CacheRow | null, limite: number): boolean {
+function cacheFresco(row: CacheRow | null, limite: number, ttlHours: number): boolean {
   if (!row?.refreshed_at || (row.searched_depth < limite && !row.exhausted)) return false;
   const atualizado = new Date(row.refreshed_at).getTime();
-  return Number.isFinite(atualizado) && atualizado >= Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000;
+  return Number.isFinite(atualizado) && atualizado >= Date.now() - ttlHours * 60 * 60 * 1000;
 }
 
 async function lerCache(admin: SupabaseClient, chave: string): Promise<CacheRow | null> {
@@ -39,11 +39,16 @@ async function lerCache(admin: SupabaseClient, chave: string): Promise<CacheRow 
   return data as CacheRow | null;
 }
 
-async function reivindicar(admin: SupabaseClient, chave: string, limite: number): Promise<Claim> {
+async function reivindicar(
+  admin: SupabaseClient,
+  chave: string,
+  limite: number,
+  ttlHours: number,
+): Promise<Claim> {
   const { data, error } = await admin.rpc("claim_apify_search_cache_v3", {
     p_query_key: chave,
     p_target_depth: limite,
-    p_ttl_hours: CACHE_TTL_HOURS,
+    p_ttl_hours: ttlHours,
   });
   if (error) throw new Error(`Falha ao reservar cache social: ${error.message}`);
   const claim = data as Claim | null;
@@ -66,12 +71,13 @@ async function aguardar(
   admin: SupabaseClient,
   chave: string,
   limite: number,
+  ttlHours: number,
 ): Promise<unknown[] | null> {
   const deadline = Date.now() + CACHE_WAIT_MS;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, CACHE_POLL_MS));
     const row = await lerCache(admin, chave);
-    if (cacheFresco(row, limite)) return itensDoCache<unknown>(row?.items, limite);
+    if (cacheFresco(row, limite, ttlHours)) return itensDoCache<unknown>(row?.items, limite);
     const reservaExpirou =
       !row?.refreshing_until || new Date(row.refreshing_until).getTime() <= Date.now();
     if (reservaExpirou) return null;
@@ -86,20 +92,22 @@ export async function prepararCacheRedes<T>(
   admin: SupabaseClient,
   chave: string,
   limite: number,
+  ttlHours = CACHE_TTL_HOURS,
 ): Promise<EstadoCacheRedes<T>> {
+  const ttlSeguro = Math.max(1, Math.min(720, Math.floor(ttlHours)));
   const existente = await lerCache(admin, chave);
-  if (cacheFresco(existente, limite)) {
+  if (cacheFresco(existente, limite, ttlSeguro)) {
     return { cacheHit: true, items: itensDoCache<T>(existente?.items, limite) };
   }
 
-  let claim = await reivindicar(admin, chave, limite);
+  let claim = await reivindicar(admin, chave, limite, ttlSeguro);
   if (claim.decision === "cache") {
     return { cacheHit: true, items: itensDoCache<T>(claim.items, limite) };
   }
   if (claim.decision === "wait") {
-    const concluido = await aguardar(admin, chave, limite);
+    const concluido = await aguardar(admin, chave, limite, ttlSeguro);
     if (concluido) return { cacheHit: true, items: itensDoCache<T>(concluido, limite) };
-    claim = await reivindicar(admin, chave, limite);
+    claim = await reivindicar(admin, chave, limite, ttlSeguro);
     if (claim.decision === "cache") {
       return { cacheHit: true, items: itensDoCache<T>(claim.items, limite) };
     }
