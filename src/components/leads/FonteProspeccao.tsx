@@ -44,6 +44,7 @@ import {
   type ValoresBusca,
   type CampoId,
   type Viabilidade,
+  type PedidoBusca,
 } from "@/lib/fontes-prospeccao";
 
 const ICONE: Record<FonteProspeccao, React.ReactNode> = {
@@ -260,13 +261,15 @@ export function FormEstrategias({
   onEstrategia,
   valores,
   onValores,
+  onBuscar,
+  isBuscaRunning,
 }: {
   fonte: Exclude<FonteProspeccao, "google_maps">;
   estrategiaId: string;
   onEstrategia: (id: string) => void;
   valores: ValoresBusca;
   onValores: (v: ValoresBusca) => void;
-  onBuscar?: (estrategia: Estrategia, pedido: PedidoBusca) => void;
+  onBuscar?: (estrategia: Estrategia, pedido: PedidoBusca) => Promise<void>;
   isBuscaRunning?: boolean;
 }) {
   const f = FONTES[fonte];
@@ -283,10 +286,10 @@ export function FormEstrategias({
 
   const coletar = async () => {
     if (onBuscar) {
-      onBuscar(atual, pedido);
+      await onBuscar(atual, pedido);
       return;
     }
-    
+
     setRodando(true);
     setResultado(null);
     try {
