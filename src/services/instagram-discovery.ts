@@ -1,5 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { estimarCustoCommentsHunter } from "@/lib/instagram-comments";
+import {
+  estimateInstagramContentDiscoveryCost,
+  type ContentDiscoveryMode,
+  type InstagramContentSignals,
+} from "@/lib/instagram-content-discovery";
 
 export type CommentsHunterInput = {
   sourceType: "profile" | "posts";
@@ -114,4 +119,122 @@ export async function listCommentsHunterHistory(): Promise<CommentsHunterHistory
   });
   if (error) throw error;
   return ((data as { jobs?: CommentsHunterHistory[] })?.jobs ?? []) as CommentsHunterHistory[];
+}
+
+export type ContentDiscoveryInput = {
+  mode: ContentDiscoveryMode;
+  hashtags: string[];
+  niche: string;
+  city: string;
+  state: string;
+  locationQuery: string;
+  sourcesLimit: number;
+  postsPerSource: number;
+  targetLeads: number;
+  recentDays: number;
+  minFollowers: number;
+  maxFollowers: number;
+  minContentScore: number;
+  minLeadScore: number;
+  onlyProfessionals: boolean;
+  requireLocation: boolean;
+  requireNiche: boolean;
+};
+
+export type ContentLeadResult = {
+  username: string;
+  fullName: string | null;
+  avatarUrl: string | null;
+  biography: string;
+  followers: number;
+  following: number;
+  posts: number;
+  professional: boolean;
+  accountKind: "business" | "creator" | "consumer";
+  category: string | null;
+  externalUrl: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  sourceType: ContentDiscoveryMode;
+  sourceLabel: string;
+  sourceUrl: string | null;
+  evidenceCaption: string;
+  contentCount: number;
+  signals: InstagramContentSignals;
+  leadScore: number;
+  nicheMatch: boolean;
+  locationMatch: boolean;
+  authenticity: number;
+  decision: "qualified" | "candidate" | "rejected" | "duplicate";
+  rejectionReason: string | null;
+  leadId: string | null;
+};
+
+export type ContentDiscoveryStats = {
+  sourcesFound: number;
+  contentItems: number;
+  uniqueProfiles: number;
+  enrichedProfiles: number;
+  qualified: number;
+  newLeads: number;
+  duplicates: number;
+  averageContentScore: number;
+  formatCounts: Record<string, number>;
+  rejections: Record<string, number>;
+  cache: { sources: boolean; content: boolean; profiles: boolean };
+};
+
+export type ContentDiscoveryResponse = {
+  ok: boolean;
+  jobId?: string;
+  stats?: ContentDiscoveryStats;
+  results?: ContentLeadResult[];
+  estimatedCost?: number;
+  actualCost?: number;
+  spentMonthAfter?: number;
+  caps?: { round: number; month: number };
+  reason?: string;
+  error?: string;
+};
+
+export type ContentDiscoveryHistory = {
+  id: string;
+  status: string;
+  input: ContentDiscoveryInput;
+  stats: ContentDiscoveryStats | Record<string, never>;
+  result: ContentDiscoveryResponse | null;
+  estimated_cost_usd: number;
+  actual_cost_usd: number;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export function estimateContentDiscoveryCost(input: ContentDiscoveryInput): number {
+  return estimateInstagramContentDiscoveryCost(input);
+}
+
+export async function runContentDiscovery(
+  input: ContentDiscoveryInput,
+): Promise<ContentDiscoveryResponse> {
+  const { data, error } = await supabase.functions.invoke("instagram-discovery", {
+    body: { acao: "buscar_conteudo", requestId: crypto.randomUUID(), ...input },
+  });
+  if (error) {
+    const context = error.context as { json?: () => Promise<ContentDiscoveryResponse> } | undefined;
+    const payload = await context?.json?.().catch(() => null);
+    throw new Error(payload?.error ?? error.message);
+  }
+  const response = data as ContentDiscoveryResponse;
+  if (!response.ok) throw new Error(response.error ?? "A descoberta por conteudo nao concluiu.");
+  return response;
+}
+
+export async function listContentDiscoveryHistory(
+  mode: ContentDiscoveryMode,
+): Promise<ContentDiscoveryHistory[]> {
+  const { data, error } = await supabase.functions.invoke("instagram-discovery", {
+    body: { acao: "historico", mode },
+  });
+  if (error) throw error;
+  return ((data as { jobs?: ContentDiscoveryHistory[] })?.jobs ?? []) as ContentDiscoveryHistory[];
 }

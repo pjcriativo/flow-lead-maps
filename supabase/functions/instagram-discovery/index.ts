@@ -18,6 +18,14 @@ import {
   selecionarComentaristasUnicos,
 } from "../../../src/lib/instagram-comments.ts";
 import {
+  analyzeInstagramContentSignals,
+  buildInstagramHashtagUrls,
+  calculateInstagramContentLeadScore,
+  estimateInstagramContentDiscoveryCost,
+  normalizeInstagramHashtag,
+  type ContentDiscoveryMode,
+} from "../../../src/lib/instagram-content-discovery.ts";
+import {
   perfilEhProfissionalInstagram,
   perfilTemLocalidade,
   perfilTemNicho,
@@ -29,6 +37,7 @@ const API = "https://api.apify.com/v2";
 const ACTOR_POSTS = "apify~instagram-post-scraper";
 const ACTOR_COMMENTS = "apify~instagram-comment-scraper";
 const ACTOR_PROFILES = "apify~instagram-profile-scraper";
+const ACTOR_DISCOVERY = "apify~instagram-scraper";
 const TERMINAIS = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 
 // Payloads de Actors são fronteiras externas e deliberadamente flexíveis.
@@ -48,6 +57,27 @@ type EntradaComments = {
   commentsPerPost: number;
   targetLeads: number;
   minIntentScore: number;
+  minLeadScore: number;
+  onlyProfessionals: boolean;
+  requireLocation: boolean;
+  requireNiche: boolean;
+};
+
+type EntradaConteudo = {
+  requestId: string;
+  mode: ContentDiscoveryMode;
+  hashtags: string[];
+  niche: string;
+  city: string;
+  state: string;
+  locationQuery: string;
+  sourcesLimit: number;
+  postsPerSource: number;
+  targetLeads: number;
+  recentDays: number;
+  minFollowers: number;
+  maxFollowers: number;
+  minContentScore: number;
   minLeadScore: number;
   onlyProfessionals: boolean;
   requireLocation: boolean;
@@ -140,6 +170,56 @@ function validarEntrada(body: Rec): EntradaComments {
     commentsPerPost: inteiro(body.commentsPerPost, 5, 100, 30),
     targetLeads: inteiro(body.targetLeads, 1, 50, 15),
     minIntentScore: inteiro(body.minIntentScore, 0, 100, 40),
+    minLeadScore: inteiro(body.minLeadScore, 0, 100, 55),
+    onlyProfessionals: booleano(body.onlyProfessionals, true),
+    requireLocation: booleano(body.requireLocation, false),
+    requireNiche: booleano(body.requireNiche, true),
+  };
+}
+
+function validarEntradaConteudo(body: Rec): EntradaConteudo {
+  const requestId = String(body.requestId ?? "").trim();
+  if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId)) throw new Error("request_id_invalido");
+  const mode: ContentDiscoveryMode = body.mode === "places" ? "places" : "hashtags";
+  const hashtags = Array.isArray(body.hashtags)
+    ? [
+        ...new Set(
+          body.hashtags
+            .map(normalizeInstagramHashtag)
+            .filter((tag: string) => /^[a-z0-9_]{2,100}$/.test(tag)),
+        ),
+      ].slice(0, 6)
+    : [];
+  const niche = String(body.niche ?? "").trim();
+  const city = String(body.city ?? "").trim();
+  const locationQuery = String(body.locationQuery ?? "").trim();
+  if (!niche) throw new Error("Escolha o nicho do lead ideal.");
+  if (mode === "hashtags" && hashtags.length === 0) {
+    throw new Error("Informe ao menos uma hashtag valida, sem depender do #.");
+  }
+  if (mode === "places" && !city && !locationQuery) {
+    throw new Error("Escolha a cidade ou informe um bairro/local para pesquisar.");
+  }
+  const minFollowers = inteiro(body.minFollowers, 0, 10_000_000, 100);
+  const maxFollowers = inteiro(body.maxFollowers, minFollowers, 100_000_000, 250_000);
+  return {
+    requestId,
+    mode,
+    hashtags,
+    niche,
+    city,
+    state: String(body.state ?? "")
+      .trim()
+      .toUpperCase()
+      .slice(0, 2),
+    locationQuery,
+    sourcesLimit: inteiro(body.sourcesLimit, 1, 12, 5),
+    postsPerSource: inteiro(body.postsPerSource, 3, 30, 10),
+    targetLeads: inteiro(body.targetLeads, 1, 50, 15),
+    recentDays: inteiro(body.recentDays, 7, 365, 90),
+    minFollowers,
+    maxFollowers,
+    minContentScore: inteiro(body.minContentScore, 0, 100, 45),
     minLeadScore: inteiro(body.minLeadScore, 0, 100, 55),
     onlyProfessionals: booleano(body.onlyProfessionals, true),
     requireLocation: booleano(body.requireLocation, false),
@@ -429,6 +509,595 @@ function perfilPorUsername(items: Rec[]): Map<string, Rec> {
   return mapa;
 }
 
+function urlLocalInstagram(item: Rec): string | null {
+  const candidates = [item.inputUrl, item.url, item.locationUrl];
+  for (const value of candidates) {
+    const url = String(value ?? "").trim();
+    if (/instagram\.com\/explore\/locations\//i.test(url)) return url;
+  }
+  const id = String(item.location_id ?? item.locationId ?? item.id ?? "").trim();
+  if (!/^\d+$/.test(id)) return null;
+  return `https://www.instagram.com/explore/locations/${id}/`;
+}
+
+function textoLocalPost(post: Rec): string {
+  if (!post.location) return "";
+  return typeof post.location === "string" ? post.location : JSON.stringify(post.location);
+}
+
+function postsPorAutor(posts: Rec[]): Map<string, Rec[]> {
+  const grouped = new Map<string, Rec[]>();
+  for (const post of posts) {
+    const username = normalizarUsername(post.owner_username);
+    if (!username || username === "origem-direta") continue;
+    grouped.set(username, [...(grouped.get(username) ?? []), post]);
+  }
+  return grouped;
+}
+
+async function processarDescobertaConteudo(params: {
+  req: Request;
+  admin: Admin;
+  userId: string;
+  orgId: string;
+  body: Rec;
+}): Promise<Response> {
+  const { req, admin, userId, orgId, body } = params;
+  let input: EntradaConteudo;
+  try {
+    input = validarEntradaConteudo(body);
+  } catch (error) {
+    return json(
+      { ok: false, error: error instanceof Error ? error.message : String(error) },
+      400,
+      req,
+    );
+  }
+
+  const { data: existing } = await admin
+    .from("instagram_discovery_jobs")
+    .select("status,result,error")
+    .eq("user_id", userId)
+    .eq("request_id", input.requestId)
+    .maybeSingle();
+  if (existing?.result) return json(existing.result, 200, req);
+  if (existing) {
+    return json(
+      {
+        ok: existing.status !== "failed",
+        pending: existing.status === "running",
+        status: existing.status,
+        error: existing.error,
+      },
+      existing.status === "failed" ? 409 : 202,
+      req,
+    );
+  }
+
+  const config = await lerConfigPlataforma(admin);
+  const roundCap = config.teto_redes_rodada_usd ?? TETO_REDES_RODADA_USD;
+  const monthCap = config.teto_redes_mes_usd ?? TETO_REDES_MES_USD;
+  const monthRef = mesRefAtual(new Date());
+  const [{ data: discoveryCosts }, { data: legacyCosts }] = await Promise.all([
+    admin
+      .from("instagram_discovery_jobs")
+      .select("actual_cost_usd")
+      .eq("user_id", userId)
+      .eq("month_ref", monthRef),
+    admin
+      .from("redes_buscas")
+      .select("custo_usd")
+      .eq("user_id", userId)
+      .eq("mes_ref", monthRef)
+      .eq("fonte", "instagram"),
+  ]);
+  const spentMonth =
+    (discoveryCosts ?? []).reduce(
+      (sum: number, row: Rec) => sum + Number(row.actual_cost_usd ?? 0),
+      0,
+    ) + (legacyCosts ?? []).reduce((sum: number, row: Rec) => sum + Number(row.custo_usd ?? 0), 0);
+  const estimatedCost = estimateInstagramContentDiscoveryCost(input);
+  const availableBudget = Math.max(0, Math.min(roundCap, monthCap - spentMonth));
+
+  const sourceName =
+    input.mode === "hashtags"
+      ? input.hashtags.map((tag) => `#${tag}`).join(", ")
+      : [input.niche, input.locationQuery || input.city].filter(Boolean).join(" em ");
+  const { data: source, error: sourceError } = await admin
+    .from("instagram_sources")
+    .insert({
+      org_id: orgId,
+      user_id: userId,
+      source_type: input.mode === "hashtags" ? "hashtag" : "place",
+      name: sourceName,
+      config: input,
+    })
+    .select("id")
+    .single();
+  if (sourceError || !source) return json({ ok: false, error: sourceError?.message }, 500, req);
+
+  const initialStatus = estimatedCost > availableBudget ? "budget_stopped" : "running";
+  const { data: job, error: jobError } = await admin
+    .from("instagram_discovery_jobs")
+    .insert({
+      org_id: orgId,
+      user_id: userId,
+      source_id: source.id,
+      request_id: input.requestId,
+      mode: input.mode,
+      status: initialStatus,
+      input,
+      estimated_cost_usd: estimatedCost,
+      month_ref: monthRef,
+      stop_reason: initialStatus === "budget_stopped" ? "estimated_cost_exceeds_budget" : null,
+      started_at: initialStatus === "running" ? new Date().toISOString() : null,
+      completed_at: initialStatus === "budget_stopped" ? new Date().toISOString() : null,
+    })
+    .select("id")
+    .single();
+  if (jobError || !job) return json({ ok: false, error: jobError?.message }, 500, req);
+  if (initialStatus === "budget_stopped") {
+    return json(
+      {
+        ok: false,
+        reason: "budget",
+        error: `A estimativa de US$ ${estimatedCost.toFixed(2)} excede o saldo seguro de US$ ${availableBudget.toFixed(2)}.`,
+        estimatedCost,
+        spentMonth,
+        caps: { round: roundCap, month: monthCap },
+      },
+      409,
+      req,
+    );
+  }
+
+  let actualCost = 0;
+  const cacheStats = { sources: false, content: false, profiles: false };
+  const updateCost = async () => {
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({ actual_cost_usd: actualCost, updated_at: new Date().toISOString() })
+      .eq("id", job.id);
+  };
+
+  try {
+    let originUrls: string[] = [];
+    let sourcesFound = input.mode === "hashtags" ? input.hashtags.length : 0;
+    if (input.mode === "hashtags") {
+      originUrls = buildInstagramHashtagUrls(input.hashtags);
+    } else {
+      const search = [input.niche, input.locationQuery, input.city, input.state]
+        .filter(Boolean)
+        .join(" ");
+      const sourceRun = await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "discover_sources",
+        actorId: ACTOR_DISCOVERY,
+        input: {
+          search,
+          searchType: "place",
+          searchLimit: input.sourcesLimit,
+          resultsType: "details",
+        },
+        requested: input.sourcesLimit,
+        ttlHours: 7 * 24,
+        maxCharge: Math.min(0.08, availableBudget - actualCost),
+      });
+      actualCost += sourceRun.cost;
+      cacheStats.sources = sourceRun.cacheHit;
+      await updateCost();
+      originUrls = [
+        ...new Set(
+          sourceRun.items.map(urlLocalInstagram).filter((url): url is string => Boolean(url)),
+        ),
+      ].slice(0, input.sourcesLimit);
+      sourcesFound = originUrls.length;
+    }
+    if (!originUrls.length) {
+      throw new Error(
+        input.mode === "hashtags"
+          ? "Nenhuma hashtag valida foi montada."
+          : "Nenhum local publico do Instagram foi encontrado para essa regiao.",
+      );
+    }
+
+    const requestedContent = originUrls.length * input.postsPerSource;
+    const contentRun = await executarActor({
+      admin,
+      jobId: job.id,
+      orgId,
+      stepType: "discover_content",
+      actorId: ACTOR_DISCOVERY,
+      input: {
+        directUrls: originUrls,
+        resultsType: "posts",
+        resultsLimit: input.postsPerSource,
+        onlyPostsNewerThan: `${input.recentDays} days`,
+        addParentData: true,
+      },
+      requested: requestedContent,
+      ttlHours: 12,
+      maxCharge: Math.min(Math.max(0.08, requestedContent * 0.0032), availableBudget - actualCost),
+    });
+    actualCost += contentRun.cost;
+    cacheStats.content = contentRun.cacheHit;
+    await updateCost();
+    const posts = contentRun.items
+      .map((item) => normalizarPost(item, normalizarUsername(item.ownerUsername)))
+      .filter((item): item is Rec => Boolean(item));
+    if (!posts.length) throw new Error("A fonte nao retornou posts publicos recentes.");
+    const contentIds = await salvarConteudos({
+      admin,
+      orgId,
+      userId,
+      sourceId: source.id,
+      jobId: job.id,
+      posts,
+    });
+
+    const grouped = postsPorAutor(posts);
+    const prequalified = [...grouped.entries()]
+      .map(([username, authorPosts]) => ({
+        username,
+        posts: authorPosts,
+        signals: analyzeInstagramContentSignals({
+          contents: authorPosts.map((post) => ({
+            caption: post.caption,
+            likes: post.metrics?.likes,
+            comments: post.metrics?.comments,
+            views: post.metrics?.views,
+            postedAt: post.posted_at,
+            contentType: post.content_type,
+            locationText: textoLocalPost(post),
+          })),
+          followers: 0,
+          niche: input.niche,
+          city: input.city,
+        }),
+      }))
+      .sort((a, b) => b.signals.contentScore - a.signals.contentScore);
+    const enrichLimit = Math.min(75, Math.max(12, input.targetLeads * 3), prequalified.length);
+    const toEnrich = prequalified.slice(0, enrichLimit);
+    let profiles: Rec[] = [];
+    if (toEnrich.length) {
+      const profileRun = await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "enrich_profiles",
+        actorId: ACTOR_PROFILES,
+        input: {
+          usernames: toEnrich.map((candidate) => candidate.username),
+          includeAboutSection: false,
+        },
+        requested: toEnrich.length,
+        ttlHours: 7 * 24,
+        maxCharge: Math.min(Math.max(0.08, toEnrich.length * 0.0035), availableBudget - actualCost),
+      });
+      actualCost += profileRun.cost;
+      cacheStats.profiles = profileRun.cacheHit;
+      await updateCost();
+      profiles = profileRun.items;
+    }
+
+    const profileMap = perfilPorUsername(profiles);
+    const results: Rec[] = [];
+    const evidenceRows: Rec[] = [];
+    const rejections: Record<string, number> = {};
+    const formatCounts: Record<string, number> = {};
+    let newLeads = 0;
+    let duplicates = 0;
+    let qualified = 0;
+    const consumption = await estadoConsumo(admin, orgId, "leads");
+    let planRemaining = consumption.limite == null ? Infinity : (consumption.restante ?? 0);
+
+    for (const candidate of toEnrich) {
+      const profile = profileMap.get(candidate.username) ?? null;
+      const followers = Number(profile?.followersCount ?? 0);
+      const signals = analyzeInstagramContentSignals({
+        contents: candidate.posts.map((post) => ({
+          caption: post.caption,
+          likes: post.metrics?.likes,
+          comments: post.metrics?.comments,
+          views: post.metrics?.views,
+          postedAt: post.posted_at,
+          contentType: post.content_type,
+          locationText: textoLocalPost(post),
+        })),
+        followers,
+        niche: input.niche,
+        city: input.city,
+      });
+      for (const format of signals.formats) formatCounts[format] = (formatCounts[format] ?? 0) + 1;
+      const professional = profile ? perfilEhProfissionalInstagram(profile) : false;
+      const profileNicheMatch = profile ? perfilTemNicho(profile, input.niche) : false;
+      const profileLocationMatch = profile
+        ? input.city
+          ? perfilTemLocalidade(profile, input.city)
+          : true
+        : false;
+      const nicheMatch = profileNicheMatch || signals.nicheScore >= 50;
+      const locationMatch = profileLocationMatch || signals.locationScore >= 50;
+      const externalUrl = profile?.externalUrl ?? null;
+      const biography = String(profile?.biography ?? "");
+      const email = acharEmail(`${biography} ${profile?.businessEmail ?? ""}`);
+      const whatsapp = acharWhatsapp(
+        `${biography} ${profile?.businessPhoneNumber ?? ""} ${externalUrl ?? ""}`,
+      );
+      const hasContact = Boolean(email || whatsapp || externalUrl);
+      const authenticity = profile ? autenticidadePerfil(profile) : 0;
+      const leadScore = calculateInstagramContentLeadScore({
+        contentScore: signals.contentScore,
+        professional,
+        profileNicheMatch: nicheMatch,
+        profileLocationMatch: locationMatch,
+        authenticityScore: authenticity,
+        hasContact,
+        followers,
+      });
+      const accountKind = professional
+        ? String(profile?.businessCategoryName ?? "")
+            .toLocaleLowerCase("pt-BR")
+            .includes("creator")
+          ? "creator"
+          : "business"
+        : "consumer";
+
+      let decision: "qualified" | "candidate" | "rejected" | "duplicate" = "candidate";
+      let rejectionReason: string | null = null;
+      if (!profile) rejectionReason = "perfil_indisponivel";
+      else if (input.onlyProfessionals && !professional) rejectionReason = "conta_pessoal";
+      else if (followers < input.minFollowers) rejectionReason = "poucos_seguidores";
+      else if (followers > input.maxFollowers) rejectionReason = "seguidores_acima_do_maximo";
+      else if (input.requireNiche && !nicheMatch) rejectionReason = "fora_nicho";
+      else if (input.requireLocation && !locationMatch) rejectionReason = "fora_localidade";
+      else if (signals.contentScore < input.minContentScore) rejectionReason = "conteudo_fraco";
+      else if (leadScore < input.minLeadScore) rejectionReason = "score_insuficiente";
+      else if (qualified >= input.targetLeads) rejectionReason = "meta_atingida";
+      else if (planRemaining <= 0) rejectionReason = "limite_plano";
+
+      let leadId: string | null = null;
+      if (!rejectionReason && profile) {
+        const lead = perfilParaLead(
+          {
+            username: candidate.username,
+            nome: profile.fullName,
+            bio: biography,
+            linkBio: temSiteProprioInstagram(externalUrl) ? externalUrl : null,
+            email,
+            whatsapp,
+            categoria: profile.businessCategoryName ?? profile.category ?? null,
+            cidade: locationMatch && input.city ? input.city : null,
+            seguidores: followers || null,
+          },
+          input.mode === "hashtags" ? "IG-HASHTAG" : "IG-PLACES",
+        ) as Rec;
+        Object.assign(lead, {
+          org_id: orgId,
+          user_id: userId,
+          assigned_to: userId,
+          state: locationMatch ? input.state || null : null,
+          score: leadScore,
+          score_breakdown: {
+            tipo: "instagram_content_signal",
+            fonte: input.mode,
+            conteudo: signals.contentScore,
+            nicho_confirmado: nicheMatch,
+            localidade_confirmada: locationMatch,
+            conta: accountKind,
+            atividade: signals.activityScore,
+            engajamento_robusto: signals.robustEngagementRate,
+            sinais_comerciais: signals.commercialSignals,
+          },
+          sem_contato: !hasContact,
+        });
+        const { data: existingLead } = await admin
+          .from("leads")
+          .select("id")
+          .eq("org_id", orgId)
+          .eq("place_id", lead.place_id)
+          .maybeSingle();
+        if (existingLead) {
+          leadId = existingLead.id;
+          decision = "duplicate";
+          duplicates++;
+        } else {
+          const { data: inserted, error } = await admin
+            .from("leads")
+            .insert(lead)
+            .select("id")
+            .single();
+          if (error || !inserted) rejectionReason = "erro_banco";
+          else {
+            leadId = inserted.id;
+            decision = "qualified";
+            newLeads++;
+            planRemaining--;
+          }
+        }
+        if (leadId) {
+          const { error: profileError } = await admin.from("instagram_profiles").upsert(
+            {
+              lead_id: leadId,
+              org_id: orgId,
+              user_id: userId,
+              username: candidate.username,
+              instagram_user_id: String(profile.id ?? "") || null,
+              full_name: profile.fullName ?? null,
+              biography: biography || null,
+              profile_pic_url: profile.profilePicUrlHD ?? profile.profilePicUrl ?? null,
+              external_url: externalUrl,
+              bio_links: Array.isArray(profile.externalUrls) ? profile.externalUrls : [],
+              followers_count: followers || null,
+              following_count: Number(profile.followsCount ?? 0) || null,
+              posts_count: Number(profile.postsCount ?? 0) || null,
+              verified: Boolean(profile.verified),
+              private: Boolean(profile.private),
+              professional,
+              business_category: profile.businessCategoryName ?? null,
+              business_email: email,
+              business_phone: whatsapp,
+              business_address: profile.businessAddress ?? null,
+              avg_likes: signals.averageLikes,
+              avg_comments: signals.averageComments,
+              engagement_rate: signals.robustEngagementRate,
+              last_post_at: signals.latestPostAt,
+              recent_posts: candidate.posts.slice(0, 12).map((post) => post.raw_payload),
+              related_profiles: Array.isArray(profile.relatedProfiles)
+                ? profile.relatedProfiles.slice(0, 20)
+                : [],
+              raw_payload: profile,
+              discovery_source: input.mode,
+              last_active_at: signals.latestPostAt,
+              intent_score: null,
+              authenticity_score: authenticity,
+              content_score: signals.contentScore,
+              content_signals: signals,
+              collected_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "lead_id" },
+          );
+          if (profileError) throw new Error(`Falha ao salvar perfil: ${profileError.message}`);
+        }
+        if (!rejectionReason) qualified++;
+      }
+
+      if (rejectionReason && decision !== "duplicate") {
+        decision =
+          rejectionReason === "score_insuficiente" ||
+          rejectionReason === "conteudo_fraco" ||
+          rejectionReason === "meta_atingida"
+            ? "candidate"
+            : "rejected";
+        rejections[rejectionReason] = (rejections[rejectionReason] ?? 0) + 1;
+      }
+      const bestPost = [...candidate.posts].sort(
+        (a, b) => Number(b.metrics?.likes ?? 0) - Number(a.metrics?.likes ?? 0),
+      )[0];
+      results.push({
+        username: candidate.username,
+        fullName: profile?.fullName ?? null,
+        avatarUrl: profile?.profilePicUrlHD ?? profile?.profilePicUrl ?? null,
+        biography,
+        followers,
+        following: Number(profile?.followsCount ?? 0),
+        posts: Number(profile?.postsCount ?? 0),
+        professional,
+        accountKind,
+        category: profile?.businessCategoryName ?? null,
+        externalUrl,
+        email,
+        whatsapp,
+        sourceType: input.mode,
+        sourceLabel: sourceName,
+        sourceUrl: bestPost?.url ?? null,
+        evidenceCaption: bestPost?.caption ?? "Conteudo publicado na origem selecionada.",
+        contentCount: candidate.posts.length,
+        signals,
+        leadScore,
+        nicheMatch,
+        locationMatch,
+        authenticity,
+        decision,
+        rejectionReason,
+        leadId,
+      });
+      evidenceRows.push({
+        org_id: orgId,
+        user_id: userId,
+        job_id: job.id,
+        content_id: bestPost?.url ? (contentIds.get(bestPost.url) ?? null) : null,
+        event_id: null,
+        lead_id: leadId,
+        username: candidate.username,
+        evidence_type: input.mode === "hashtags" ? "hashtag_post" : "place_post",
+        excerpt: String(bestPost?.caption ?? "Conteudo publicado na origem selecionada.").slice(
+          0,
+          1000,
+        ),
+        source_url: bestPost?.url ?? null,
+        intent_label: null,
+        intent_score: null,
+        lead_score: leadScore,
+        content_score: signals.contentScore,
+        signal_data: signals,
+        decision,
+        rejection_reason: rejectionReason,
+        profile_snapshot: profile,
+        observed_at: bestPost?.posted_at ?? null,
+      });
+    }
+
+    if (evidenceRows.length) {
+      const { error } = await admin.from("instagram_profile_evidence").insert(evidenceRows);
+      if (error) throw new Error(`Falha ao salvar evidencias: ${error.message}`);
+    }
+    if (newLeads > 0) await consumir(admin, orgId, "leads", newLeads);
+    results.sort((a, b) => Number(b.leadScore) - Number(a.leadScore));
+    const averageContentScore = results.length
+      ? Number(
+          (
+            results.reduce((sum, result) => sum + Number(result.signals.contentScore), 0) /
+            results.length
+          ).toFixed(1),
+        )
+      : 0;
+    const stats = {
+      sourcesFound,
+      contentItems: posts.length,
+      uniqueProfiles: grouped.size,
+      enrichedProfiles: profiles.length,
+      qualified,
+      newLeads,
+      duplicates,
+      averageContentScore,
+      formatCounts,
+      rejections,
+      cache: cacheStats,
+    };
+    const response = {
+      ok: true,
+      jobId: job.id,
+      stats,
+      results,
+      estimatedCost,
+      actualCost,
+      spentMonthAfter: spentMonth + actualCost,
+      caps: { round: roundCap, month: monthCap },
+    };
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({
+        status: qualified > 0 ? "completed" : "partial",
+        stats,
+        result: response,
+        actual_cost_usd: actualCost,
+        stop_reason: qualified >= input.targetLeads ? "target_reached" : "source_exhausted",
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    return json(response, 200, req);
+  } catch (error) {
+    if (error instanceof ActorRunError) actualCost += error.costUsd;
+    const message = error instanceof Error ? error.message : String(error);
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({
+        status: "failed",
+        actual_cost_usd: actualCost,
+        error: message.slice(0, 500),
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    return json({ ok: false, error: message, jobId: job.id, actualCost }, 500, req);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405, req);
@@ -461,17 +1130,24 @@ Deno.serve(async (req) => {
   }
 
   if (body.acao === "historico") {
+    const historyMode = ["comments", "hashtags", "places"].includes(String(body.mode))
+      ? String(body.mode)
+      : "comments";
     const { data, error } = await admin
       .from("instagram_discovery_jobs")
       .select(
         "id,status,input,stats,result,estimated_cost_usd,actual_cost_usd,created_at,completed_at",
       )
       .eq("org_id", orgId)
-      .eq("mode", "comments")
+      .eq("mode", historyMode)
       .order("created_at", { ascending: false })
       .limit(12);
     if (error) return json({ error: error.message }, 500, req);
     return json({ ok: true, jobs: data ?? [] }, 200, req);
+  }
+
+  if (body.acao === "buscar_conteudo") {
+    return processarDescobertaConteudo({ req, admin, userId, orgId, body });
   }
 
   let input: EntradaComments;

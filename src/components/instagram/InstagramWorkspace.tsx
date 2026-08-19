@@ -14,6 +14,7 @@ import {
   Megaphone,
   MessageCircle,
   MessageCircleMore,
+  Radar,
   Search,
   Send,
   Sparkles,
@@ -41,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { InstagramSearchPanel } from "@/components/leads/instagram/InstagramSearchPanel";
 import { InstagramRunSummary } from "@/components/leads/instagram/InstagramResults";
 import { CommentsHunter } from "@/components/instagram/comments/CommentsHunter";
+import { ContentDiscoveryHunter } from "@/components/instagram/content/ContentDiscoveryHunter";
 import type { Estrategia, PedidoBusca } from "@/lib/fontes-prospeccao";
 import { buscarRedes, type ColetaRedes } from "@/services/whatsapp";
 import {
@@ -231,7 +233,7 @@ export function InstagramWorkspace() {
       </header>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:w-fit sm:grid-cols-5">
+        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:w-fit sm:grid-cols-6">
           <TabsTrigger value="overview">
             <BarChart3 /> Visão geral
           </TabsTrigger>
@@ -240,6 +242,9 @@ export function InstagramWorkspace() {
           </TabsTrigger>
           <TabsTrigger value="comments">
             <MessageCircleMore /> Comentários
+          </TabsTrigger>
+          <TabsTrigger value="radar">
+            <Radar /> Radar
           </TabsTrigger>
           <TabsTrigger value="leads">
             <Users /> Perfis
@@ -329,6 +334,10 @@ export function InstagramWorkspace() {
 
         <TabsContent value="comments" className="mt-5">
           <CommentsHunter onLeadsChanged={load} />
+        </TabsContent>
+
+        <TabsContent value="radar" className="mt-5">
+          <ContentDiscoveryHunter onLeadsChanged={load} />
         </TabsContent>
 
         <TabsContent value="leads" className="mt-5 space-y-4">

@@ -75,7 +75,7 @@ Controles:
 - cache de 6 horas para comentários, 12 horas para posts e 7 dias para perfis;
 - teto de custo por trabalho e mês.
 
-## Fase 2 — Hashtags, locais e conteúdo
+## Fase 2 — Hashtags, locais e conteúdo (implementada)
 
 ### Hashtag Hunter
 
@@ -98,6 +98,20 @@ Controles:
 - taxa de engajamento robusta, sem depender só da média;
 - recência, consistência e formatos usados;
 - menções, coautores, hashtags e chamadas comerciais na legenda.
+
+Entregue no `Discovery Radar`:
+
+- alternância entre Hashtag Hunter e Places Hunter no mesmo fluxo;
+- até 6 hashtags ou 12 locais por trabalho, com recência e volume configuráveis;
+- busca de locais por nicho, bairro/local, cidade e UF antes de coletar o conteúdo;
+- posts e Reels normalizados e vinculados à fonte, ao job e ao perfil;
+- deduplicação de autores antes do enriquecimento pago;
+- média e mediana de curtidas/comentários, taxa robusta de engajamento, formatos,
+  recência, sinais comerciais, aderência de nicho e evidência geográfica;
+- distinção entre negócio, criador e consumidor;
+- qualificação por conteúdo + perfil, com motivo de aprovação/rejeição e evidência original;
+- paginação, histórico por fonte, funil e custo real na interface;
+- cache de 12 horas para conteúdo, 7 dias para locais e perfis, com teto por busca e por mês.
 
 ## Fase 3 — Inteligência de concorrentes
 
@@ -171,4 +185,6 @@ Cold DM automatizado por sessão não oficial não deve ser o fundamento do prod
 
 ## Próximo incremento recomendado
 
-Implementar Hashtag Hunter e Places Hunter usando as mesmas tabelas e o mesmo score, depois consolidar o dashboard multifuente. Isso aumenta cobertura sem duplicar a infraestrutura já entregue pelo Comments Hunter.
+Executar a Fase 3: inteligência de concorrentes com fontes monitoradas, snapshots históricos,
+comentadores recorrentes, objeções, hashtags/locais usados e alertas de oportunidade. Depois disso,
+o dashboard multifuente da Fase 5 poderá comparar tendências reais, e não apenas snapshots isolados.
