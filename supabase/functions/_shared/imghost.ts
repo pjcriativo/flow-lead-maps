@@ -132,7 +132,7 @@ async function analisar(url: string, bytes: Uint8Array): Promise<Analise | null>
     const img = await Image.decode(bytes);
     const w = img.width;
     const h = img.height;
-    const bmp: Uint8Array = img.bitmap;
+    const bmp = img.bitmap;
     let sum = 0;
     let n = 0;
     const step = Math.max(1, Math.floor(bmp.length / 4 / 1500)) * 4;

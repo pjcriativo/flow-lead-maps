@@ -20,8 +20,9 @@ autorização explícita do dono PARA AQUELA AÇÃO ESPECÍFICA.**
 Estado autorizado hoje (mantido pelo dono):
 
 - Coleta em redes LIGADA só nas estratégias **IG-5, IG-7, IG-8, IG-9 e LI-4**
-  (Edge `buscar-redes`), sempre sob o teto de **US$ 5/busca e US$ 50/mês**
-  (`src/lib/redes-teto.ts` + livro-caixa `redes_buscas`). As outras 15
+  (Edge `buscar-redes`), sempre sob o teto social padrão de **US$ 0,75/busca e
+  US$ 5/mês por usuário**, com limite nativo na Apify, cache compartilhado de 7
+  dias e livro-caixa `redes_buscas` (`src/lib/redes-teto.ts`). As outras 15
   estratégias ficam "Em breve" até ordem do dono.
 - Fontes gratuitas do Maps (OSM/Geoapify) não geram gasto; o provider
   `apify` do Maps é PAGO — mesma regra: só rodar quando o dono mandar.

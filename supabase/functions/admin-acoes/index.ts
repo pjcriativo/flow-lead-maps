@@ -623,6 +623,8 @@ Deno.serve(async (req) => {
       const NUMERICOS = [
         "teto_rodada_usd",
         "teto_mes_usd",
+        "teto_redes_rodada_usd",
+        "teto_redes_mes_usd",
         "dias_validade_site",
         "intervalo_disparo_min_seg",
         "intervalo_disparo_max_seg",
@@ -1519,7 +1521,7 @@ Deno.serve(async (req) => {
           }
         : null;
       const ultimaBusca = [ultimaBuscaRedesResult.data, ultimaBuscaMaps]
-        .filter((row): row is Rec => Boolean(row))
+        .filter((row) => row !== null)
         .sort(
           (left, right) =>
             new Date(String(right.criado_em)).getTime() -

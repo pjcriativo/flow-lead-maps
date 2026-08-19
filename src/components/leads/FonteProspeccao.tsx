@@ -1,8 +1,7 @@
 // Seletor das 3 FONTES DE PROSPECÇÃO + o motor de ESTRATÉGIAS (10 por rede).
 // Cada estratégia declara os campos que precisa (src/lib/fontes-prospeccao.ts) e a tela se monta
 // sozinha a partir disso — não existem 20 formulários hardcoded.
-// Instagram e LinkedIn ainda NÃO coletam: os campos validam e montam o pedido, mas o botão fica
-// desabilitado e se explica. Nada aqui finge que já busca.
+// Instagram coleta de verdade; LinkedIn permanece em prévia até a fonte ser liberada.
 import { useMemo, useState } from "react";
 import {
   Instagram,
@@ -30,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { estimarCustoColeta, TETO_REDES_MES_USD, TETO_REDES_RODADA_USD } from "@/lib/redes-teto";
 import {
   FONTES,
   ORDEM_FONTES,
@@ -281,6 +281,8 @@ export function FormEstrategias({
   const erros = useMemo(() => validarEstrategia(atual, valores).erros, [atual, valores]);
   const pedido = useMemo(() => montarPedido(atual, valores), [atual, valores]);
   const camposOk = erros.length === 0;
+  const quantidade = Number(valores.limite ?? 50);
+  const custoEstimado = estimarCustoColeta(quantidade);
   const [rodando, setRodando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
 
@@ -296,7 +298,11 @@ export function FormEstrategias({
       const r = await buscarRedes(atual.id, pedido.campos, pedido.limite);
       if (!r.ok) {
         const msg =
-          r.reason === "teto" ? `Teto de gasto: ${r.motivo}` : `Não coletou: ${r.reason ?? "erro"}`;
+          r.reason === "teto"
+            ? `Teto de gasto: ${r.motivo}`
+            : r.reason === "limite_plano"
+              ? (r.motivo ?? "Limite de leads do plano atingido.")
+              : `Não coletou: ${r.reason ?? "erro"}`;
         toast.error(msg);
         setResultado(msg);
         return;
@@ -304,7 +310,8 @@ export function FormEstrategias({
       const txt =
         `${r.inseridos} lead(s) novo(s) de ${r.encontrados} encontrado(s)` +
         (r.descartados ? ` · ${r.descartados} descartado(s) sem contato` : "") +
-        ` · custo US$ ${(r.custo ?? 0).toFixed(4)} · gasto no mês US$ ${(r.gastoMesDepois ?? 0).toFixed(2)} de ${r.teto?.mes ?? 50}`;
+        ` · ${r.cacheHit ? "cache compartilhado" : `custo US$ ${(r.custo ?? 0).toFixed(4)}`}` +
+        ` · gasto no mês US$ ${(r.gastoMesDepois ?? 0).toFixed(2)} de ${r.teto?.mes ?? TETO_REDES_MES_USD}`;
       toast.success(`${r.inseridos} lead(s) coletado(s).`);
       setResultado(txt);
     } catch (e) {
@@ -414,12 +421,10 @@ export function FormEstrategias({
             <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Quantidade
             </Label>
-            <span className="text-sm font-semibold tabular-nums">
-              {Number(valores.limite ?? 50)}
-            </span>
+            <span className="text-sm font-semibold tabular-nums">{quantidade}</span>
           </div>
           <Slider
-            value={[Number(valores.limite ?? 50)]}
+            value={[quantidade]}
             min={10}
             max={200}
             step={5}
@@ -511,8 +516,10 @@ export function FormEstrategias({
           {atual.coleta ? (
             camposOk ? (
               <>
-                Coleta ligada nesta estratégia. Ela <b>gasta de verdade</b> e para sozinha no teto
-                (US$ 5 por busca · US$ 50 no mês).
+                Estimativa para {quantidade} perfis: <b>até ~US$ {custoEstimado.toFixed(2)}</b>.
+                Busca idêntica recente usa cache e custa US$ 0. Proteção padrão: US${" "}
+                {TETO_REDES_RODADA_USD.toFixed(2)} por busca e US$ {TETO_REDES_MES_USD.toFixed(2)}{" "}
+                por usuário/mês.
               </>
             ) : (
               <>Complete os campos acima para poder buscar.</>

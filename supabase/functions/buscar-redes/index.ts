@@ -17,9 +17,11 @@ import { computeScore } from "../_shared/score.ts";
 import {
   planejarColeta,
   estourouColeta,
-  TETO_RODADA_USD,
-  TETO_MES_USD,
+  limitesRunApify,
+  TETO_REDES_RODADA_USD,
+  TETO_REDES_MES_USD,
 } from "../../../src/lib/redes-teto.ts";
+import { criarChaveCacheRedes } from "../../../src/lib/redes-economia.ts";
 import { mesRefAtual } from "../../../src/lib/automacao-teto.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
 import {
@@ -29,7 +31,8 @@ import {
   type ChaveApify,
 } from "../_shared/apify-pool.ts";
 import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
-import { orgDoUsuario } from "../_shared/limite.ts";
+import { consumir, estadoConsumo, orgDoUsuario } from "../_shared/limite.ts";
+import { liberarCacheRedes, prepararCacheRedes, salvarCacheRedes } from "../_shared/redes-cache.ts";
 
 const API = "https://api.apify.com/v2";
 
@@ -184,8 +187,8 @@ Deno.serve(async (req) => {
 
   // ⚙️ CONFIGURAÇÕES (admin): teto de gasto override — null = usa o padrão de redes-teto.ts
   const configPlataforma = await lerConfigPlataforma(admin);
-  const TETO_RODADA = configPlataforma.teto_rodada_usd ?? TETO_RODADA_USD;
-  const TETO_MES = configPlataforma.teto_mes_usd ?? TETO_MES_USD;
+  const TETO_RODADA = configPlataforma.teto_redes_rodada_usd ?? TETO_REDES_RODADA_USD;
+  const TETO_MES = configPlataforma.teto_redes_mes_usd ?? TETO_REDES_MES_USD;
 
   let b: Rec = {};
   try {
@@ -220,14 +223,27 @@ Deno.serve(async (req) => {
   const agora = new Date();
   const mesRef = mesRefAtual(agora);
 
+  // A coleta social respeita a mesma cota de leads do plano antes de comprar perfis.
+  const consumoPlano = await estadoConsumo(admin, orgId, "leads");
+  const restantePlano = consumoPlano.limite == null ? limitePedido : (consumoPlano.restante ?? 0);
+  if (restantePlano <= 0) {
+    return json({
+      ok: false,
+      reason: "limite_plano",
+      motivo: `Limite de leads do plano atingido: ${consumoPlano.usado ?? consumoPlano.limite}/${consumoPlano.limite}.`,
+    });
+  }
+  const limiteComPlano = Math.min(limitePedido, restantePlano);
+
   // CAMADA 1 — teto ANTES de gastar
   const { data: doMes } = await admin
     .from("redes_buscas")
     .select("custo_usd")
     .eq("user_id", userId)
-    .eq("mes_ref", mesRef);
+    .eq("mes_ref", mesRef)
+    .in("fonte", ["instagram", "linkedin"]);
   const gastoMes = (doMes ?? []).reduce((s, r) => s + Number(r.custo_usd ?? 0), 0);
-  const plano = planejarColeta(gastoMes, limitePedido, TETO_RODADA, TETO_MES);
+  const plano = planejarColeta(gastoMes, limiteComPlano, TETO_RODADA, TETO_MES);
   if (!plano.podeRodar) {
     await admin.from("redes_buscas").insert({
       user_id: userId,
@@ -269,18 +285,27 @@ Deno.serve(async (req) => {
       .update({ ...patch, concluida_em: new Date().toISOString() })
       .eq("id", registro?.id);
 
+  let chaveCacheReservada: string | null = null;
+  const logCache = (mensagem: string) => console.warn(mensagem);
+  const liberarReservaCache = async () => {
+    if (!chaveCacheReservada) return;
+    await liberarCacheRedes(admin, chaveCacheReservada, logCache);
+    chaveCacheReservada = null;
+  };
+
   try {
-    // roda o ator com o teto TRADUZIDO em limite de itens + timeout
+    // A identidade considera só o pedido bruto ao Actor. Estratégias e filtros locais diferentes
+    // reutilizam o mesmo resultado público quando a consulta externa é idêntica.
+    const inputBase = cfg.monta(campos);
+    const chaveCache = criarChaveCacheRedes(cfg.ator, inputBase);
+    const cache = await prepararCacheRedes<Rec>(admin, chaveCache, plano.maxItens);
+    if (!cache.cacheHit) chaveCacheReservada = chaveCache;
+
     const input = {
-      ...cfg.monta(campos),
+      ...inputBase,
       searchLimit: plano.maxItens,
       resultsLimit: plano.maxItens,
       maxItems: plano.maxItens,
-    };
-    const initStart: RequestInit = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
     };
 
     // ═══ ETAPA 3 — NÃO DEIXAR CAIR: laço de rodadas com rodízio de chaves ═══
@@ -288,7 +313,7 @@ Deno.serve(async (req) => {
     // chave, a próxima REINICIA o run — o upsert (user_id, place_id) elimina duplicata.
     // Só falha de verdade se TODAS as chaves acabarem (e ainda entrega o parcial se houver).
     const MAX_RODADAS = 4;
-    const itens: Rec[] = [];
+    const itens: Rec[] = [...cache.items];
     let custoTotal = 0;
     let chaveUsada: ChaveApify | null = null;
     let trocasDeChave = 0;
@@ -303,112 +328,135 @@ Deno.serve(async (req) => {
       itens.push(...parcial);
     };
 
-    for (let rodada = 1; rodada <= MAX_RODADAS; rodada++) {
-      const r = await startRunComPool(
-        admin,
-        () => `${API}/acts/${cfg.ator}/runs?timeout=300&memory=1024`,
-        initStart,
-      );
-      if (!r.ok) {
-        if ((r.reason === "pool_esgotado" || r.reason === "sem_chave") && itens.length > 0) {
-          avisoChaves = "Crédito das chaves acabou no meio — aproveitando o que já foi coletado.";
-          break; // processa o parcial em vez de jogar fora
-        }
-        await finalizar({
-          status: "erro",
-          custo_usd: custoTotal,
-          detalhe:
-            r.reason === "pool_esgotado"
-              ? "todas as chaves Apify esgotadas"
-              : `Apify ${r.status ?? ""}: ${r.detalhe.slice(0, 180)}`,
-          chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
-        });
-        return json({
-          ok: false,
-          reason: r.reason === "pool_esgotado" ? "chaves_esgotadas" : "apify_falhou",
-          status: r.status,
-          detalhe: r.detalhe,
-        });
-      }
-      chaveUsada = r.chave;
-      trocasDeChave += r.trocas;
-      const startJson = (await r.resp.json().catch(() => ({}))) as Rec;
-      const runId = startJson?.data?.id;
-      let datasetId: string | null = startJson?.data?.defaultDatasetId ?? null;
-
-      // aguarda o run (com teto de tempo — o edge não pode ficar preso)
-      let status = "READY";
-      let custoRodada = 0;
-      for (let i = 0; i < 100; i++) {
-        await new Promise((rr) => setTimeout(rr, 3000));
-        const st = await fetch(`${API}/actor-runs/${runId}`, {
-          headers: { Authorization: `Bearer ${chaveUsada.token}` },
-        });
-        const sj = await st.json().catch(() => ({}) as Rec);
-        status = sj?.data?.status ?? "UNKNOWN";
-        custoRodada = Number(sj?.data?.usageTotalUsd ?? 0);
-        datasetId = sj?.data?.defaultDatasetId ?? datasetId;
-        if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
-        // trava de segurança: se a BUSCA já passou do teto da rodada, aborta na hora
-        if (custoTotal + custoRodada >= TETO_RODADA) {
-          await fetch(`${API}/actor-runs/${runId}/abort`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${chaveUsada.token}` },
-          }).catch(() => {});
-          await finalizar({
-            status: "parada_teto",
-            custo_usd: custoTotal + custoRodada,
-            detalhe: "run abortado no teto",
-            chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
-          });
-          return json({ ok: false, reason: "teto_no_run", custo: custoTotal + custoRodada });
-        }
-      }
-      custoTotal += custoRodada;
-
-      if (status === "SUCCEEDED") {
-        await colherDataset(datasetId, chaveUsada.token);
-        break;
-      }
-
-      if (status === "ABORTED" || status === "FAILED") {
-        // parcial do run morto primeiro (o dataset do run morto continua legível)
-        await colherDataset(datasetId, chaveUsada.token);
-        const veredito = await tratarRunMorto(admin, chaveUsada, status, false);
-        if (veredito === "trocar_chave") {
-          trocasDeChave++;
-          avisoChaves = `A busca continuou em outra chave (a "${chaveUsada.apelido}" esgotou no meio).`;
-          continue; // a PRÓXIMA chave reinicia o run — dedupe elimina repetidos
-        }
-        if (veredito === "parar_sem_pool" && itens.length > 0) {
-          avisoChaves = "Crédito esgotou no meio — aproveitando o que já foi coletado.";
+    if (!cache.cacheHit) {
+      for (let rodada = 1; rodada <= MAX_RODADAS; rodada++) {
+        const limitesRun = limitesRunApify(plano.maxItens, TETO_RODADA - custoTotal);
+        if (limitesRun.maxItems <= 0) {
+          avisoChaves = "A busca parou antes de outro run porque o orçamento da rodada acabou.";
           break;
         }
+        const initStart: RequestInit = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...input,
+            searchLimit: limitesRun.maxItems,
+            resultsLimit: limitesRun.maxItems,
+            maxItems: limitesRun.maxItems,
+          }),
+        };
+        const urlRun =
+          `${API}/acts/${cfg.ator}/runs?timeout=300&memory=1024` +
+          `&maxItems=${limitesRun.maxItems}` +
+          `&maxTotalChargeUsd=${limitesRun.maxTotalChargeUsd}`;
+        const r = await startRunComPool(admin, () => urlRun, initStart);
+        if (!r.ok) {
+          if ((r.reason === "pool_esgotado" || r.reason === "sem_chave") && itens.length > 0) {
+            avisoChaves = "Crédito das chaves acabou no meio — aproveitando o que já foi coletado.";
+            break; // processa o parcial em vez de jogar fora
+          }
+          await finalizar({
+            status: "erro",
+            custo_usd: custoTotal,
+            detalhe:
+              r.reason === "pool_esgotado"
+                ? "todas as chaves Apify esgotadas"
+                : `Apify ${r.status ?? ""}: ${r.detalhe.slice(0, 180)}`,
+            chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
+          });
+          await liberarReservaCache();
+          return json({
+            ok: false,
+            reason: r.reason === "pool_esgotado" ? "chaves_esgotadas" : "apify_falhou",
+            status: r.status,
+            detalhe: r.detalhe,
+          });
+        }
+        chaveUsada = r.chave;
+        trocasDeChave += r.trocas;
+        const startJson = (await r.resp.json().catch(() => ({}))) as Rec;
+        const runId = startJson?.data?.id;
+        let datasetId: string | null = startJson?.data?.defaultDatasetId ?? null;
+
+        // aguarda o run (com teto de tempo — o edge não pode ficar preso)
+        let status = "READY";
+        let custoRodada = 0;
+        for (let i = 0; i < 100; i++) {
+          await new Promise((rr) => setTimeout(rr, 3000));
+          const st = await fetch(`${API}/actor-runs/${runId}`, {
+            headers: { Authorization: `Bearer ${chaveUsada.token}` },
+          });
+          const sj = await st.json().catch(() => ({}) as Rec);
+          status = sj?.data?.status ?? "UNKNOWN";
+          custoRodada = Number(sj?.data?.usageTotalUsd ?? 0);
+          datasetId = sj?.data?.defaultDatasetId ?? datasetId;
+          if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
+          // trava de segurança: se a BUSCA já passou do teto da rodada, aborta na hora
+          if (custoTotal + custoRodada >= TETO_RODADA) {
+            await fetch(`${API}/actor-runs/${runId}/abort`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${chaveUsada.token}` },
+            }).catch(() => {});
+            await finalizar({
+              status: "parada_teto",
+              custo_usd: custoTotal + custoRodada,
+              detalhe: "run abortado no teto",
+              chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
+            });
+            await liberarReservaCache();
+            return json({ ok: false, reason: "teto_no_run", custo: custoTotal + custoRodada });
+          }
+        }
+        custoTotal += custoRodada;
+
+        if (status === "SUCCEEDED") {
+          await colherDataset(datasetId, chaveUsada.token);
+          break;
+        }
+
+        if (status === "ABORTED" || status === "FAILED") {
+          // parcial do run morto primeiro (o dataset do run morto continua legível)
+          await colherDataset(datasetId, chaveUsada.token);
+          const veredito = await tratarRunMorto(admin, chaveUsada, status, false);
+          if (veredito === "trocar_chave") {
+            trocasDeChave++;
+            avisoChaves = `A busca continuou em outra chave (a "${chaveUsada.apelido}" esgotou no meio).`;
+            continue; // a PRÓXIMA chave reinicia o run — dedupe elimina repetidos
+          }
+          if (veredito === "parar_sem_pool" && itens.length > 0) {
+            avisoChaves = "Crédito esgotou no meio — aproveitando o que já foi coletado.";
+            break;
+          }
+          await finalizar({
+            status: "erro",
+            custo_usd: custoTotal,
+            detalhe:
+              veredito === "parar_sem_pool"
+                ? "crédito Apify esgotado (chave única)"
+                : `run ${status}`,
+            chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
+          });
+          await liberarReservaCache();
+          return json({
+            ok: false,
+            reason: veredito === "parar_sem_pool" ? "chaves_esgotadas" : "run_nao_concluiu",
+            status,
+            custo: custoTotal,
+          });
+        }
+
+        // TIMED-OUT / UNKNOWN — falha do run, não de crédito: sem rodízio (comportamento antigo)
         await finalizar({
           status: "erro",
           custo_usd: custoTotal,
-          detalhe:
-            veredito === "parar_sem_pool"
-              ? "crédito Apify esgotado (chave única)"
-              : `run ${status}`,
+          detalhe: `run ${status}`,
           chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
         });
-        return json({
-          ok: false,
-          reason: veredito === "parar_sem_pool" ? "chaves_esgotadas" : "run_nao_concluiu",
-          status,
-          custo: custoTotal,
-        });
+        await liberarReservaCache();
+        return json({ ok: false, reason: "run_nao_concluiu", status, custo: custoTotal });
       }
-
-      // TIMED-OUT / UNKNOWN — falha do run, não de crédito: sem rodízio (comportamento antigo)
-      await finalizar({
-        status: "erro",
-        custo_usd: custoTotal,
-        detalhe: `run ${status}`,
-        chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
-      });
-      return json({ ok: false, reason: "run_nao_concluiu", status, custo: custoTotal });
+      await salvarCacheRedes(admin, chaveCache, plano.maxItens, itens, logCache);
+      chaveCacheReservada = null;
     }
     const custo = custoTotal;
 
@@ -477,14 +525,15 @@ Deno.serve(async (req) => {
 
       // MESMO score do Maps — nada de régua paralela.
       const sc = computeScore({
-        business_name: lead.business_name ?? "",
-        website: lead.website ?? null,
-        phone: lead.phone ?? null,
-        email: lead.email ?? null,
+        hasWebsite: !!lead.website,
+        site: null,
+        hasInstagram: !!lead.instagram_url,
+        hasFacebook: false,
+        hasWhatsapp: !!lead.whatsapp,
+        hasPhone: !!lead.phone,
+        hasEmail: !!lead.email,
         rating: null,
-        review_count: null,
-        instagram_url: lead.instagram_url ?? null,
-        facebook_url: null,
+        reviewCount: null,
       });
       lead.score = sc.score;
       lead.score_breakdown = sc;
@@ -508,6 +557,8 @@ Deno.serve(async (req) => {
       if (!error && insertedLead) inseridos++;
     }
 
+    if (inseridos > 0) await consumir(admin, orgId, "leads", inseridos);
+
     const estourou = estourouColeta(custo, gastoMes, TETO_RODADA, TETO_MES);
     await finalizar({
       status: estourou ? "parada_teto" : "concluida",
@@ -516,7 +567,11 @@ Deno.serve(async (req) => {
       inseridos,
       // 📒 livro-caixa agora registra QUAL chave gastou + o rastro do rodízio
       chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
-      detalhe: estourou ? "custo real bateu o teto" : (avisoChaves ?? null),
+      detalhe: estourou
+        ? "custo real bateu o teto"
+        : cache.cacheHit
+          ? "resultado entregue pelo cache compartilhado"
+          : (avisoChaves ?? null),
     });
 
     return json({
@@ -542,9 +597,11 @@ Deno.serve(async (req) => {
       chaveApelido: chaveUsada?.id ? chaveUsada.apelido : null,
       trocasDeChave,
       avisoChaves,
+      cacheHit: cache.cacheHit,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    await liberarReservaCache();
     await finalizar({ status: "erro", detalhe: msg.slice(0, 300) });
     return json({ ok: false, reason: "erro", detalhe: msg.slice(0, 300) });
   }

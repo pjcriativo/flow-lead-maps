@@ -344,27 +344,30 @@ async function bloco1(L) {
   T(leadIg.status === "new" && leadLi.status === "new", "ambos entram como 'new' no MESMO funil");
 
   console.log(" · TETO da coleta paga em redes (Apify) — não liga sem teto");
-  T(L.TETO_RODADA_USD === 5 && L.TETO_MES_USD === 50, "teto: US$5/rodada e US$50/mês");
+  T(
+    L.TETO_REDES_RODADA_USD === 0.75 && L.TETO_REDES_MES_USD === 5,
+    "teto social: US$0,75/rodada e US$5/mês",
+  );
   const p0 = L.planejarColeta(0, 50);
   T(p0.podeRodar === true, "mês zerado → pode rodar");
   T(p0.maxItens === 50, "pedido de 50 cabe no teto da rodada", String(p0.maxItens));
   const pMuito = L.planejarColeta(0, 5000);
   T(
-    pMuito.maxItens === 500,
-    "pedido gigante é CORTADO pelo teto da rodada (US$5/0,01)",
+    pMuito.maxItens === 250,
+    "pedido gigante é CORTADO pelo teto da rodada (US$0,75/0,003)",
     String(pMuito.maxItens),
   );
-  T(L.planejarColeta(50, 50).podeRodar === false, "teto MENSAL batido → não roda");
-  T(L.planejarColeta(49.995, 50).podeRodar === false, "sobra que não cobre 1 item → não roda");
-  const pQuase = L.planejarColeta(48, 500);
+  T(L.planejarColeta(5, 50).podeRodar === false, "teto MENSAL batido → não roda");
+  T(L.planejarColeta(4.999, 50).podeRodar === false, "sobra que não cobre 1 item → não roda");
+  const pQuase = L.planejarColeta(4.5, 500);
   T(
-    pQuase.maxItens === 200,
-    "perto do teto mensal, a rodada encolhe (US$2 restantes)",
+    pQuase.maxItens === 166,
+    "perto do teto mensal, a rodada encolhe (US$0,50 restantes)",
     String(pQuase.maxItens),
   );
-  T(L.estourouColeta(5, 0) === true, "custo real == teto da rodada → estourou");
-  T(L.estourouColeta(1, 49.5) === true, "custo real + mês == teto mensal → estourou");
-  T(L.estourouColeta(1, 0) === false, "dentro dos dois tetos → segue");
+  T(L.estourouColeta(0.75, 0) === true, "custo real == teto da rodada → estourou");
+  T(L.estourouColeta(0.1, 4.9) === true, "custo real + mês == teto mensal → estourou");
+  T(L.estourouColeta(0.1, 0) === false, "dentro dos dois tetos → segue");
   T(
     L.mesRefAtual(new Date("2026-07-15T00:00:00Z")) === "2026-07",
     "mês de referência no formato certo",

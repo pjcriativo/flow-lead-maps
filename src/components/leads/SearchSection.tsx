@@ -321,15 +321,24 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     try {
       const r = await buscarRedes(estrategia.id, pedido.campos, pedido.limite);
       if (!r.ok) {
-        const msg = r.reason === "teto" ? `Teto de gasto: ${r.motivo}` : `Falha: ${r.reason}`;
+        const msg =
+          r.reason === "teto"
+            ? `Teto de gasto: ${r.motivo}`
+            : r.reason === "limite_plano"
+              ? (r.motivo ?? "Limite de leads do plano atingido.")
+              : `Falha: ${r.reason}`;
         setStatus(msg);
         pushLog(`✖ ${msg}`);
         return;
       }
 
-      pushLog(`✔ Coleta concluída. Custo: US$ ${(r.custo ?? 0).toFixed(4)}.`);
+      pushLog(
+        r.cacheHit
+          ? "✔ Resultado recente reutilizado do cache. Custo Apify: US$ 0,0000."
+          : `✔ Coleta concluída. Custo: US$ ${(r.custo ?? 0).toFixed(4)}.`,
+      );
       if (r.avisoChaves) pushLog(`⚠️ ${r.avisoChaves}`);
-      
+
       const qtdInseridos = r.inseridos ?? 0;
       if (qtdInseridos > 0) {
         setStatus(`Buscando os ${qtdInseridos} novos leads no banco...`);
@@ -340,20 +349,28 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
           .eq("origem_estrategia", estrategia.id)
           .order("created_at", { ascending: false })
           .limit(qtdInseridos);
-          
+
         if (novosLeads) {
           setLeads(novosLeads as Lead[]);
           insertedIdsRef.current = novosLeads.map((l) => l.id);
         }
       }
 
-      setStatus(`Concluído — ${qtdInseridos} leads inseridos (${r.encontrados} encontrados, ${r.descartados} s/ contato)`);
-      posthog.capture("search_redes_done", { estrategia: estrategia.id, inseridos: qtdInseridos, custo: r.custo });
+      setStatus(
+        `Concluído — ${qtdInseridos} leads inseridos (${r.encontrados} encontrados, ${r.descartados} s/ contato)`,
+      );
+      posthog.capture("search_redes_done", {
+        estrategia: estrategia.id,
+        inseridos: qtdInseridos,
+        custo: r.custo,
+      });
 
       const ids = insertedIdsRef.current;
       if (ids.length > 0) {
         try {
-          const nichoStr = String(pedido.campos.nicho ?? pedido.campos.setor ?? pedido.campos.termo ?? estrategia.id);
+          const nichoStr = String(
+            pedido.campos.nicho ?? pedido.campos.setor ?? pedido.campos.termo ?? estrategia.id,
+          );
           const cidadeStr = String(pedido.campos.cidade ?? pedido.campos.regiao ?? "");
           const nome = nomeAutoLista(nichoStr, cidadeStr, "");
           const lista = await criarListaComLeads({
@@ -365,7 +382,9 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
             radius: 0,
             leadIds: ids,
           });
-          pushLog(`🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`);
+          pushLog(
+            `🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`,
+          );
         } catch (le) {
           const msg = le instanceof Error ? le.message : "erro";
           pushLog(`⚠️ Leads salvos, mas falhou ao criar a lista: ${msg}`);

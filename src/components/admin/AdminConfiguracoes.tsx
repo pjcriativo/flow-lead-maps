@@ -48,6 +48,8 @@ type Config = {
   // Limites e operação
   teto_rodada_usd: number | null;
   teto_mes_usd: number | null;
+  teto_redes_rodada_usd: number | null;
+  teto_redes_mes_usd: number | null;
   dias_validade_site: number | null;
   intervalo_disparo_min_seg: number | null;
   intervalo_disparo_max_seg: number | null;
@@ -81,6 +83,8 @@ const VAZIA: Config = {
   fonte_leads_padrao: null,
   teto_rodada_usd: null,
   teto_mes_usd: null,
+  teto_redes_rodada_usd: null,
+  teto_redes_mes_usd: null,
   dias_validade_site: null,
   intervalo_disparo_min_seg: null,
   intervalo_disparo_max_seg: null,
@@ -1744,19 +1748,35 @@ export function AdminConfiguracoes() {
                 descricao="Tetos de gasto e prazos operacionais — todos aplicados no servidor."
               >
                 <Campo
-                  rotulo="Teto de gasto por rodada (US$)"
-                  fonte="buscar-redes / redesign-site — trava a rodada acima disso"
+                  rotulo="Teto de IA/site por geração (US$)"
+                  fonte="redesign-site — não interfere na coleta social"
                   valor={campo("teto_rodada_usd")}
                   onChange={set("teto_rodada_usd")}
-                  placeholder="padrão do sistema"
+                  placeholder="5 (padrão)"
                   type="number"
                 />
                 <Campo
-                  rotulo="Teto de gasto por mês (US$)"
-                  fonte="buscar-redes / redesign-site — trava novas buscas no mês"
+                  rotulo="Teto de IA/site por mês (US$)"
+                  fonte="redesign-site — orçamento separado da coleta social"
                   valor={campo("teto_mes_usd")}
                   onChange={set("teto_mes_usd")}
-                  placeholder="padrão do sistema"
+                  placeholder="50 (padrão)"
+                  type="number"
+                />
+                <Campo
+                  rotulo="Teto social por busca (US$)"
+                  fonte="buscar-redes — Instagram/LinkedIn via Apify"
+                  valor={campo("teto_redes_rodada_usd")}
+                  onChange={set("teto_redes_rodada_usd")}
+                  placeholder="0,75 (padrão)"
+                  type="number"
+                />
+                <Campo
+                  rotulo="Teto social por usuário/mês (US$)"
+                  fonte="buscar-redes — padrão de US$ 5,00"
+                  valor={campo("teto_redes_mes_usd")}
+                  onChange={set("teto_redes_mes_usd")}
+                  placeholder="5 (padrão)"
                   type="number"
                 />
                 <Campo

@@ -518,6 +518,8 @@ export type Database = {
           simbolo_moeda: string | null;
           termos_condicoes_ativo: boolean;
           teto_mes_usd: number | null;
+          teto_redes_mes_usd: number | null;
+          teto_redes_rodada_usd: number | null;
           teto_rodada_usd: number | null;
         };
         Insert: {
@@ -548,6 +550,8 @@ export type Database = {
           simbolo_moeda?: string | null;
           termos_condicoes_ativo?: boolean;
           teto_mes_usd?: number | null;
+          teto_redes_mes_usd?: number | null;
+          teto_redes_rodada_usd?: number | null;
           teto_rodada_usd?: number | null;
         };
         Update: {
@@ -578,6 +582,8 @@ export type Database = {
           simbolo_moeda?: string | null;
           termos_condicoes_ativo?: boolean;
           teto_mes_usd?: number | null;
+          teto_redes_mes_usd?: number | null;
+          teto_redes_rodada_usd?: number | null;
           teto_rodada_usd?: number | null;
         };
         Relationships: [];

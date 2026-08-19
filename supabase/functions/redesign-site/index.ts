@@ -91,7 +91,8 @@ Deno.serve(async (req) => {
     .from("redes_buscas")
     .select("custo_usd")
     .eq("user_id", userId)
-    .eq("mes_ref", mesRef);
+    .eq("mes_ref", mesRef)
+    .eq("fonte", "ia_site");
   const gastoMes = (doMes ?? []).reduce(
     (s: number, r: { custo_usd: unknown }) => s + Number(r.custo_usd ?? 0),
     0,

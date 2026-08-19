@@ -5,12 +5,41 @@
 //   2) DEPOIS de rodar → o custo REAL do run (lido da Apify) é somado e registrado; se estourou,
 //      a próxima rodada é bloqueada. Nunca "descobrimos" o gasto no fim do mês.
 
+/** Tetos legados do livro-caixa global, mantidos para geração de sites com IA. */
 export const TETO_RODADA_USD = 5;
 export const TETO_MES_USD = 50;
 
+/** Tetos específicos da coleta social: preservam margem sem reduzir os 200 perfis da UI. */
+export const TETO_REDES_RODADA_USD = 0.75;
+export const TETO_REDES_MES_USD = 5;
+
 /** Custo médio por item coletado, usado só para PLANEJAR quantos itens cabem no teto.
  *  O gasto que vale é sempre o real, lido do run. Conservador de propósito. */
-export const CUSTO_ITEM_ESTIMADO_USD = 0.01;
+export const CUSTO_ITEM_ESTIMADO_USD = 0.003;
+
+const arredondarUsd = (valor: number) => Number(valor.toFixed(6));
+
+export function estimarCustoColeta(
+  itens: number,
+  custoItem: number = CUSTO_ITEM_ESTIMADO_USD,
+): number {
+  return arredondarUsd(Math.max(0, Math.floor(itens)) * custoItem);
+}
+
+/** Limites cobrados pela própria plataforma Apify, antes de o Actor iniciar. */
+export function limitesRunApify(
+  itensDesejados: number,
+  orcamentoDisponivelUsd: number,
+  custoItem: number = CUSTO_ITEM_ESTIMADO_USD,
+): { maxItems: number; maxTotalChargeUsd: number } {
+  const desejados = Math.max(0, Math.floor(itensDesejados));
+  const orcamento = Math.max(0, orcamentoDisponivelUsd);
+  const maxItems = Math.min(desejados, Math.floor(orcamento / custoItem));
+  return {
+    maxItems,
+    maxTotalChargeUsd: arredondarUsd(Math.min(orcamento, estimarCustoColeta(maxItems, custoItem))),
+  };
+}
 
 export type PlanoColeta = {
   podeRodar: boolean;
@@ -23,8 +52,8 @@ export type PlanoColeta = {
 export function planejarColeta(
   gastoMesUsd: number,
   limitePedido: number,
-  tetoRodada: number = TETO_RODADA_USD,
-  tetoMes: number = TETO_MES_USD,
+  tetoRodada: number = TETO_REDES_RODADA_USD,
+  tetoMes: number = TETO_REDES_MES_USD,
   custoItem: number = CUSTO_ITEM_ESTIMADO_USD,
 ): PlanoColeta {
   const restanteMesUsd = Math.max(0, tetoMes - gastoMesUsd);
@@ -56,8 +85,8 @@ export function planejarColeta(
 export function estourouColeta(
   custoRunUsd: number,
   gastoMesAntes: number,
-  tetoRodada: number = TETO_RODADA_USD,
-  tetoMes: number = TETO_MES_USD,
+  tetoRodada: number = TETO_REDES_RODADA_USD,
+  tetoMes: number = TETO_REDES_MES_USD,
 ): boolean {
   return custoRunUsd >= tetoRodada || gastoMesAntes + custoRunUsd >= tetoMes;
 }

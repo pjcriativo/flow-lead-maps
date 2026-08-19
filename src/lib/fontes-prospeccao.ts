@@ -5,14 +5,10 @@
 // lugares. Aqui é o canal de origem: o Maps busca NEGÓCIO por lugar, o Instagram busca PERFIL
 // por descoberta, o LinkedIn busca PESSOA por filtro profissional.
 //
-// ⚠️ Instagram e LinkedIn ainda NÃO coletam nada. Este módulo define as estratégias, os campos
-// que cada uma exige, valida o formulário e monta o "pedido de busca" — para que, quando a
-// coleta entrar (Apify), o lead caia no MESMO pipeline (mesma tabela `leads` → score → redesign
-// → campanha). NÃO existe pipeline paralelo: veja `perfilParaLead`/`pessoaParaLead`.
+// O Instagram já coleta via Apify; o LinkedIn permanece em prévia. Este módulo é compartilhado
+// entre navegador e Edge, portanto não importa clientes de browser nem dependências de runtime.
 //
 // Cada estratégia declara `pluga`: onde o ator da Apify entra quando for ligar.
-
-import type { Lead } from "@/lib/leads-api";
 
 export type FonteProspeccao = "google_maps" | "instagram" | "linkedin";
 
@@ -564,8 +560,24 @@ export function montarPedido(e: Estrategia, v: ValoresBusca): PedidoBusca {
  * para depois medir QUAL ESTRATÉGIA converte mais (migration 037).
  */
 
-// As colunas da migration 037 (origem_fonte, origem_estrategia, cargo, seguidores) já estão
-// nos tipos gerados do Supabase — por isso `Partial<Lead>` abaixo cobre tudo, sem tipo extra.
+export type LeadProspeccao = {
+  place_id: string;
+  business_name: string;
+  owner_name?: string | null;
+  instagram_url?: string | null;
+  linkedin_url?: string | null;
+  website?: string | null;
+  email?: string | null;
+  whatsapp?: string | null;
+  category?: string | null;
+  city?: string | null;
+  notes?: string | null;
+  status: "new";
+  origem_fonte: "instagram" | "linkedin";
+  origem_estrategia: string;
+  cargo?: string | null;
+  seguidores?: number | null;
+};
 
 export type PerfilInstagram = {
   username: string;
@@ -589,7 +601,7 @@ export type PessoaLinkedIn = {
 };
 
 /** Perfil do Instagram → linha de `leads` (mesmo pipeline: score → redesign → campanha). */
-export function perfilParaLead(p: PerfilInstagram, estrategia: string): Partial<Lead> {
+export function perfilParaLead(p: PerfilInstagram, estrategia: string): LeadProspeccao {
   const user = p.username.trim().replace(/^@/, "");
   return {
     place_id: `ig:${user}`,
@@ -610,7 +622,7 @@ export function perfilParaLead(p: PerfilInstagram, estrategia: string): Partial<
 }
 
 /** Pessoa do LinkedIn → linha de `leads`. É B2B: a PESSOA é o lead, a empresa vira o negócio. */
-export function pessoaParaLead(p: PessoaLinkedIn, estrategia: string): Partial<Lead> {
+export function pessoaParaLead(p: PessoaLinkedIn, estrategia: string): LeadProspeccao {
   const slug = p.slug.trim().replace(/^\//, "");
   return {
     place_id: `li:${slug}`,
