@@ -113,7 +113,7 @@ Entregue no `Discovery Radar`:
 - paginação, histórico por fonte, funil e custo real na interface;
 - cache de 12 horas para conteúdo, 7 dias para locais e perfis, com teto por busca e por mês.
 
-## Fase 3 — Inteligência de concorrentes
+## Fase 3 — Inteligência de concorrentes (implementada)
 
 - lista de concorrentes monitorados;
 - novos posts e Reels;
@@ -124,7 +124,18 @@ Entregue no `Discovery Radar`:
 - comparação de frequência e engajamento;
 - alertas de oportunidade por palavras de compra.
 
-O sistema deve mostrar tendência ao longo do tempo. Snapshot sem histórico não mede crescimento.
+Entregue no painel `Concorrentes`:
+
+- cadastro e arquivamento de concorrentes com nicho, cidade, UF e frequência planejada;
+- snapshots históricos de perfil, seguidores, posts, frequência e engajamento robusto;
+- coleta seletiva de posts/Reels e comentários nos conteúdos com maior atividade;
+- comentaristas recorrentes, sinais de compra, dúvidas e objeções por categoria;
+- hashtags, locais, formatos e ranking dos conteúdos que mais mobilizam a audiência;
+- alertas de crescimento, salto de engajamento, intenção, recorrência, objeção e nova hashtag;
+- cache, deduplicação, teto por execução e proteção do orçamento compartilhados com os demais hunters;
+- dashboard com evolução temporal e evidências clicáveis para auditoria.
+
+O primeiro snapshot estabelece a linha de base; crescimento e variação aparecem a partir da segunda coleta.
 
 ## Fase 4 — Score Instagram v2
 
@@ -185,6 +196,6 @@ Cold DM automatizado por sessão não oficial não deve ser o fundamento do prod
 
 ## Próximo incremento recomendado
 
-Executar a Fase 3: inteligência de concorrentes com fontes monitoradas, snapshots históricos,
-comentadores recorrentes, objeções, hashtags/locais usados e alertas de oportunidade. Depois disso,
-o dashboard multifuente da Fase 5 poderá comparar tendências reais, e não apenas snapshots isolados.
+Executar a Fase 4: Score Instagram v2 com pesos independentes de intenção, fit, atividade e
+autenticidade, configurados conforme a origem do lead. Em seguida, consolidar os resultados no
+dashboard multifuente da Fase 5.

@@ -26,6 +26,13 @@ import {
   type ContentDiscoveryMode,
 } from "../../../src/lib/instagram-content-discovery.ts";
 import {
+  buildCompetitorAlerts,
+  compareCompetitorSnapshots,
+  estimateCompetitorMonitoringCost,
+  summarizeCompetitorComments,
+  summarizeCompetitorContent,
+} from "../../../src/lib/instagram-competitor-intelligence.ts";
+import {
   perfilEhProfissionalInstagram,
   perfilTemLocalidade,
   perfilTemNicho,
@@ -82,6 +89,14 @@ type EntradaConteudo = {
   onlyProfessionals: boolean;
   requireLocation: boolean;
   requireNiche: boolean;
+};
+
+type EntradaMonitoramentoConcorrente = {
+  requestId: string;
+  competitorId: string;
+  maxPosts: number;
+  commentPosts: number;
+  commentsPerPost: number;
 };
 
 type RunResult = {
@@ -224,6 +239,21 @@ function validarEntradaConteudo(body: Rec): EntradaConteudo {
     onlyProfessionals: booleano(body.onlyProfessionals, true),
     requireLocation: booleano(body.requireLocation, false),
     requireNiche: booleano(body.requireNiche, true),
+  };
+}
+
+function validarEntradaMonitoramento(body: Rec): EntradaMonitoramentoConcorrente {
+  const requestId = String(body.requestId ?? "").trim();
+  if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId)) throw new Error("request_id_invalido");
+  const competitorId = String(body.competitorId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(competitorId)) throw new Error("Concorrente invalido.");
+  const maxPosts = inteiro(body.maxPosts, 5, 30, 12);
+  return {
+    requestId,
+    competitorId,
+    maxPosts,
+    commentPosts: inteiro(body.commentPosts, 1, Math.min(5, maxPosts), 3),
+    commentsPerPost: inteiro(body.commentsPerPost, 10, 100, 30),
   };
 }
 
@@ -1098,6 +1128,572 @@ async function processarDescobertaConteudo(params: {
   }
 }
 
+async function listarConcorrentes(admin: Admin, orgId: string, req: Request): Promise<Response> {
+  const { data: competitors, error } = await admin
+    .from("instagram_competitors")
+    .select("*")
+    .eq("org_id", orgId)
+    .neq("status", "archived")
+    .order("updated_at", { ascending: false });
+  if (error) return json({ ok: false, error: error.message }, 500, req);
+  const ids = (competitors ?? []).map((item: Rec) => String(item.id));
+  if (!ids.length) return json({ ok: true, competitors: [], snapshots: [], alerts: [] }, 200, req);
+  const [{ data: snapshots, error: snapshotsError }, { data: alerts, error: alertsError }] =
+    await Promise.all([
+      admin
+        .from("instagram_competitor_snapshots")
+        .select("*")
+        .in("competitor_id", ids)
+        .order("captured_at", { ascending: false })
+        .limit(300),
+      admin
+        .from("instagram_competitor_alerts")
+        .select("*")
+        .in("competitor_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(150),
+    ]);
+  if (snapshotsError || alertsError) {
+    return json({ ok: false, error: snapshotsError?.message ?? alertsError?.message }, 500, req);
+  }
+  return json(
+    { ok: true, competitors: competitors ?? [], snapshots: snapshots ?? [], alerts: alerts ?? [] },
+    200,
+    req,
+  );
+}
+
+async function salvarConcorrente(params: {
+  admin: Admin;
+  orgId: string;
+  userId: string;
+  body: Rec;
+  req: Request;
+}): Promise<Response> {
+  const { admin, orgId, userId, body, req } = params;
+  const username = normalizarUsername(body.username);
+  const niche = String(body.niche ?? "").trim();
+  if (!/^[\w.]{1,30}$/.test(username)) {
+    return json({ ok: false, error: "Informe um perfil publico valido." }, 400, req);
+  }
+  if (!niche) return json({ ok: false, error: "Escolha o nicho do concorrente." }, 400, req);
+  const intervalHours = inteiro(body.monitoringIntervalHours, 24, 720, 168);
+  const { data, error } = await admin
+    .from("instagram_competitors")
+    .upsert(
+      {
+        org_id: orgId,
+        user_id: userId,
+        username,
+        label: String(body.label ?? "").trim() || null,
+        niche,
+        city: String(body.city ?? "").trim() || null,
+        state:
+          String(body.state ?? "")
+            .trim()
+            .toUpperCase()
+            .slice(0, 2) || null,
+        status: "active",
+        monitoring_interval_hours: intervalHours,
+        next_analysis_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "org_id,username" },
+    )
+    .select("*")
+    .single();
+  if (error || !data) return json({ ok: false, error: error?.message }, 500, req);
+  return json({ ok: true, competitor: data }, 200, req);
+}
+
+async function arquivarConcorrente(
+  admin: Admin,
+  orgId: string,
+  body: Rec,
+  req: Request,
+): Promise<Response> {
+  const competitorId = String(body.competitorId ?? "");
+  const { error } = await admin
+    .from("instagram_competitors")
+    .update({ status: "archived", updated_at: new Date().toISOString() })
+    .eq("id", competitorId)
+    .eq("org_id", orgId);
+  if (error) return json({ ok: false, error: error.message }, 500, req);
+  return json({ ok: true }, 200, req);
+}
+
+async function processarMonitoramentoConcorrente(params: {
+  req: Request;
+  admin: Admin;
+  userId: string;
+  orgId: string;
+  body: Rec;
+}): Promise<Response> {
+  const { req, admin, userId, orgId, body } = params;
+  let input: EntradaMonitoramentoConcorrente;
+  try {
+    input = validarEntradaMonitoramento(body);
+  } catch (error) {
+    return json(
+      { ok: false, error: error instanceof Error ? error.message : String(error) },
+      400,
+      req,
+    );
+  }
+  const { data: competitor, error: competitorError } = await admin
+    .from("instagram_competitors")
+    .select("*")
+    .eq("id", input.competitorId)
+    .eq("org_id", orgId)
+    .neq("status", "archived")
+    .maybeSingle();
+  if (competitorError || !competitor) {
+    return json({ ok: false, error: "Concorrente nao encontrado." }, 404, req);
+  }
+  const { data: existing } = await admin
+    .from("instagram_discovery_jobs")
+    .select("status,result,error")
+    .eq("user_id", userId)
+    .eq("request_id", input.requestId)
+    .maybeSingle();
+  if (existing?.result) return json(existing.result, 200, req);
+  if (existing) {
+    return json(
+      { ok: existing.status !== "failed", status: existing.status, error: existing.error },
+      existing.status === "failed" ? 409 : 202,
+      req,
+    );
+  }
+
+  const config = await lerConfigPlataforma(admin);
+  const roundCap = config.teto_redes_rodada_usd ?? TETO_REDES_RODADA_USD;
+  const monthCap = config.teto_redes_mes_usd ?? TETO_REDES_MES_USD;
+  const monthRef = mesRefAtual(new Date());
+  const [{ data: discoveryCosts }, { data: legacyCosts }] = await Promise.all([
+    admin
+      .from("instagram_discovery_jobs")
+      .select("actual_cost_usd")
+      .eq("user_id", userId)
+      .eq("month_ref", monthRef),
+    admin
+      .from("redes_buscas")
+      .select("custo_usd")
+      .eq("user_id", userId)
+      .eq("mes_ref", monthRef)
+      .eq("fonte", "instagram"),
+  ]);
+  const spentMonth =
+    (discoveryCosts ?? []).reduce(
+      (sum: number, row: Rec) => sum + Number(row.actual_cost_usd ?? 0),
+      0,
+    ) + (legacyCosts ?? []).reduce((sum: number, row: Rec) => sum + Number(row.custo_usd ?? 0), 0);
+  const estimatedCost = estimateCompetitorMonitoringCost(input);
+  const availableBudget = Math.max(0, Math.min(roundCap, monthCap - spentMonth));
+
+  let sourceId = competitor.source_id ? String(competitor.source_id) : null;
+  if (!sourceId) {
+    const { data: source, error: sourceError } = await admin
+      .from("instagram_sources")
+      .insert({
+        org_id: orgId,
+        user_id: userId,
+        source_type: "competitor",
+        name: `@${competitor.username}`,
+        config: { competitorId: competitor.id, username: competitor.username },
+      })
+      .select("id")
+      .single();
+    if (sourceError || !source) return json({ ok: false, error: sourceError?.message }, 500, req);
+    sourceId = source.id;
+    await admin
+      .from("instagram_competitors")
+      .update({ source_id: sourceId, updated_at: new Date().toISOString() })
+      .eq("id", competitor.id);
+  }
+  const initialStatus = estimatedCost > availableBudget ? "budget_stopped" : "running";
+  const { data: job, error: jobError } = await admin
+    .from("instagram_discovery_jobs")
+    .insert({
+      org_id: orgId,
+      user_id: userId,
+      source_id: sourceId,
+      request_id: input.requestId,
+      mode: "competitors",
+      status: initialStatus,
+      input: { ...input, username: competitor.username },
+      estimated_cost_usd: estimatedCost,
+      month_ref: monthRef,
+      stop_reason: initialStatus === "budget_stopped" ? "estimated_cost_exceeds_budget" : null,
+      started_at: initialStatus === "running" ? new Date().toISOString() : null,
+      completed_at: initialStatus === "budget_stopped" ? new Date().toISOString() : null,
+    })
+    .select("id")
+    .single();
+  if (jobError || !job) return json({ ok: false, error: jobError?.message }, 500, req);
+  if (initialStatus === "budget_stopped") {
+    return json(
+      {
+        ok: false,
+        error: `A estimativa de US$ ${estimatedCost.toFixed(2)} excede o saldo seguro de US$ ${availableBudget.toFixed(2)}.`,
+        reason: "budget",
+      },
+      409,
+      req,
+    );
+  }
+
+  let actualCost = 0;
+  const updateCost = async () => {
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({ actual_cost_usd: actualCost, updated_at: new Date().toISOString() })
+      .eq("id", job.id);
+  };
+  try {
+    const profileRun = await executarActor({
+      admin,
+      jobId: job.id,
+      orgId,
+      stepType: "enrich_profiles",
+      actorId: ACTOR_PROFILES,
+      input: { usernames: [competitor.username], includeAboutSection: false },
+      requested: 1,
+      ttlHours: 24,
+      maxCharge: Math.min(0.05, availableBudget - actualCost),
+    });
+    actualCost += profileRun.cost;
+    await updateCost();
+    const profile = profilePorUsername(profileRun.items).get(competitor.username);
+    if (!profile) throw new Error("O perfil publico do concorrente nao foi encontrado.");
+
+    const postsRun = await executarActor({
+      admin,
+      jobId: job.id,
+      orgId,
+      stepType: "discover_content",
+      actorId: ACTOR_POSTS,
+      input: {
+        username: [competitor.username],
+        resultsLimit: input.maxPosts,
+        skipPinnedPosts: true,
+        dataDetailLevel: "basicData",
+      },
+      requested: input.maxPosts,
+      ttlHours: 12,
+      maxCharge: Math.min(Math.max(0.05, input.maxPosts * 0.002), availableBudget - actualCost),
+    });
+    actualCost += postsRun.cost;
+    await updateCost();
+    const posts = postsRun.items
+      .map((item) => normalizarPost(item, competitor.username))
+      .filter((item): item is Rec => Boolean(item));
+    if (!posts.length) throw new Error("Nenhum post ou Reel publico foi encontrado.");
+    const contentIds = await salvarConteudos({
+      admin,
+      orgId,
+      userId,
+      sourceId,
+      jobId: job.id,
+      posts,
+    });
+    const topForComments = [...posts]
+      .sort((a, b) => Number(b.metrics?.comments ?? 0) - Number(a.metrics?.comments ?? 0))
+      .slice(0, input.commentPosts);
+    let comments: Array<NonNullable<ReturnType<typeof normalizarComentario>>> = [];
+    if (topForComments.length) {
+      const commentsRun = await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "collect_comments",
+        actorId: ACTOR_COMMENTS,
+        input: {
+          directUrls: topForComments.map((post) => post.url),
+          resultsLimit: input.commentsPerPost,
+          includeNestedComments: false,
+          isNewestComments: true,
+        },
+        requested: topForComments.length * input.commentsPerPost,
+        ttlHours: 6,
+        maxCharge: Math.min(
+          Math.max(0.08, topForComments.length * input.commentsPerPost * 0.003),
+          availableBudget - actualCost,
+        ),
+      });
+      actualCost += commentsRun.cost;
+      await updateCost();
+      comments = commentsRun.items
+        .map(normalizarComentario)
+        .filter((item): item is NonNullable<ReturnType<typeof normalizarComentario>> =>
+          Boolean(item),
+        );
+    }
+    if (comments.length) {
+      const eventRows = comments.map((comment) => ({
+        org_id: orgId,
+        user_id: userId,
+        source_id: sourceId,
+        job_id: job.id,
+        content_id: comment.postUrl ? (contentIds.get(comment.postUrl) ?? null) : null,
+        instagram_event_id: comment.instagramEventId,
+        event_type: "comment",
+        actor_username: comment.username,
+        actor_instagram_id: comment.instagramUserId,
+        actor_full_name: comment.fullName,
+        actor_avatar_url: comment.avatarUrl,
+        text: comment.texto,
+        likes_count: comment.likes,
+        replies_count: comment.repliesCount,
+        occurred_at: comment.ocorridoEm,
+        intent_label: comment.classificacao.rotulo,
+        intent_score: comment.classificacao.score,
+        intent_signals: comment.classificacao.sinais,
+        is_spam: comment.classificacao.spam,
+        raw_payload: comment.raw,
+      }));
+      const { error } = await admin
+        .from("instagram_engagement_events")
+        .upsert(eventRows, { onConflict: "org_id,instagram_event_id", ignoreDuplicates: true });
+      if (error) throw new Error(`Falha ao salvar comentarios: ${error.message}`);
+    }
+
+    const followers = Number(profile.followersCount ?? 0);
+    const contentSummary = summarizeCompetitorContent({
+      posts: posts.map((post) => ({
+        url: post.url,
+        caption: post.caption,
+        likes: post.metrics?.likes,
+        comments: post.metrics?.comments,
+        views: post.metrics?.views,
+        postedAt: post.posted_at,
+        contentType: post.content_type,
+        hashtags: Array.isArray(post.raw_payload?.hashtags) ? post.raw_payload.hashtags : [],
+        locationText: textoLocalPost(post),
+      })),
+      followers,
+      niche: competitor.niche,
+      city: competitor.city ?? "",
+    });
+    const commentSummary = summarizeCompetitorComments(
+      comments.map((comment) => ({
+        username: comment.username,
+        text: comment.texto,
+        likes: comment.likes,
+        occurredAt: comment.ocorridoEm,
+        postUrl: comment.postUrl,
+      })),
+    );
+    const { data: previousSnapshot } = await admin
+      .from("instagram_competitor_snapshots")
+      .select("followers_count,posts_count,engagement_rate,hashtags,captured_at")
+      .eq("competitor_id", competitor.id)
+      .order("captured_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const comparableCurrent = {
+      followers,
+      postsCount: Number(profile.postsCount ?? 0),
+      engagementRate: contentSummary.signals.robustEngagementRate,
+      hashtags: contentSummary.hashtags,
+    };
+    const trend = compareCompetitorSnapshots(
+      comparableCurrent,
+      previousSnapshot
+        ? {
+            followers: Number(previousSnapshot.followers_count ?? 0),
+            postsCount: Number(previousSnapshot.posts_count ?? 0),
+            engagementRate: Number(previousSnapshot.engagement_rate ?? 0),
+            hashtags: previousSnapshot.hashtags ?? [],
+            capturedAt: previousSnapshot.captured_at,
+          }
+        : null,
+    );
+    const { data: snapshot, error: snapshotError } = await admin
+      .from("instagram_competitor_snapshots")
+      .insert({
+        competitor_id: competitor.id,
+        org_id: orgId,
+        user_id: userId,
+        job_id: job.id,
+        followers_count: followers,
+        following_count: Number(profile.followsCount ?? 0),
+        posts_count: Number(profile.postsCount ?? 0),
+        follower_delta: trend.followerDelta,
+        follower_growth_percent: trend.followerGrowthPercent,
+        posts_delta: trend.postsDelta,
+        engagement_rate: contentSummary.signals.robustEngagementRate,
+        engagement_delta: trend.engagementDelta,
+        posting_frequency_weekly: contentSummary.postingFrequencyWeekly,
+        average_likes: contentSummary.signals.averageLikes,
+        median_likes: contentSummary.signals.medianLikes,
+        average_comments: contentSummary.signals.averageComments,
+        median_comments: contentSummary.signals.medianComments,
+        content_score: contentSummary.signals.contentScore,
+        profile_pic_url: profile.profilePicUrlHD ?? profile.profilePicUrl ?? null,
+        full_name: profile.fullName ?? null,
+        biography: profile.biography ?? null,
+        business_category: profile.businessCategoryName ?? null,
+        format_counts: contentSummary.formatCounts,
+        hashtags: contentSummary.hashtags,
+        locations: contentSummary.locations,
+        top_posts: contentSummary.topPosts,
+        comment_summary: commentSummary,
+        profile_snapshot: profile,
+      })
+      .select("*")
+      .single();
+    if (snapshotError || !snapshot)
+      throw new Error(`Falha ao salvar snapshot: ${snapshotError?.message}`);
+
+    const insightRows: Rec[] = [
+      ...commentSummary.recurringCommenters.map((item) => ({
+        insight_type: "recurring_commenter",
+        key: item.username,
+        title: `@${item.username} comenta com frequencia`,
+        evidence: item.bestEvidence,
+        score: item.bestIntentScore,
+        occurrences: item.count,
+        data: item,
+      })),
+      ...commentSummary.intentOpportunities.map((item) => ({
+        insight_type: "purchase_intent",
+        key: item.username,
+        title: `@${item.username} demonstrou ${item.label}`,
+        evidence: item.text,
+        score: item.score,
+        occurrences: 1,
+        data: item,
+      })),
+      ...commentSummary.objections.map((item) => ({
+        insight_type: "objection",
+        key: item.category,
+        title: `Objecao: ${item.category}`,
+        evidence: item.examples.join(" | "),
+        score: Math.min(100, 30 + item.count * 10),
+        occurrences: item.count,
+        data: item,
+      })),
+      ...commentSummary.questionTopics.map((item) => ({
+        insight_type: "question_topic",
+        key: item.name,
+        title: `Duvidas sobre ${item.name}`,
+        evidence: null,
+        score: Math.min(100, 25 + item.count * 8),
+        occurrences: item.count,
+        data: item,
+      })),
+      ...contentSummary.hashtags.map((item) => ({
+        insight_type: "hashtag",
+        key: item.name,
+        title: `#${item.name}`,
+        evidence: null,
+        score: Math.min(100, 20 + item.count * 5),
+        occurrences: item.count,
+        data: item,
+      })),
+      ...contentSummary.locations.map((item) => ({
+        insight_type: "location",
+        key: item.name,
+        title: item.name,
+        evidence: null,
+        score: Math.min(100, 20 + item.count * 5),
+        occurrences: item.count,
+        data: item,
+      })),
+    ].map((item) => ({
+      ...item,
+      competitor_id: competitor.id,
+      snapshot_id: snapshot.id,
+      org_id: orgId,
+      job_id: job.id,
+    }));
+    if (insightRows.length) {
+      const { error } = await admin.from("instagram_competitor_insights").insert(insightRows);
+      if (error) throw new Error(`Falha ao salvar insights: ${error.message}`);
+    }
+    const alerts = buildCompetitorAlerts({ comments: commentSummary, trend });
+    if (alerts.length) {
+      const { error } = await admin.from("instagram_competitor_alerts").insert(
+        alerts.map((alert) => ({
+          competitor_id: competitor.id,
+          snapshot_id: snapshot.id,
+          org_id: orgId,
+          alert_type: alert.type,
+          severity: alert.severity,
+          title: alert.title,
+          description: alert.description,
+          score: alert.score,
+          data: alert.data,
+        })),
+      );
+      if (error) throw new Error(`Falha ao salvar alertas: ${error.message}`);
+    }
+    const capturedAt = String(snapshot.captured_at ?? new Date().toISOString());
+    const nextAnalysis = new Date(
+      new Date(capturedAt).getTime() +
+        Number(competitor.monitoring_interval_hours ?? 168) * 3_600_000,
+    ).toISOString();
+    await admin
+      .from("instagram_competitors")
+      .update({
+        last_analyzed_at: capturedAt,
+        next_analysis_at: nextAnalysis,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", competitor.id);
+    const stats = {
+      posts: posts.length,
+      comments: comments.length,
+      uniqueCommenters: commentSummary.uniqueCommenters,
+      opportunities: commentSummary.intentOpportunities.length,
+      recurringCommenters: commentSummary.recurringCommenters.length,
+      objections: commentSummary.objectionCount,
+      alerts: alerts.length,
+    };
+    const response = {
+      ok: true,
+      jobId: job.id,
+      competitor: { ...competitor, last_analyzed_at: capturedAt, next_analysis_at: nextAnalysis },
+      snapshot,
+      content: contentSummary,
+      comments: commentSummary,
+      trend,
+      alerts,
+      stats,
+      estimatedCost,
+      actualCost,
+      spentMonthAfter: spentMonth + actualCost,
+    };
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({
+        status: "completed",
+        stats,
+        result: response,
+        actual_cost_usd: actualCost,
+        stop_reason: "snapshot_completed",
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    return json(response, 200, req);
+  } catch (error) {
+    if (error instanceof ActorRunError) actualCost += error.costUsd;
+    const message = error instanceof Error ? error.message : String(error);
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({
+        status: "failed",
+        actual_cost_usd: actualCost,
+        error: message.slice(0, 500),
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    return json({ ok: false, error: message, jobId: job.id, actualCost }, 500, req);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405, req);
@@ -1127,6 +1723,17 @@ Deno.serve(async (req) => {
     body = await req.json();
   } catch {
     return json({ error: "Body inválido" }, 400, req);
+  }
+
+  if (body.acao === "listar_concorrentes") return listarConcorrentes(admin, orgId, req);
+  if (body.acao === "salvar_concorrente") {
+    return salvarConcorrente({ admin, orgId, userId, body, req });
+  }
+  if (body.acao === "arquivar_concorrente") {
+    return arquivarConcorrente(admin, orgId, body, req);
+  }
+  if (body.acao === "monitorar_concorrente") {
+    return processarMonitoramentoConcorrente({ req, admin, userId, orgId, body });
   }
 
   if (body.acao === "historico") {
