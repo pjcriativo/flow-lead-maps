@@ -507,12 +507,17 @@ export type ColetaRedes = {
   status?: string;
   recuperada?: boolean;
   leadIds?: string[];
+  newLeadIds?: string[];
+  buscaId?: string;
   resumo?: {
     analisados: number;
     aprovados: number;
+    entregues: number;
+    meta: number;
     novos: number;
     duplicados: number;
     rejeitados: Record<string, number>;
+    motivoParada: "meta_atingida" | "fonte_esgotada";
   };
 };
 
@@ -521,10 +526,18 @@ export async function buscarRedes(
   estrategia: string,
   campos: Record<string, unknown>,
   limite: number,
+  opcoes?: { somenteNovos?: boolean },
 ): Promise<ColetaRedes> {
   const requestId = crypto.randomUUID();
   const inicial = await supabase.functions.invoke("buscar-redes", {
-    body: { acao: "buscar", estrategia, campos, limite, requestId },
+    body: {
+      acao: "buscar",
+      estrategia,
+      campos,
+      limite,
+      somenteNovos: opcoes?.somenteNovos ?? true,
+      requestId,
+    },
   });
   const respostaInicial = inicial.data as ColetaRedes | null;
   if (!inicial.error && respostaInicial && !respostaInicial.pendente) return respostaInicial;

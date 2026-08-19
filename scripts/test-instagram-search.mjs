@@ -25,6 +25,11 @@ assert.equal(perfilTemNicho(perfil, "Clínica odontológica"), true);
 assert.equal(perfilTemLocalidade(perfil, "Curitiba"), true);
 assert.equal(temSiteProprioInstagram(perfil.externalUrl), false, "Linktree não é site próprio");
 assert.equal(
+  temSiteProprioInstagram("https://maps.app.goo.gl/exemplo"),
+  false,
+  "Google Maps na bio não pode ser classificado como site próprio",
+);
+assert.equal(
   motivoRejeicaoInstagram(
     perfil,
     {
@@ -65,5 +70,26 @@ const score = calcularScoreInstagram({
 });
 assert.equal(score.score, 85);
 assert.equal(score.breakdown.tipo, "aderencia_instagram");
+
+assert.equal(
+  motivoRejeicaoInstagram(
+    {
+      ...perfil,
+      isBusinessAccount: false,
+      isProfessionalAccount: true,
+      businessCategoryName: "Digital creator",
+    },
+    {
+      nicho: "Clínica odontológica",
+      cidade: "Curitiba",
+      minSeguidores: 500,
+      soComerciais: true,
+      exigirLocalidade: true,
+    },
+    false,
+  ),
+  null,
+  "conta Creator/profissional relevante não pode ser descartada como pessoal",
+);
 
 console.log("OK: relevância, localidade, DM e score do Instagram validados.");

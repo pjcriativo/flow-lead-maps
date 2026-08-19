@@ -7,6 +7,7 @@ const CACHE_POLL_MS = 2_000;
 type CacheRow = {
   items: unknown;
   searched_depth: number;
+  exhausted: boolean;
   refreshed_at: string | null;
   refreshing_until: string | null;
 };
@@ -23,7 +24,7 @@ function itensDoCache<T>(valor: unknown, limite: number): T[] {
 }
 
 function cacheFresco(row: CacheRow | null, limite: number): boolean {
-  if (!row?.refreshed_at || row.searched_depth < limite) return false;
+  if (!row?.refreshed_at || (row.searched_depth < limite && !row.exhausted)) return false;
   const atualizado = new Date(row.refreshed_at).getTime();
   return Number.isFinite(atualizado) && atualizado >= Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000;
 }
@@ -31,7 +32,7 @@ function cacheFresco(row: CacheRow | null, limite: number): boolean {
 async function lerCache(admin: SupabaseClient, chave: string): Promise<CacheRow | null> {
   const { data, error } = await admin
     .from("apify_search_cache")
-    .select("items, searched_depth, refreshed_at, refreshing_until")
+    .select("items, searched_depth, exhausted, refreshed_at, refreshing_until")
     .eq("query_key", chave)
     .maybeSingle();
   if (error) throw new Error(`Cache social indisponível: ${error.message}`);
@@ -39,7 +40,7 @@ async function lerCache(admin: SupabaseClient, chave: string): Promise<CacheRow 
 }
 
 async function reivindicar(admin: SupabaseClient, chave: string, limite: number): Promise<Claim> {
-  const { data, error } = await admin.rpc("claim_apify_search_cache_v2", {
+  const { data, error } = await admin.rpc("claim_apify_search_cache_v3", {
     p_query_key: chave,
     p_target_depth: limite,
     p_ttl_hours: CACHE_TTL_HOURS,
@@ -116,9 +117,9 @@ export async function salvarCacheRedes(
   items: unknown[],
   log: (mensagem: string) => void,
 ): Promise<void> {
-  const { error } = await admin.rpc("store_apify_search_cache", {
+  const { error } = await admin.rpc("store_apify_search_cache_v3", {
     p_query_key: chave,
-    p_searched_depth: limite,
+    p_requested_depth: limite,
     p_items: items,
   });
   if (!error) return;

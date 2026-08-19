@@ -20,6 +20,9 @@ export type InstagramProfileSignals = {
   address?: unknown;
   businessAddress?: unknown;
   isBusinessAccount?: unknown;
+  isProfessionalAccount?: unknown;
+  accountType?: unknown;
+  statistics?: { accountType?: unknown } | unknown;
   followersCount?: unknown;
   externalUrl?: unknown;
   website?: unknown;
@@ -102,7 +105,7 @@ export function perfilTemLocalidade(perfil: InstagramProfileSignals, cidade: str
 }
 
 const NAO_E_SITE =
-  /(^|\.)(wa\.me|api\.whatsapp\.com|whatsapp\.com|linktr\.ee|linktree\.|beacons\.ai|bio\.link|linkin\.bio|linkbio|campsite\.bio|msha\.ke|instagram\.com|facebook\.com|fb\.me|youtube\.com|youtu\.be|tiktok\.com|twitter\.com|x\.com|t\.me|linktr\.)/i;
+  /(^|\.)(wa\.me|api\.whatsapp\.com|whatsapp\.com|linktr\.ee|linktree\.|beacons\.ai|bio\.link|linkin\.bio|linkbio|campsite\.bio|msha\.ke|instagram\.com|facebook\.com|fb\.me|youtube\.com|youtu\.be|tiktok\.com|twitter\.com|x\.com|t\.me|linktr\.|maps\.app\.goo\.gl|maps\.google\.|goo\.gl)/i;
 
 export function temSiteProprioInstagram(url: unknown): boolean {
   if (!url) return false;
@@ -111,6 +114,17 @@ export function temSiteProprioInstagram(url: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+export function perfilEhProfissionalInstagram(perfil: InstagramProfileSignals): boolean {
+  if (perfil.isBusinessAccount === true || perfil.isProfessionalAccount === true) return true;
+  if (String(perfil.businessCategoryName ?? perfil.category ?? "").trim()) return true;
+  const statistics =
+    perfil.statistics && typeof perfil.statistics === "object"
+      ? (perfil.statistics as { accountType?: unknown })
+      : null;
+  const tipo = Number(statistics?.accountType ?? perfil.accountType ?? 0);
+  return tipo === 2 || tipo === 3;
 }
 
 export function motivoRejeicaoInstagram(
@@ -122,7 +136,7 @@ export function motivoRejeicaoInstagram(
   if (!perfilTemNicho(perfil, filtros.nicho)) return "fora_nicho";
   if (filtros.exigirLocalidade && !perfilTemLocalidade(perfil, filtros.cidade))
     return "fora_localidade";
-  if (filtros.soComerciais && perfil.isBusinessAccount !== true) return "nao_comercial";
+  if (filtros.soComerciais && !perfilEhProfissionalInstagram(perfil)) return "nao_comercial";
   if (filtros.semSiteProprio && temSiteProprioInstagram(perfil.externalUrl ?? perfil.website))
     return "com_site_proprio";
   if (Number(perfil.followersCount ?? 0) < Number(filtros.minSeguidores ?? 0))

@@ -323,7 +323,9 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     pushLog(`⏳ Chamando robô coletor para a estratégia ${estrategia.id}...`);
 
     try {
-      const r = await buscarRedes(estrategia.id, pedido.campos, pedido.limite);
+      const r = await buscarRedes(estrategia.id, pedido.campos, pedido.limite, {
+        somenteNovos: pedido.somenteNovos,
+      });
       if (!r.ok) {
         const msg =
           r.reason === "teto"

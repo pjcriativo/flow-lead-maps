@@ -97,6 +97,12 @@ assert.equal(resposta.status, 200, JSON.stringify(resposta.data));
 assert.equal(resposta.data?.ok, true, JSON.stringify(resposta.data));
 assert.equal(resposta.data?.estrategia, "IG-LOCAL");
 assert.equal(resposta.data?.resumo?.analisados, resposta.data?.encontrados);
+assert.equal(resposta.data?.resumo?.meta, pedido.limite);
+assert.ok(
+  resposta.data?.resumo?.motivoParada === "fonte_esgotada" ||
+    resposta.data?.leadIds?.length === pedido.limite,
+  "a busca deve entregar a meta exata, exceto quando a fonte pública estiver comprovadamente esgotada",
+);
 
 const repetida = await chamar(jwt, { acao: "recuperar", requestId });
 assert.equal(repetida.status, 200);
@@ -109,7 +115,7 @@ assert.deepEqual(
 const { data: ledger, error: ledgerError } = await admin
   .from("redes_buscas")
   .select(
-    "id, request_id, fonte, estrategia, status, custo_usd, encontrados, inseridos, apify_run_id, apify_dataset_id, resultado, detalhe",
+    "id, request_id, fonte, estrategia, status, custo_usd, encontrados, inseridos, meta_qualificados, candidatos_solicitados, motivo_parada, apify_run_id, apify_dataset_id, resultado, detalhe",
   )
   .eq("request_id", requestId)
   .single();
@@ -140,7 +146,21 @@ if (ids.length > 0) {
     // A coluna compartilhada tem default 0; a busca IG não a usa nem a exibe.
     assert.equal(lead.review_count, 0);
   }
+  const { data: profiles, error: profilesError } = await admin
+    .from("instagram_profiles")
+    .select("lead_id, username, followers_count, external_url, profile_pic_url, raw_payload")
+    .in("lead_id", ids);
+  if (profilesError) throw profilesError;
+  assert.equal(profiles.length, ids.length, "todo lead entregue deve ter perfil Instagram enriquecido");
+  assert.ok(profiles.every((profile) => profile.username && profile.raw_payload));
 }
+
+const { count: audited, error: auditError } = await admin
+  .from("instagram_search_results")
+  .select("id", { count: "exact", head: true })
+  .eq("search_id", ledger.id);
+if (auditError) throw auditError;
+assert.equal(audited, resposta.data?.resumo?.analisados, "todo perfil analisado deve ser auditado");
 
 console.log("\nRESULTADO FINAL");
 console.log(JSON.stringify(resposta.data, null, 2));
@@ -151,6 +171,9 @@ console.table([
     run: ledger.apify_run_id,
     analisados: ledger.encontrados,
     inseridos: ledger.inseridos,
+    meta: ledger.meta_qualificados,
+    candidatos: ledger.candidatos_solicitados,
+    parada: ledger.motivo_parada,
     custo_usd: Number(ledger.custo_usd),
     detalhe: ledger.detalhe,
   },

@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { NichoSelector } from "../NichoSelector";
 import { UF_LIST } from "../leads-shared";
 import { estimarCustoColeta } from "@/lib/redes-teto";
+import { montarPlanoDescobertaInstagram } from "@/lib/instagram-discovery";
 import { estrategiaPorId, type Estrategia, type PedidoBusca } from "@/lib/fontes-prospeccao";
 import { CitySelector } from "./CitySelector";
 
@@ -35,10 +36,18 @@ export function InstagramSearchPanel({
   const [soComerciais, setSoComerciais] = useState(true);
   const [exigirLocalidade, setExigirLocalidade] = useState(true);
   const [exigirContatoExterno, setExigirContatoExterno] = useState(false);
+  const [somenteNovos, setSomenteNovos] = useState(true);
 
   const estrategia = estrategiaPorId("IG-LOCAL")!;
   const podeBuscar = Boolean(nicho.trim() && uf && cidade && !running);
-  const custo = useMemo(() => estimarCustoColeta(limite), [limite]);
+  const plano = useMemo(() => {
+    if (!nicho.trim() || !cidade.trim()) return null;
+    return montarPlanoDescobertaInstagram({ nicho, cidade, metaQualificados: limite });
+  }, [cidade, limite, nicho]);
+  const custo = useMemo(
+    () => estimarCustoColeta(plano?.maxCandidatos ?? limite),
+    [limite, plano?.maxCandidatos],
+  );
 
   const buscar = async () => {
     if (!podeBuscar) return;
@@ -47,6 +56,7 @@ export function InstagramSearchPanel({
       estrategia: estrategia.id,
       titulo: estrategia.titulo,
       limite,
+      somenteNovos,
       campos: {
         nicho,
         cidade,
@@ -214,26 +224,36 @@ export function InstagramSearchPanel({
             onChange={setExigirContatoExterno}
             disabled={running}
           />
+          <FilterSwitch
+            id="ig-novos"
+            label="Entregar somente leads novos"
+            hint="Ligado, a coleta ignora duplicados e continua até buscar a meta de novos leads."
+            value={somenteNovos}
+            onChange={setSomenteNovos}
+            disabled={running}
+          />
         </div>
         <div className="rounded-lg border border-border bg-secondary/20 p-3">
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="inline-flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" /> Perfis para analisar
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" /> Meta de leads
+              qualificados
             </span>
             <b>{limite}</b>
           </div>
           <Slider
             value={[limite]}
             min={10}
-            max={200}
+            max={100}
             step={10}
             onValueChange={(v) => setLimite(v[0])}
             disabled={running}
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            O total de leads pode ser menor: só entram perfis que passam pelos filtros. Estimativa
-            máxima desta análise: <b className="text-foreground">US$ {custo.toFixed(2)}</b>; buscas
-            recentes idênticas usam cache e custam US$ 0.
+            Para entregar {limite}, o motor pode analisar até {plano?.maxCandidatos ?? limite}
+            perfis em consultas complementares e para assim que atingir a meta. Estimativa máxima:
+            <b className="text-foreground"> US$ {custo.toFixed(2)}</b>; buscas recentes idênticas
+            usam cache e custam US$ 0.
           </p>
         </div>
       </section>

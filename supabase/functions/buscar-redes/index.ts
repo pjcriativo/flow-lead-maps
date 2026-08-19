@@ -34,11 +34,13 @@ import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospec
 import {
   calcularScoreInstagram,
   motivoRejeicaoInstagram,
+  perfilEhProfissionalInstagram,
   perfilTemLocalidade,
   perfilTemNicho,
   temSiteProprioInstagram,
   type InstagramRejectionReason,
 } from "../../../src/lib/instagram-search.ts";
+import { montarPlanoDescobertaInstagram } from "../../../src/lib/instagram-discovery.ts";
 import { consumir, estadoConsumo, orgDoUsuario } from "../_shared/limite.ts";
 import { liberarCacheRedes, prepararCacheRedes, salvarCacheRedes } from "../_shared/redes-cache.ts";
 import { decifrar } from "../_shared/cofre.ts";
@@ -51,9 +53,10 @@ const ATOR: Record<string, { ator: string; monta: (c: Rec) => Rec }> = {
   "IG-LOCAL": {
     ator: "apify~instagram-scraper",
     monta: (c) => ({
-      search: `${c.nicho ?? ""} ${c.cidade ?? ""}`.trim(),
+      search: c.buscaComposta ?? `${c.nicho ?? ""} ${c.cidade ?? ""}`.trim(),
       searchType: "user",
       resultsType: "details",
+      addProfileStatistics: true,
     }),
   },
   // Instagram — o mesmo ator oficial cobre hashtag/busca; o filtro fino é NOSSO.
@@ -165,27 +168,60 @@ async function processarResultados(params: {
   admin: Rec;
   itens: Rec[];
   limite: number;
+  metaQualificados: number;
   estrategiaId: string;
   fonte: "instagram" | "linkedin";
   campos: Rec;
   orgId: string;
   userId: string;
+  searchId: string;
+  somenteNovos?: boolean;
 }) {
-  const { admin, itens, limite, estrategiaId, fonte, campos, orgId, userId } = params;
+  const {
+    admin,
+    itens,
+    limite,
+    metaQualificados,
+    estrategiaId,
+    fonte,
+    campos,
+    orgId,
+    userId,
+    searchId,
+    somenteNovos = true,
+  } = params;
   let inseridos = 0;
   let aprovados = 0;
   let duplicados = 0;
+  let analisados = 0;
   const leadIds: string[] = [];
+  const newLeadIds: string[] = [];
   const rejeitados: Record<string, number> = {};
+  const resultadosBusca: Rec[] = [];
+  const usernamesVistos = new Set<string>();
   const registrarRejeicao = (motivo: InstagramRejectionReason | "sem_contato" | "erro_banco") => {
     rejeitados[motivo] = (rejeitados[motivo] ?? 0) + 1;
   };
 
   for (const it of itens.slice(0, limite)) {
+    if (leadIds.length >= metaQualificados) break;
     const txt = JSON.stringify(it);
     let lead: Rec | null = null;
+    let perfilRow: Rec | null = null;
+    let usernameNormalizado: string | null = null;
+    let scoreInstagram: number | null = null;
+    analisados++;
     if (fonte === "instagram") {
       const username = it.username ?? it.ownerUsername ?? null;
+      usernameNormalizado = String(username ?? "")
+        .trim()
+        .replace(/^@/, "")
+        .toLowerCase();
+      if (usernameNormalizado && usernamesVistos.has(usernameNormalizado)) {
+        analisados--;
+        continue;
+      }
+      if (usernameNormalizado) usernamesVistos.add(usernameNormalizado);
       const bio = it.biography ?? it.bio ?? "";
       const link = it.externalUrl ?? it.website ?? null;
       const temSiteProprio = temSiteProprioInstagram(link);
@@ -208,6 +244,17 @@ async function processarResultados(params: {
       const motivo = motivoRejeicaoInstagram(perfil, filtros, temContatoExterno);
       if (motivo) {
         registrarRejeicao(motivo);
+        resultadosBusca.push({
+          search_id: searchId,
+          org_id: orgId,
+          user_id: userId,
+          username: usernameNormalizado || `invalido-${analisados}`,
+          decision: "rejected",
+          rejection_reason: motivo,
+          rank: analisados,
+          is_new: false,
+          profile_snapshot: perfil,
+        });
         continue;
       }
       const localidadeConfirmada = perfilTemLocalidade(perfil, filtros.cidade);
@@ -231,13 +278,69 @@ async function processarResultados(params: {
       const aderencia = calcularScoreInstagram({
         temNicho: nichoConfirmado,
         temLocalidade: localidadeConfirmada,
-        comercial: it.isBusinessAccount === true,
+        comercial: perfilEhProfissionalInstagram(perfil),
         temContatoExterno,
         semSiteProprio: !temSiteProprio,
         seguidores,
       });
       lead.score = aderencia.score;
       lead.score_breakdown = aderencia.breakdown;
+      scoreInstagram = aderencia.score;
+
+      const posts = Array.isArray(it.latestPosts)
+        ? it.latestPosts
+        : Array.isArray(it.recentPosts)
+          ? it.recentPosts
+          : [];
+      const postMetrics = posts.slice(0, 12).map((post: Rec) => ({
+        likes: Number(post.likesCount ?? post.likes ?? 0),
+        comments: Number(post.commentsCount ?? post.comments ?? 0),
+      }));
+      const media = (campo: "likes" | "comments") =>
+        postMetrics.length
+          ? postMetrics.reduce((total: number, post: Rec) => total + Number(post[campo]), 0) /
+            postMetrics.length
+          : null;
+      const avgLikes = media("likes");
+      const avgComments = media("comments");
+      const engagement =
+        seguidores > 0 && avgLikes != null && avgComments != null
+          ? ((avgLikes + avgComments) / seguidores) * 100
+          : null;
+      const primeiraData = posts
+        .map((post: Rec) => post.timestamp ?? post.takenAtTimestamp ?? post.createdAt)
+        .find(Boolean);
+      perfilRow = {
+        org_id: orgId,
+        user_id: userId,
+        username: usernameNormalizado,
+        instagram_user_id: String(it.id ?? it.instagramId ?? it.ownerId ?? "") || null,
+        full_name: it.fullName ?? it.name ?? null,
+        biography: bio || null,
+        profile_pic_url: it.profilePicUrlHD ?? it.profilePicUrl ?? it.profilePictureUrl ?? null,
+        external_url: link,
+        bio_links: Array.isArray(it.bioLinks) ? it.bioLinks : link ? [{ url: link }] : [],
+        followers_count: seguidores || null,
+        following_count: Number(it.followsCount ?? it.followingCount ?? 0) || null,
+        posts_count: Number(it.postsCount ?? it.mediaCount ?? 0) || null,
+        verified: Boolean(it.verified ?? it.isVerified),
+        private: Boolean(it.private ?? it.isPrivate),
+        professional: perfilEhProfissionalInstagram(perfil),
+        account_type: String(it.accountType ?? it.statistics?.accountType ?? "") || null,
+        business_category: it.businessCategoryName ?? it.category ?? null,
+        business_email: email,
+        business_phone: whatsapp,
+        business_address: it.businessAddress ?? null,
+        last_post_at: primeiraData ? new Date(primeiraData).toISOString() : null,
+        avg_likes: avgLikes,
+        avg_comments: avgComments,
+        engagement_rate: engagement,
+        recent_posts: posts.slice(0, 12),
+        related_profiles: Array.isArray(it.relatedProfiles) ? it.relatedProfiles.slice(0, 20) : [],
+        raw_payload: it,
+        collected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
     } else {
       const slug =
         it.publicIdentifier ?? it.universalName ?? it.slug ?? it.linkedinUrl ?? it.id ?? null;
@@ -285,24 +388,89 @@ async function processarResultados(params: {
       continue;
     }
     aprovados++;
-    const { data: insertedLead, error } = await admin
+    const { data: existente } = await admin
       .from("leads")
-      .upsert(lead, { onConflict: "org_id,place_id", ignoreDuplicates: true })
       .select("id")
+      .eq("org_id", orgId)
+      .eq("place_id", lead.place_id)
       .maybeSingle();
-    if (error) registrarRejeicao("erro_banco");
-    else if (insertedLead) {
+    let leadId = existente?.id ?? null;
+    let novo = false;
+    if (!leadId) {
+      const { data: insertedLead, error } = await admin
+        .from("leads")
+        .insert(lead)
+        .select("id")
+        .single();
+      if (error || !insertedLead) {
+        registrarRejeicao("erro_banco");
+        if (fonte === "instagram") {
+          resultadosBusca.push({
+            search_id: searchId,
+            org_id: orgId,
+            user_id: userId,
+            username: usernameNormalizado,
+            decision: "rejected",
+            rejection_reason: "erro_banco",
+            rank: analisados,
+            is_new: false,
+            score: scoreInstagram,
+            profile_snapshot: it,
+          });
+        }
+        continue;
+      }
+      leadId = insertedLead.id;
+      novo = true;
       inseridos++;
-      leadIds.push(insertedLead.id);
-    } else duplicados++;
+      newLeadIds.push(leadId);
+    } else {
+      duplicados++;
+    }
+
+    if (fonte === "instagram" && perfilRow && leadId) {
+      await admin
+        .from("instagram_profiles")
+        .upsert({ ...perfilRow, lead_id: leadId }, { onConflict: "lead_id" });
+      resultadosBusca.push({
+        search_id: searchId,
+        org_id: orgId,
+        user_id: userId,
+        username: usernameNormalizado,
+        lead_id: leadId,
+        decision: novo ? "approved" : "duplicate",
+        rank: analisados,
+        is_new: novo,
+        score: scoreInstagram,
+        profile_snapshot: it,
+      });
+    }
+    if (novo || !somenteNovos) leadIds.push(leadId);
   }
-  const analisados = Math.min(itens.length, limite);
+  if (resultadosBusca.length > 0) {
+    const { error } = await admin.from("instagram_search_results").upsert(resultadosBusca, {
+      onConflict: "search_id,username",
+    });
+    if (error) console.warn(`Falha ao salvar auditoria Instagram: ${error.message}`);
+  }
   const descartados = Object.values(rejeitados).reduce((total, valor) => total + valor, 0);
+  const motivoParada = leadIds.length >= metaQualificados ? "meta_atingida" : "fonte_esgotada";
   return {
     inseridos,
     descartados,
     leadIds,
-    resumo: { analisados, aprovados, novos: inseridos, duplicados, rejeitados },
+    newLeadIds,
+    motivoParada,
+    resumo: {
+      analisados,
+      aprovados,
+      entregues: leadIds.length,
+      meta: metaQualificados,
+      novos: inseridos,
+      duplicados,
+      rejeitados,
+      motivoParada,
+    },
   };
 }
 
@@ -402,7 +570,7 @@ Deno.serve(async (req) => {
     const { data: registro } = await admin
       .from("redes_buscas")
       .select(
-        "id, fonte, estrategia, pedido, limite, mes_ref, status, resultado, apify_run_id, apify_dataset_id, apify_chave_id, cache_key, chave_apelido",
+        "id, fonte, estrategia, pedido, limite, meta_qualificados, candidatos_solicitados, consultas, mes_ref, status, resultado, apify_run_id, apify_dataset_id, apify_chave_id, cache_key, chave_apelido",
       )
       .eq("user_id", userId)
       .eq("request_id", requestId)
@@ -443,14 +611,18 @@ Deno.serve(async (req) => {
 
     const datasetId = run.defaultDatasetId ?? registro.apify_dataset_id;
     const datasetResponse = await fetch(
-      `${API}/datasets/${datasetId}/items?limit=${registro.limite}`,
+      `${API}/datasets/${datasetId}/items?limit=${registro.candidatos_solicitados ?? registro.limite}`,
       { headers: { Authorization: `Bearer ${tokenRun}` }, signal: AbortSignal.timeout(20_000) },
     );
     if (!datasetResponse.ok) return json({ ok: false, reason: "dataset_indisponivel" }, 502);
     const itens = ((await datasetResponse.json().catch(() => [])) ?? []) as Rec[];
     if (registro.cache_key)
-      await salvarCacheRedes(admin, registro.cache_key, registro.limite, itens, (mensagem) =>
-        console.warn(mensagem),
+      await salvarCacheRedes(
+        admin,
+        registro.cache_key,
+        registro.candidatos_solicitados ?? registro.limite,
+        itens,
+        (mensagem) => console.warn(mensagem),
       );
 
     const estrategia = estrategiaPorId(registro.estrategia);
@@ -458,12 +630,15 @@ Deno.serve(async (req) => {
     const processado = await processarResultados({
       admin,
       itens,
-      limite: registro.limite,
+      limite: registro.candidatos_solicitados ?? registro.limite,
+      metaQualificados: registro.meta_qualificados ?? registro.limite,
       estrategiaId: registro.estrategia,
       fonte: registro.fonte,
-      campos: registro.pedido ?? {},
+      campos: registro.pedido?.campos ?? registro.pedido ?? {},
       orgId,
       userId,
+      searchId: registro.id,
+      somenteNovos: registro.pedido?.somenteNovos ?? true,
     });
     if (processado.inseridos > 0) await consumir(admin, orgId, "leads", processado.inseridos);
     const { data: buscasMes } = await admin
@@ -485,6 +660,8 @@ Deno.serve(async (req) => {
       inseridos: processado.inseridos,
       descartados: processado.descartados,
       leadIds: processado.leadIds,
+      newLeadIds: processado.newLeadIds,
+      buscaId: registro.id,
       resumo: processado.resumo,
       custo,
       gastoMesDepois: gastoMes + custo,
@@ -501,6 +678,7 @@ Deno.serve(async (req) => {
         custo_usd: custo,
         encontrados: processado.resumo.analisados,
         inseridos: processado.inseridos,
+        motivo_parada: processado.motivoParada,
         resultado,
         detalhe: "resultado recuperado após timeout HTTP",
         concluida_em: new Date().toISOString(),
@@ -530,7 +708,11 @@ Deno.serve(async (req) => {
   if (!cfg) return json({ ok: false, reason: "estrategia_sem_coleta", estrategia: estrategiaId });
 
   const campos: Rec = b?.campos ?? {};
-  const limitePedido = Math.max(1, Math.min(200, Number(b?.limite ?? 50)));
+  const limitePedido = Math.max(
+    1,
+    Math.min(estrategia.fonte === "instagram" ? 100 : 200, Number(b?.limite ?? 50)),
+  );
+  const somenteNovos = b?.somenteNovos === undefined ? true : Boolean(b.somenteNovos);
   const agora = new Date();
   const mesRef = mesRefAtual(agora);
 
@@ -554,14 +736,30 @@ Deno.serve(async (req) => {
     .eq("mes_ref", mesRef)
     .in("fonte", ["instagram", "linkedin"]);
   const gastoMes = (doMes ?? []).reduce((s, r) => s + Number(r.custo_usd ?? 0), 0);
-  const plano = planejarColeta(gastoMes, limiteComPlano, TETO_RODADA, TETO_MES);
+  let descobertaInstagram: ReturnType<typeof montarPlanoDescobertaInstagram> | null = null;
+  if (estrategia.fonte === "instagram") {
+    try {
+      descobertaInstagram = montarPlanoDescobertaInstagram({
+        nicho: String(campos.nicho ?? campos.categoria ?? ""),
+        cidade: String(campos.cidade ?? ""),
+        metaQualificados: limiteComPlano,
+      });
+    } catch (error) {
+      return json({ ok: false, reason: "campos_invalidos", motivo: (error as Error).message }, 400);
+    }
+  }
+  const candidatosDesejados = descobertaInstagram?.maxCandidatos ?? limiteComPlano;
+  const plano = planejarColeta(gastoMes, candidatosDesejados, TETO_RODADA, TETO_MES);
   if (!plano.podeRodar) {
     await admin.from("redes_buscas").insert({
       user_id: userId,
       fonte: estrategia.fonte,
       estrategia: estrategiaId,
-      pedido: campos,
+      pedido: { campos, somenteNovos },
       limite: limitePedido,
+      meta_qualificados: limiteComPlano,
+      candidatos_solicitados: candidatosDesejados,
+      consultas: descobertaInstagram?.consultas ?? [],
       status: "parada_teto",
       detalhe: plano.motivo,
       mes_ref: mesRef,
@@ -583,8 +781,11 @@ Deno.serve(async (req) => {
       request_id: requestId,
       fonte: estrategia.fonte,
       estrategia: estrategiaId,
-      pedido: campos,
-      limite: plano.maxItens,
+      pedido: { campos, somenteNovos },
+      limite: limitePedido,
+      meta_qualificados: limiteComPlano,
+      candidatos_solicitados: plano.maxItens,
+      consultas: descobertaInstagram?.consultas ?? [],
       status: "rodando",
       mes_ref: mesRef,
     })
@@ -608,7 +809,10 @@ Deno.serve(async (req) => {
   try {
     // A identidade considera só o pedido bruto ao Actor. Estratégias e filtros locais diferentes
     // reutilizam o mesmo resultado público quando a consulta externa é idêntica.
-    const inputBase = cfg.monta(campos);
+    const inputBase = cfg.monta({
+      ...campos,
+      buscaComposta: descobertaInstagram?.buscaComposta,
+    });
     const chaveCache = criarChaveCacheRedes(cfg.ator, inputBase);
     const cache = await prepararCacheRedes<Rec>(admin, chaveCache, plano.maxItens);
     if (!cache.cacheHit) chaveCacheReservada = chaveCache;
@@ -786,13 +990,16 @@ Deno.serve(async (req) => {
       admin,
       itens,
       limite: plano.maxItens,
+      metaQualificados: limiteComPlano,
       estrategiaId,
       fonte: estrategia.fonte,
       campos,
       orgId,
       userId,
+      searchId: registro?.id,
+      somenteNovos,
     });
-    const { inseridos, descartados, leadIds, resumo } = processado;
+    const { inseridos, descartados, leadIds, newLeadIds, resumo } = processado;
     const analisados = resumo.analisados;
 
     if (inseridos > 0) await consumir(admin, orgId, "leads", inseridos);
@@ -805,6 +1012,8 @@ Deno.serve(async (req) => {
       inseridos,
       descartados,
       leadIds,
+      newLeadIds,
+      buscaId: registro?.id,
       resumo,
       custo,
       gastoMesDepois: gastoMes + custo,
@@ -820,6 +1029,7 @@ Deno.serve(async (req) => {
       custo_usd: custo,
       encontrados: analisados,
       inseridos,
+      motivo_parada: processado.motivoParada,
       // 📒 livro-caixa agora registra QUAL chave gastou + o rastro do rodízio
       chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
       detalhe: estourou

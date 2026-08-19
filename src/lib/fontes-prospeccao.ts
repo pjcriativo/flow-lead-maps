@@ -537,6 +537,7 @@ export type PedidoBusca = {
   estrategia: string;
   titulo: string;
   limite: number;
+  somenteNovos?: boolean;
   campos: Record<string, string | number | boolean>;
 };
 

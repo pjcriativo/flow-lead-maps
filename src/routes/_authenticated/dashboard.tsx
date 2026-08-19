@@ -25,6 +25,7 @@ import {
   LifeBuoy,
   Bell,
   Lock,
+  Instagram,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { posthog } from "@/lib/posthog";
 import { SearchSection } from "@/components/leads/SearchSection";
+import { InstagramWorkspace } from "@/components/instagram/InstagramWorkspace";
 import { PipelineSection } from "@/components/leads/PipelineSection";
 import { LeadsManager } from "@/components/leads/LeadsManager";
 import { PropostasSection } from "@/components/propostas/PropostasSection";
@@ -95,6 +97,7 @@ function getUserId(): string {
 
 type Section =
   | "buscar"
+  | "instagram"
   | "listas"
   | "pipeline"
   | "leads"
@@ -116,6 +119,7 @@ type Section =
 // "Google Sheets" saiu da sidebar (deprecated). No lugar entrou "Campanhas".
 const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
+  { id: "instagram", label: "Instagram", Icon: Instagram },
   { id: "listas", label: "Minhas Listas", Icon: FolderOpen },
   { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
   { id: "leads", label: "Meus Leads", Icon: Users },
@@ -337,6 +341,7 @@ function Dashboard() {
 
       <main className="min-w-0 flex-1 bg-white px-4 pb-10 pt-16 md:px-8 md:pt-8">
         {section === "buscar" && <SearchSection />}
+        {section === "instagram" && <InstagramWorkspace />}
         {section === "listas" && (
           <MinhasListasSection
             onOpenRedesign={(leadId) => {
