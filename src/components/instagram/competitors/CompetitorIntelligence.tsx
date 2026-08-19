@@ -89,7 +89,7 @@ const EMPTY_FORM = {
   monitoringIntervalHours: 168,
 };
 
-export function CompetitorIntelligence() {
+export function CompetitorIntelligence({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const [competitors, setCompetitors] = useState<InstagramCompetitor[]>([]);
   const [snapshots, setSnapshots] = useState<InstagramCompetitorSnapshot[]>([]);
   const [alerts, setAlerts] = useState<InstagramCompetitorAlert[]>([]);
@@ -100,6 +100,7 @@ export function CompetitorIntelligence() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [monitor, setMonitor] = useState(DEFAULT_MONITOR);
+  const [updatingInterval, setUpdatingInterval] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -187,6 +188,26 @@ export function CompetitorIntelligence() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateInterval = async (competitorId: string, username: string, label: string | null, niche: string, city: string | null, state: string | null, intervalHours: number) => {
+    setUpdatingInterval(true);
+    try {
+      await saveInstagramCompetitor({
+        username,
+        label: label ?? "",
+        niche,
+        city: city ?? "",
+        state: state ?? "",
+        monitoringIntervalHours: intervalHours,
+      });
+      await reload(competitorId);
+      toast.success("Frequência de monitoramento atualizada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a frequência.");
+    } finally {
+      setUpdatingInterval(false);
     }
   };
 
@@ -406,6 +427,36 @@ export function CompetitorIntelligence() {
                     setMonitor((current) => ({ ...current, commentsPerPost: value }))
                   }
                 />
+                <div className="space-y-1.5">
+                  <span className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Frequência de monitoramento
+                  </span>
+                  <Select
+                    value={String(selected.monitoring_interval_hours)}
+                    disabled={updatingInterval}
+                    onValueChange={(value) =>
+                      updateInterval(
+                        selected.id,
+                        selected.username,
+                        selected.label,
+                        selected.niche,
+                        selected.city,
+                        selected.state,
+                        Number(value)
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="24">Diária</SelectItem>
+                      <SelectItem value="72">A cada 3 dias</SelectItem>
+                      <SelectItem value="168">Semanal</SelectItem>
+                      <SelectItem value="720">Mensal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
             {latest ? (
@@ -414,6 +465,7 @@ export function CompetitorIntelligence() {
                 snapshot={latest}
                 snapshots={selectedSnapshots}
                 alerts={selectedAlerts}
+                onNavigate={onNavigate}
               />
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
@@ -547,6 +599,7 @@ function CompetitorDashboard({
   snapshot: InstagramCompetitorSnapshot;
   snapshots: InstagramCompetitorSnapshot[];
   alerts: InstagramCompetitorAlert[];
+  onNavigate?: (tab: string) => void;
 }) {
   const comments = snapshot.comment_summary;
   const relatedProfiles = normalizeRelatedProfiles(snapshot.profile_snapshot);
@@ -872,9 +925,20 @@ function CompetitorDashboard({
                       </Badge>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{alert.description}</p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {relativeDate(alert.created_at)}
-                    </p>
+                    <div className="mt-2 flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground">
+                        {relativeDate(alert.created_at)}
+                      </span>
+                      {alert.severity === "opportunity" && onNavigate && (
+                        <Button
+                          variant="link"
+                          className="h-auto p-0 text-xs"
+                          onClick={() => onNavigate("comments")}
+                        >
+                          Ir para o Comments Hunter →
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -1362,7 +1362,7 @@ async function arquivarConcorrente(
   return json({ ok: true }, 200, req);
 }
 
-async function processarMonitoramentoConcorrente(params: {
+export async function processarMonitoramentoConcorrente(params: {
   req: Request;
   admin: Admin;
   userId: string;

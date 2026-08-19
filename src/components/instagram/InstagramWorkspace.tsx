@@ -268,7 +268,7 @@ export function InstagramWorkspace() {
         </TabsContent>
 
         <TabsContent value="competitors" className="mt-5">
-          <CompetitorIntelligence />
+          <CompetitorIntelligence onNavigate={setTab} />
         </TabsContent>
 
         <TabsContent value="leads" className="mt-5 space-y-4">
