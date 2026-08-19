@@ -45,6 +45,7 @@ import {
   InstagramScoreControls,
   type InstagramScoreSort,
 } from "@/components/instagram/shared/InstagramScoreV2";
+import { InstagramInbox } from "@/components/instagram/inbox/InstagramInbox";
 import type { Estrategia, PedidoBusca } from "@/lib/fontes-prospeccao";
 import {
   instagramScoreValue,
@@ -220,7 +221,7 @@ export function InstagramWorkspace() {
       </header>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:grid-cols-4 lg:w-fit lg:grid-cols-7">
+        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:grid-cols-4 lg:w-fit lg:grid-cols-8">
           <TabsTrigger value="overview">
             <BarChart3 /> Visão geral
           </TabsTrigger>
@@ -241,6 +242,9 @@ export function InstagramWorkspace() {
           </TabsTrigger>
           <TabsTrigger value="campaigns">
             <Megaphone /> Direct
+          </TabsTrigger>
+          <TabsTrigger value="inbox">
+            <MessageCircle /> Inbox
           </TabsTrigger>
         </TabsList>
 
@@ -269,6 +273,10 @@ export function InstagramWorkspace() {
 
         <TabsContent value="competitors" className="mt-5">
           <CompetitorIntelligence onNavigate={setTab} />
+        </TabsContent>
+
+        <TabsContent value="inbox" className="mt-5">
+          <InstagramInbox />
         </TabsContent>
 
         <TabsContent value="leads" className="mt-5 space-y-4">
