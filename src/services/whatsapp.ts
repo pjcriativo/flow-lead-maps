@@ -502,6 +502,10 @@ export type ColetaRedes = {
   detalhe?: string;
   avisoChaves?: string;
   cacheHit?: boolean;
+  pendente?: boolean;
+  requestId?: string;
+  status?: string;
+  recuperada?: boolean;
   leadIds?: string[];
   resumo?: {
     analisados: number;
@@ -518,11 +522,37 @@ export async function buscarRedes(
   campos: Record<string, unknown>,
   limite: number,
 ): Promise<ColetaRedes> {
-  const { data, error } = await supabase.functions.invoke("buscar-redes", {
-    body: { acao: "buscar", estrategia, campos, limite },
+  const requestId = crypto.randomUUID();
+  const inicial = await supabase.functions.invoke("buscar-redes", {
+    body: { acao: "buscar", estrategia, campos, limite, requestId },
   });
-  if (error) throw error;
-  return data as ColetaRedes;
+  const respostaInicial = inicial.data as ColetaRedes | null;
+  if (!inicial.error && respostaInicial && !respostaInicial.pendente) return respostaInicial;
+
+  // O Actor pode sobreviver ao limite HTTP da Edge. Recuperamos pelo requestId e consultamos
+  // o MESMO run pago até ele terminar; nunca reenviamos a ação "buscar".
+  const deadline = Date.now() + 10 * 60 * 1000;
+  let ultimoErro: unknown = inicial.error;
+  let falhasConsecutivas = 0;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 4_000));
+    const consulta = await supabase.functions.invoke("buscar-redes", {
+      body: { acao: "recuperar", requestId },
+    });
+    if (consulta.error) {
+      ultimoErro = consulta.error;
+      falhasConsecutivas++;
+      if (inicial.error && falhasConsecutivas >= 3) throw inicial.error;
+      continue;
+    }
+    falhasConsecutivas = 0;
+    const resposta = consulta.data as ColetaRedes;
+    if (resposta?.reason === "busca_nao_encontrada" && inicial.error) throw inicial.error;
+    if (!resposta?.pendente) return resposta;
+  }
+  throw ultimoErro instanceof Error
+    ? ultimoErro
+    : new Error("A coleta continua processando além do tempo esperado. Tente consultar novamente.");
 }
 
 // ===== Agente SDR: rascunhos de resposta (o agente sugere, o dono decide) =====

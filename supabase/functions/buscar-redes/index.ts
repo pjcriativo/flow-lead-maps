@@ -41,6 +41,7 @@ import {
 } from "../../../src/lib/instagram-search.ts";
 import { consumir, estadoConsumo, orgDoUsuario } from "../_shared/limite.ts";
 import { liberarCacheRedes, prepararCacheRedes, salvarCacheRedes } from "../_shared/redes-cache.ts";
+import { decifrar } from "../_shared/cofre.ts";
 
 const API = "https://api.apify.com/v2";
 
@@ -160,6 +161,172 @@ function achaWhats(txt: string): string | null {
   return full.length >= 12 && full.length <= 13 ? full : null;
 }
 
+async function processarResultados(params: {
+  admin: Rec;
+  itens: Rec[];
+  limite: number;
+  estrategiaId: string;
+  fonte: "instagram" | "linkedin";
+  campos: Rec;
+  orgId: string;
+  userId: string;
+}) {
+  const { admin, itens, limite, estrategiaId, fonte, campos, orgId, userId } = params;
+  let inseridos = 0;
+  let aprovados = 0;
+  let duplicados = 0;
+  const leadIds: string[] = [];
+  const rejeitados: Record<string, number> = {};
+  const registrarRejeicao = (motivo: InstagramRejectionReason | "sem_contato" | "erro_banco") => {
+    rejeitados[motivo] = (rejeitados[motivo] ?? 0) + 1;
+  };
+
+  for (const it of itens.slice(0, limite)) {
+    const txt = JSON.stringify(it);
+    let lead: Rec | null = null;
+    if (fonte === "instagram") {
+      const username = it.username ?? it.ownerUsername ?? null;
+      const bio = it.biography ?? it.bio ?? "";
+      const link = it.externalUrl ?? it.website ?? null;
+      const temSiteProprio = temSiteProprioInstagram(link);
+      const email = it.businessEmail ?? achaEmail(bio) ?? null;
+      const whatsapp = it.businessPhoneNumber ?? whatsDoLink(link) ?? achaWhats(bio) ?? null;
+      const temContatoExterno = !!email || !!whatsapp || temSiteProprio;
+      const perfil = { ...it, username };
+      const filtros = {
+        nicho: String(campos.nicho ?? campos.categoria ?? ""),
+        cidade: String(campos.cidade ?? ""),
+        minSeguidores: Number(campos.minSeguidores ?? 0),
+        soComerciais: Boolean(campos.soComerciais),
+        exigirLocalidade:
+          campos.exigirLocalidade === undefined
+            ? estrategiaId === "IG-LOCAL"
+            : Boolean(campos.exigirLocalidade),
+        semSiteProprio: estrategiaId === "IG-5" || Boolean(campos.semSiteProprio),
+        exigirContatoExterno: Boolean(campos.exigirContatoExterno),
+      };
+      const motivo = motivoRejeicaoInstagram(perfil, filtros, temContatoExterno);
+      if (motivo) {
+        registrarRejeicao(motivo);
+        continue;
+      }
+      const localidadeConfirmada = perfilTemLocalidade(perfil, filtros.cidade);
+      const nichoConfirmado = perfilTemNicho(perfil, filtros.nicho);
+      const seguidores = Number(it.followersCount ?? 0);
+      lead = perfilParaLead(
+        {
+          username: String(username),
+          nome: it.fullName ?? it.name ?? null,
+          bio,
+          linkBio: temSiteProprio ? link : null,
+          email,
+          whatsapp,
+          categoria: it.businessCategoryName ?? it.category ?? null,
+          cidade: localidadeConfirmada ? String(campos.cidade ?? "") || null : null,
+          seguidores: seguidores || null,
+        },
+        estrategiaId,
+      );
+      lead.state = localidadeConfirmada ? String(campos.uf ?? "") || null : null;
+      const aderencia = calcularScoreInstagram({
+        temNicho: nichoConfirmado,
+        temLocalidade: localidadeConfirmada,
+        comercial: it.isBusinessAccount === true,
+        temContatoExterno,
+        semSiteProprio: !temSiteProprio,
+        seguidores,
+      });
+      lead.score = aderencia.score;
+      lead.score_breakdown = aderencia.breakdown;
+    } else {
+      const slug =
+        it.publicIdentifier ?? it.universalName ?? it.slug ?? it.linkedinUrl ?? it.id ?? null;
+      if (!slug) continue;
+      const nome = it.name ?? it.companyName ?? it.title ?? null;
+      if (!nome) continue;
+      lead = {
+        place_id: `li:${String(slug)
+          .replace(/^https?:\/\/[^/]+\/company\//, "")
+          .replace(/\/$/, "")}`,
+        business_name: String(nome).trim(),
+        linkedin_url: it.linkedinUrl ?? `https://linkedin.com/company/${slug}`,
+        website: it.websiteUrl ?? it.website ?? null,
+        category: it.industry ?? (String(campos.setor ?? "") || null),
+        city: it.location ?? (String(campos.regiao ?? "") || null),
+        email: achaEmail(txt),
+        status: "new",
+        origem_fonte: "linkedin",
+        origem_estrategia: estrategiaId,
+      };
+    }
+    if (!lead) continue;
+    if (fonte !== "instagram") {
+      const sc = computeScore({
+        hasWebsite: !!lead.website,
+        site: null,
+        hasInstagram: !!lead.instagram_url,
+        hasFacebook: false,
+        hasWhatsapp: !!lead.whatsapp,
+        hasPhone: !!lead.phone,
+        hasEmail: !!lead.email,
+        rating: null,
+        reviewCount: null,
+      });
+      lead.score = sc.score;
+      lead.score_breakdown = sc;
+    }
+    lead.org_id = orgId;
+    lead.user_id = userId;
+    lead.assigned_to = userId;
+    lead.sem_contato =
+      !lead.instagram_url && !lead.email && !lead.whatsapp && !lead.phone && !lead.website;
+    if (lead.sem_contato) {
+      registrarRejeicao("sem_contato");
+      continue;
+    }
+    aprovados++;
+    const { data: insertedLead, error } = await admin
+      .from("leads")
+      .upsert(lead, { onConflict: "org_id,place_id", ignoreDuplicates: true })
+      .select("id")
+      .maybeSingle();
+    if (error) registrarRejeicao("erro_banco");
+    else if (insertedLead) {
+      inseridos++;
+      leadIds.push(insertedLead.id);
+    } else duplicados++;
+  }
+  const analisados = Math.min(itens.length, limite);
+  const descartados = Object.values(rejeitados).reduce((total, valor) => total + valor, 0);
+  return {
+    inseridos,
+    descartados,
+    leadIds,
+    resumo: { analisados, aprovados, novos: inseridos, duplicados, rejeitados },
+  };
+}
+
+async function tokenDaChaveDoRun(
+  admin: Rec,
+  chaveId: string | null,
+  pool: ChaveApify[],
+): Promise<string | null> {
+  if (!chaveId) return (pool[0]?.token ?? token()) || null;
+  const ativa = pool.find((chave) => chave.id === chaveId);
+  if (ativa) return ativa.token;
+  const { data } = await admin
+    .from("apify_chaves")
+    .select("valor_cifrado")
+    .eq("id", chaveId)
+    .maybeSingle();
+  if (!data?.valor_cifrado) return null;
+  try {
+    return await decifrar(data.valor_cifrado);
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
@@ -227,7 +394,135 @@ Deno.serve(async (req) => {
     return json({ ok: true, atores, teto: { rodada: TETO_RODADA, mes: TETO_MES } });
   }
 
+  // ---------- RECUPERAR: consulta o MESMO run após timeout HTTP; nunca inicia outra cobrança ----------
+  if (acao === "recuperar") {
+    const requestId = String(b?.requestId ?? "");
+    if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId))
+      return json({ ok: false, reason: "request_id_invalido" }, 400);
+    const { data: registro } = await admin
+      .from("redes_buscas")
+      .select(
+        "id, fonte, estrategia, pedido, limite, mes_ref, status, resultado, apify_run_id, apify_dataset_id, apify_chave_id, cache_key, chave_apelido",
+      )
+      .eq("user_id", userId)
+      .eq("request_id", requestId)
+      .maybeSingle();
+    if (!registro) return json({ ok: false, reason: "busca_nao_encontrada" }, 404);
+    if (registro.resultado) return json(registro.resultado);
+    if (!registro.apify_run_id)
+      return json({ ok: true, pendente: true, requestId, status: registro.status });
+
+    const tokenRun = await tokenDaChaveDoRun(admin, registro.apify_chave_id, poolInicial.chaves);
+    if (!tokenRun) return json({ ok: false, reason: "chave_do_run_indisponivel" }, 503);
+    const runResponse = await fetch(`${API}/actor-runs/${registro.apify_run_id}`, {
+      headers: { Authorization: `Bearer ${tokenRun}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!runResponse.ok) return json({ ok: false, reason: "status_apify_indisponivel" }, 502);
+    const runJson = (await runResponse.json().catch(() => ({}))) as Rec;
+    const run = runJson?.data ?? {};
+    const runStatus = String(run.status ?? "UNKNOWN");
+    if (!["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) {
+      return json({ ok: true, pendente: true, requestId, status: runStatus });
+    }
+    const custo = Number(run.usageTotalUsd ?? 0);
+    if (runStatus !== "SUCCEEDED") {
+      if (registro.cache_key)
+        await liberarCacheRedes(admin, registro.cache_key, (mensagem) => console.warn(mensagem));
+      await admin
+        .from("redes_buscas")
+        .update({
+          status: "erro",
+          custo_usd: custo,
+          detalhe: `run ${runStatus}`,
+          concluida_em: new Date().toISOString(),
+        })
+        .eq("id", registro.id);
+      return json({ ok: false, reason: "run_nao_concluiu", status: runStatus, custo });
+    }
+
+    const datasetId = run.defaultDatasetId ?? registro.apify_dataset_id;
+    const datasetResponse = await fetch(
+      `${API}/datasets/${datasetId}/items?limit=${registro.limite}`,
+      { headers: { Authorization: `Bearer ${tokenRun}` }, signal: AbortSignal.timeout(20_000) },
+    );
+    if (!datasetResponse.ok) return json({ ok: false, reason: "dataset_indisponivel" }, 502);
+    const itens = ((await datasetResponse.json().catch(() => [])) ?? []) as Rec[];
+    if (registro.cache_key)
+      await salvarCacheRedes(admin, registro.cache_key, registro.limite, itens, (mensagem) =>
+        console.warn(mensagem),
+      );
+
+    const estrategia = estrategiaPorId(registro.estrategia);
+    if (!estrategia) return json({ ok: false, reason: "estrategia_desconhecida" }, 409);
+    const processado = await processarResultados({
+      admin,
+      itens,
+      limite: registro.limite,
+      estrategiaId: registro.estrategia,
+      fonte: registro.fonte,
+      campos: registro.pedido ?? {},
+      orgId,
+      userId,
+    });
+    if (processado.inseridos > 0) await consumir(admin, orgId, "leads", processado.inseridos);
+    const { data: buscasMes } = await admin
+      .from("redes_buscas")
+      .select("custo_usd")
+      .eq("user_id", userId)
+      .eq("mes_ref", registro.mes_ref)
+      .neq("id", registro.id)
+      .in("fonte", ["instagram", "linkedin"]);
+    const gastoMes = (buscasMes ?? []).reduce(
+      (total: number, item: Rec) => total + Number(item.custo_usd ?? 0),
+      0,
+    );
+    const estourou = estourouColeta(custo, gastoMes, TETO_RODADA, TETO_MES);
+    const resultado = {
+      ok: true,
+      estrategia: registro.estrategia,
+      encontrados: processado.resumo.analisados,
+      inseridos: processado.inseridos,
+      descartados: processado.descartados,
+      leadIds: processado.leadIds,
+      resumo: processado.resumo,
+      custo,
+      gastoMesDepois: gastoMes + custo,
+      teto: { rodada: TETO_RODADA, mes: TETO_MES },
+      estourou,
+      chaveApelido: registro.chave_apelido,
+      cacheHit: false,
+      recuperada: true,
+    };
+    await admin
+      .from("redes_buscas")
+      .update({
+        status: estourou ? "parada_teto" : "concluida",
+        custo_usd: custo,
+        encontrados: processado.resumo.analisados,
+        inseridos: processado.inseridos,
+        resultado,
+        detalhe: "resultado recuperado após timeout HTTP",
+        concluida_em: new Date().toISOString(),
+      })
+      .eq("id", registro.id);
+    return json(resultado);
+  }
+
   // ---------- BUSCAR ----------
+  const requestId = String(b?.requestId ?? "");
+  if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId))
+    return json({ ok: false, reason: "request_id_invalido" }, 400);
+  const { data: buscaExistente } = await admin
+    .from("redes_buscas")
+    .select("status, resultado")
+    .eq("user_id", userId)
+    .eq("request_id", requestId)
+    .maybeSingle();
+  if (buscaExistente?.resultado) return json(buscaExistente.resultado);
+  if (buscaExistente)
+    return json({ ok: true, pendente: true, requestId, status: buscaExistente.status });
+
   const estrategiaId = String(b?.estrategia || "");
   const estrategia = estrategiaPorId(estrategiaId);
   if (!estrategia) return json({ ok: false, reason: "estrategia_desconhecida" });
@@ -285,6 +580,7 @@ Deno.serve(async (req) => {
     .from("redes_buscas")
     .insert({
       user_id: userId,
+      request_id: requestId,
       fonte: estrategia.fonte,
       estrategia: estrategiaId,
       pedido: campos,
@@ -316,6 +612,7 @@ Deno.serve(async (req) => {
     const chaveCache = criarChaveCacheRedes(cfg.ator, inputBase);
     const cache = await prepararCacheRedes<Rec>(admin, chaveCache, plano.maxItens);
     if (!cache.cacheHit) chaveCacheReservada = chaveCache;
+    await admin.from("redes_buscas").update({ cache_key: chaveCache }).eq("id", registro?.id);
 
     const input = {
       ...inputBase,
@@ -393,6 +690,15 @@ Deno.serve(async (req) => {
         const startJson = (await r.resp.json().catch(() => ({}))) as Rec;
         const runId = startJson?.data?.id;
         let datasetId: string | null = startJson?.data?.defaultDatasetId ?? null;
+        await admin
+          .from("redes_buscas")
+          .update({
+            apify_run_id: runId,
+            apify_dataset_id: datasetId,
+            apify_chave_id: chaveUsada.id,
+            chave_apelido: chaveUsada.apelido,
+          })
+          .eq("id", registro?.id);
 
         // aguarda o run (com teto de tempo — o edge não pode ficar preso)
         let status = "READY";
@@ -476,145 +782,39 @@ Deno.serve(async (req) => {
     }
     const custo = custoTotal;
 
-    // Cada fonte tem sua própria régua. Instagram mede aderência ao pedido; Maps mede
-    // oportunidade digital. Misturar as duas escalas produzia o mesmo score em todos os perfis.
-    let inseridos = 0;
-    let aprovados = 0;
-    let duplicados = 0;
-    const leadIds: string[] = [];
-    const rejeitados: Record<string, number> = {};
-    const registrarRejeicao = (motivo: InstagramRejectionReason | "sem_contato" | "erro_banco") => {
-      rejeitados[motivo] = (rejeitados[motivo] ?? 0) + 1;
-    };
-    for (const it of itens.slice(0, plano.maxItens)) {
-      const txt = JSON.stringify(it);
-      let lead: Rec | null = null;
-
-      if (estrategia.fonte === "instagram") {
-        const username = it.username ?? it.ownerUsername ?? null;
-        const bio = it.biography ?? it.bio ?? "";
-        const link = it.externalUrl ?? it.website ?? null;
-        const temSiteProprio = temSiteProprioInstagram(link);
-        const email = it.businessEmail ?? achaEmail(bio) ?? null;
-        const whatsapp = it.businessPhoneNumber ?? whatsDoLink(link) ?? achaWhats(bio) ?? null;
-        const temContatoExterno = !!email || !!whatsapp || temSiteProprio;
-        const perfil = { ...it, username };
-        const filtros = {
-          nicho: String(campos.nicho ?? campos.categoria ?? ""),
-          cidade: String(campos.cidade ?? ""),
-          minSeguidores: Number(campos.minSeguidores ?? 0),
-          soComerciais: Boolean(campos.soComerciais),
-          exigirLocalidade:
-            campos.exigirLocalidade === undefined
-              ? estrategiaId === "IG-LOCAL"
-              : Boolean(campos.exigirLocalidade),
-          semSiteProprio: estrategiaId === "IG-5" || Boolean(campos.semSiteProprio),
-          exigirContatoExterno: Boolean(campos.exigirContatoExterno),
-        };
-        const motivo = motivoRejeicaoInstagram(perfil, filtros, temContatoExterno);
-        if (motivo) {
-          registrarRejeicao(motivo);
-          continue;
-        }
-        const localidadeConfirmada = perfilTemLocalidade(perfil, filtros.cidade);
-        const nichoConfirmado = perfilTemNicho(perfil, filtros.nicho);
-        const seguidores = Number(it.followersCount ?? 0);
-        lead = perfilParaLead(
-          {
-            username: String(username),
-            nome: it.fullName ?? it.name ?? null,
-            bio,
-            linkBio: temSiteProprio ? link : null,
-            email,
-            whatsapp,
-            categoria: it.businessCategoryName ?? it.category ?? null,
-            cidade: localidadeConfirmada ? String(campos.cidade ?? "") || null : null,
-            seguidores: seguidores || null,
-          },
-          estrategiaId,
-        );
-        lead.state = localidadeConfirmada ? String(campos.uf ?? "") || null : null;
-        const aderencia = calcularScoreInstagram({
-          temNicho: nichoConfirmado,
-          temLocalidade: localidadeConfirmada,
-          comercial: it.isBusinessAccount === true,
-          temContatoExterno,
-          semSiteProprio: !temSiteProprio,
-          seguidores,
-        });
-        lead.score = aderencia.score;
-        lead.score_breakdown = aderencia.breakdown;
-      } else {
-        // LI-4 busca EMPRESA (não pessoa): o lead é a empresa. owner_name/cargo ficam vazios —
-        // gravar o nome da empresa como "dono" seria mentir sobre quem é o contato.
-        const slug =
-          it.publicIdentifier ?? it.universalName ?? it.slug ?? it.linkedinUrl ?? it.id ?? null;
-        if (!slug) continue;
-        const nome = it.name ?? it.companyName ?? it.title ?? null;
-        if (!nome) continue;
-        lead = {
-          place_id: `li:${String(slug)
-            .replace(/^https?:\/\/[^/]+\/company\//, "")
-            .replace(/\/$/, "")}`,
-          business_name: String(nome).trim(),
-          linkedin_url: it.linkedinUrl ?? `https://linkedin.com/company/${slug}`,
-          website: it.websiteUrl ?? it.website ?? null,
-          category: it.industry ?? (String(campos.setor ?? "") || null),
-          city: it.location ?? (String(campos.regiao ?? "") || null),
-          email: achaEmail(txt),
-          status: "new",
-          origem_fonte: "linkedin",
-          origem_estrategia: estrategiaId,
-        };
-      }
-      if (!lead) continue;
-
-      if (estrategia.fonte !== "instagram") {
-        const sc = computeScore({
-          hasWebsite: !!lead.website,
-          site: null,
-          hasInstagram: !!lead.instagram_url,
-          hasFacebook: false,
-          hasWhatsapp: !!lead.whatsapp,
-          hasPhone: !!lead.phone,
-          hasEmail: !!lead.email,
-          rating: null,
-          reviewCount: null,
-        });
-        lead.score = sc.score;
-        lead.score_breakdown = sc;
-      }
-      lead.org_id = orgId;
-      lead.user_id = userId;
-      lead.assigned_to = userId;
-      // O perfil do Instagram é um canal acionável por DM. Contato externo é um filtro opcional,
-      // não uma condição escondida para o lead existir.
-      lead.sem_contato =
-        !lead.instagram_url && !lead.email && !lead.whatsapp && !lead.phone && !lead.website;
-      if (lead.sem_contato) {
-        registrarRejeicao("sem_contato");
-        continue;
-      }
-
-      aprovados++;
-      const { data: insertedLead, error } = await admin
-        .from("leads")
-        .upsert(lead, { onConflict: "org_id,place_id", ignoreDuplicates: true })
-        .select("id")
-        .maybeSingle();
-      if (error) registrarRejeicao("erro_banco");
-      else if (insertedLead) {
-        inseridos++;
-        leadIds.push(insertedLead.id);
-      } else duplicados++;
-    }
-
-    const analisados = Math.min(itens.length, plano.maxItens);
-    const descartados = Object.values(rejeitados).reduce((total, valor) => total + valor, 0);
+    const processado = await processarResultados({
+      admin,
+      itens,
+      limite: plano.maxItens,
+      estrategiaId,
+      fonte: estrategia.fonte,
+      campos,
+      orgId,
+      userId,
+    });
+    const { inseridos, descartados, leadIds, resumo } = processado;
+    const analisados = resumo.analisados;
 
     if (inseridos > 0) await consumir(admin, orgId, "leads", inseridos);
 
     const estourou = estourouColeta(custo, gastoMes, TETO_RODADA, TETO_MES);
+    const resultado = {
+      ok: true,
+      estrategia: estrategiaId,
+      encontrados: analisados,
+      inseridos,
+      descartados,
+      leadIds,
+      resumo,
+      custo,
+      gastoMesDepois: gastoMes + custo,
+      teto: { rodada: TETO_RODADA, mes: TETO_MES },
+      estourou,
+      chaveApelido: chaveUsada?.id ? chaveUsada.apelido : null,
+      trocasDeChave,
+      avisoChaves,
+      cacheHit: cache.cacheHit,
+    };
     await finalizar({
       status: estourou ? "parada_teto" : "concluida",
       custo_usd: custo,
@@ -627,41 +827,10 @@ Deno.serve(async (req) => {
         : cache.cacheHit
           ? "resultado entregue pelo cache compartilhado"
           : (avisoChaves ?? null),
+      resultado,
     });
 
-    return json({
-      ok: true,
-      estrategia: estrategiaId,
-      amostra: itens[0] ? Object.keys(itens[0]).slice(0, 40) : null,
-      amostraValores: itens[0]
-        ? {
-            username: itens[0].username ?? null,
-            externalUrl: itens[0].externalUrl ?? null,
-            followersCount: itens[0].followersCount ?? null,
-            name: itens[0].name ?? null,
-          }
-        : null,
-      encontrados: analisados,
-      inseridos,
-      descartados,
-      leadIds,
-      resumo: {
-        analisados,
-        aprovados,
-        novos: inseridos,
-        duplicados,
-        rejeitados,
-      },
-      custo,
-      gastoMesDepois: gastoMes + custo,
-      teto: { rodada: TETO_RODADA, mes: TETO_MES },
-      estourou,
-      // rastro do rodízio — a UI mostra sem susto ("a busca continuou em outra chave")
-      chaveApelido: chaveUsada?.id ? chaveUsada.apelido : null,
-      trocasDeChave,
-      avisoChaves,
-      cacheHit: cache.cacheHit,
-    });
+    return json(resultado);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await liberarReservaCache();
