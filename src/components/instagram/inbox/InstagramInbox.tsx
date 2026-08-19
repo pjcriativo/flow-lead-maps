@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { MessageCircle, Send, Plus, Loader2, Settings } from "lucide-react";
+import { MessageCircle, Send, Loader2, Settings } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,11 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-type Account = {
+type IgInstancia = {
   id: string;
-  instagram_id: string;
-  username: string;
-  facebook_page_id: string;
+  nome: string;
+  username_ig: string;
   status: string;
 };
 
@@ -28,7 +27,7 @@ type Conversation = {
 
 type Message = {
   id: string;
-  conversation_id: string;
+  conversa_id: string;
   direction: 'inbound' | 'outbound';
   message_type: string;
   text: string;
@@ -38,19 +37,19 @@ type Message = {
 
 export function InstagramInbox() {
   const { session } = useAuth();
-  const [account, setAccount] = useState<Account | null>(null);
+  const [account, setAccount] = useState<IgInstancia | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load account
   useEffect(() => {
     async function loadAccount() {
-      const { data } = await supabase.from("instagram_accounts").select("*").eq('status', 'active').limit(1);
+      const { data } = await supabase.from("ig_instancias").select("*").limit(1);
       if (data && data.length > 0) {
         setAccount(data[0]);
         loadConversations(data[0].id);
@@ -61,11 +60,11 @@ export function InstagramInbox() {
     void loadAccount();
   }, []);
 
-  const loadConversations = async (accountId: string) => {
+  const loadConversations = async (instanciaId: string) => {
     const { data } = await supabase
-      .from("instagram_conversations")
+      .from("ig_conversas")
       .select("*")
-      .eq("account_id", accountId)
+      .eq("instancia_id", instanciaId)
       .order("last_message_at", { ascending: false });
     if (data) setConversations(data);
     setLoading(false);
@@ -74,9 +73,9 @@ export function InstagramInbox() {
   const loadMessages = async (convId: string) => {
     setActiveConvId(convId);
     const { data } = await supabase
-      .from("instagram_messages")
+      .from("ig_mensagens")
       .select("*")
-      .eq("conversation_id", convId)
+      .eq("conversa_id", convId)
       .order("timestamp", { ascending: true });
     if (data) setMessages(data);
     scrollToBottom();
@@ -91,10 +90,10 @@ export function InstagramInbox() {
   useEffect(() => {
     if (!activeConvId) return;
     const channel = supabase
-      .channel("public:instagram_messages")
+      .channel("public:ig_mensagens")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "instagram_messages", filter: `conversation_id=eq.${activeConvId}` },
+        { event: "INSERT", schema: "public", table: "ig_mensagens", filter: `conversa_id=eq.${activeConvId}` },
         (payload) => {
           setMessages((current) => [...current, payload.new as Message]);
           scrollToBottom();
@@ -106,22 +105,39 @@ export function InstagramInbox() {
     };
   }, [activeConvId]);
 
+  const connectAccount = async () => {
+    setConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ig-chips", {
+        body: { acao: "criar" }
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      
+      setAccount(data.inst);
+      toast.success("Instância Evolution criada! Realize o login no painel.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao conectar conta");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
   const sendMessage = async () => {
     if (!inputText.trim() || !activeConvId) return;
     
     setSending(true);
     const textToSend = inputText;
-    setInputText(""); // optimistico
+    setInputText("");
 
     try {
-      const { data, error } = await supabase.functions.invoke("instagram-send", {
-        body: { conversationId: activeConvId, text: textToSend }
+      const { data, error } = await supabase.functions.invoke("ig-send", {
+        body: { conversaId: activeConvId, text: textToSend }
       });
 
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
 
-      // The real-time subscription will catch the message insertion and update the UI
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao enviar mensagem");
       setInputText(textToSend); // rollback
@@ -140,11 +156,14 @@ export function InstagramInbox() {
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Settings className="h-8 w-8" />
         </div>
-        <h2 className="mt-4 text-xl font-semibold">Caixa de Entrada Oficial</h2>
+        <h2 className="mt-4 text-xl font-semibold">Caixa de Entrada Oficial (Evolution)</h2>
         <p className="mt-2 text-sm text-muted-foreground max-w-md">
-          Para usar a mensageria oficial da Meta, você precisa vincular sua conta do Instagram Business e fornecer um Token de Acesso permanente.
+          Para receber mensagens do Instagram Direct via Evolution API, crie uma instância segura e conecte sua conta.
         </p>
-        <Button className="mt-6" variant="outline">Configurar Integração</Button>
+        <Button className="mt-6" onClick={() => void connectAccount()} disabled={connecting}>
+          {connecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Criar Instância Segura
+        </Button>
       </div>
     );
   }
@@ -155,10 +174,13 @@ export function InstagramInbox() {
     <div className="grid h-[700px] grid-cols-[300px_1fr] overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
       {/* Sidebar - Conversas */}
       <div className="flex flex-col border-r border-border bg-muted/20">
-        <div className="border-b border-border p-4">
+        <div className="border-b border-border p-4 flex items-center justify-between">
           <h3 className="font-semibold flex items-center gap-2">
-            <MessageCircle className="h-4 w-4" /> Inbox ({account.username})
+            <MessageCircle className="h-4 w-4" /> Inbox ({account.nome})
           </h3>
+          <span className={`text-[10px] font-medium px-2 py-1 rounded-full ${account.status === 'conectado' ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'}`}>
+             {account.status}
+          </span>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {conversations.length === 0 ? (
@@ -176,11 +198,11 @@ export function InstagramInbox() {
               >
                 <Avatar className="h-10 w-10 border bg-background">
                   <AvatarImage src={conv.external_contact_avatar} />
-                  <AvatarFallback>{conv.external_contact_username?.charAt(0) || "U"}</AvatarFallback>
+                  <AvatarFallback>{conv.external_contact_name?.charAt(0) || "U"}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 overflow-hidden">
                   <div className="truncate font-medium text-sm">
-                    {conv.external_contact_name || conv.external_contact_username}
+                    {conv.external_contact_name || conv.external_contact_id}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {conv.last_message_text}
@@ -199,11 +221,10 @@ export function InstagramInbox() {
             <div className="flex items-center gap-3 border-b border-border bg-card p-4 shadow-sm z-10">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={activeConv?.external_contact_avatar} />
-                <AvatarFallback>{activeConv?.external_contact_username?.charAt(0) || "U"}</AvatarFallback>
+                <AvatarFallback>{activeConv?.external_contact_name?.charAt(0) || "U"}</AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-semibold leading-tight">{activeConv?.external_contact_name || activeConv?.external_contact_username}</h3>
-                <p className="text-xs text-muted-foreground">@{activeConv?.external_contact_username}</p>
+                <h3 className="font-semibold leading-tight">{activeConv?.external_contact_name || activeConv?.external_contact_id}</h3>
               </div>
             </div>
 
