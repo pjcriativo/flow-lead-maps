@@ -26,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -53,6 +52,12 @@ import {
   InstagramSourceChoice as SourceChoice,
   InstagramToggleField as ToggleField,
 } from "@/components/instagram/shared/InstagramDiscoveryFields";
+import {
+  InstagramScoreBars,
+  InstagramScoreControls,
+  type InstagramScoreSort,
+} from "@/components/instagram/shared/InstagramScoreV2";
+import { instagramScoreValue } from "@/lib/instagram-score-v2";
 
 const INITIAL_INPUT: CommentsHunterInput = {
   sourceType: "profile",
@@ -84,6 +89,8 @@ export function CommentsHunter({
   const [result, setResult] = useState<CommentsHunterResponse | null>(null);
   const [history, setHistory] = useState<CommentsHunterHistory[]>([]);
   const [filter, setFilter] = useState<ResultFilter>("all");
+  const [scoreSort, setScoreSort] = useState<InstagramScoreSort>("total");
+  const [minScore, setMinScore] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -113,10 +120,16 @@ export function CommentsHunter({
   const requestedComments =
     (input.sourceType === "profile" ? input.maxPosts : Math.max(1, parsedUrls.length)) *
     input.commentsPerPost;
-  const visibleResults = useMemo(
-    () => (result?.results ?? []).filter((item) => filter === "all" || item.decision === filter),
-    [filter, result],
-  );
+  const visibleResults = useMemo(() => {
+    return (result?.results ?? [])
+      .filter((item) => filter === "all" || item.decision === filter)
+      .filter((item) => item.scoreV2.total >= minScore)
+      .sort(
+        (left, right) =>
+          instagramScoreValue(right.scoreV2, scoreSort) -
+          instagramScoreValue(left.scoreV2, scoreSort),
+      );
+  }, [filter, minScore, result, scoreSort]);
 
   const update = <K extends keyof CommentsHunterInput>(key: K, value: CommentsHunterInput[K]) => {
     setInput((current) => ({ ...current, [key]: value }));
@@ -379,6 +392,10 @@ export function CommentsHunter({
           visibleResults={visibleResults}
           filter={filter}
           onFilter={setFilter}
+          scoreSort={scoreSort}
+          minScore={minScore}
+          onScoreSort={setScoreSort}
+          onMinScore={setMinScore}
         />
       ) : null}
 
@@ -422,11 +439,19 @@ function CommentsResults({
   visibleResults,
   filter,
   onFilter,
+  scoreSort,
+  minScore,
+  onScoreSort,
+  onMinScore,
 }: {
   result: CommentsHunterResponse;
   visibleResults: CommentLeadResult[];
   filter: ResultFilter;
   onFilter: (filter: ResultFilter) => void;
+  scoreSort: InstagramScoreSort;
+  minScore: number;
+  onScoreSort: (sort: InstagramScoreSort) => void;
+  onMinScore: (score: number) => void;
 }) {
   const stats = result.stats!;
   const funnel = [
@@ -482,6 +507,13 @@ function CommentsResults({
             </Button>
           ),
         )}
+        <InstagramScoreControls
+          className="sm:ml-auto"
+          sort={scoreSort}
+          minScore={minScore}
+          onSortChange={onScoreSort}
+          onMinScoreChange={onMinScore}
+        />
       </div>
       <div className="divide-y divide-border">
         {visibleResults.map((lead) => (
@@ -499,7 +531,7 @@ function CommentsResults({
 
 function CommentLeadCard({ lead }: { lead: CommentLeadResult }) {
   return (
-    <article className="grid gap-4 p-5 xl:grid-cols-[minmax(260px,1.1fr)_minmax(300px,1.4fr)_220px_140px] xl:items-center">
+    <article className="grid gap-4 p-5 xl:grid-cols-[minmax(240px,1fr)_minmax(280px,1.2fr)_310px_130px] xl:items-center">
       <div className="flex min-w-0 items-center gap-3">
         <Avatar className="size-12 border border-border">
           <AvatarImage src={lead.avatarUrl ?? undefined} alt={`Avatar de @${lead.username}`} />
@@ -545,9 +577,7 @@ function CommentLeadCard({ lead }: { lead: CommentLeadResult }) {
         ) : null}
       </div>
       <div className="space-y-2 text-xs">
-        <Signal label="Intenção" value={lead.intentScore} />
-        <Signal label="Score do lead" value={lead.leadScore} />
-        <Signal label="Autenticidade" value={lead.authenticity} />
+        <InstagramScoreBars score={lead.scoreV2} />
         <div className="flex flex-wrap gap-1">
           {lead.nicheMatch ? <Badge variant="outline">nicho ✓</Badge> : null}
           {lead.locationMatch ? (
@@ -593,18 +623,6 @@ function FlowStep({
         <div className="text-sm font-medium">{title}</div>
         <div className="text-xs text-muted-foreground">{text}</div>
       </div>
-    </div>
-  );
-}
-
-function Signal({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex justify-between">
-        <span className="text-muted-foreground">{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <Progress value={value} className="h-1.5" />
     </div>
   );
 }

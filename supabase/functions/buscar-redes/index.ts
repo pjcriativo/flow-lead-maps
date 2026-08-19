@@ -32,7 +32,6 @@ import {
 } from "../_shared/apify-pool.ts";
 import { estrategiaPorId, perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
 import {
-  calcularScoreInstagram,
   motivoRejeicaoInstagram,
   perfilEhProfissionalInstagram,
   perfilTemLocalidade,
@@ -40,6 +39,12 @@ import {
   temSiteProprioInstagram,
   type InstagramRejectionReason,
 } from "../../../src/lib/instagram-search.ts";
+import {
+  calculateInstagramScoreV2,
+  scoreInstagramActivity,
+  scoreInstagramAuthenticity,
+  scoreInstagramCommercialIntent,
+} from "../../../src/lib/instagram-score-v2.ts";
 import { montarPlanoDescobertaInstagram } from "../../../src/lib/instagram-discovery.ts";
 import { consumir, estadoConsumo, orgDoUsuario } from "../_shared/limite.ts";
 import { liberarCacheRedes, prepararCacheRedes, salvarCacheRedes } from "../_shared/redes-cache.ts";
@@ -210,6 +215,7 @@ async function processarResultados(params: {
     let perfilRow: Rec | null = null;
     let usernameNormalizado: string | null = null;
     let scoreInstagram: number | null = null;
+    let scoreV2Instagram: ReturnType<typeof calculateInstagramScoreV2> | null = null;
     analisados++;
     if (fonte === "instagram") {
       const username = it.username ?? it.ownerUsername ?? null;
@@ -260,6 +266,14 @@ async function processarResultados(params: {
       const localidadeConfirmada = perfilTemLocalidade(perfil, filtros.cidade);
       const nichoConfirmado = perfilTemNicho(perfil, filtros.nicho);
       const seguidores = Number(it.followersCount ?? 0);
+      const posts = Array.isArray(it.latestPosts)
+        ? it.latestPosts
+        : Array.isArray(it.recentPosts)
+          ? it.recentPosts
+          : [];
+      const primeiraData = posts
+        .map((post: Rec) => post.timestamp ?? post.takenAtTimestamp ?? post.createdAt)
+        .find(Boolean);
       lead = perfilParaLead(
         {
           username: String(username),
@@ -275,23 +289,49 @@ async function processarResultados(params: {
         estrategiaId,
       );
       lead.state = localidadeConfirmada ? String(campos.uf ?? "") || null : null;
-      const aderencia = calcularScoreInstagram({
-        temNicho: nichoConfirmado,
-        temLocalidade: localidadeConfirmada,
-        comercial: perfilEhProfissionalInstagram(perfil),
-        temContatoExterno,
-        semSiteProprio: !temSiteProprio,
-        seguidores,
+      const profissional = perfilEhProfissionalInstagram(perfil);
+      const activity = scoreInstagramActivity({
+        lastActiveAt: primeiraData ? new Date(primeiraData).toISOString() : null,
+        postsCount: Number(it.postsCount ?? it.mediaCount ?? 0),
       });
-      lead.score = aderencia.score;
-      lead.score_breakdown = aderencia.breakdown;
-      scoreInstagram = aderencia.score;
-
-      const posts = Array.isArray(it.latestPosts)
-        ? it.latestPosts
-        : Array.isArray(it.recentPosts)
-          ? it.recentPosts
-          : [];
+      const authenticity = scoreInstagramAuthenticity({
+        followers: seguidores,
+        following: Number(it.followsCount ?? it.followingCount ?? 0),
+        posts: Number(it.postsCount ?? it.mediaCount ?? 0),
+        private: Boolean(it.private ?? it.isPrivate),
+        verified: Boolean(it.verified ?? it.isVerified),
+        hasAvatar: Boolean(it.profilePicUrlHD ?? it.profilePicUrl ?? it.profilePictureUrl),
+        hasBio: Boolean(String(bio).trim()),
+      });
+      scoreV2Instagram = calculateInstagramScoreV2({
+        source: "profile_search",
+        intent: scoreInstagramCommercialIntent({
+          professional: profissional,
+          hasContact: temContatoExterno,
+          callToAction: /\b(agende|orcamento|whatsapp|direct|contato|link na bio)\b/i.test(bio),
+        }),
+        fit: {
+          niche: nichoConfirmado ? 100 : 0,
+          location: localidadeConfirmada ? 100 : filtros.cidade ? 0 : 70,
+          profileType: profissional ? 100 : filtros.soComerciais ? 0 : 60,
+          audience: seguidores >= Number(filtros.minSeguidores ?? 0) ? 100 : 25,
+          contact: temContatoExterno ? 100 : 60,
+        },
+        activity,
+        authenticity,
+        evidence: {
+          intent: temContatoExterno ? ["contato externo público"] : ["abordagem disponível por DM"],
+          fit: [
+            nichoConfirmado ? "nicho confirmado" : "nicho sem confirmação",
+            localidadeConfirmada ? "localidade confirmada" : "localidade sem confirmação",
+          ],
+          activity: primeiraData ? [`último conteúdo: ${primeiraData}`] : [],
+          authenticity: [`perfil público analisado com ${seguidores} seguidores`],
+        },
+      });
+      lead.score = scoreV2Instagram.total;
+      lead.score_breakdown = { tipo: "instagram_score_v2", ...scoreV2Instagram };
+      scoreInstagram = scoreV2Instagram.total;
       const postMetrics = posts.slice(0, 12).map((post: Rec) => ({
         likes: Number(post.likesCount ?? post.likes ?? 0),
         comments: Number(post.commentsCount ?? post.comments ?? 0),
@@ -307,9 +347,6 @@ async function processarResultados(params: {
         seguidores > 0 && avgLikes != null && avgComments != null
           ? ((avgLikes + avgComments) / seguidores) * 100
           : null;
-      const primeiraData = posts
-        .map((post: Rec) => post.timestamp ?? post.takenAtTimestamp ?? post.createdAt)
-        .find(Boolean);
       perfilRow = {
         org_id: orgId,
         user_id: userId,
@@ -325,7 +362,7 @@ async function processarResultados(params: {
         posts_count: Number(it.postsCount ?? it.mediaCount ?? 0) || null,
         verified: Boolean(it.verified ?? it.isVerified),
         private: Boolean(it.private ?? it.isPrivate),
-        professional: perfilEhProfissionalInstagram(perfil),
+        professional: profissional,
         account_type: String(it.accountType ?? it.statistics?.accountType ?? "") || null,
         business_category: it.businessCategoryName ?? it.category ?? null,
         business_email: email,
@@ -337,6 +374,14 @@ async function processarResultados(params: {
         engagement_rate: engagement,
         recent_posts: posts.slice(0, 12),
         related_profiles: Array.isArray(it.relatedProfiles) ? it.relatedProfiles.slice(0, 20) : [],
+        discovery_source: "profile_search",
+        last_active_at: primeiraData ? new Date(primeiraData).toISOString() : null,
+        intent_score: scoreV2Instagram.scores.intent,
+        lead_score: scoreV2Instagram.total,
+        fit_score: scoreV2Instagram.scores.fit,
+        activity_score: scoreV2Instagram.scores.activity,
+        authenticity_score: scoreV2Instagram.scores.authenticity,
+        score_v2: scoreV2Instagram,
         raw_payload: it,
         collected_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -415,6 +460,11 @@ async function processarResultados(params: {
             rank: analisados,
             is_new: false,
             score: scoreInstagram,
+            intent_score: scoreV2Instagram?.scores.intent ?? null,
+            fit_score: scoreV2Instagram?.scores.fit ?? null,
+            activity_score: scoreV2Instagram?.scores.activity ?? null,
+            authenticity_score: scoreV2Instagram?.scores.authenticity ?? null,
+            score_v2: scoreV2Instagram ?? {},
             profile_snapshot: it,
           });
         }
@@ -442,6 +492,11 @@ async function processarResultados(params: {
         rank: analisados,
         is_new: novo,
         score: scoreInstagram,
+        intent_score: scoreV2Instagram?.scores.intent ?? null,
+        fit_score: scoreV2Instagram?.scores.fit ?? null,
+        activity_score: scoreV2Instagram?.scores.activity ?? null,
+        authenticity_score: scoreV2Instagram?.scores.authenticity ?? null,
+        score_v2: scoreV2Instagram ?? {},
         profile_snapshot: it,
       });
     }

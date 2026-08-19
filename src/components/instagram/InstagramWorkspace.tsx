@@ -44,7 +44,17 @@ import { InstagramRunSummary } from "@/components/leads/instagram/InstagramResul
 import { CommentsHunter } from "@/components/instagram/comments/CommentsHunter";
 import { CompetitorIntelligence } from "@/components/instagram/competitors/CompetitorIntelligence";
 import { ContentDiscoveryHunter } from "@/components/instagram/content/ContentDiscoveryHunter";
+import {
+  InstagramScoreBars,
+  InstagramScoreControls,
+  type InstagramScoreSort,
+} from "@/components/instagram/shared/InstagramScoreV2";
 import type { Estrategia, PedidoBusca } from "@/lib/fontes-prospeccao";
+import {
+  instagramScoreValue,
+  isInstagramScoreV2,
+  type InstagramScoreV2Result,
+} from "@/lib/instagram-score-v2";
 import { buscarRedes, type ColetaRedes } from "@/services/whatsapp";
 import {
   atualizarTarefaInstagram,
@@ -77,6 +87,8 @@ export function InstagramWorkspace() {
   const [message, setMessage] = useState(TEMPLATE_PADRAO);
   const [lastRun, setLastRun] = useState<ColetaRedes | null>(null);
   const [tab, setTab] = useState("overview");
+  const [profileScoreSort, setProfileScoreSort] = useState<InstagramScoreSort>("total");
+  const [profileMinScore, setProfileMinScore] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -135,14 +147,21 @@ export function InstagramWorkspace() {
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("pt-BR");
-    if (!normalized) return leads;
-    return leads.filter((item) =>
-      [item.username, item.full_name, item.biography, item.lead.category, item.lead.city]
-        .join(" ")
-        .toLocaleLowerCase("pt-BR")
-        .includes(normalized),
-    );
-  }, [leads, query]);
+    return leads
+      .filter(
+        (item) =>
+          !normalized ||
+          [item.username, item.full_name, item.biography, item.lead.category, item.lead.city]
+            .join(" ")
+            .toLocaleLowerCase("pt-BR")
+            .includes(normalized),
+      )
+      .filter((item) => profileScoreValue(item, "total") >= profileMinScore)
+      .sort(
+        (left, right) =>
+          profileScoreValue(right, profileScoreSort) - profileScoreValue(left, profileScoreSort),
+      );
+  }, [leads, profileMinScore, profileScoreSort, query]);
 
   const metrics = useMemo(() => {
     const followers = leads.reduce((total, lead) => total + Number(lead.followers_count ?? 0), 0);
@@ -360,6 +379,12 @@ export function InstagramWorkspace() {
               />
             </div>
             <div className="flex items-center gap-3">
+              <InstagramScoreControls
+                sort={profileScoreSort}
+                minScore={profileMinScore}
+                onSortChange={setProfileScoreSort}
+                onMinScoreChange={setProfileMinScore}
+              />
               <span className="text-sm text-muted-foreground">{selected.size} selecionados</span>
               <Button
                 disabled={!selected.size}
@@ -378,7 +403,7 @@ export function InstagramWorkspace() {
           ) : filtered.length ? (
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-sm">
+                <table className="w-full min-w-[1250px] text-sm">
                   <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="w-12 px-4 py-3">
@@ -392,6 +417,7 @@ export function InstagramWorkspace() {
                         />
                       </th>
                       <th className="px-4 py-3">Perfil</th>
+                      <th className="px-4 py-3">Score v2</th>
                       <th className="px-4 py-3">Audiência</th>
                       <th className="px-4 py-3">Engajamento</th>
                       <th className="px-4 py-3">Local</th>
@@ -587,10 +613,26 @@ function ProfileRow({
   onCheck: (value: boolean) => void;
   onOpen: () => void;
 }) {
+  const scoreV2 = instagramProfileScore(item);
   return (
     <tr className="border-t border-border hover:bg-secondary/30">
       <td className="px-4 py-3">
         <Checkbox checked={checked} onCheckedChange={(value) => onCheck(value === true)} />
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 font-semibold text-primary">
+            {scoreV2?.total ?? item.lead.score}
+          </span>
+          {scoreV2 ? (
+            <span className="text-[11px] leading-4 text-muted-foreground">
+              I {scoreV2.scores.intent} · F {scoreV2.scores.fit}
+              <br />A {scoreV2.scores.activity} · R {scoreV2.scores.authenticity}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">score legado</span>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
@@ -717,6 +759,7 @@ function ProfileDialog({
   profile: InstagramLead | null;
   onClose: () => void;
 }) {
+  const scoreV2 = profile ? instagramProfileScore(profile) : null;
   return (
     <Dialog open={Boolean(profile)} onOpenChange={(open) => !open && onClose()}>
       {profile && (
@@ -766,6 +809,11 @@ function ProfileDialog({
               label="média de comentários"
             />
           </div>
+          {scoreV2 ? (
+            <div className="rounded-xl border border-border p-4">
+              <InstagramScoreBars score={scoreV2} />
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {profile.external_url && (
               <Button variant="outline" asChild>
@@ -787,6 +835,23 @@ function ProfileDialog({
         </DialogContent>
       )}
     </Dialog>
+  );
+}
+function instagramProfileScore(profile: InstagramLead): InstagramScoreV2Result | null {
+  return isInstagramScoreV2(profile.score_v2) ? profile.score_v2 : null;
+}
+function profileScoreValue(profile: InstagramLead, dimension: InstagramScoreSort): number {
+  const scoreV2 = instagramProfileScore(profile);
+  if (scoreV2) return instagramScoreValue(scoreV2, dimension);
+  if (dimension === "total") return Number(profile.lead_score ?? profile.lead.score ?? 0);
+  return Number(
+    dimension === "intent"
+      ? profile.intent_score
+      : dimension === "fit"
+        ? profile.fit_score
+        : dimension === "activity"
+          ? profile.activity_score
+          : profile.authenticity_score,
   );
 }
 function MiniMetric({ value, label }: { value: string; label: string }) {

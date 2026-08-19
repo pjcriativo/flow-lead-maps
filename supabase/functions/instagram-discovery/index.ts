@@ -12,7 +12,6 @@ import { criarChaveCacheRedes } from "../../../src/lib/redes-economia.ts";
 import { mesRefAtual } from "../../../src/lib/automacao-teto.ts";
 import { TETO_REDES_MES_USD, TETO_REDES_RODADA_USD } from "../../../src/lib/redes-teto.ts";
 import {
-  calcularScoreLeadComentario,
   classificarIntencaoComentario,
   estimarCustoCommentsHunter,
   selecionarComentaristasUnicos,
@@ -20,11 +19,16 @@ import {
 import {
   analyzeInstagramContentSignals,
   buildInstagramHashtagUrls,
-  calculateInstagramContentLeadScore,
   estimateInstagramContentDiscoveryCost,
   normalizeInstagramHashtag,
   type ContentDiscoveryMode,
 } from "../../../src/lib/instagram-content-discovery.ts";
+import {
+  calculateInstagramScoreV2,
+  scoreInstagramActivity,
+  scoreInstagramAuthenticity,
+  scoreInstagramCommercialIntent,
+} from "../../../src/lib/instagram-score-v2.ts";
 import {
   buildCompetitorAlerts,
   compareCompetitorSnapshots,
@@ -282,26 +286,22 @@ function atividadePerfil(perfil: Rec): number {
     .filter(Boolean)
     .sort()
     .at(-1);
-  if (maisRecente) {
-    const dias = (Date.now() - new Date(maisRecente).getTime()) / 86_400_000;
-    if (dias <= 14) return 100;
-    if (dias <= 30) return 85;
-    if (dias <= 90) return 60;
-  }
-  return Number(perfil.postsCount ?? 0) > 0 ? 35 : 10;
+  return scoreInstagramActivity({
+    lastActiveAt: maisRecente ?? null,
+    postsCount: Number(perfil.postsCount ?? 0),
+  });
 }
 
 function autenticidadePerfil(perfil: Rec): number {
-  const seguidores = Number(perfil.followersCount ?? 0);
-  const seguindo = Number(perfil.followsCount ?? perfil.followingCount ?? 0);
-  const posts = Number(perfil.postsCount ?? 0);
-  let score = 45;
-  if (posts >= 6) score += 15;
-  if (seguidores >= 100) score += 15;
-  if (seguidores >= 300 && seguindo > 0 && seguidores / seguindo >= 0.2) score += 15;
-  if (perfil.private === true) score -= 15;
-  if (perfil.verified === true) score += 10;
-  return Math.max(0, Math.min(100, score));
+  return scoreInstagramAuthenticity({
+    followers: Number(perfil.followersCount ?? 0),
+    following: Number(perfil.followsCount ?? perfil.followingCount ?? 0),
+    posts: Number(perfil.postsCount ?? 0),
+    private: Boolean(perfil.private),
+    verified: Boolean(perfil.verified),
+    hasAvatar: Boolean(perfil.profilePicUrlHD ?? perfil.profilePicUrl),
+    hasBio: Boolean(String(perfil.biography ?? "").trim()),
+  });
 }
 
 async function criarStep(
@@ -858,15 +858,35 @@ async function processarDescobertaConteudo(params: {
       );
       const hasContact = Boolean(email || whatsapp || externalUrl);
       const authenticity = profile ? autenticidadePerfil(profile) : 0;
-      const leadScore = calculateInstagramContentLeadScore({
-        contentScore: signals.contentScore,
-        professional,
-        profileNicheMatch: nicheMatch,
-        profileLocationMatch: locationMatch,
-        authenticityScore: authenticity,
-        hasContact,
-        followers,
+      const scoreV2 = calculateInstagramScoreV2({
+        source: input.mode,
+        intent: scoreInstagramCommercialIntent({
+          explicitIntent: signals.commercialScore,
+          professional,
+          hasContact,
+          commercialSignalCount: signals.commercialSignals.length,
+          contentScore: signals.contentScore,
+        }),
+        fit: {
+          niche: nicheMatch ? Math.max(80, signals.nicheScore) : signals.nicheScore,
+          location: locationMatch ? Math.max(80, signals.locationScore) : signals.locationScore,
+          profileType: professional ? 100 : input.onlyProfessionals ? 0 : 60,
+          audience: followers >= input.minFollowers && followers <= input.maxFollowers ? 100 : 25,
+          contact: hasContact ? 100 : 55,
+        },
+        activity: signals.activityScore,
+        authenticity,
+        evidence: {
+          intent: signals.commercialSignals,
+          fit: [
+            nicheMatch ? "nicho confirmado" : "nicho sem confirmação",
+            locationMatch ? "localidade confirmada" : "localidade sem confirmação",
+          ],
+          activity: signals.latestPostAt ? [`último conteúdo: ${signals.latestPostAt}`] : [],
+          authenticity: [`perfil público analisado com ${followers} seguidores`],
+        },
       });
+      const leadScore = scoreV2.total;
       const accountKind = professional
         ? String(profile?.businessCategoryName ?? "")
             .toLocaleLowerCase("pt-BR")
@@ -910,17 +930,7 @@ async function processarDescobertaConteudo(params: {
           assigned_to: userId,
           state: locationMatch ? input.state || null : null,
           score: leadScore,
-          score_breakdown: {
-            tipo: "instagram_content_signal",
-            fonte: input.mode,
-            conteudo: signals.contentScore,
-            nicho_confirmado: nicheMatch,
-            localidade_confirmada: locationMatch,
-            conta: accountKind,
-            atividade: signals.activityScore,
-            engajamento_robusto: signals.robustEngagementRate,
-            sinais_comerciais: signals.commercialSignals,
-          },
+          score_breakdown: { tipo: "instagram_score_v2", ...scoreV2 },
           sem_contato: !hasContact,
         });
         const { data: existingLead } = await admin
@@ -981,8 +991,12 @@ async function processarDescobertaConteudo(params: {
               raw_payload: profile,
               discovery_source: input.mode,
               last_active_at: signals.latestPostAt,
-              intent_score: null,
+              intent_score: scoreV2.scores.intent,
+              lead_score: leadScore,
+              fit_score: scoreV2.scores.fit,
+              activity_score: scoreV2.scores.activity,
               authenticity_score: authenticity,
+              score_v2: scoreV2,
               content_score: signals.contentScore,
               content_signals: signals,
               collected_at: new Date().toISOString(),
@@ -1028,6 +1042,7 @@ async function processarDescobertaConteudo(params: {
         contentCount: candidate.posts.length,
         signals,
         leadScore,
+        scoreV2,
         nicheMatch,
         locationMatch,
         authenticity,
@@ -1050,8 +1065,12 @@ async function processarDescobertaConteudo(params: {
         ),
         source_url: bestPost?.url ?? null,
         intent_label: null,
-        intent_score: null,
+        intent_score: scoreV2.scores.intent,
         lead_score: leadScore,
+        fit_score: scoreV2.scores.fit,
+        activity_score: scoreV2.scores.activity,
+        authenticity_score: scoreV2.scores.authenticity,
+        score_v2: scoreV2,
         content_score: signals.contentScore,
         signal_data: signals,
         decision,
@@ -2041,15 +2060,30 @@ Deno.serve(async (req) => {
       );
       const hasContact = Boolean(email || whatsapp || externalUrl);
       const activity = profile ? atividadePerfil(profile) : 0;
-      const leadScore = calcularScoreLeadComentario({
-        intencao: comment.classificacao.score,
-        profissional: professional,
-        aderenciaNicho: nicheMatch ? 100 : 0,
-        aderenciaLocalidade: locationMatch ? 100 : input.city ? 0 : 70,
-        atividade: activity,
-        temContato: hasContact,
-        seguidores: followers,
+      const authenticity = profile ? autenticidadePerfil(profile) : 0;
+      const scoreV2 = calculateInstagramScoreV2({
+        source: "comments",
+        intent: comment.classificacao.score,
+        fit: {
+          niche: nicheMatch ? 100 : 0,
+          location: locationMatch ? 100 : input.city ? 0 : 70,
+          profileType: professional ? 100 : input.onlyProfessionals ? 0 : 60,
+          audience: followers >= 100 ? 100 : followers > 0 ? 45 : 0,
+          contact: hasContact ? 100 : 60,
+        },
+        activity,
+        authenticity,
+        evidence: {
+          intent: comment.classificacao.sinais,
+          fit: [
+            nicheMatch ? "nicho confirmado" : "nicho sem confirmação",
+            locationMatch ? "localidade confirmada" : "localidade sem confirmação",
+          ],
+          activity: comment.ocorridoEm ? [`comentou em ${comment.ocorridoEm}`] : [],
+          authenticity: [`perfil público analisado com ${followers} seguidores`],
+        },
       });
+      const leadScore = scoreV2.total;
 
       let decision: "qualified" | "candidate" | "rejected" | "duplicate" = "candidate";
       let rejectionReason: string | null = null;
@@ -2083,15 +2117,7 @@ Deno.serve(async (req) => {
           assigned_to: userId,
           state: locationMatch ? input.state || null : null,
           score: leadScore,
-          score_breakdown: {
-            tipo: "instagram_comment_intent",
-            intencao: comment.classificacao.score,
-            conta_comercial: professional,
-            nicho_confirmado: nicheMatch,
-            localidade_confirmada: locationMatch,
-            atividade: activity,
-            contato_externo: hasContact,
-          },
+          score_breakdown: { tipo: "instagram_score_v2", ...scoreV2 },
           sem_contato: false,
         });
         const { data: existingLead } = await admin
@@ -2155,7 +2181,11 @@ Deno.serve(async (req) => {
               discovery_source: "comments",
               last_active_at: comment.ocorridoEm,
               intent_score: comment.classificacao.score,
-              authenticity_score: autenticidadePerfil(profile),
+              lead_score: leadScore,
+              fit_score: scoreV2.scores.fit,
+              activity_score: scoreV2.scores.activity,
+              authenticity_score: scoreV2.scores.authenticity,
+              score_v2: scoreV2,
               collected_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
@@ -2195,10 +2225,11 @@ Deno.serve(async (req) => {
         intentScore: comment.classificacao.score,
         intentSignals: comment.classificacao.sinais,
         leadScore,
+        scoreV2,
         nicheMatch,
         locationMatch,
         activity,
-        authenticity: profile ? autenticidadePerfil(profile) : 0,
+        authenticity,
         decision,
         rejectionReason,
         leadId,
@@ -2220,6 +2251,10 @@ Deno.serve(async (req) => {
         intent_label: comment.classificacao.rotulo,
         intent_score: comment.classificacao.score,
         lead_score: leadScore,
+        fit_score: scoreV2.scores.fit,
+        activity_score: scoreV2.scores.activity,
+        authenticity_score: scoreV2.scores.authenticity,
+        score_v2: scoreV2,
         decision,
         rejection_reason: rejectionReason,
         profile_snapshot: profile,

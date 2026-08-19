@@ -137,7 +137,7 @@ Entregue no painel `Concorrentes`:
 
 O primeiro snapshot estabelece a linha de base; crescimento e variação aparecem a partir da segunda coleta.
 
-## Fase 4 — Score Instagram v2
+## Fase 4 — Score Instagram v2 (implementada)
 
 Quatro scores independentes:
 
@@ -145,6 +145,17 @@ Quatro scores independentes:
 - `fit_score`: nicho, região, porte e tipo de conta;
 - `activity_score`: recência e consistência de conteúdo;
 - `authenticity_score`: sinais básicos de perfil real e audiência plausível.
+
+Entregue em todos os fluxos de descoberta:
+
+- quatro notas independentes: intenção, aderência, atividade e autenticidade;
+- pesos normalizados por origem: comentário prioriza intenção, perfil prioriza aderência e conteúdo prioriza atividade;
+- peso customizável no contrato do motor sem permitir combinação inválida;
+- limites de segurança para autenticidade ou aderência críticas;
+- explicação textual, forças, riscos, contribuições e evidências preservadas no momento da decisão;
+- persistência no perfil, resultado da busca e evidência histórica;
+- filtros por score mínimo e ordenação por qualquer dimensão nos Hunters e na base de perfis;
+- compatibilidade com históricos anteriores, normalizados na fronteira do serviço.
 
 O score final é configurável por estratégia. Comments Hunter dá mais peso à intenção; descoberta por perfil dá mais peso ao fit.
 
@@ -196,6 +207,5 @@ Cold DM automatizado por sessão não oficial não deve ser o fundamento do prod
 
 ## Próximo incremento recomendado
 
-Executar a Fase 4: Score Instagram v2 com pesos independentes de intenção, fit, atividade e
-autenticidade, configurados conforme a origem do lead. Em seguida, consolidar os resultados no
-dashboard multifuente da Fase 5.
+Executar a Fase 5: consolidar funil, custo, conversão, qualidade e evolução de todas as fontes em
+um dashboard multifuente. O Score Instagram v2 passa a ser a régua comum para comparar os canais.

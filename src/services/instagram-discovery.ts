@@ -5,6 +5,12 @@ import {
   type ContentDiscoveryMode,
   type InstagramContentSignals,
 } from "@/lib/instagram-content-discovery";
+import {
+  calculateInstagramScoreV2,
+  isInstagramScoreV2,
+  scoreInstagramCommercialIntent,
+  type InstagramScoreV2Result,
+} from "@/lib/instagram-score-v2";
 
 export type CommentsHunterInput = {
   sourceType: "profile" | "posts";
@@ -44,6 +50,7 @@ export type CommentLeadResult = {
   intentScore: number;
   intentSignals: string[];
   leadScore: number;
+  scoreV2: InstagramScoreV2Result;
   nicheMatch: boolean;
   locationMatch: boolean;
   activity: number;
@@ -97,6 +104,31 @@ export function estimateCommentsHunterCost(input: CommentsHunterInput): number {
   return estimarCustoCommentsHunter(input);
 }
 
+function normalizeCommentScore(result: CommentLeadResult): CommentLeadResult {
+  if (isInstagramScoreV2(result.scoreV2)) return result;
+  return {
+    ...result,
+    scoreV2: calculateInstagramScoreV2({
+      source: "comments",
+      intent: result.intentScore,
+      fit: {
+        niche: result.nicheMatch ? 100 : 0,
+        location: result.locationMatch ? 100 : 70,
+        profileType: result.professional ? 100 : 60,
+        audience: result.followers >= 100 ? 100 : 45,
+        contact: result.email || result.whatsapp || result.externalUrl ? 100 : 60,
+      },
+      activity: result.activity,
+      authenticity: result.authenticity,
+      evidence: { intent: result.intentSignals },
+    }),
+  };
+}
+
+function normalizeCommentsResponse(response: CommentsHunterResponse): CommentsHunterResponse {
+  return { ...response, results: response.results?.map(normalizeCommentScore) };
+}
+
 export async function runCommentsHunter(
   input: CommentsHunterInput,
 ): Promise<CommentsHunterResponse> {
@@ -110,7 +142,7 @@ export async function runCommentsHunter(
   }
   const response = data as CommentsHunterResponse;
   if (!response.ok) throw new Error(response.error ?? "O Comments Hunter não concluiu a busca.");
-  return response;
+  return normalizeCommentsResponse(response);
 }
 
 export async function listCommentsHunterHistory(): Promise<CommentsHunterHistory[]> {
@@ -118,7 +150,10 @@ export async function listCommentsHunterHistory(): Promise<CommentsHunterHistory
     body: { acao: "historico" },
   });
   if (error) throw error;
-  return ((data as { jobs?: CommentsHunterHistory[] })?.jobs ?? []) as CommentsHunterHistory[];
+  return ((data as { jobs?: CommentsHunterHistory[] })?.jobs ?? []).map((job) => ({
+    ...job,
+    result: job.result ? normalizeCommentsResponse(job.result) : null,
+  }));
 }
 
 export type ContentDiscoveryInput = {
@@ -162,6 +197,7 @@ export type ContentLeadResult = {
   contentCount: number;
   signals: InstagramContentSignals;
   leadScore: number;
+  scoreV2: InstagramScoreV2Result;
   nicheMatch: boolean;
   locationMatch: boolean;
   authenticity: number;
@@ -213,6 +249,34 @@ export function estimateContentDiscoveryCost(input: ContentDiscoveryInput): numb
   return estimateInstagramContentDiscoveryCost(input);
 }
 
+function normalizeContentScore(result: ContentLeadResult): ContentLeadResult {
+  if (isInstagramScoreV2(result.scoreV2)) return result;
+  return {
+    ...result,
+    scoreV2: calculateInstagramScoreV2({
+      source: result.sourceType,
+      intent: scoreInstagramCommercialIntent({
+        explicitIntent: result.signals.commercialScore,
+        professional: result.professional,
+        hasContact: Boolean(result.email || result.whatsapp || result.externalUrl),
+      }),
+      fit: {
+        niche: result.nicheMatch ? 100 : result.signals.nicheScore,
+        location: result.locationMatch ? 100 : result.signals.locationScore,
+        profileType: result.professional ? 100 : 60,
+        audience: result.followers >= 100 ? 100 : 45,
+        contact: result.email || result.whatsapp || result.externalUrl ? 100 : 55,
+      },
+      activity: result.signals.activityScore,
+      authenticity: result.authenticity,
+    }),
+  };
+}
+
+function normalizeContentResponse(response: ContentDiscoveryResponse): ContentDiscoveryResponse {
+  return { ...response, results: response.results?.map(normalizeContentScore) };
+}
+
 export async function runContentDiscovery(
   input: ContentDiscoveryInput,
 ): Promise<ContentDiscoveryResponse> {
@@ -226,7 +290,7 @@ export async function runContentDiscovery(
   }
   const response = data as ContentDiscoveryResponse;
   if (!response.ok) throw new Error(response.error ?? "A descoberta por conteudo nao concluiu.");
-  return response;
+  return normalizeContentResponse(response);
 }
 
 export async function listContentDiscoveryHistory(
@@ -236,5 +300,8 @@ export async function listContentDiscoveryHistory(
     body: { acao: "historico", mode },
   });
   if (error) throw error;
-  return ((data as { jobs?: ContentDiscoveryHistory[] })?.jobs ?? []) as ContentDiscoveryHistory[];
+  return ((data as { jobs?: ContentDiscoveryHistory[] })?.jobs ?? []).map((job) => ({
+    ...job,
+    result: job.result ? normalizeContentResponse(job.result) : null,
+  }));
 }

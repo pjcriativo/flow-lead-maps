@@ -868,6 +868,8 @@ export type Database = {
       instagram_profiles: {
         Row: {
           account_type: string | null
+          activity_score: number | null
+          authenticity_score: number | null
           avg_comments: number | null
           avg_likes: number | null
           bio_links: Json
@@ -877,14 +879,21 @@ export type Database = {
           business_email: string | null
           business_phone: string | null
           collected_at: string
+          content_score: number | null
+          content_signals: Json
+          discovery_source: string
           engagement_rate: number | null
           external_url: string | null
           followers_count: number | null
           following_count: number | null
           full_name: string | null
+          fit_score: number | null
           instagram_user_id: string | null
+          intent_score: number | null
+          last_active_at: string | null
           last_post_at: string | null
           lead_id: string
+          lead_score: number | null
           org_id: string
           posts_count: number | null
           private: boolean
@@ -893,6 +902,7 @@ export type Database = {
           raw_payload: Json | null
           recent_posts: Json
           related_profiles: Json
+          score_v2: Json
           updated_at: string
           user_id: string
           username: string
@@ -900,6 +910,8 @@ export type Database = {
         }
         Insert: {
           account_type?: string | null
+          activity_score?: number | null
+          authenticity_score?: number | null
           avg_comments?: number | null
           avg_likes?: number | null
           bio_links?: Json
@@ -909,14 +921,21 @@ export type Database = {
           business_email?: string | null
           business_phone?: string | null
           collected_at?: string
+          content_score?: number | null
+          content_signals?: Json
+          discovery_source?: string
           engagement_rate?: number | null
           external_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           full_name?: string | null
+          fit_score?: number | null
           instagram_user_id?: string | null
+          intent_score?: number | null
+          last_active_at?: string | null
           last_post_at?: string | null
           lead_id: string
+          lead_score?: number | null
           org_id: string
           posts_count?: number | null
           private?: boolean
@@ -925,6 +944,7 @@ export type Database = {
           raw_payload?: Json | null
           recent_posts?: Json
           related_profiles?: Json
+          score_v2?: Json
           updated_at?: string
           user_id: string
           username: string
@@ -932,6 +952,8 @@ export type Database = {
         }
         Update: {
           account_type?: string | null
+          activity_score?: number | null
+          authenticity_score?: number | null
           avg_comments?: number | null
           avg_likes?: number | null
           bio_links?: Json
@@ -941,14 +963,21 @@ export type Database = {
           business_email?: string | null
           business_phone?: string | null
           collected_at?: string
+          content_score?: number | null
+          content_signals?: Json
+          discovery_source?: string
           engagement_rate?: number | null
           external_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           full_name?: string | null
+          fit_score?: number | null
           instagram_user_id?: string | null
+          intent_score?: number | null
+          last_active_at?: string | null
           last_post_at?: string | null
           lead_id?: string
+          lead_score?: number | null
           org_id?: string
           posts_count?: number | null
           private?: boolean
@@ -957,6 +986,7 @@ export type Database = {
           raw_payload?: Json | null
           recent_posts?: Json
           related_profiles?: Json
+          score_v2?: Json
           updated_at?: string
           user_id?: string
           username?: string
@@ -981,46 +1011,61 @@ export type Database = {
       }
       instagram_search_results: {
         Row: {
+          activity_score: number | null
+          authenticity_score: number | null
           created_at: string
           decision: string
           id: string
           is_new: boolean
+          fit_score: number | null
+          intent_score: number | null
           lead_id: string | null
           org_id: string
           profile_snapshot: Json
           rank: number
           rejection_reason: string | null
           score: number | null
+          score_v2: Json
           search_id: string
           user_id: string
           username: string
         }
         Insert: {
+          activity_score?: number | null
+          authenticity_score?: number | null
           created_at?: string
           decision: string
           id?: string
           is_new?: boolean
+          fit_score?: number | null
+          intent_score?: number | null
           lead_id?: string | null
           org_id: string
           profile_snapshot?: Json
           rank?: number
           rejection_reason?: string | null
           score?: number | null
+          score_v2?: Json
           search_id: string
           user_id: string
           username: string
         }
         Update: {
+          activity_score?: number | null
+          authenticity_score?: number | null
           created_at?: string
           decision?: string
           id?: string
           is_new?: boolean
+          fit_score?: number | null
+          intent_score?: number | null
           lead_id?: string | null
           org_id?: string
           profile_snapshot?: Json
           rank?: number
           rejection_reason?: string | null
           score?: number | null
+          score_v2?: Json
           search_id?: string
           user_id?: string
           username?: string

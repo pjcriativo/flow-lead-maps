@@ -25,7 +25,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -42,6 +41,12 @@ import {
   InstagramSourceChoice,
   InstagramToggleField,
 } from "@/components/instagram/shared/InstagramDiscoveryFields";
+import {
+  InstagramScoreBars,
+  InstagramScoreControls,
+  type InstagramScoreSort,
+} from "@/components/instagram/shared/InstagramScoreV2";
+import { instagramScoreValue } from "@/lib/instagram-score-v2";
 import {
   estimateContentDiscoveryCost,
   listContentDiscoveryHistory,
@@ -87,6 +92,8 @@ export function ContentDiscoveryHunter({
   const [history, setHistory] = useState<ContentDiscoveryHistory[]>([]);
   const [filter, setFilter] = useState<ResultFilter>("all");
   const [page, setPage] = useState(1);
+  const [scoreSort, setScoreSort] = useState<InstagramScoreSort>("total");
+  const [minScore, setMinScore] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -117,10 +124,16 @@ export function ContentDiscoveryHunter({
   const requestedContent =
     (input.mode === "hashtags" ? Math.max(1, hashtags.length) : input.sourcesLimit) *
     input.postsPerSource;
-  const filtered = useMemo(
-    () => (result?.results ?? []).filter((item) => filter === "all" || item.decision === filter),
-    [filter, result],
-  );
+  const filtered = useMemo(() => {
+    return (result?.results ?? [])
+      .filter((item) => filter === "all" || item.decision === filter)
+      .filter((item) => item.scoreV2.total >= minScore)
+      .sort(
+        (left, right) =>
+          instagramScoreValue(right.scoreV2, scoreSort) -
+          instagramScoreValue(left.scoreV2, scoreSort),
+      );
+  }, [filter, minScore, result, scoreSort]);
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -421,6 +434,16 @@ export function ContentDiscoveryHunter({
           page={page}
           pages={pages}
           onPage={setPage}
+          scoreSort={scoreSort}
+          minScore={minScore}
+          onScoreSort={(value) => {
+            setScoreSort(value);
+            setPage(1);
+          }}
+          onMinScore={(value) => {
+            setMinScore(value);
+            setPage(1);
+          }}
         />
       ) : null}
 
@@ -467,6 +490,10 @@ function ContentResults({
   page,
   pages,
   onPage,
+  scoreSort,
+  minScore,
+  onScoreSort,
+  onMinScore,
 }: {
   result: ContentDiscoveryResponse;
   visible: ContentLeadResult[];
@@ -475,6 +502,10 @@ function ContentResults({
   page: number;
   pages: number;
   onPage: (page: number) => void;
+  scoreSort: InstagramScoreSort;
+  minScore: number;
+  onScoreSort: (sort: InstagramScoreSort) => void;
+  onMinScore: (score: number) => void;
 }) {
   const stats = result.stats!;
   const funnel = [
@@ -517,6 +548,13 @@ function ContentResults({
             </Button>
           ),
         )}
+        <InstagramScoreControls
+          className="sm:ml-auto"
+          sort={scoreSort}
+          minScore={minScore}
+          onSortChange={onScoreSort}
+          onMinScoreChange={onMinScore}
+        />
       </div>
       <div className="divide-y divide-border">
         {visible.map((lead) => (
@@ -559,7 +597,7 @@ function ContentResults({
 
 function ContentLeadCard({ lead }: { lead: ContentLeadResult }) {
   return (
-    <article className="grid gap-4 p-5 xl:grid-cols-[minmax(240px,1fr)_minmax(300px,1.35fr)_230px_130px] xl:items-center">
+    <article className="grid gap-4 p-5 xl:grid-cols-[minmax(220px,1fr)_minmax(280px,1.15fr)_310px_120px] xl:items-center">
       <div className="flex min-w-0 items-center gap-3">
         <Avatar className="size-12 border border-border">
           <AvatarImage src={lead.avatarUrl ?? undefined} alt={`Avatar de @${lead.username}`} />
@@ -611,8 +649,7 @@ function ContentLeadCard({ lead }: { lead: ContentLeadResult }) {
         ) : null}
       </div>
       <div className="space-y-2 text-xs">
-        <Signal label="Conteúdo" value={lead.signals.contentScore} />
-        <Signal label="Score do lead" value={lead.leadScore} />
+        <InstagramScoreBars score={lead.scoreV2} />
         <div className="flex flex-wrap gap-1">
           <Badge variant="outline">{lead.signals.robustEngagementRate.toFixed(2)}% eng.</Badge>
           <Badge variant="outline">mediana {compact(lead.signals.medianLikes)} likes</Badge>
@@ -655,18 +692,6 @@ function FlowStep({
         <div className="text-sm font-medium">{title}</div>
         <div className="text-xs text-muted-foreground">{text}</div>
       </div>
-    </div>
-  );
-}
-
-function Signal({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex justify-between">
-        <span className="text-muted-foreground">{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <Progress value={value} className="h-1.5" />
     </div>
   );
 }
