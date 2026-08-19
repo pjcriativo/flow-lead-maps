@@ -161,15 +161,23 @@ O score final é configurável por estratégia. Comments Hunter dá mais peso à
 
 ## Fase 5 — Dashboard profissional
 
-- funil por fonte: coletado → único → enriquecido → qualificado → novo;
-- custo por lead novo e por lead qualificado;
-- conversão por fonte, nicho, cidade e concorrente;
-- distribuição de seguidores e engajamento;
-- sinais de intenção mais frequentes;
-- ranking de origens;
-- evolução semanal da base;
-- qualidade dos dados e causas de rejeição;
-- lista paginada e visão completa do perfil.
+Implementado em agosto de 2026:
+
+- função analítica exata no PostgreSQL, isolada por organização e com períodos de 7, 30 e 90 dias;
+- funil multifuente: coletado → único → enriquecido → qualificado → novo;
+- separação explícita entre aquisição de leads e inteligência de concorrentes;
+- custo real total, por lead novo e por lead qualificado;
+- conversão, custo e ranking por busca de perfis, comentários, hashtags e locais;
+- série diária de qualificados e novos leads;
+- distribuição de Score v2 e seguidores;
+- cobertura do Score v2, engajamento médio e disponibilidade de contato externo;
+- causas de rejeição e sinais de intenção consolidados;
+- concentração da base por nicho e cidade;
+- funil do Direct assistido e histórico auditável das execuções;
+- atualização automática após buscas, coleta de leads ou movimentação de abordagem.
+
+A visão completa do perfil já está disponível na base. Paginação integral no servidor permanece como
+acabamento para bases acima do limite operacional atual da lista.
 
 ## Fase 6 — Sinais avançados
 
@@ -207,5 +215,7 @@ Cold DM automatizado por sessão não oficial não deve ser o fundamento do prod
 
 ## Próximo incremento recomendado
 
-Executar a Fase 5: consolidar funil, custo, conversão, qualidade e evolução de todas as fontes em
-um dashboard multifuente. O Score Instagram v2 passa a ser a régua comum para comparar os canais.
+Executar a Fase 6 pelos sinais de maior retorno: menções e posts marcados, perfis relacionados,
+Reels e importação de usernames/URLs. Em paralelo, concluir os acabamentos do monitoramento:
+agendamento real com orçamento, alertas lidos/não lidos e conversão de oportunidades de concorrentes
+em buscas do Comments Hunter.

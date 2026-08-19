@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity,
   BarChart3,
   Check,
   CheckCircle2,
@@ -16,12 +15,8 @@ import {
   MessageCircleMore,
   Radar,
   Search,
-  Send,
-  Sparkles,
-  Target,
   Users,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -44,6 +39,7 @@ import { InstagramRunSummary } from "@/components/leads/instagram/InstagramResul
 import { CommentsHunter } from "@/components/instagram/comments/CommentsHunter";
 import { CompetitorIntelligence } from "@/components/instagram/competitors/CompetitorIntelligence";
 import { ContentDiscoveryHunter } from "@/components/instagram/content/ContentDiscoveryHunter";
+import { InstagramAnalyticsDashboard } from "@/components/instagram/dashboard/InstagramAnalyticsDashboard";
 import {
   InstagramScoreBars,
   InstagramScoreControls,
@@ -89,6 +85,7 @@ export function InstagramWorkspace() {
   const [tab, setTab] = useState("overview");
   const [profileScoreSort, setProfileScoreSort] = useState<InstagramScoreSort>("total");
   const [profileMinScore, setProfileMinScore] = useState(0);
+  const [dashboardRevision, setDashboardRevision] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -98,13 +95,14 @@ export function InstagramWorkspace() {
       ]);
       setLeads(profiles);
       setCampaigns(instagramCampaigns);
-      if (!selectedCampaign && instagramCampaigns[0]) setSelectedCampaign(instagramCampaigns[0].id);
+      setSelectedCampaign((current) => current || instagramCampaigns[0]?.id || "");
+      setDashboardRevision((current) => current + 1);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao carregar o Instagram.");
     } finally {
       setLoading(false);
     }
-  }, [selectedCampaign]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -163,38 +161,6 @@ export function InstagramWorkspace() {
       );
   }, [leads, profileMinScore, profileScoreSort, query]);
 
-  const metrics = useMemo(() => {
-    const followers = leads.reduce((total, lead) => total + Number(lead.followers_count ?? 0), 0);
-    const engagement = leads.filter((lead) => lead.engagement_rate != null);
-    return {
-      profiles: leads.length,
-      followers,
-      engagement: engagement.length
-        ? engagement.reduce((total, lead) => total + Number(lead.engagement_rate), 0) /
-          engagement.length
-        : 0,
-      contactable: leads.filter(
-        (lead) => lead.business_email || lead.business_phone || lead.external_url,
-      ).length,
-    };
-  }, [leads]);
-
-  const chartData = useMemo(() => {
-    const ranges = [
-      { label: "Até 1 mil", min: 0, max: 999 },
-      { label: "1–5 mil", min: 1000, max: 4999 },
-      { label: "5–20 mil", min: 5000, max: 19999 },
-      { label: "20 mil+", min: 20000, max: Infinity },
-    ];
-    return ranges.map((range) => ({
-      name: range.label,
-      perfis: leads.filter((lead) => {
-        const followers = Number(lead.followers_count ?? 0);
-        return followers >= range.min && followers <= range.max;
-      }).length,
-    }));
-  }, [leads]);
-
   const selectedLeads = leads.filter((lead) => selected.has(lead.lead_id));
 
   const createCampaign = async () => {
@@ -223,6 +189,7 @@ export function InstagramWorkspace() {
     await atualizarTarefaInstagram(task.id, state);
     setTasks(await listarTarefasInstagram(task.campanha_id));
     setCampaigns(await listarCampanhasInstagram());
+    setDashboardRevision((current) => current + 1);
   };
 
   return (
@@ -278,70 +245,7 @@ export function InstagramWorkspace() {
         </TabsList>
 
         <TabsContent value="overview" className="mt-5 space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi
-              icon={Users}
-              label="Perfis qualificados"
-              value={metrics.profiles.toLocaleString("pt-BR")}
-            />
-            <Kpi
-              icon={Activity}
-              label="Seguidores alcançáveis"
-              value={compact(metrics.followers)}
-            />
-            <Kpi
-              icon={Sparkles}
-              label="Engajamento médio"
-              value={`${metrics.engagement.toFixed(2)}%`}
-            />
-            <Kpi
-              icon={Target}
-              label="Com contato externo"
-              value={metrics.contactable.toLocaleString("pt-BR")}
-            />
-          </div>
-          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-              <h2 className="font-semibold">Distribuição por audiência</h2>
-              <p className="text-sm text-muted-foreground">
-                Faixa real de seguidores dos perfis coletados.
-              </p>
-              <div className="mt-5 h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                    <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} />
-                    <Tooltip cursor={{ fill: "var(--secondary)" }} />
-                    <Bar dataKey="perfis" fill="var(--instagram-pink)" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-              <h2 className="font-semibold">Próxima melhor ação</h2>
-              <div className="mt-4 space-y-4">
-                <Action
-                  icon={Search}
-                  title="Amplie a base"
-                  text="Combine nicho, cidade e filtros para buscar perfis novos."
-                  onClick={() => setTab("discover")}
-                />
-                <Action
-                  icon={Eye}
-                  title="Revise a inteligência"
-                  text="Abra o perfil completo antes da abordagem."
-                  onClick={() => setTab("leads")}
-                />
-                <Action
-                  icon={Send}
-                  title="Crie uma cadência"
-                  text="Prepare mensagens personalizadas para envio manual seguro."
-                  onClick={() => setTab("campaigns")}
-                />
-              </div>
-            </div>
-          </div>
+          <InstagramAnalyticsDashboard refreshToken={dashboardRevision} />
         </TabsContent>
 
         <TabsContent value="discover" className="mt-5">
@@ -565,43 +469,6 @@ export function InstagramWorkspace() {
   );
 }
 
-function Kpi({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">{label}</span>
-        <Icon className="h-4 w-4 text-[var(--instagram-pink)]" />
-      </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-function Action({
-  icon: Icon,
-  title,
-  text,
-  onClick,
-}: {
-  icon: typeof Search;
-  title: string;
-  text: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition hover:bg-secondary/50"
-    >
-      <span className="rounded-lg bg-primary/10 p-2 text-primary">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span>
-        <b className="block text-sm">{title}</b>
-        <span className="text-xs text-muted-foreground">{text}</span>
-      </span>
-    </button>
-  );
-}
 function ProfileRow({
   item,
   checked,
