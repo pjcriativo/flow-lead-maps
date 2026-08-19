@@ -159,6 +159,7 @@ export async function listCommentsHunterHistory(): Promise<CommentsHunterHistory
 export type ContentDiscoveryInput = {
   mode: ContentDiscoveryMode;
   hashtags: string[];
+  profileInputs: string[];
   niche: string;
   city: string;
   state: string;

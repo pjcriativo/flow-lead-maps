@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import {
   calculateInstagramDashboardEfficiency,
+  mergeInstagramDashboards,
   parseInstagramDashboard,
   rankInstagramDashboardSources,
 } from "../src/lib/instagram-dashboard.ts";
@@ -110,5 +111,37 @@ const parsed = parseInstagramDashboard({
 assert.equal(parsed.funnel.newLeads, 15);
 assert.deepEqual(parsed.rejections[0], { label: "fora_nicho", amount: 7 });
 assert.throws(() => parseInstagramDashboard({ version: 2 }), /Versão/);
+
+const advanced = {
+  ...parsed,
+  generatedAt: "2026-08-19T13:00:00.000Z",
+  funnel: {
+    ...parsed.funnel,
+    collected: 20,
+    uniqueProfiles: 12,
+    qualified: 5,
+    newLeads: 4,
+    cost: 0.1,
+  },
+  allCost: 0.1,
+  sources: [sources[0]],
+  timeline: [{ date: "2026-08-19", collected: 20, qualified: 5, newLeads: 4, cost: 0.1 }],
+};
+const merged = mergeInstagramDashboards(
+  {
+    ...parsed,
+    timeline: [{ date: "2026-08-19", collected: 10, qualified: 2, newLeads: 1, cost: 0.05 }],
+  },
+  advanced,
+);
+assert.equal(merged.funnel.collected, 120);
+assert.equal(merged.allCost, 0.45);
+assert.deepEqual(merged.timeline[0], {
+  date: "2026-08-19",
+  collected: 30,
+  qualified: 7,
+  newLeads: 5,
+  cost: 0.15,
+});
 
 console.log("OK: métricas, parser e ranking do dashboard Instagram validados.");

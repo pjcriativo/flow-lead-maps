@@ -1,5 +1,13 @@
 export type InstagramScoreSource =
-  "profile_search" | "comments" | "hashtags" | "places" | "competitor";
+  | "profile_search"
+  | "comments"
+  | "hashtags"
+  | "places"
+  | "competitor"
+  | "reels"
+  | "mentions"
+  | "imports"
+  | "related";
 
 export type InstagramScoreDimension = "intent" | "fit" | "activity" | "authenticity";
 export type InstagramScoreWeights = Record<InstagramScoreDimension, number>;
@@ -45,6 +53,10 @@ export const INSTAGRAM_SCORE_DEFAULT_WEIGHTS: Record<InstagramScoreSource, Insta
     hashtags: { intent: 0.2, fit: 0.4, activity: 0.25, authenticity: 0.15 },
     places: { intent: 0.2, fit: 0.4, activity: 0.25, authenticity: 0.15 },
     competitor: { intent: 0.4, fit: 0.3, activity: 0.15, authenticity: 0.15 },
+    reels: { intent: 0.25, fit: 0.35, activity: 0.25, authenticity: 0.15 },
+    mentions: { intent: 0.4, fit: 0.3, activity: 0.15, authenticity: 0.15 },
+    imports: { intent: 0.1, fit: 0.55, activity: 0.2, authenticity: 0.15 },
+    related: { intent: 0.15, fit: 0.45, activity: 0.25, authenticity: 0.15 },
   };
 
 const DIMENSION_LABELS: Record<InstagramScoreDimension, string> = {
@@ -66,6 +78,10 @@ const SOURCE_LABELS: Record<InstagramScoreSource, string> = {
   hashtags: "hashtags",
   places: "lugares",
   competitor: "concorrentes",
+  reels: "Reels",
+  mentions: "menções",
+  imports: "importação de perfis",
+  related: "perfis relacionados",
 };
 
 function clamp(value: number): number {

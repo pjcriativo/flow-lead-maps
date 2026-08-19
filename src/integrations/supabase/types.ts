@@ -2825,6 +2825,7 @@ export type Database = {
       _col_limite: { Args: { p_recurso: string }; Returns: string }
       acesso_ferramenta_liberado: { Args: never; Returns: boolean }
       instagram_dashboard_v1: { Args: { p_days?: number }; Returns: Json }
+      instagram_dashboard_advanced_v1: { Args: { p_days?: number }; Returns: Json }
       admin_api_lead_counts: {
         Args: { p_since: string }
         Returns: {

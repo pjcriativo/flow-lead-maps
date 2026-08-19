@@ -19,7 +19,11 @@ import {
 import {
   analyzeInstagramContentSignals,
   buildInstagramHashtagUrls,
+  buildInstagramProfileUrls,
   estimateInstagramContentDiscoveryCost,
+  extractInstagramRelatedUsernames,
+  instagramContentResultsType,
+  normalizeInstagramProfileInputs,
   normalizeInstagramHashtag,
   type ContentDiscoveryMode,
 } from "../../../src/lib/instagram-content-discovery.ts";
@@ -78,6 +82,7 @@ type EntradaConteudo = {
   requestId: string;
   mode: ContentDiscoveryMode;
   hashtags: string[];
+  profileInputs: string[];
   niche: string;
   city: string;
   state: string;
@@ -199,7 +204,16 @@ function validarEntrada(body: Rec): EntradaComments {
 function validarEntradaConteudo(body: Rec): EntradaConteudo {
   const requestId = String(body.requestId ?? "").trim();
   if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId)) throw new Error("request_id_invalido");
-  const mode: ContentDiscoveryMode = body.mode === "places" ? "places" : "hashtags";
+  const allowedModes = new Set<ContentDiscoveryMode>([
+    "hashtags",
+    "places",
+    "reels",
+    "mentions",
+    "imports",
+    "related",
+  ]);
+  const requestedMode = String(body.mode ?? "hashtags") as ContentDiscoveryMode;
+  const mode: ContentDiscoveryMode = allowedModes.has(requestedMode) ? requestedMode : "hashtags";
   const hashtags = Array.isArray(body.hashtags)
     ? [
         ...new Set(
@@ -209,15 +223,21 @@ function validarEntradaConteudo(body: Rec): EntradaConteudo {
         ),
       ].slice(0, 6)
     : [];
+  const profileInputs = Array.isArray(body.profileInputs)
+    ? normalizeInstagramProfileInputs(body.profileInputs).slice(0, 12)
+    : [];
   const niche = String(body.niche ?? "").trim();
   const city = String(body.city ?? "").trim();
   const locationQuery = String(body.locationQuery ?? "").trim();
   if (!niche) throw new Error("Escolha o nicho do lead ideal.");
-  if (mode === "hashtags" && hashtags.length === 0) {
+  if ((mode === "hashtags" || mode === "reels") && hashtags.length === 0) {
     throw new Error("Informe ao menos uma hashtag valida, sem depender do #.");
   }
   if (mode === "places" && !city && !locationQuery) {
     throw new Error("Escolha a cidade ou informe um bairro/local para pesquisar.");
+  }
+  if (["mentions", "imports", "related"].includes(mode) && profileInputs.length === 0) {
+    throw new Error("Informe ao menos um username ou URL publica de perfil do Instagram.");
   }
   const minFollowers = inteiro(body.minFollowers, 0, 10_000_000, 100);
   const maxFollowers = inteiro(body.maxFollowers, minFollowers, 100_000_000, 250_000);
@@ -225,6 +245,7 @@ function validarEntradaConteudo(body: Rec): EntradaConteudo {
     requestId,
     mode,
     hashtags,
+    profileInputs,
     niche,
     city,
     state: String(body.state ?? "")
@@ -565,6 +586,28 @@ function postsPorAutor(posts: Rec[]): Map<string, Rec[]> {
   return grouped;
 }
 
+const CONTENT_SOURCE_CONFIG: Record<
+  ContentDiscoveryMode,
+  { sourceType: string; leadSource: string; evidenceType: string }
+> = {
+  hashtags: { sourceType: "hashtag", leadSource: "IG-HASHTAG", evidenceType: "hashtag_post" },
+  places: { sourceType: "place", leadSource: "IG-PLACES", evidenceType: "place_post" },
+  reels: { sourceType: "reel", leadSource: "IG-REELS", evidenceType: "reel" },
+  mentions: { sourceType: "mention", leadSource: "IG-MENTIONS", evidenceType: "mention_post" },
+  imports: { sourceType: "import", leadSource: "IG-IMPORT", evidenceType: "import_profile" },
+  related: { sourceType: "profile", leadSource: "IG-RELATED", evidenceType: "related_profile" },
+};
+
+function nomeFonteConteudo(input: EntradaConteudo): string {
+  if (input.mode === "hashtags" || input.mode === "reels") {
+    return input.hashtags.map((tag) => `#${tag}`).join(", ");
+  }
+  if (input.mode === "places") {
+    return [input.niche, input.locationQuery || input.city].filter(Boolean).join(" em ");
+  }
+  return input.profileInputs.map((username) => `@${username}`).join(", ");
+}
+
 async function processarDescobertaConteudo(params: {
   req: Request;
   admin: Admin;
@@ -629,16 +672,14 @@ async function processarDescobertaConteudo(params: {
   const estimatedCost = estimateInstagramContentDiscoveryCost(input);
   const availableBudget = Math.max(0, Math.min(roundCap, monthCap - spentMonth));
 
-  const sourceName =
-    input.mode === "hashtags"
-      ? input.hashtags.map((tag) => `#${tag}`).join(", ")
-      : [input.niche, input.locationQuery || input.city].filter(Boolean).join(" em ");
+  const sourceName = nomeFonteConteudo(input);
+  const sourceConfig = CONTENT_SOURCE_CONFIG[input.mode];
   const { data: source, error: sourceError } = await admin
     .from("instagram_sources")
     .insert({
       org_id: orgId,
       user_id: userId,
-      source_type: input.mode === "hashtags" ? "hashtag" : "place",
+      source_type: sourceConfig.sourceType,
       name: sourceName,
       config: input,
     })
@@ -692,9 +733,35 @@ async function processarDescobertaConteudo(params: {
 
   try {
     let originUrls: string[] = [];
-    let sourcesFound = input.mode === "hashtags" ? input.hashtags.length : 0;
-    if (input.mode === "hashtags") {
+    let sourcesFound = 0;
+    if (input.mode === "hashtags" || input.mode === "reels") {
       originUrls = buildInstagramHashtagUrls(input.hashtags);
+      sourcesFound = originUrls.length;
+    } else if (input.mode === "mentions" || input.mode === "imports") {
+      originUrls = buildInstagramProfileUrls(input.profileInputs);
+      sourcesFound = originUrls.length;
+    } else if (input.mode === "related") {
+      const seedRun = await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "discover_sources",
+        actorId: ACTOR_PROFILES,
+        input: { usernames: input.profileInputs, includeAboutSection: false },
+        requested: input.profileInputs.length,
+        ttlHours: 7 * 24,
+        maxCharge: Math.min(Math.max(0.03, input.profileInputs.length * 0.0035), availableBudget),
+      });
+      actualCost += seedRun.cost;
+      cacheStats.sources = seedRun.cacheHit;
+      await updateCost();
+      const relatedUsernames = extractInstagramRelatedUsernames(
+        seedRun.items,
+        input.sourcesLimit,
+        input.profileInputs,
+      );
+      originUrls = buildInstagramProfileUrls(relatedUsernames);
+      sourcesFound = originUrls.length;
     } else {
       const search = [input.niche, input.locationQuery, input.city, input.state]
         .filter(Boolean)
@@ -726,45 +793,98 @@ async function processarDescobertaConteudo(params: {
       sourcesFound = originUrls.length;
     }
     if (!originUrls.length) {
-      throw new Error(
-        input.mode === "hashtags"
-          ? "Nenhuma hashtag valida foi montada."
-          : "Nenhum local publico do Instagram foi encontrado para essa regiao.",
-      );
+      const errors: Record<ContentDiscoveryMode, string> = {
+        hashtags: "Nenhuma hashtag valida foi montada.",
+        reels: "Nenhuma hashtag valida foi montada para pesquisar Reels.",
+        places: "Nenhum local publico do Instagram foi encontrado para essa regiao.",
+        mentions: "Nenhum perfil publico valido foi informado para pesquisar mencoes.",
+        imports: "Nenhum perfil publico valido foi informado para importacao.",
+        related: "Os perfis-semente nao retornaram contas relacionadas publicas.",
+      };
+      throw new Error(errors[input.mode]);
     }
 
-    const requestedContent = originUrls.length * input.postsPerSource;
-    const contentRun = await executarActor({
-      admin,
-      jobId: job.id,
-      orgId,
-      stepType: "discover_content",
-      actorId: ACTOR_DISCOVERY,
-      input: {
-        directUrls: originUrls,
-        resultsType: "posts",
-        resultsLimit: input.postsPerSource,
-        onlyPostsNewerThan: `${input.recentDays} days`,
-        addParentData: true,
-      },
-      requested: requestedContent,
-      ttlHours: 12,
-      maxCharge: Math.min(Math.max(0.08, requestedContent * 0.0032), availableBudget - actualCost),
-    });
-    actualCost += contentRun.cost;
-    cacheStats.content = contentRun.cacheHit;
+    const requestedContent =
+      originUrls.length * (input.mode === "imports" ? 1 : input.postsPerSource);
+    let sourceProfiles: Rec[] = [];
+    let posts: Rec[] = [];
+    if (input.mode === "imports") {
+      const importRun = await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "enrich_profiles",
+        actorId: ACTOR_PROFILES,
+        input: { usernames: input.profileInputs, includeAboutSection: false },
+        requested: input.profileInputs.length,
+        ttlHours: 7 * 24,
+        maxCharge: Math.min(
+          Math.max(0.03, input.profileInputs.length * 0.0035),
+          availableBudget - actualCost,
+        ),
+      });
+      actualCost += importRun.cost;
+      cacheStats.profiles = importRun.cacheHit;
+      sourceProfiles = importRun.items;
+      posts = sourceProfiles.flatMap((profile) => {
+        const username = normalizarUsername(profile.username);
+        const recent = Array.isArray(profile.latestPosts)
+          ? profile.latestPosts
+              .slice(0, input.postsPerSource)
+              .map((item: Rec) => normalizarPost(item, username))
+              .filter((item: Rec | null): item is Rec => Boolean(item))
+          : [];
+        if (recent.length) return recent;
+        return [
+          {
+            owner_username: username,
+            url: `https://www.instagram.com/${username}/`,
+            caption: String(profile.biography ?? ""),
+            posted_at: null,
+            content_type: "profile",
+            location: null,
+            metrics: { likes: 0, comments: 0, views: 0 },
+            raw_payload: profile,
+          },
+        ];
+      });
+    } else {
+      const contentRun = await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "discover_content",
+        actorId: ACTOR_DISCOVERY,
+        input: {
+          directUrls: originUrls,
+          resultsType: instagramContentResultsType(input.mode),
+          resultsLimit: input.postsPerSource,
+          onlyPostsNewerThan: `${input.recentDays} days`,
+          addParentData: true,
+        },
+        requested: requestedContent,
+        ttlHours: 12,
+        maxCharge: Math.min(
+          Math.max(0.08, requestedContent * 0.0032),
+          availableBudget - actualCost,
+        ),
+      });
+      actualCost += contentRun.cost;
+      cacheStats.content = contentRun.cacheHit;
+      posts = contentRun.items
+        .map((item) => normalizarPost(item, normalizarUsername(item.ownerUsername)))
+        .filter((item): item is Rec => Boolean(item));
+    }
     await updateCost();
-    const posts = contentRun.items
-      .map((item) => normalizarPost(item, normalizarUsername(item.ownerUsername)))
-      .filter((item): item is Rec => Boolean(item));
-    if (!posts.length) throw new Error("A fonte nao retornou posts publicos recentes.");
+    if (!posts.length) throw new Error("A fonte nao retornou conteudo publico recente.");
+    const persistentPosts = posts.filter((post) => /instagram\.com\/(p|reel)\//i.test(post.url));
     const contentIds = await salvarConteudos({
       admin,
       orgId,
       userId,
       sourceId: source.id,
       jobId: job.id,
-      posts,
+      posts: persistentPosts,
     });
 
     const grouped = postsPorAutor(posts);
@@ -790,8 +910,8 @@ async function processarDescobertaConteudo(params: {
       .sort((a, b) => b.signals.contentScore - a.signals.contentScore);
     const enrichLimit = Math.min(75, Math.max(12, input.targetLeads * 3), prequalified.length);
     const toEnrich = prequalified.slice(0, enrichLimit);
-    let profiles: Rec[] = [];
-    if (toEnrich.length) {
+    let profiles: Rec[] = sourceProfiles;
+    if (toEnrich.length && input.mode !== "imports") {
       const profileRun = await executarActor({
         admin,
         jobId: job.id,
@@ -903,7 +1023,8 @@ async function processarDescobertaConteudo(params: {
       else if (followers > input.maxFollowers) rejectionReason = "seguidores_acima_do_maximo";
       else if (input.requireNiche && !nicheMatch) rejectionReason = "fora_nicho";
       else if (input.requireLocation && !locationMatch) rejectionReason = "fora_localidade";
-      else if (signals.contentScore < input.minContentScore) rejectionReason = "conteudo_fraco";
+      else if (input.mode !== "imports" && signals.contentScore < input.minContentScore)
+        rejectionReason = "conteudo_fraco";
       else if (leadScore < input.minLeadScore) rejectionReason = "score_insuficiente";
       else if (qualified >= input.targetLeads) rejectionReason = "meta_atingida";
       else if (planRemaining <= 0) rejectionReason = "limite_plano";
@@ -922,7 +1043,7 @@ async function processarDescobertaConteudo(params: {
             cidade: locationMatch && input.city ? input.city : null,
             seguidores: followers || null,
           },
-          input.mode === "hashtags" ? "IG-HASHTAG" : "IG-PLACES",
+          sourceConfig.leadSource,
         ) as Rec;
         Object.assign(lead, {
           org_id: orgId,
@@ -1058,7 +1179,7 @@ async function processarDescobertaConteudo(params: {
         event_id: null,
         lead_id: leadId,
         username: candidate.username,
-        evidence_type: input.mode === "hashtags" ? "hashtag_post" : "place_post",
+        evidence_type: sourceConfig.evidenceType,
         excerpt: String(bestPost?.caption ?? "Conteudo publicado na origem selecionada.").slice(
           0,
           1000,
@@ -1756,7 +1877,15 @@ Deno.serve(async (req) => {
   }
 
   if (body.acao === "historico") {
-    const historyMode = ["comments", "hashtags", "places"].includes(String(body.mode))
+    const historyMode = [
+      "comments",
+      "hashtags",
+      "places",
+      "reels",
+      "mentions",
+      "imports",
+      "related",
+    ].includes(String(body.mode))
       ? String(body.mode)
       : "comments";
     const { data, error } = await admin

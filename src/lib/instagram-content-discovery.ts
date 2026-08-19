@@ -1,8 +1,10 @@
-export type ContentDiscoveryMode = "hashtags" | "places";
+export type ContentDiscoveryMode =
+  "hashtags" | "places" | "reels" | "mentions" | "imports" | "related";
 
 export type ContentDiscoveryCostInput = {
   mode: ContentDiscoveryMode;
   hashtags: readonly string[];
+  profileInputs?: readonly string[];
   sourcesLimit: number;
   postsPerSource: number;
   targetLeads: number;
@@ -28,6 +30,9 @@ export type InstagramContentSignals = {
   medianLikes: number;
   averageComments: number;
   medianComments: number;
+  averageViews: number;
+  medianViews: number;
+  viewRate: number;
   robustEngagementRate: number;
   latestPostAt: string | null;
   formats: string[];
@@ -86,15 +91,89 @@ export function buildInstagramHashtagUrls(hashtags: readonly string[]): string[]
   ].map((tag) => `https://www.instagram.com/explore/tags/${tag}/`);
 }
 
+export function normalizeInstagramProfileInputs(values: readonly unknown[]): string[] {
+  return [
+    ...new Set(
+      values
+        .map((value) => String(value ?? "").trim())
+        .map((value) => {
+          if (!value) return "";
+          if (!/instagram\.com/i.test(value)) return value.replace(/^@/, "");
+          try {
+            const parsed = new URL(value.match(/^https?:\/\//i) ? value : `https://${value}`);
+            if (!/(^|\.)instagram\.com$/i.test(parsed.hostname)) return "";
+            const [segment = ""] = parsed.pathname.split("/").filter(Boolean);
+            if (["p", "reel", "reels", "stories", "explore", "share"].includes(segment)) return "";
+            return segment;
+          } catch {
+            return value.replace(/^@/, "");
+          }
+        })
+        .map((value) => value.toLocaleLowerCase("pt-BR"))
+        .filter((value) => /^[a-z0-9._]{1,30}$/.test(value)),
+    ),
+  ];
+}
+
+export function buildInstagramProfileUrls(values: readonly unknown[]): string[] {
+  return normalizeInstagramProfileInputs(values).map(
+    (username) => `https://www.instagram.com/${username}/`,
+  );
+}
+
+export function extractInstagramRelatedUsernames(
+  profiles: readonly unknown[],
+  limit: number,
+  excluded: readonly unknown[] = [],
+): string[] {
+  const excludedSet = new Set(normalizeInstagramProfileInputs(excluded));
+  const candidates = profiles.flatMap((profile) => {
+    if (!profile || typeof profile !== "object") return [];
+    const related = (profile as { relatedProfiles?: unknown }).relatedProfiles;
+    if (!Array.isArray(related)) return [];
+    return related.map((item) =>
+      typeof item === "string"
+        ? item
+        : item && typeof item === "object"
+          ? ((item as { username?: unknown; userName?: unknown }).username ??
+            (item as { userName?: unknown }).userName)
+          : "",
+    );
+  });
+  return normalizeInstagramProfileInputs(candidates)
+    .filter((username) => !excludedSet.has(username))
+    .slice(0, Math.max(0, Math.floor(limit)));
+}
+
+export function instagramContentResultsType(
+  mode: ContentDiscoveryMode,
+): "posts" | "reels" | "mentions" {
+  if (mode === "reels") return "reels";
+  if (mode === "mentions") return "mentions";
+  return "posts";
+}
+
+export function instagramDiscoverySourceCount(input: ContentDiscoveryCostInput): number {
+  if (input.mode === "hashtags" || input.mode === "reels") {
+    return Math.max(1, input.hashtags.length);
+  }
+  if (input.mode === "mentions" || input.mode === "imports") {
+    return Math.max(1, input.profileInputs?.length ?? 0);
+  }
+  return Math.max(1, input.sourcesLimit);
+}
+
 export function estimateInstagramContentDiscoveryCost(input: ContentDiscoveryCostInput): number {
-  const sourceCount =
-    input.mode === "hashtags"
-      ? Math.max(1, input.hashtags.length)
-      : Math.max(1, input.sourcesLimit);
+  const sourceCount = instagramDiscoverySourceCount(input);
+  if (input.mode === "imports") return Number((sourceCount * 0.0026).toFixed(4));
   const sourceDiscovery = input.mode === "places" ? input.sourcesLimit * 0.0027 : 0;
+  const seedEnrichment =
+    input.mode === "related" ? Math.max(1, input.profileInputs?.length ?? 0) * 0.0026 : 0;
   const contentItems = sourceCount * input.postsPerSource;
   const profiles = Math.min(75, Math.max(12, input.targetLeads * 3));
-  return Number((sourceDiscovery + contentItems * 0.0027 + profiles * 0.0026).toFixed(4));
+  return Number(
+    (sourceDiscovery + seedEnrichment + contentItems * 0.0027 + profiles * 0.0026).toFixed(4),
+  );
 }
 
 function relevantTokens(value: string): string[] {
@@ -133,6 +212,7 @@ export function analyzeInstagramContentSignals(params: {
   const now = params.now ?? new Date();
   const likes = contents.map((item) => validMetric(item.likes));
   const comments = contents.map((item) => validMetric(item.comments));
+  const views = contents.map((item) => validMetric(item.views));
   const captions = contents.map((item) => normalizeInstagramDiscoveryText(item.caption));
   const nicheTokens = relevantTokens(niche);
   const cityTokens = relevantTokens(city);
@@ -168,16 +248,20 @@ export function analyzeInstagramContentSignals(params: {
   const commercialScore = clamp(commercialSignals.length * 24);
   const medianLikes = median(likes);
   const medianComments = median(comments);
+  const medianViews = median(views);
   const robustEngagementRate = followers
     ? Number((((medianLikes + medianComments) / followers) * 100).toFixed(2))
     : 0;
   const engagementScore = clamp(Math.min(100, robustEngagementRate * 16));
+  const viewRate = followers ? Number(((medianViews / followers) * 100).toFixed(2)) : 0;
+  const viewScore = clamp(Math.min(100, viewRate * 2));
+  const hasVideoMetrics = views.some((value) => value > 0);
   const contentScore = clamp(
     nicheScore * 0.35 +
       locationScore * 0.15 +
       commercialScore * 0.2 +
       activityScore * 0.2 +
-      engagementScore * 0.1,
+      Math.max(engagementScore, hasVideoMetrics ? viewScore : 0) * 0.1,
   );
 
   return {
@@ -190,6 +274,9 @@ export function analyzeInstagramContentSignals(params: {
     medianLikes: Number(medianLikes.toFixed(1)),
     averageComments: Number(average(comments).toFixed(1)),
     medianComments: Number(medianComments.toFixed(1)),
+    averageViews: Number(average(views).toFixed(1)),
+    medianViews: Number(medianViews.toFixed(1)),
+    viewRate,
     robustEngagementRate,
     latestPostAt: latest?.toISOString() ?? null,
     formats: [...new Set(contents.map((item) => String(item.contentType ?? "post")))],

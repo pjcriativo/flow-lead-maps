@@ -233,6 +233,46 @@ export function safePercentage(numerator: number, denominator: number): number {
   return Number(((numerator / denominator) * 100).toFixed(1));
 }
 
+export function mergeInstagramDashboards(
+  base: InstagramDashboard,
+  advanced: InstagramDashboard,
+): InstagramDashboard {
+  const timeline = new Map<string, InstagramDashboardTimelinePoint>();
+  for (const point of [...base.timeline, ...advanced.timeline]) {
+    const current = timeline.get(point.date);
+    timeline.set(point.date, {
+      date: point.date,
+      collected: (current?.collected ?? 0) + point.collected,
+      qualified: (current?.qualified ?? 0) + point.qualified,
+      newLeads: (current?.newLeads ?? 0) + point.newLeads,
+      cost: Number(((current?.cost ?? 0) + point.cost).toFixed(6)),
+    });
+  }
+  const addFunnel = (
+    left: InstagramDashboardFunnel,
+    right: InstagramDashboardFunnel,
+  ): InstagramDashboardFunnel => ({
+    collected: left.collected + right.collected,
+    uniqueProfiles: left.uniqueProfiles + right.uniqueProfiles,
+    enriched: left.enriched + right.enriched,
+    qualified: left.qualified + right.qualified,
+    newLeads: left.newLeads + right.newLeads,
+    duplicates: left.duplicates + right.duplicates,
+    cost: Number((left.cost + right.cost).toFixed(6)),
+  });
+  return {
+    ...base,
+    generatedAt: base.generatedAt > advanced.generatedAt ? base.generatedAt : advanced.generatedAt,
+    funnel: addFunnel(base.funnel, advanced.funnel),
+    allCost: Number((base.allCost + advanced.allCost).toFixed(6)),
+    sources: [...base.sources, ...advanced.sources],
+    timeline: [...timeline.values()].sort((left, right) => left.date.localeCompare(right.date)),
+    recentRuns: [...base.recentRuns, ...advanced.recentRuns]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, 12),
+  };
+}
+
 export function calculateInstagramDashboardEfficiency(
   funnel: InstagramDashboardFunnel,
 ): InstagramDashboardEfficiency {

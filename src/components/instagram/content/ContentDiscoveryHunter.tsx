@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
+  AtSign,
   BarChart3,
   Building2,
   CheckCircle2,
@@ -12,7 +13,9 @@ import {
   History,
   Instagram,
   Loader2,
+  ListPlus,
   MapPinned,
+  Network,
   Radar,
   SearchCheck,
   Sparkles,
@@ -25,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -48,6 +52,10 @@ import {
 } from "@/components/instagram/shared/InstagramScoreV2";
 import { instagramScoreValue } from "@/lib/instagram-score-v2";
 import {
+  instagramDiscoverySourceCount,
+  normalizeInstagramProfileInputs,
+} from "@/lib/instagram-content-discovery";
+import {
   estimateContentDiscoveryCost,
   listContentDiscoveryHistory,
   runContentDiscovery,
@@ -60,6 +68,7 @@ import {
 const INITIAL_INPUT: ContentDiscoveryInput = {
   mode: "hashtags",
   hashtags: [],
+  profileInputs: [],
   niche: "",
   city: "",
   state: "",
@@ -80,6 +89,26 @@ const INITIAL_INPUT: ContentDiscoveryInput = {
 type ResultFilter = "all" | ContentLeadResult["decision"];
 const PAGE_SIZE = 8;
 
+const MODE_LABELS: Record<ContentDiscoveryInput["mode"], string> = {
+  hashtags: "Hashtag",
+  places: "Local",
+  reels: "Reel",
+  mentions: "Menção",
+  imports: "Importação",
+  related: "Relacionado",
+};
+
+function modeActionLabel(mode: ContentDiscoveryInput["mode"]): string {
+  return {
+    hashtags: "Caçar por hashtags",
+    places: "Caçar por lugares",
+    reels: "Analisar Reels",
+    mentions: "Caçar menções",
+    imports: "Importar e qualificar",
+    related: "Expandir relacionados",
+  }[mode];
+}
+
 export function ContentDiscoveryHunter({
   onLeadsChanged,
 }: {
@@ -87,6 +116,7 @@ export function ContentDiscoveryHunter({
 }) {
   const [input, setInput] = useState(INITIAL_INPUT);
   const [hashtagsText, setHashtagsText] = useState("");
+  const [profilesText, setProfilesText] = useState("");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ContentDiscoveryResponse | null>(null);
   const [history, setHistory] = useState<ContentDiscoveryHistory[]>([]);
@@ -119,11 +149,18 @@ export function ContentDiscoveryHunter({
       ].slice(0, 6),
     [hashtagsText],
   );
-  const effectiveInput = useMemo(() => ({ ...input, hashtags }), [hashtags, input]);
+  const profileInputs = useMemo(
+    () => normalizeInstagramProfileInputs(profilesText.split(/[\s,;]+/)).slice(0, 12),
+    [profilesText],
+  );
+  const effectiveInput = useMemo(
+    () => ({ ...input, hashtags, profileInputs }),
+    [hashtags, input, profileInputs],
+  );
   const estimatedCost = estimateContentDiscoveryCost(effectiveInput);
   const requestedContent =
-    (input.mode === "hashtags" ? Math.max(1, hashtags.length) : input.sourcesLimit) *
-    input.postsPerSource;
+    instagramDiscoverySourceCount(effectiveInput) *
+    (effectiveInput.mode === "imports" ? 1 : input.postsPerSource);
   const filtered = useMemo(() => {
     return (result?.results ?? [])
       .filter((item) => filter === "all" || item.decision === filter)
@@ -149,11 +186,17 @@ export function ContentDiscoveryHunter({
 
   const run = async () => {
     if (!effectiveInput.niche) return toast.error("Escolha o nicho do lead ideal.");
-    if (effectiveInput.mode === "hashtags" && !effectiveInput.hashtags.length) {
+    if (["hashtags", "reels"].includes(effectiveInput.mode) && !effectiveInput.hashtags.length) {
       return toast.error("Informe ao menos uma hashtag do nicho ou da cidade.");
     }
     if (effectiveInput.mode === "places" && !effectiveInput.city && !effectiveInput.locationQuery) {
       return toast.error("Escolha a cidade ou informe um bairro/local.");
+    }
+    if (
+      ["mentions", "imports", "related"].includes(effectiveInput.mode) &&
+      !effectiveInput.profileInputs.length
+    ) {
+      return toast.error("Informe ao menos um @username ou URL pública de perfil.");
     }
     setRunning(true);
     try {
@@ -174,6 +217,7 @@ export function ContentDiscoveryHunter({
   const restore = (job: ContentDiscoveryHistory) => {
     setInput({ ...INITIAL_INPUT, ...job.input });
     setHashtagsText(job.input.hashtags?.map((tag) => `#${tag}`).join(", ") ?? "");
+    setProfilesText(job.input.profileInputs?.map((username) => `@${username}`).join("\n") ?? "");
     setResult(job.result);
     setFilter("all");
     setPage(1);
@@ -191,14 +235,14 @@ export function ContentDiscoveryHunter({
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-semibold">Discovery Radar</h2>
+                  <h2 className="text-xl font-semibold">Instagram Signal Explorer</h2>
                   <Badge className="gap-1">
-                    <Radar className="size-3" /> Fase 2
+                    <Radar className="size-3" /> Fase 6
                   </Badge>
                 </div>
                 <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                  Descobre negócios por hashtags ou lugares reais, mede conteúdo, atividade e
-                  engajamento robusto, e só enriquece os autores mais promissores.
+                  Encontra sinais de compra em hashtags, lugares, Reels e menções; importa listas e
+                  expande perfis relacionados sem pagar enriquecimento desnecessário.
                 </p>
               </div>
             </div>
@@ -212,7 +256,7 @@ export function ContentDiscoveryHunter({
           </div>
 
           <div className="grid gap-3 lg:grid-cols-4">
-            <FlowStep icon={Radar} number="1" title="Origem" text="Hashtag ou local público" />
+            <FlowStep icon={Radar} number="1" title="Origem" text="Seis fontes públicas" />
             <FlowStep icon={Film} number="2" title="Conteúdo" text="Posts e Reels recentes" />
             <FlowStep
               icon={BarChart3}
@@ -230,7 +274,7 @@ export function ContentDiscoveryHunter({
 
           <div>
             <Label className="mb-2 block">1. Escolha a fonte de descoberta</Label>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <InstagramSourceChoice
                 active={input.mode === "hashtags"}
                 icon={Hash}
@@ -245,10 +289,38 @@ export function ContentDiscoveryHunter({
                 text="Pesquisa locais comerciais e analisa autores que publicam neles."
                 onClick={() => chooseMode("places")}
               />
+              <InstagramSourceChoice
+                active={input.mode === "reels"}
+                icon={Film}
+                title="Reels Intelligence"
+                text="Descobre autores e mede visualizações em vídeos do nicho."
+                onClick={() => chooseMode("reels")}
+              />
+              <InstagramSourceChoice
+                active={input.mode === "mentions"}
+                icon={AtSign}
+                title="Mention Hunter"
+                text="Encontra quem marcou perfis-alvo em publicações públicas."
+                onClick={() => chooseMode("mentions")}
+              />
+              <InstagramSourceChoice
+                active={input.mode === "imports"}
+                icon={ListPlus}
+                title="Importar perfis"
+                text="Qualifica uma lista de usernames ou URLs que você já possui."
+                onClick={() => chooseMode("imports")}
+              />
+              <InstagramSourceChoice
+                active={input.mode === "related"}
+                icon={Network}
+                title="Perfis relacionados"
+                text="Expande contas semelhantes a partir de perfis-semente."
+                onClick={() => chooseMode("related")}
+              />
             </div>
           </div>
 
-          {input.mode === "hashtags" ? (
+          {input.mode === "hashtags" || input.mode === "reels" ? (
             <InstagramField label="Hashtags — separe por vírgula (máx. 6)">
               <div className="relative">
                 <Hash className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -268,7 +340,7 @@ export function ContentDiscoveryHunter({
                 ))}
               </div>
             </InstagramField>
-          ) : (
+          ) : input.mode === "places" ? (
             <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
               <InstagramField label="Bairro, local conhecido ou tipo de estabelecimento">
                 <Input
@@ -285,6 +357,49 @@ export function ContentDiscoveryHunter({
                 max={12}
                 onChange={(value) => update("sourcesLimit", value)}
               />
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+              <InstagramField
+                label={
+                  input.mode === "mentions"
+                    ? "Perfis que serão monitorados nas menções"
+                    : input.mode === "related"
+                      ? "Perfis-semente para expansão"
+                      : "Perfis para importar e qualificar"
+                }
+              >
+                <Textarea
+                  value={profilesText}
+                  onChange={(event) => setProfilesText(event.target.value)}
+                  placeholder={"@perfil_exemplo\nhttps://instagram.com/outro_perfil"}
+                  className="min-h-24 resize-y"
+                  disabled={running}
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {profileInputs.map((username) => (
+                    <Badge key={username} variant="secondary">
+                      @{username}
+                    </Badge>
+                  ))}
+                </div>
+              </InstagramField>
+              {input.mode === "related" ? (
+                <InstagramRangeField
+                  label="Relacionados para analisar"
+                  value={input.sourcesLimit}
+                  min={1}
+                  max={12}
+                  onChange={(value) => update("sourcesLimit", value)}
+                />
+              ) : (
+                <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+                  <strong className="block text-foreground">
+                    {profileInputs.length}/12 perfis
+                  </strong>
+                  Aceita @username, URL completa, vírgulas ou uma linha por perfil.
+                </div>
+              )}
             </div>
           )}
 
@@ -326,13 +441,22 @@ export function ContentDiscoveryHunter({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <InstagramRangeField
-              label="Conteúdos por origem"
-              value={input.postsPerSource}
-              min={3}
-              max={30}
-              onChange={(value) => update("postsPerSource", value)}
-            />
+            {input.mode === "imports" ? (
+              <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm">
+                <strong>1 coleta por perfil</strong>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Bio, audiência, categoria, contato e publicações recentes na mesma etapa.
+                </p>
+              </div>
+            ) : (
+              <InstagramRangeField
+                label="Conteúdos por origem"
+                value={input.postsPerSource}
+                min={3}
+                max={30}
+                onChange={(value) => update("postsPerSource", value)}
+              />
+            )}
             <InstagramRangeField
               label="Recência"
               value={input.recentDays}
@@ -401,22 +525,27 @@ export function ContentDiscoveryHunter({
 
           <div className="flex flex-col justify-between gap-4 border-t border-border pt-5 sm:flex-row sm:items-center">
             <div className="text-sm text-muted-foreground">
-              <strong className="text-foreground">{requestedContent}</strong> conteúdos no teto ·
-              mediana reduz distorção por post viral · enriquecimento seletivo
+              <strong className="text-foreground">{requestedContent}</strong>{" "}
+              {input.mode === "imports" ? "perfis" : "conteúdos"} no teto · mediana reduz distorção
+              por post viral · enriquecimento seletivo
             </div>
             <Button onClick={run} disabled={running} size="lg" className="min-w-52">
               {running ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : input.mode === "hashtags" ? (
                 <Hash className="size-4" />
-              ) : (
+              ) : input.mode === "places" ? (
                 <MapPinned className="size-4" />
+              ) : input.mode === "reels" ? (
+                <Film className="size-4" />
+              ) : input.mode === "mentions" ? (
+                <AtSign className="size-4" />
+              ) : input.mode === "imports" ? (
+                <ListPlus className="size-4" />
+              ) : (
+                <Network className="size-4" />
               )}
-              {running
-                ? "Analisando sinais…"
-                : input.mode === "hashtags"
-                  ? "Caçar por hashtags"
-                  : "Caçar por lugares"}
+              {running ? "Analisando sinais…" : modeActionLabel(input.mode)}
             </Button>
           </div>
         </div>
@@ -463,9 +592,11 @@ export function ContentDiscoveryHunter({
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-medium">
-                    {job.input.mode === "hashtags"
+                    {job.input.mode === "hashtags" || job.input.mode === "reels"
                       ? job.input.hashtags.map((tag) => `#${tag}`).join(" · ")
-                      : job.input.locationQuery || job.input.city}
+                      : job.input.mode === "places"
+                        ? job.input.locationQuery || job.input.city
+                        : job.input.profileInputs?.map((username) => `@${username}`).join(" · ")}
                   </span>
                   <Badge variant="outline">{job.status}</Badge>
                 </div>
@@ -628,7 +759,7 @@ function ContentLeadCard({ lead }: { lead: ContentLeadResult }) {
       </div>
       <div className="rounded-xl border border-border bg-muted/30 p-3">
         <div className="mb-1 flex flex-wrap gap-1">
-          <Badge variant="secondary">{lead.sourceType === "hashtags" ? "Hashtag" : "Local"}</Badge>
+          <Badge variant="secondary">{MODE_LABELS[lead.sourceType]}</Badge>
           {lead.signals.formats.map((format) => (
             <Badge key={format} variant="outline">
               {format}
@@ -653,6 +784,9 @@ function ContentLeadCard({ lead }: { lead: ContentLeadResult }) {
         <div className="flex flex-wrap gap-1">
           <Badge variant="outline">{lead.signals.robustEngagementRate.toFixed(2)}% eng.</Badge>
           <Badge variant="outline">mediana {compact(lead.signals.medianLikes)} likes</Badge>
+          {lead.signals.medianViews > 0 ? (
+            <Badge variant="outline">mediana {compact(lead.signals.medianViews)} views</Badge>
+          ) : null}
           {lead.nicheMatch ? <Badge variant="outline">nicho ✓</Badge> : null}
           {lead.locationMatch ? <Badge variant="outline">local ✓</Badge> : null}
         </div>
