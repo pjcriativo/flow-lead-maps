@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { MessageCircle, Send, Loader2, Settings } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { useAuth } from "@/components/auth/AuthProvider";
+
 
 type IgInstancia = {
   id: string;
@@ -36,7 +36,7 @@ type Message = {
 };
 
 export function InstagramInbox() {
-  const { session } = useAuth();
+
   const [account, setAccount] = useState<IgInstancia | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
