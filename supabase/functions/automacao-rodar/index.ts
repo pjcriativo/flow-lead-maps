@@ -145,6 +145,7 @@ async function executarRodada(admin: Admin, userId: string, authHeader: string, 
     candidatos = await searchApifyComCache({
       admin,
       orgId,
+      userId,
       seen,
       nicho: receita.nicho,
       cidade: receita.cidade,

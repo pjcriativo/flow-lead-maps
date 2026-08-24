@@ -14,6 +14,29 @@ export type ApiUsageResumo = {
   unattributed_items: number;
   total_requests: number;
   total_leads_crawled: number;
+  lead_economy: {
+    catalog_total: number;
+    searches: number;
+    catalog_leads: number;
+    cache_leads: number;
+    reused_leads: number;
+    returned_candidates: number;
+    reuse_rate: number;
+    paid_runs_started: number;
+    paid_runs_avoided: number;
+    duplicates_avoided: number;
+    new_apify_leads: number;
+    cost_per_new_lead_usd: number;
+    top_queries: Array<{
+      query_key: string;
+      niche: string;
+      city: string;
+      searches: number;
+      reused_leads: number;
+      paid_runs: number;
+      duplicates_avoided: number;
+    }>;
+  };
   top_users: Array<{
     user_id: string;
     user_name: string;
@@ -132,6 +155,7 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
     : [];
 
   const apify = isRecord(result.apify_account) ? result.apify_account : {};
+  const economy = isRecord(result.lead_economy) ? result.lead_economy : {};
   const accounts = Array.isArray(apify.accounts)
     ? apify.accounts.filter(isRecord).map((account) => ({
         label: text(account.label, "Conta Apify"),
@@ -162,6 +186,31 @@ export async function obterResumoConsumoApi(dias: number = 30): Promise<ApiUsage
     unattributed_items: number(result.unattributed_items),
     total_requests: number(result.total_requests),
     total_leads_crawled: number(result.total_leads_crawled),
+    lead_economy: {
+      catalog_total: number(economy.catalog_total),
+      searches: number(economy.searches),
+      catalog_leads: number(economy.catalog_leads),
+      cache_leads: number(economy.cache_leads),
+      reused_leads: number(economy.reused_leads),
+      returned_candidates: number(economy.returned_candidates),
+      reuse_rate: number(economy.reuse_rate),
+      paid_runs_started: number(economy.paid_runs_started),
+      paid_runs_avoided: number(economy.paid_runs_avoided),
+      duplicates_avoided: number(economy.duplicates_avoided),
+      new_apify_leads: number(economy.new_apify_leads),
+      cost_per_new_lead_usd: number(economy.cost_per_new_lead_usd),
+      top_queries: Array.isArray(economy.top_queries)
+        ? economy.top_queries.filter(isRecord).map((query) => ({
+            query_key: text(query.query_key, "consulta"),
+            niche: text(query.niche, "Nicho não informado"),
+            city: text(query.city, "Área do mapa"),
+            searches: number(query.searches),
+            reused_leads: number(query.reused_leads),
+            paid_runs: number(query.paid_runs),
+            duplicates_avoided: number(query.duplicates_avoided),
+          }))
+        : [],
+    },
     top_users: topUsers,
     service_breakdown: serviceBreakdown,
     apify_account: {

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { obterResumoConsumoApi, type ApiUsageResumo } from "@/services/api-consumption";
 import { cn } from "@/lib/utils";
+import { LeadEconomyOverview } from "./LeadEconomyOverview";
 import {
   BarChart,
   Bar,
@@ -433,6 +434,8 @@ export function AdminApiUsageDashboard() {
           </div>
         </div>
       </div>
+
+      <LeadEconomyOverview economy={resumo?.lead_economy ?? null} loading={loading} />
 
       {/* Gráficos */}
       <div className="grid gap-6 lg:grid-cols-2">

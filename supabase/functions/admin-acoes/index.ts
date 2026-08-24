@@ -929,8 +929,38 @@ Deno.serve(async (req) => {
         }
       };
 
+      const carregarEventosEconomia = async () => {
+        try {
+          const data = await collectUniqueOffsetPages(
+            async (offset, limit) => {
+              const pagina = await admin
+                .from("lead_search_events")
+                .select(
+                  "id, org_id, user_id, query_key, niche, city, state, requested, catalog_returned, cache_returned, provider_returned, returned_candidates, duplicates_avoided, paid_run_started, reason, created_at",
+                )
+                .gte("created_at", desde)
+                .lte("created_at", snapshotAt)
+                .order("created_at", { ascending: true })
+                .order("id", { ascending: true })
+                .range(offset, offset + limit - 1);
+              if (pagina.error) throw pagina.error;
+              return { items: (pagina.data ?? []) as Rec[] };
+            },
+            (row) => String(row.id),
+          );
+          return { data, error: null };
+        } catch (error) {
+          return {
+            data: null,
+            error: { message: error instanceof Error ? error.message : String(error) },
+          };
+        }
+      };
+
       const [
         logsResult,
+        economyEventsResult,
+        catalogCountResult,
         profilesResult,
         membershipsResult,
         orgsResult,
@@ -940,6 +970,8 @@ Deno.serve(async (req) => {
         keysResult,
       ] = await Promise.all([
         carregarLogsConsumo(),
+        carregarEventosEconomia(),
+        admin.from("lead_catalog").select("place_id", { count: "exact", head: true }),
         admin
           .from("profiles")
           .select("id, email, full_name, is_super_admin, plan, created_at")
@@ -954,6 +986,8 @@ Deno.serve(async (req) => {
 
       const queryError = [
         logsResult.error,
+        economyEventsResult.error,
+        catalogCountResult.error,
         profilesResult.error,
         membershipsResult.error,
         orgsResult.error,
@@ -1222,6 +1256,61 @@ Deno.serve(async (req) => {
         })),
       });
 
+      const economyEvents = economyEventsResult.data ?? [];
+      const newApifyLeads = periodSummary.users.reduce(
+        (total, user) => total + user.apify_leads_generated_period,
+        0,
+      );
+      const economyByQuery = new Map<
+        string,
+        {
+          query_key: string;
+          niche: string;
+          city: string;
+          searches: number;
+          reused_leads: number;
+          paid_runs: number;
+          duplicates_avoided: number;
+        }
+      >();
+      let reusedLeads = 0;
+      let catalogLeads = 0;
+      let cacheLeads = 0;
+      let paidRunsStarted = 0;
+      let paidRunsAvoided = 0;
+      let duplicatesAvoided = 0;
+      let returnedCandidates = 0;
+      for (const event of economyEvents) {
+        const catalog = Number(event.catalog_returned ?? 0);
+        const cache = Number(event.cache_returned ?? 0);
+        const duplicates = Number(event.duplicates_avoided ?? 0);
+        const returned = Number(event.returned_candidates ?? 0);
+        const paid = event.paid_run_started === true;
+        catalogLeads += catalog;
+        cacheLeads += cache;
+        reusedLeads += catalog + cache;
+        duplicatesAvoided += duplicates;
+        returnedCandidates += returned;
+        if (paid) paidRunsStarted += 1;
+        else paidRunsAvoided += 1;
+
+        const key = String(event.query_key);
+        const current = economyByQuery.get(key) ?? {
+          query_key: key,
+          niche: String(event.niche ?? ""),
+          city: String(event.city ?? ""),
+          searches: 0,
+          reused_leads: 0,
+          paid_runs: 0,
+          duplicates_avoided: 0,
+        };
+        current.searches += 1;
+        current.reused_leads += catalog + cache;
+        current.paid_runs += paid ? 1 : 0;
+        current.duplicates_avoided += duplicates;
+        economyByQuery.set(key, current);
+      }
+
       const accounts: Array<{
         label: string;
         account_id: string;
@@ -1294,6 +1383,29 @@ Deno.serve(async (req) => {
         unattributed_items: periodSummary.unattributedItems,
         total_requests: periodSummary.totalRequests,
         total_leads_crawled: periodSummary.totalItemsCharged,
+        lead_economy: {
+          catalog_total: catalogCountResult.count ?? 0,
+          searches: economyEvents.length,
+          catalog_leads: catalogLeads,
+          cache_leads: cacheLeads,
+          reused_leads: reusedLeads,
+          returned_candidates: returnedCandidates,
+          reuse_rate: returnedCandidates > 0 ? Math.min(1, reusedLeads / returnedCandidates) : 0,
+          paid_runs_started: paidRunsStarted,
+          paid_runs_avoided: paidRunsAvoided,
+          duplicates_avoided: duplicatesAvoided,
+          new_apify_leads: newApifyLeads,
+          cost_per_new_lead_usd:
+            newApifyLeads > 0 ? periodSummary.attributedApifyCostUsd / newApifyLeads : 0,
+          top_queries: [...economyByQuery.values()]
+            .sort(
+              (a, b) =>
+                b.reused_leads - a.reused_leads ||
+                b.duplicates_avoided - a.duplicates_avoided ||
+                b.searches - a.searches,
+            )
+            .slice(0, 10),
+        },
         top_users: periodSummary.users,
         service_breakdown: periodSummary.services,
         apify_account: {

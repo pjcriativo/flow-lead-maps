@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
         };
         const collected =
           fonte === "apify"
-            ? await searchApifyComCache({ ...providerParams, admin, orgId, seen })
+            ? await searchApifyComCache({ ...providerParams, admin, orgId, userId, seen })
             : await provider({ ...providerParams, seen: new Set(seen.placeIds) });
         const candidates = collected.filter((place) => {
           const businessKey = leadBusinessIdentity(place.name, place.address);
