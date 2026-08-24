@@ -191,7 +191,15 @@ export function CompetitorIntelligence({ onNavigate }: { onNavigate?: (tab: stri
     }
   };
 
-  const updateInterval = async (competitorId: string, username: string, label: string | null, niche: string, city: string | null, state: string | null, intervalHours: number) => {
+  const updateInterval = async (
+    competitorId: string,
+    username: string,
+    label: string | null,
+    niche: string,
+    city: string | null,
+    state: string | null,
+    intervalHours: number,
+  ) => {
     setUpdatingInterval(true);
     try {
       await saveInstagramCompetitor({
@@ -205,7 +213,9 @@ export function CompetitorIntelligence({ onNavigate }: { onNavigate?: (tab: stri
       await reload(competitorId);
       toast.success("Frequência de monitoramento atualizada.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a frequência.");
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível atualizar a frequência.",
+      );
     } finally {
       setUpdatingInterval(false);
     }
@@ -442,7 +452,7 @@ export function CompetitorIntelligence({ onNavigate }: { onNavigate?: (tab: stri
                         selected.niche,
                         selected.city,
                         selected.state,
-                        Number(value)
+                        Number(value),
                       )
                     }
                   >
@@ -594,6 +604,7 @@ function CompetitorDashboard({
   snapshot,
   snapshots,
   alerts,
+  onNavigate,
 }: {
   competitor: InstagramCompetitor;
   snapshot: InstagramCompetitorSnapshot;

@@ -60,6 +60,52 @@ const TERMINAIS = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 type Rec = Record<string, any>;
 type Admin = SupabaseClient;
 
+const USD_TO_BRL = 5.6;
+
+async function registrarCustoInstagram(params: {
+  admin: Admin;
+  jobId: string;
+  orgId: string;
+  userId: string;
+  action: string;
+  costUsd: number;
+  status: string;
+}): Promise<void> {
+  const { admin, jobId, orgId, userId, action, costUsd, status } = params;
+  if (!Number.isFinite(costUsd) || costUsd <= 0) return;
+
+  const { error } = await admin.from("api_consumption_logs").upsert(
+    {
+      org_id: orgId,
+      user_id: userId,
+      service: "apify_instagram",
+      action,
+      external_id: jobId,
+      quantity: 1,
+      cost_usd: costUsd,
+      cost_brl: costUsd * USD_TO_BRL,
+      metadata: {
+        source: "instagram_discovery_jobs",
+        job_id: jobId,
+        job_status: status,
+        cost_source: "apify_run_actual_cost",
+      },
+    },
+    { onConflict: "service,external_id" },
+  );
+
+  if (error) {
+    // O job continua sendo o livro-caixa de contingência e a migração de backfill
+    // permite reconciliar o custo sem repetir uma chamada paga.
+    console.error("Falha ao centralizar custo do Instagram", {
+      jobId,
+      userId,
+      costUsd,
+      error: error.message,
+    });
+  }
+}
+
 type EntradaComments = {
   requestId: string;
   sourceType: "profile" | "posts";
@@ -1250,6 +1296,15 @@ async function processarDescobertaConteudo(params: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", job.id);
+    await registrarCustoInstagram({
+      admin,
+      jobId: String(job.id),
+      orgId,
+      userId,
+      action: `content_discovery_${input.mode}`,
+      costUsd: actualCost,
+      status: qualified > 0 ? "completed" : "partial",
+    });
     return json(response, 200, req);
   } catch (error) {
     if (error instanceof ActorRunError) actualCost += error.costUsd;
@@ -1264,6 +1319,15 @@ async function processarDescobertaConteudo(params: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", job.id);
+    await registrarCustoInstagram({
+      admin,
+      jobId: String(job.id),
+      orgId,
+      userId,
+      action: `content_discovery_${input.mode}`,
+      costUsd: actualCost,
+      status: "failed",
+    });
     return json({ ok: false, error: message, jobId: job.id, actualCost }, 500, req);
   }
 }
@@ -1816,6 +1880,15 @@ export async function processarMonitoramentoConcorrente(params: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", job.id);
+    await registrarCustoInstagram({
+      admin,
+      jobId: String(job.id),
+      orgId,
+      userId,
+      action: "competitor_monitor",
+      costUsd: actualCost,
+      status: "completed",
+    });
     return json(response, 200, req);
   } catch (error) {
     if (error instanceof ActorRunError) actualCost += error.costUsd;
@@ -1830,6 +1903,15 @@ export async function processarMonitoramentoConcorrente(params: {
         updated_at: new Date().toISOString(),
       })
       .eq("id", job.id);
+    await registrarCustoInstagram({
+      admin,
+      jobId: String(job.id),
+      orgId,
+      userId,
+      action: "competitor_monitor",
+      costUsd: actualCost,
+      status: "failed",
+    });
     return json({ ok: false, error: message, jobId: job.id, actualCost }, 500, req);
   }
 }
@@ -2432,6 +2514,15 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       })
       .eq("id", job.id);
+    await registrarCustoInstagram({
+      admin,
+      jobId: String(job.id),
+      orgId,
+      userId,
+      action: "comments_hunter",
+      costUsd: actualCost,
+      status: qualified > 0 ? "completed" : "partial",
+    });
     return json(response, 200, req);
   } catch (error) {
     if (error instanceof ActorRunError) actualCost += error.costUsd;
@@ -2446,6 +2537,15 @@ Deno.serve(async (req) => {
         updated_at: new Date().toISOString(),
       })
       .eq("id", job.id);
+    await registrarCustoInstagram({
+      admin,
+      jobId: String(job.id),
+      orgId,
+      userId,
+      action: "comments_hunter",
+      costUsd: actualCost,
+      status: "failed",
+    });
     return json({ ok: false, error: message, jobId: job.id, actualCost }, 500, req);
   }
 });

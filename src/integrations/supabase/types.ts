@@ -795,6 +795,248 @@ export type Database = {
           },
         ]
       }
+      ig_automacoes: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          id: string
+          instancia_id: string
+          is_active: boolean
+          keywords: string[] | null
+          name: string
+          org_id: string
+          reply_text: string
+          trigger_type: string
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          instancia_id: string
+          is_active?: boolean
+          keywords?: string[] | null
+          name: string
+          org_id: string
+          reply_text: string
+          trigger_type?: string
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          id?: string
+          instancia_id?: string
+          is_active?: boolean
+          keywords?: string[] | null
+          name?: string
+          org_id?: string
+          reply_text?: string
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_automacoes_instancia_id_fkey"
+            columns: ["instancia_id"]
+            isOneToOne: false
+            referencedRelation: "ig_instancias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ig_automacoes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_conversas: {
+        Row: {
+          atualizado_em: string
+          criado_em: string
+          external_contact_avatar: string | null
+          external_contact_id: string
+          external_contact_name: string | null
+          id: string
+          instancia_id: string
+          last_message_at: string
+          last_message_text: string | null
+          lead_id: string | null
+          org_id: string
+          status: string
+        }
+        Insert: {
+          atualizado_em?: string
+          criado_em?: string
+          external_contact_avatar?: string | null
+          external_contact_id: string
+          external_contact_name?: string | null
+          id?: string
+          instancia_id: string
+          last_message_at?: string
+          last_message_text?: string | null
+          lead_id?: string | null
+          org_id: string
+          status?: string
+        }
+        Update: {
+          atualizado_em?: string
+          criado_em?: string
+          external_contact_avatar?: string | null
+          external_contact_id?: string
+          external_contact_name?: string | null
+          id?: string
+          instancia_id?: string
+          last_message_at?: string
+          last_message_text?: string | null
+          lead_id?: string | null
+          org_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_conversas_instancia_id_fkey"
+            columns: ["instancia_id"]
+            isOneToOne: false
+            referencedRelation: "ig_instancias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ig_conversas_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ig_conversas_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_instancia_tokens: {
+        Row: {
+          atualizado_em: string
+          instancia_id: string
+          token: string
+        }
+        Insert: {
+          atualizado_em?: string
+          instancia_id: string
+          token: string
+        }
+        Update: {
+          atualizado_em?: string
+          instancia_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_instancia_tokens_instancia_id_fkey"
+            columns: ["instancia_id"]
+            isOneToOne: true
+            referencedRelation: "ig_instancias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_instancias: {
+        Row: {
+          atualizado_em: string
+          criada_em: string
+          id: string
+          nome: string
+          org_id: string
+          status: string
+          username_ig: string | null
+        }
+        Insert: {
+          atualizado_em?: string
+          criada_em?: string
+          id?: string
+          nome: string
+          org_id: string
+          status?: string
+          username_ig?: string | null
+        }
+        Update: {
+          atualizado_em?: string
+          criada_em?: string
+          id?: string
+          nome?: string
+          org_id?: string
+          status?: string
+          username_ig?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_instancias_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ig_mensagens: {
+        Row: {
+          conversa_id: string
+          criado_em: string
+          direction: string
+          external_message_id: string | null
+          id: string
+          is_read: boolean
+          media_url: string | null
+          message_type: string
+          org_id: string
+          text: string | null
+          timestamp: string
+        }
+        Insert: {
+          conversa_id: string
+          criado_em?: string
+          direction: string
+          external_message_id?: string | null
+          id?: string
+          is_read?: boolean
+          media_url?: string | null
+          message_type?: string
+          org_id: string
+          text?: string | null
+          timestamp?: string
+        }
+        Update: {
+          conversa_id?: string
+          criado_em?: string
+          direction?: string
+          external_message_id?: string | null
+          id?: string
+          is_read?: boolean
+          media_url?: string | null
+          message_type?: string
+          org_id?: string
+          text?: string | null
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "ig_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ig_mensagens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instagram_outreach_tasks: {
         Row: {
           assigned_to: string | null

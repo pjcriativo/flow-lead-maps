@@ -51,7 +51,8 @@ import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { cn } from "@/lib/utils";
 import { carregarPainelAdmin, type PainelAdmin } from "@/services/admin";
 import { AdminRoles, AdminStaffs } from "./AdminStaffRoles";
-import { AdminAllUsers, AdminSubscribers } from "./AdminUsers";
+import { AdminSubscribers } from "./AdminUsers";
+import { AdminUserOperations } from "./AdminUserOperations";
 import { AdminPlanos } from "./AdminPlanos";
 import { AdminTickets } from "./AdminTickets";
 import { AdminRelatorios } from "./AdminRelatorios";
@@ -568,9 +569,10 @@ export function AdminPanel({ email }: { email: string }) {
               <AdminStaffs staffs={painel?.staffs ?? []} onMudou={recarregar} />
             )}
             {tela === "all-users" && (
-              <AdminAllUsers
+              <AdminUserOperations
                 usuarios={painel?.usuarios ?? []}
                 planos={painel?.planos ?? []}
+                resumo={painel?.operacaoUsuarios}
                 onMudou={recarregar}
               />
             )}

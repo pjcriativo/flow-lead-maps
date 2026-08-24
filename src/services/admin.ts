@@ -39,6 +39,11 @@ export type UsuarioPlataforma = {
   email: string;
   full_name?: string | null;
   plan: string | null;
+  plan_status: string | null;
+  trial_ends_at: string | null;
+  phone: string | null;
+  org_id: string | null;
+  org_nome: string | null;
   /** Nome real do plano do catálogo (ex: "Pro") — vem da org do usuário */
   plano_nome: string | null;
   /** UUID do plano da org (orgs.plano_id) */
@@ -52,6 +57,41 @@ export type UsuarioPlataforma = {
   created_at: string;
   acesso_liberado: boolean;
   is_super_admin: boolean;
+  operacao: UsuarioOperacao;
+};
+export type UsuarioServico = {
+  service: string;
+  requests_count: number;
+  quantity: number;
+  cost_usd: number;
+  cost_brl: number;
+};
+export type UsuarioOperacao = {
+  custo_hoje_usd: number;
+  custo_mes_usd: number;
+  custo_mes_brl: number;
+  requisicoes_mes: number;
+  servicos: UsuarioServico[];
+  serie_14d: { data: string; custo_usd: number; requisicoes: number }[];
+  ultima_atividade: { em: string; servico: string; acao: string } | null;
+  consumo_mes: { leads: number; sites: number; campanhas: number; mensagens: number };
+  whatsapp: {
+    total: number;
+    conectados: number;
+    numeros: { id: string; nome: string; numero: string | null; status: string }[];
+  };
+};
+export type OperacaoUsuariosResumo = {
+  periodo: string;
+  fuso_horario: string;
+  custo_hoje_usd: number;
+  custo_mes_usd: number;
+  custo_mes_brl: number;
+  usuarios_com_custo_hoje: number;
+  whatsapp_total: number;
+  whatsapp_conectados: number;
+  custo_nao_atribuido_usd: number;
+  serie_14d: { data: string; custo_usd: number; requisicoes: number }[];
 };
 export type PontoSerie = { dia: string; leads: number; disparos: number };
 export type LeadRecente = {
@@ -115,6 +155,14 @@ export type Plano = {
   limite_whatsapp: number | null;
   limite_templates: number | null;
   limite_segmentos: number | null;
+  has_instagram_search: boolean | null;
+  has_linkedin_search: boolean | null;
+  has_propostas: boolean | null;
+  has_contratos: boolean | null;
+  has_financeiro: boolean | null;
+  has_whatsapp: boolean | null;
+  has_redesign: boolean | null;
+  has_publicar: boolean | null;
   ativo: boolean;
   ordem: number;
 };
@@ -122,6 +170,7 @@ export type Plano = {
 export type PainelAdmin = {
   kpis: AdminKpis;
   usuarios: UsuarioPlataforma[];
+  operacaoUsuarios: OperacaoUsuariosResumo;
   statusCampanhas: { status: string; total: number }[];
   serie14d: PontoSerie[];
   leadsRecentes: LeadRecente[];
@@ -157,6 +206,7 @@ export type AdminAcao =
   | "user_sites_override"
   | "user_sites_bonus"
   | "user_delete"
+  | "users_delete_bulk"
   | "plano_upsert"
   | "plano_toggle"
   | "plano_delete"
