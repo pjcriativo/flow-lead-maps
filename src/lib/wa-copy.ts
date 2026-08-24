@@ -1,7 +1,7 @@
 // COPY de WhatsApp — variáveis + variações que revezam. Funções PURAS (dá pra provar sem rede),
 // usadas TANTO pela tela (preview) QUANTO pelo edge send-proposal-wa (envio) — uma fonte só, sem
 // duplicar a regra. REUSA o classificarMotivo e o piso de nota do e-mail (nunca inventa nota).
-import { classificarMotivo, NOTA_MINIMA_ABERTURA_A } from "./copy-proposta";
+import { classificarMotivo, NOTA_MINIMA_ABERTURA_A } from "./copy-proposta.ts";
 
 export const NOTA_MINIMA_WA = NOTA_MINIMA_ABERTURA_A; // mesmo piso 4,5 da abertura A do e-mail
 
