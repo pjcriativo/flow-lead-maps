@@ -399,6 +399,26 @@ Deno.serve(async (req) => {
       const nome = String(p.nome || "").trim();
       if (!nome) return json({ ok: false, reason: "nome_obrigatorio" });
       const num = (v: unknown) => (v === "" || v === null || v === undefined ? null : Number(v));
+      const valoresNumericos = [
+        p.preco,
+        p.limite_leads,
+        p.limite_sites,
+        p.limite_campanhas,
+        p.limite_mensagens,
+        p.limite_whatsapp,
+        p.limite_templates,
+        p.limite_segmentos,
+        p.limite_instagram_leads,
+        p.limite_instagram_audiencia,
+        p.limite_instagram_concorrentes,
+        p.limite_instagram_cacadas,
+        p.limite_instagram_cruzamentos,
+        p.limite_instagram_enriquecimentos,
+        p.limite_instagram_marcas,
+        p.teto_instagram_usd,
+      ].filter((v) => v !== "" && v !== null && v !== undefined);
+      if (valoresNumericos.some((v) => !Number.isFinite(Number(v)) || Number(v) < 0))
+        return json({ ok: false, reason: "limite_invalido" }, 400);
       const linha = {
         nome,
         descricao: String(p.descricao ?? "") || null,
@@ -435,7 +455,9 @@ Deno.serve(async (req) => {
         ativo: p.ativo !== false,
       };
       if (p.id) {
-        await admin.from("planos").update(linha).eq("id", String(p.id));
+        const { error } = await admin.from("planos").update(linha).eq("id", String(p.id));
+        if (error)
+          return json({ ok: false, reason: "falha_atualizar", detalhe: error.message }, 400);
         return json({ ok: true, id: p.id });
       }
       const { data, error } = await admin.from("planos").insert(linha).select("id").single();

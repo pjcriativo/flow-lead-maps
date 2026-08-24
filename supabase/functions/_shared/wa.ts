@@ -173,16 +173,20 @@ export async function resolverInstanciaDaOrg(
 
   if (!criarSeFaltar) return null;
 
-  // Org sem instância → cria a DELA. Nome gerado e ARMAZENADO (nunca derivado em runtime).
+  // Reserva a linha primeiro: o trigger de plano serializa e bloqueia acima da cota
+  // antes de criar uma instância externa na Evolution.
   const nome = `org-${userId.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 4)}`;
-  const token = await criarNaEvolution(nome);
-  if (!token) return null;
   const { data: nova, error } = await admin
     .from("wa_instancias")
     .insert({ user_id: userId, nome, status: "desconectado" })
     .select("id, nome, numero, status")
     .single();
   if (error || !nova) return null;
+  const token = await criarNaEvolution(nome);
+  if (!token) {
+    await admin.from("wa_instancias").delete().eq("id", nova.id);
+    return null;
+  }
   await admin.from("wa_instancia_tokens").insert({ instancia_id: nova.id, token });
   return { id: nova.id, nome: nova.nome, token, numero: null, status: "desconectado" };
 }
@@ -359,8 +363,6 @@ export async function criarInstanciaDaOrg(
 ): Promise<WaInstanciaOrg | null> {
   if (!waBase() || !waGlobalKey()) return null;
   const nome = `org-${userId.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 4)}`;
-  const token = await criarNaEvolution(nome);
-  if (!token) return null;
   const { data: ult } = await admin
     .from("wa_instancias")
     .select("ordem")
@@ -381,6 +383,11 @@ export async function criarInstanciaDaOrg(
     .select("id, nome, numero, status, funcao")
     .single();
   if (error || !nova) return null;
+  const token = await criarNaEvolution(nome);
+  if (!token) {
+    await admin.from("wa_instancias").delete().eq("id", nova.id);
+    return null;
+  }
   await admin.from("wa_instancia_tokens").insert({ instancia_id: nova.id, token });
   return {
     id: nova.id,

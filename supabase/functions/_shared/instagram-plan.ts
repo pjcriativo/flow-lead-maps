@@ -40,6 +40,10 @@ export class InstagramPlanLimitError extends Error {
       enrichments_limit: "A cota mensal de enriquecimentos foi atingida.",
       brands_limit: "O limite de marcas do plano foi atingido.",
       cost_limit: "O teto seguro mensal de custo do Instagram foi atingido.",
+      request_id_conflict: "Esta solicitação já foi usada por outra operação.",
+      request_already_finalized:
+        "Esta solicitação já foi concluída e não pode ser executada novamente.",
+      actual_exceeds_reservation: "O consumo real ultrapassou a reserva segura da operação.",
     };
     super(labels[reason] ?? "O limite do plano não permite concluir esta operação.");
     this.name = "InstagramPlanLimitError";
@@ -101,7 +105,7 @@ export async function finalizeInstagramUsage(params: {
   amount?: InstagramUsageAmount;
 }): Promise<void> {
   const { admin, orgId, requestId, status, amount = {} } = params;
-  const { error } = await admin.rpc("instagram_finalize_usage", {
+  const { data, error } = await admin.rpc("instagram_finalize_usage", {
     p_org: orgId,
     p_request_id: requestId,
     p_status: status,
@@ -115,4 +119,6 @@ export async function finalizeInstagramUsage(params: {
     p_cost_usd: positiveCost(amount.monthlyCostUsd),
   });
   if (error) throw new Error(`Falha ao finalizar a cota Instagram: ${error.message}`);
+  if (!data?.ok)
+    throw new InstagramPlanLimitError(String(data?.reason ?? "plan_limit"), data?.status);
 }

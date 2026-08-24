@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Roda SQL no Postgres do Supabase via Management API (roda como `postgres`).
-// Uso: node scripts/sql.mjs "SELECT ..."  |  node scripts/sql.mjs -f arquivo.sql
+// Uso: node scripts/sql.mjs "SELECT ..." | node scripts/sql.mjs -f arquivo.sql
+//      node scripts/sql.mjs --rollback -f migration.sql (valida sem persistir)
 import { readFileSync } from "node:fs";
 
 function loadEnv() {
@@ -29,13 +30,16 @@ if (!TOKEN) {
 }
 
 const args = process.argv.slice(2);
+const rollback = args.includes("--rollback");
+const effectiveArgs = args.filter((arg) => arg !== "--rollback");
 let query;
-if (args[0] === "-f") query = readFileSync(args[1], "utf8");
-else query = args.join(" ");
+if (effectiveArgs[0] === "-f") query = readFileSync(effectiveArgs[1], "utf8");
+else query = effectiveArgs.join(" ");
 if (!query) {
   console.error('Passe SQL: node scripts/sql.mjs "SELECT 1"');
   process.exit(1);
 }
+if (rollback) query = `begin;\n${query}\nrollback;`;
 
 const res = await fetch(`https://api.supabase.com/v1/projects/${REF}/database/query`, {
   method: "POST",
