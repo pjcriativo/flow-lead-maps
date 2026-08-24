@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
-import { criarChaveCacheApify, planejarColetaApify } from "./apify-economy.ts";
+import {
+  APIFY_MAX_INCREMENTAL_DEPTH,
+  criarChaveCacheApify,
+  planejarCacheIncrementalApify,
+  selecionarIneditosApify,
+} from "./apify-economy.ts";
+import { leadBusinessIdentity, type SeenLeadIdentities } from "./lead-dedupe.ts";
 import { searchApify } from "./providers/apify.ts";
 import type { ProviderParams, RawPlace } from "./providers/types.ts";
 
@@ -10,6 +16,7 @@ const CACHE_POLL_MS = 2_000;
 type CacheRow = {
   items: unknown;
   searched_depth: number;
+  requested_depth: number;
   exhausted: boolean;
   refreshed_at: string | null;
   refreshing_until: string | null;
@@ -24,6 +31,8 @@ type Claim = {
 
 export type ApifyCachedSearchParams = Omit<ProviderParams, "seen"> & {
   admin: SupabaseClient;
+  orgId: string;
+  seen: SeenLeadIdentities;
 };
 
 function nullableString(value: unknown): string | null {
@@ -62,16 +71,52 @@ function parsePlaces(value: unknown): RawPlace[] {
   return value.map(parseRawPlace).filter((place): place is RawPlace => place !== null);
 }
 
+function lugarJaConhecido(place: RawPlace, seen: SeenLeadIdentities): boolean {
+  if (seen.placeIds.has(place.source_id)) return true;
+  const businessKey = leadBusinessIdentity(place.name, place.address);
+  return businessKey !== null && seen.businessKeys.has(businessKey);
+}
+
+function selecionarIneditos(
+  places: readonly RawPlace[],
+  solicitado: number,
+  seen: SeenLeadIdentities,
+): RawPlace[] {
+  return selecionarIneditosApify(places, solicitado, (place) => lugarJaConhecido(place, seen));
+}
+
+function contarIneditos(places: readonly RawPlace[], seen: SeenLeadIdentities): number {
+  return places.reduce((total, place) => total + (lugarJaConhecido(place, seen) ? 0 : 1), 0);
+}
+
 function cacheFresco(row: CacheRow | null): boolean {
   if (!row?.refreshed_at) return false;
   const refreshedAt = new Date(row.refreshed_at).getTime();
   return Number.isFinite(refreshedAt) && refreshedAt >= Date.now() - CACHE_TTL_MS;
 }
 
+async function organizacaoJaPagouConsulta(
+  admin: SupabaseClient,
+  orgId: string,
+  queryKey: string,
+): Promise<boolean> {
+  const desde = new Date(Date.now() - CACHE_TTL_MS).toISOString();
+  const { data, error } = await admin
+    .from("api_consumption_logs")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("service", "apify_maps")
+    .eq("metadata->>query_key", queryKey)
+    .gte("created_at", desde)
+    .limit(1);
+  if (error) throw new Error(`Histórico de buscas Apify indisponível: ${error.message}`);
+  return Array.isArray(data) && data.length > 0;
+}
+
 async function lerCache(admin: SupabaseClient, queryKey: string): Promise<CacheRow | null> {
   const { data, error } = await admin
     .from("apify_search_cache")
-    .select("items, searched_depth, exhausted, refreshed_at, refreshing_until")
+    .select("items, searched_depth, requested_depth, exhausted, refreshed_at, refreshing_until")
     .eq("query_key", queryKey)
     .maybeSingle();
   if (error) throw new Error(`Cache Apify indisponível: ${error.message}`);
@@ -100,6 +145,8 @@ async function aguardarCache(
   admin: SupabaseClient,
   queryKey: string,
   targetDepth: number,
+  solicitado: number,
+  seen: SeenLeadIdentities,
   log: (message: string) => void,
 ): Promise<RawPlace[] | null> {
   const deadline = Date.now() + CACHE_WAIT_MS;
@@ -107,13 +154,9 @@ async function aguardarCache(
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, CACHE_POLL_MS));
     const row = await lerCache(admin, queryKey);
-    const plano = planejarColetaApify({
-      solicitado: targetDepth,
-      restantePlano: null,
-      profundidadeCache: cacheFresco(row) ? (row?.searched_depth ?? 0) : 0,
-      cacheEsgotado: cacheFresco(row) && Boolean(row?.exhausted),
-    });
-    if (row && plano.servidoDoCache) return parsePlaces(row.items);
+    if (row && cacheFresco(row) && (row.searched_depth >= targetDepth || row.exhausted)) {
+      return selecionarIneditos(parsePlaces(row.items), solicitado, seen);
+    }
     const lockExpired =
       !row?.refreshing_until || new Date(row.refreshing_until).getTime() <= Date.now();
     if (lockExpired) return null;
@@ -134,33 +177,63 @@ async function liberarReserva(
 
 export async function searchApifyComCache({
   admin,
+  orgId,
+  seen,
   ...params
 }: ApifyCachedSearchParams): Promise<RawPlace[]> {
   const queryKey = criarChaveCacheApify(params);
   const existing = await lerCache(admin, queryKey);
-  const existingPlan = planejarColetaApify({
+  const existingPlaces = parsePlaces(existing?.items);
+  const existingFresh = cacheFresco(existing);
+  const ineditosCache = contarIneditos(existingPlaces, seen);
+  const buscaPagaRecente = await organizacaoJaPagouConsulta(admin, orgId, queryKey);
+  const existingPlan = planejarCacheIncrementalApify({
     solicitado: params.limite,
-    restantePlano: null,
-    profundidadeCache: cacheFresco(existing) ? (existing?.searched_depth ?? 0) : 0,
-    cacheEsgotado: cacheFresco(existing) && Boolean(existing?.exhausted),
+    itensCache: existingPlaces.length,
+    ineditosCache: existingFresh ? ineditosCache : 0,
+    cacheEsgotado: existingFresh && Boolean(existing?.exhausted),
+    buscaPagaRecente,
   });
-  if (existing && existingPlan.servidoDoCache) {
+  if (existingPlan.servidoDoCache) {
+    const ineditos = selecionarIneditos(existingPlaces, params.limite, seen);
     params.log(
-      `Apify: economia ativada — reutilizando ${parsePlaces(existing.items).length} lugares recentes sem nova cobrança.`,
+      ineditos.length > 0
+        ? `Apify: economia ativada — entregando ${ineditos.length} lugares inéditos do estoque compartilhado sem nova cobrança.`
+        : "Apify: esta busca já foi esgotada para sua conta; nenhum lead repetido será devolvido e nenhuma cobrança foi iniciada.",
     );
-    return parsePlaces(existing.items);
+    return ineditos;
   }
 
-  let claim = await reivindicarCache(admin, queryKey, params.limite);
+  const conhecidosNoCache = Math.max(0, existingPlaces.length - ineditosCache);
+  const targetDepth = existingFresh
+    ? existingPlan.profundidadeColeta
+    : Math.min(APIFY_MAX_INCREMENTAL_DEPTH, conhecidosNoCache + params.limite);
+  if (targetDepth <= 0) return [];
+  if (existingPlaces.length > 0) {
+    params.log(
+      `Apify: o estoque atual tem ${ineditosCache} lugar(es) inédito(s); ampliando a coleta de ${existingPlaces.length} para ${targetDepth} para buscar novos leads.`,
+    );
+  }
+
+  let claim = await reivindicarCache(admin, queryKey, targetDepth);
   if (claim.decision === "cache") {
     params.log("Apify: resultado compartilhado encontrado; nenhuma nova cobrança foi iniciada.");
-    return parsePlaces(claim.items);
+    return selecionarIneditos(parsePlaces(claim.items), params.limite, seen);
   }
   if (claim.decision === "wait") {
-    const waited = await aguardarCache(admin, queryKey, params.limite, params.log);
+    const waited = await aguardarCache(
+      admin,
+      queryKey,
+      targetDepth,
+      params.limite,
+      seen,
+      params.log,
+    );
     if (waited) return waited;
-    claim = await reivindicarCache(admin, queryKey, params.limite);
-    if (claim.decision === "cache") return parsePlaces(claim.items);
+    claim = await reivindicarCache(admin, queryKey, targetDepth);
+    if (claim.decision === "cache") {
+      return selecionarIneditos(parsePlaces(claim.items), params.limite, seen);
+    }
     if (claim.decision === "wait") {
       throw new Error(
         "Não foi possível assumir a consulta Apify após o término da reserva anterior.",
@@ -169,10 +242,26 @@ export async function searchApifyComCache({
   }
 
   try {
-    const places = await searchApify({ ...params, seen: new Set<string>() });
+    const reportUsage = (usage: Parameters<typeof params.reportUsage>[0]) =>
+      params.reportUsage({
+        ...usage,
+        metadata: {
+          ...usage.metadata,
+          query_key: queryKey,
+          requested_new_leads: params.limite,
+          collection_depth: targetDepth,
+        },
+      });
+    const places = await searchApify({
+      ...params,
+      limite: targetDepth,
+      alvo: Math.max(params.alvo, targetDepth),
+      seen: new Set<string>(),
+      reportUsage,
+    });
     const { error } = await admin.rpc("store_apify_search_cache_v3", {
       p_query_key: queryKey,
-      p_requested_depth: params.limite,
+      p_requested_depth: targetDepth,
       p_items: places,
     });
     if (error) {
@@ -181,7 +270,7 @@ export async function searchApifyComCache({
     } else {
       params.log(`Apify: ${places.length} lugares guardados para evitar cobranças repetidas.`);
     }
-    return places;
+    return selecionarIneditos(places, params.limite, seen);
   } catch (error) {
     await liberarReserva(admin, queryKey, params.log);
     throw error;

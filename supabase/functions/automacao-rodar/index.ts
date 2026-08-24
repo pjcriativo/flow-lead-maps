@@ -16,6 +16,7 @@ import { corsHeaders, json } from "../_shared/cors.ts";
 import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import { setApifyPoolContext } from "../_shared/providers/apify.ts";
 import { searchApifyComCache } from "../_shared/apify-cache.ts";
+import { loadSeenLeadIdentitiesForOrg } from "../_shared/lead-dedupe.ts";
 import { orgDoUsuario } from "../_shared/limite.ts";
 import type { ProviderUsage } from "../_shared/providers/types.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
@@ -133,9 +134,9 @@ async function executarRodada(admin: Admin, userId: string, authHeader: string, 
     return await finalizar("parada_teto", {}, plano.motivo ?? "teto atingido");
   }
 
-  const { data: jaTem } = await admin.from("leads").select("place_id").eq("user_id", userId);
-  const seen = new Set((jaTem ?? []).map((l: { place_id: string }) => l.place_id));
   const orgId = receita.org_id ?? (await orgDoUsuario(admin, userId));
+  if (!orgId) return await finalizar("erro", {}, "organização da receita não encontrada");
+  const seen = await loadSeenLeadIdentitiesForOrg(admin, orgId);
   setApifyPoolContext(admin);
 
   let gastoApifyRodada = 0;
@@ -143,6 +144,8 @@ async function executarRodada(admin: Admin, userId: string, authHeader: string, 
   try {
     candidatos = await searchApifyComCache({
       admin,
+      orgId,
+      seen,
       nicho: receita.nicho,
       cidade: receita.cidade,
       uf: receita.uf ?? "",
@@ -184,7 +187,7 @@ async function executarRodada(admin: Admin, userId: string, authHeader: string, 
     return await finalizar("erro", {}, `busca falhou: ${e instanceof Error ? e.message : e}`);
   }
   candidatos = candidatos
-    .filter((place) => !seen.has(place.source_id))
+    .filter((place) => !seen.placeIds.has(place.source_id))
     .slice(0, plano.leadsPermitidos);
 
   let gastoRodada = gastoApifyRodada;

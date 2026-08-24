@@ -58,6 +58,9 @@ export type ProviderUsage = {
     key_label: string;
     cost_source: "apify_usage_total_usd";
     dataset_error: string | null;
+    query_key?: string;
+    requested_new_leads?: number;
+    collection_depth?: number;
   };
 };
 
