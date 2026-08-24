@@ -19,6 +19,16 @@ export const CUSTO_ITEM_ESTIMADO_USD = 0.003;
 
 const arredondarUsd = (valor: number) => Number(valor.toFixed(6));
 
+/**
+ * Impede que uma retentativa renove o teto inteiro de um run pago.
+ * A Apify rejeita tetos menores que US$ 0,01, então um resíduo inferior
+ * a esse valor encerra a etapa em vez de abrir outra cobrança.
+ */
+export function orcamentoRestanteRunApify(tetoUsd: number, gastoUsd: number): number {
+  const restante = arredondarUsd(Math.max(0, tetoUsd - gastoUsd));
+  return restante >= 0.01 ? restante : 0;
+}
+
 export function estimarCustoColeta(
   itens: number,
   custoItem: number = CUSTO_ITEM_ESTIMADO_USD,

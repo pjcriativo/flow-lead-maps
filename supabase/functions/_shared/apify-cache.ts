@@ -10,6 +10,7 @@ const CACHE_POLL_MS = 2_000;
 type CacheRow = {
   items: unknown;
   searched_depth: number;
+  exhausted: boolean;
   refreshed_at: string | null;
   refreshing_until: string | null;
 };
@@ -18,6 +19,7 @@ type Claim = {
   decision: "cache" | "refresh" | "wait";
   items?: unknown;
   searched_depth?: number;
+  exhausted?: boolean;
 };
 
 export type ApifyCachedSearchParams = Omit<ProviderParams, "seen"> & {
@@ -69,7 +71,7 @@ function cacheFresco(row: CacheRow | null): boolean {
 async function lerCache(admin: SupabaseClient, queryKey: string): Promise<CacheRow | null> {
   const { data, error } = await admin
     .from("apify_search_cache")
-    .select("items, searched_depth, refreshed_at, refreshing_until")
+    .select("items, searched_depth, exhausted, refreshed_at, refreshing_until")
     .eq("query_key", queryKey)
     .maybeSingle();
   if (error) throw new Error(`Cache Apify indisponível: ${error.message}`);
@@ -81,9 +83,10 @@ async function reivindicarCache(
   queryKey: string,
   targetDepth: number,
 ): Promise<Claim> {
-  const { data, error } = await admin.rpc("claim_apify_search_cache", {
+  const { data, error } = await admin.rpc("claim_apify_search_cache_v3", {
     p_query_key: queryKey,
     p_target_depth: targetDepth,
+    p_ttl_hours: 30 * 24,
   });
   if (error) throw new Error(`Falha ao reservar busca Apify: ${error.message}`);
   const claim = data as Claim | null;
@@ -108,6 +111,7 @@ async function aguardarCache(
       solicitado: targetDepth,
       restantePlano: null,
       profundidadeCache: cacheFresco(row) ? (row?.searched_depth ?? 0) : 0,
+      cacheEsgotado: cacheFresco(row) && Boolean(row?.exhausted),
     });
     if (row && plano.servidoDoCache) return parsePlaces(row.items);
     const lockExpired =
@@ -138,6 +142,7 @@ export async function searchApifyComCache({
     solicitado: params.limite,
     restantePlano: null,
     profundidadeCache: cacheFresco(existing) ? (existing?.searched_depth ?? 0) : 0,
+    cacheEsgotado: cacheFresco(existing) && Boolean(existing?.exhausted),
   });
   if (existing && existingPlan.servidoDoCache) {
     params.log(
@@ -165,9 +170,9 @@ export async function searchApifyComCache({
 
   try {
     const places = await searchApify({ ...params, seen: new Set<string>() });
-    const { error } = await admin.rpc("store_apify_search_cache", {
+    const { error } = await admin.rpc("store_apify_search_cache_v3", {
       p_query_key: queryKey,
-      p_searched_depth: params.limite,
+      p_requested_depth: params.limite,
       p_items: places,
     });
     if (error) {

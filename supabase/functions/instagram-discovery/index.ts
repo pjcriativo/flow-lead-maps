@@ -10,7 +10,11 @@ import { startRunComPool, tratarRunMorto, type ChaveApify } from "../_shared/api
 import { liberarCacheRedes, prepararCacheRedes, salvarCacheRedes } from "../_shared/redes-cache.ts";
 import { criarChaveCacheRedes } from "../../../src/lib/redes-economia.ts";
 import { mesRefAtual } from "../../../src/lib/automacao-teto.ts";
-import { TETO_REDES_MES_USD, TETO_REDES_RODADA_USD } from "../../../src/lib/redes-teto.ts";
+import {
+  orcamentoRestanteRunApify,
+  TETO_REDES_MES_USD,
+  TETO_REDES_RODADA_USD,
+} from "../../../src/lib/redes-teto.ts";
 import {
   classificarIntencaoComentario,
   estimarCustoCommentsHunter,
@@ -410,11 +414,11 @@ async function executarActor(params: {
   maxCharge: number;
 }): Promise<RunResult> {
   const { admin, jobId, orgId, stepType, actorId, input, requested, ttlHours } = params;
+  if (params.maxCharge < 0.01)
+    throw new ActorRunError("O teto seguro desta busca foi atingido.", 0);
   const stepId = await criarStep(admin, jobId, orgId, stepType, actorId, input, requested);
   const cacheKey = criarChaveCacheRedes(actorId, input);
   const log = (mensagem: string) => console.warn(`[${stepType}] ${mensagem}`);
-  if (params.maxCharge < 0.01)
-    throw new ActorRunError("O teto seguro desta busca foi atingido.", 0);
   const cache = await prepararCacheRedes<Rec>(admin, cacheKey, requested, ttlHours);
   if (cache.cacheHit) {
     await admin
@@ -431,9 +435,14 @@ async function executarActor(params: {
   let lastError = "Actor não concluiu.";
   let totalCost = 0;
   for (let rodada = 0; rodada < 3; rodada++) {
+    const maxChargeTentativa = orcamentoRestanteRunApify(params.maxCharge, totalCost);
+    if (maxChargeTentativa === 0) {
+      lastError = "O teto seguro da etapa foi consumido pelas tentativas anteriores.";
+      break;
+    }
     const url =
       `${API}/acts/${actorId}/runs?timeout=300&memory=1024&maxItems=${requested}` +
-      `&maxTotalChargeUsd=${Math.max(0.01, params.maxCharge).toFixed(4)}`;
+      `&maxTotalChargeUsd=${maxChargeTentativa.toFixed(4)}`;
     const start = await startRunComPool(admin, () => url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

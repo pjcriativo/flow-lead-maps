@@ -44,15 +44,18 @@ export function planejarColetaApify({
   solicitado,
   restantePlano,
   profundidadeCache,
+  cacheEsgotado = false,
 }: {
   solicitado: number;
   restantePlano: number | null;
   profundidadeCache: number;
+  cacheEsgotado?: boolean;
 }): ApifyCollectionPlan {
   const pedido = Math.max(0, Math.floor(solicitado));
   const restante = restantePlano == null ? pedido : Math.max(0, Math.floor(restantePlano));
   const limiteEfetivo = Math.min(pedido, restante);
-  const servidoDoCache = Math.max(0, Math.floor(profundidadeCache)) >= limiteEfetivo;
+  const servidoDoCache =
+    cacheEsgotado || Math.max(0, Math.floor(profundidadeCache)) >= limiteEfetivo;
 
   return {
     limiteEfetivo,
