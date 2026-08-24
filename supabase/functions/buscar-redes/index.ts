@@ -49,6 +49,12 @@ import { montarPlanoDescobertaInstagram } from "../../../src/lib/instagram-disco
 import { consumir, estadoConsumo, orgDoUsuario } from "../_shared/limite.ts";
 import { liberarCacheRedes, prepararCacheRedes, salvarCacheRedes } from "../_shared/redes-cache.ts";
 import { decifrar } from "../_shared/cofre.ts";
+import {
+  finalizeInstagramUsage,
+  getInstagramPlanStatus,
+  InstagramPlanLimitError,
+  reserveInstagramUsage,
+} from "../_shared/instagram-plan.ts";
 
 const API = "https://api.apify.com/v2";
 
@@ -661,6 +667,15 @@ Deno.serve(async (req) => {
           concluida_em: new Date().toISOString(),
         })
         .eq("id", registro.id);
+      if (registro.fonte === "instagram") {
+        await finalizeInstagramUsage({
+          admin,
+          orgId,
+          requestId,
+          status: "failed",
+          amount: { monthlyCostUsd: custo },
+        }).catch((error) => console.error("Falha ao finalizar cota Instagram recuperada", error));
+      }
       return json({ ok: false, reason: "run_nao_concluiu", status: runStatus, custo });
     }
 
@@ -739,6 +754,15 @@ Deno.serve(async (req) => {
         concluida_em: new Date().toISOString(),
       })
       .eq("id", registro.id);
+    if (registro.fonte === "instagram") {
+      await finalizeInstagramUsage({
+        admin,
+        orgId,
+        requestId,
+        status: "completed",
+        amount: { leads: processado.inseridos, hunts: 1, monthlyCostUsd: custo },
+      }).catch((error) => console.error("Falha ao finalizar cota Instagram recuperada", error));
+    }
     return json(resultado);
   }
 
@@ -854,6 +878,10 @@ Deno.serve(async (req) => {
       .eq("id", registro?.id);
 
   let chaveCacheReservada: string | null = null;
+  let reservaInstagram = false;
+  let huntInstagram = 0;
+  let instagramRunBudget = TETO_RODADA;
+  let custoTotal = 0;
   const logCache = (mensagem: string) => console.warn(mensagem);
   const liberarReservaCache = async () => {
     if (!chaveCacheReservada) return;
@@ -873,6 +901,31 @@ Deno.serve(async (req) => {
     if (!cache.cacheHit) chaveCacheReservada = chaveCache;
     await admin.from("redes_buscas").update({ cache_key: chaveCache }).eq("id", registro?.id);
 
+    if (estrategia.fonte === "instagram") {
+      huntInstagram = cache.cacheHit ? 0 : 1;
+      if (!cache.cacheHit) {
+        const planStatus = await getInstagramPlanStatus(admin, orgId);
+        const remainingCost = Math.max(
+          0,
+          Number(planStatus.limits.monthlyCostUsd) - Number(planStatus.used.monthlyCostUsd),
+        );
+        instagramRunBudget = Math.min(TETO_RODADA, remainingCost);
+      }
+      await reserveInstagramUsage({
+        admin,
+        orgId,
+        userId,
+        requestId,
+        action: `legacy_${estrategiaId.toLowerCase()}`,
+        amount: {
+          leads: limiteComPlano,
+          hunts: huntInstagram,
+          monthlyCostUsd: cache.cacheHit ? 0 : Math.max(0.01, instagramRunBudget),
+        },
+      });
+      reservaInstagram = true;
+    }
+
     const input = {
       ...inputBase,
       searchLimit: plano.maxItens,
@@ -886,7 +939,6 @@ Deno.serve(async (req) => {
     // Só falha de verdade se TODAS as chaves acabarem (e ainda entrega o parcial se houver).
     const MAX_RODADAS = 4;
     const itens: Rec[] = [...cache.items];
-    let custoTotal = 0;
     let chaveUsada: ChaveApify | null = null;
     let trocasDeChave = 0;
     let avisoChaves: string | null = null;
@@ -902,7 +954,10 @@ Deno.serve(async (req) => {
 
     if (!cache.cacheHit) {
       for (let rodada = 1; rodada <= MAX_RODADAS; rodada++) {
-        const limitesRun = limitesRunApify(plano.maxItens, TETO_RODADA - custoTotal);
+        const limitesRun = limitesRunApify(
+          plano.maxItens,
+          Math.min(TETO_RODADA - custoTotal, instagramRunBudget - custoTotal),
+        );
         if (limitesRun.maxItems <= 0) {
           avisoChaves = "A busca parou antes de outro run porque o orçamento da rodada acabou.";
           break;
@@ -937,6 +992,14 @@ Deno.serve(async (req) => {
             chave_apelido: chaveUsada?.id ? chaveUsada.apelido : null,
           });
           await liberarReservaCache();
+          if (reservaInstagram)
+            await finalizeInstagramUsage({
+              admin,
+              orgId,
+              requestId,
+              status: "failed",
+              amount: { monthlyCostUsd: custoTotal },
+            });
           return json({
             ok: false,
             reason: r.reason === "pool_esgotado" ? "chaves_esgotadas" : "apify_falhou",
@@ -973,7 +1036,10 @@ Deno.serve(async (req) => {
           datasetId = sj?.data?.defaultDatasetId ?? datasetId;
           if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
           // trava de segurança: se a BUSCA já passou do teto da rodada, aborta na hora
-          if (custoTotal + custoRodada >= TETO_RODADA) {
+          if (
+            custoTotal + custoRodada >= TETO_RODADA ||
+            custoTotal + custoRodada >= instagramRunBudget
+          ) {
             await fetch(`${API}/actor-runs/${runId}/abort`, {
               method: "POST",
               headers: { Authorization: `Bearer ${chaveUsada.token}` },
@@ -985,6 +1051,14 @@ Deno.serve(async (req) => {
               chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
             });
             await liberarReservaCache();
+            if (reservaInstagram)
+              await finalizeInstagramUsage({
+                admin,
+                orgId,
+                requestId,
+                status: "failed",
+                amount: { monthlyCostUsd: custoTotal + custoRodada },
+              });
             return json({ ok: false, reason: "teto_no_run", custo: custoTotal + custoRodada });
           }
         }
@@ -1018,6 +1092,14 @@ Deno.serve(async (req) => {
             chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
           });
           await liberarReservaCache();
+          if (reservaInstagram)
+            await finalizeInstagramUsage({
+              admin,
+              orgId,
+              requestId,
+              status: "failed",
+              amount: { monthlyCostUsd: custoTotal },
+            });
           return json({
             ok: false,
             reason: veredito === "parar_sem_pool" ? "chaves_esgotadas" : "run_nao_concluiu",
@@ -1034,6 +1116,14 @@ Deno.serve(async (req) => {
           chave_apelido: chaveUsada.id ? chaveUsada.apelido : null,
         });
         await liberarReservaCache();
+        if (reservaInstagram)
+          await finalizeInstagramUsage({
+            admin,
+            orgId,
+            requestId,
+            status: "failed",
+            amount: { monthlyCostUsd: custoTotal },
+          });
         return json({ ok: false, reason: "run_nao_concluiu", status, custo: custoTotal });
       }
       await salvarCacheRedes(admin, chaveCache, plano.maxItens, itens, logCache);
@@ -1095,11 +1185,33 @@ Deno.serve(async (req) => {
       resultado,
     });
 
+    if (reservaInstagram) {
+      await finalizeInstagramUsage({
+        admin,
+        orgId,
+        requestId,
+        status: "completed",
+        amount: { leads: inseridos, hunts: huntInstagram, monthlyCostUsd: custo },
+      });
+    }
+
     return json(resultado);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await liberarReservaCache();
     await finalizar({ status: "erro", detalhe: msg.slice(0, 300) });
+    if (reservaInstagram) {
+      await finalizeInstagramUsage({
+        admin,
+        orgId,
+        requestId,
+        status: "failed",
+        amount: { monthlyCostUsd: custoTotal },
+      }).catch((error) => console.error("Falha ao liberar reserva Instagram", error));
+    }
+    if (e instanceof InstagramPlanLimitError) {
+      return json({ ok: false, reason: e.reason, detalhe: e.message, plan: e.status }, 409);
+    }
     return json({ ok: false, reason: "erro", detalhe: msg.slice(0, 300) });
   }
 });

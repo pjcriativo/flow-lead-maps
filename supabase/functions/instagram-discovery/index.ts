@@ -51,12 +51,26 @@ import {
   temSiteProprioInstagram,
 } from "../../../src/lib/instagram-search.ts";
 import { perfilParaLead } from "../../../src/lib/fontes-prospeccao.ts";
+import {
+  buildContextualApproach,
+  crossInstagramAudiences,
+  normalizeInstagramUsername,
+  rankInstagramOpportunity,
+} from "../../../src/lib/instagram-client-hunter.ts";
+import {
+  finalizeInstagramUsage,
+  getInstagramPlanStatus,
+  InstagramPlanLimitError,
+  reserveInstagramUsage,
+  type InstagramUsageAmount,
+} from "../_shared/instagram-plan.ts";
 
 const API = "https://api.apify.com/v2";
 const ACTOR_POSTS = "apify~instagram-post-scraper";
 const ACTOR_COMMENTS = "apify~instagram-comment-scraper";
 const ACTOR_PROFILES = "apify~instagram-profile-scraper";
 const ACTOR_DISCOVERY = "apify~instagram-scraper";
+const ACTOR_FOLLOWERS = "apify~instagram-followers-following-scraper";
 const TERMINAIS = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 
 // Payloads de Actors são fronteiras externas e deliberadamente flexíveis.
@@ -1435,6 +1449,963 @@ async function arquivarConcorrente(
   return json({ ok: true }, 200, req);
 }
 
+type AudienceCatalogRow = {
+  sourceUsername: string;
+  identityKey: string;
+  instagramUserId: string | null;
+  username: string;
+  fullName: string | null;
+  profilePicUrl: string | null;
+  private: boolean;
+  verified: boolean;
+  collectedAt: string;
+};
+
+function normalizarMembroAudiencia(item: Rec): AudienceCatalogRow | null {
+  const username = normalizeInstagramUsername(String(item.username ?? item.userName ?? ""));
+  const sourceUsername = normalizeInstagramUsername(
+    String(item.sourceUsername ?? item.input ?? item.inputUsername ?? ""),
+  );
+  const instagramUserId = String(item.userId ?? item.id ?? item.pk ?? "").trim() || null;
+  if (!username || !sourceUsername) return null;
+  return {
+    sourceUsername,
+    identityKey: instagramUserId ? `id:${instagramUserId}` : `username:${username}`,
+    instagramUserId,
+    username,
+    fullName: String(item.fullName ?? item.name ?? "").trim() || null,
+    profilePicUrl: String(item.profilePicUrl ?? item.profilePicUrlHD ?? "").trim() || null,
+    private: Boolean(item.isPrivate ?? item.private),
+    verified: Boolean(item.isVerified ?? item.verified),
+    collectedAt: dataIso(item.scrapedAt ?? item.timestamp) ?? new Date().toISOString(),
+  };
+}
+
+async function carregarAudienciasDoCatalogo(
+  admin: Admin,
+  usernames: string[],
+  freshOnly = true,
+): Promise<AudienceCatalogRow[]> {
+  let query = admin
+    .from("instagram_audience_memberships")
+    .select("source_username,member_identity_key,source_collected_at")
+    .in("source_username", usernames)
+    .eq("relationship", "follower")
+    .order("last_seen_at", { ascending: false })
+    .limit(50_000);
+  if (freshOnly) {
+    query = query.gte(
+      "source_collected_at",
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000).toISOString(),
+    );
+  }
+  const { data: memberships, error } = await query;
+  if (error) throw new Error(`Falha ao consultar a base de audiências: ${error.message}`);
+  const keys = [...new Set((memberships ?? []).map((row: Rec) => String(row.member_identity_key)))];
+  if (!keys.length) return [];
+  const { data: profiles, error: profileError } = await admin
+    .from("instagram_profile_catalog")
+    .select(
+      "identity_key,instagram_user_id,username,full_name,profile_pic_url,public_payload,collected_at",
+    )
+    .in("identity_key", keys);
+  if (profileError) throw new Error(`Falha ao ler perfis da base: ${profileError.message}`);
+  const byKey = new Map(
+    (profiles ?? []).map((profile: Rec) => [String(profile.identity_key), profile]),
+  );
+  return (memberships ?? []).flatMap((membership: Rec) => {
+    const profile = byKey.get(String(membership.member_identity_key));
+    if (!profile) return [];
+    return [
+      {
+        sourceUsername: String(membership.source_username),
+        identityKey: String(profile.identity_key),
+        instagramUserId: profile.instagram_user_id ? String(profile.instagram_user_id) : null,
+        username: String(profile.username),
+        fullName: profile.full_name ? String(profile.full_name) : null,
+        profilePicUrl: profile.profile_pic_url ? String(profile.profile_pic_url) : null,
+        private: Boolean(profile.public_payload?.private),
+        verified: Boolean(profile.public_payload?.verified),
+        collectedAt: String(membership.source_collected_at ?? profile.collected_at),
+      },
+    ];
+  });
+}
+
+function limitarPorOrigem(rows: AudienceCatalogRow[], sources: string[], perSource: number) {
+  const counts = new Map<string, number>();
+  return rows.filter((row) => {
+    if (!sources.includes(row.sourceUsername)) return false;
+    const count = counts.get(row.sourceUsername) ?? 0;
+    if (count >= perSource) return false;
+    counts.set(row.sourceUsername, count + 1);
+    return true;
+  });
+}
+
+async function salvarCatalogoAudiencia(admin: Admin, rows: AudienceCatalogRow[]): Promise<void> {
+  if (!rows.length) return;
+  const now = new Date().toISOString();
+  const profiles = [...new Map(rows.map((row) => [row.identityKey, row])).values()].map((row) => ({
+    identity_key: row.identityKey,
+    instagram_user_id: row.instagramUserId,
+    username: row.username,
+    full_name: row.fullName,
+    profile_pic_url: row.profilePicUrl,
+    public_payload: { private: row.private, verified: row.verified },
+    collected_at: row.collectedAt,
+    updated_at: now,
+  }));
+  const { error: profileError } = await admin
+    .from("instagram_profile_catalog")
+    .upsert(profiles, { onConflict: "identity_key" });
+  if (profileError)
+    throw new Error(`Falha ao atualizar o catálogo Instagram: ${profileError.message}`);
+  const memberships = rows.map((row) => ({
+    source_username: row.sourceUsername,
+    member_identity_key: row.identityKey,
+    relationship: "follower",
+    last_seen_at: now,
+    source_collected_at: row.collectedAt,
+  }));
+  const { error: membershipError } = await admin
+    .from("instagram_audience_memberships")
+    .upsert(memberships, { onConflict: "source_username,member_identity_key,relationship" });
+  if (membershipError) throw new Error(`Falha ao salvar a audiência: ${membershipError.message}`);
+}
+
+async function salvarOportunidadesAudiencia(params: {
+  admin: Admin;
+  orgId: string;
+  userId: string;
+  rows: AudienceCatalogRow[];
+}): Promise<number> {
+  const { admin, orgId, userId, rows } = params;
+  const grouped = new Map<string, AudienceCatalogRow[]>();
+  for (const row of rows)
+    grouped.set(row.identityKey, [...(grouped.get(row.identityKey) ?? []), row]);
+  const keys = [...grouped.keys()];
+  if (!keys.length) return 0;
+  const { data: existing } = await admin
+    .from("instagram_opportunities")
+    .select("profile_identity_key")
+    .eq("org_id", orgId)
+    .in("profile_identity_key", keys);
+  const existingKeys = new Set(
+    (existing ?? []).map((row: Rec) => String(row.profile_identity_key)),
+  );
+  const opportunityRows = [...grouped.entries()].map(([identityKey, members]) => {
+    const first = members[0];
+    const sources = [...new Set(members.map((member) => member.sourceUsername))];
+    const ranked = rankInstagramOpportunity({
+      intentScore: 0,
+      sourceCount: sources.length,
+      evidenceCount: sources.length,
+      nicheMatch: false,
+      locationMatch: false,
+      professional: false,
+      hasContact: false,
+      followers: 0,
+    });
+    return {
+      org_id: orgId,
+      user_id: userId,
+      profile_identity_key: identityKey,
+      score: ranked.score,
+      temperature: ranked.temperature,
+      reasons: ranked.reasons,
+      evidence: sources.map((source) => ({ type: "audience", source: `@${source}` })),
+      sources,
+      suggested_approach: buildContextualApproach({
+        firstName: first.fullName?.split(" ")[0] || first.username,
+        sourceName: `@${sources[0]}`,
+        evidence: "conteúdos deste mercado",
+        offer: "uma ideia prática para melhorar seus resultados",
+      }),
+      last_seen_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  });
+  const { error } = await admin
+    .from("instagram_opportunities")
+    .upsert(opportunityRows, { onConflict: "org_id,profile_identity_key" });
+  if (error) throw new Error(`Falha ao montar oportunidades: ${error.message}`);
+  return keys.filter((key) => !existingKeys.has(key)).length;
+}
+
+async function buscarAudienciaConcorrentes(params: {
+  req: Request;
+  admin: Admin;
+  orgId: string;
+  userId: string;
+  body: Rec;
+}): Promise<Response> {
+  const { req, admin, orgId, userId, body } = params;
+  const requestId = String(body.requestId ?? "").trim();
+  if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId))
+    return json({ ok: false, error: "request_id_invalido" }, 400, req);
+  const usernames = [
+    ...new Set(
+      (Array.isArray(body.usernames) ? body.usernames : [body.username])
+        .map(String)
+        .map(normalizeInstagramUsername)
+        .filter(Boolean),
+    ),
+  ].slice(0, 5);
+  if (!usernames.length)
+    return json({ ok: false, error: "Informe ao menos um perfil público." }, 400, req);
+  const status = await getInstagramPlanStatus(admin, orgId);
+  const requestedPerSource = inteiro(body.resultsLimit, 20, 2_000, 100);
+  const remainingAudience = Math.max(
+    0,
+    status.limits.audienceProfiles - status.used.audienceProfiles,
+  );
+  const perSource = Math.min(
+    requestedPerSource,
+    Math.max(1, Math.floor(remainingAudience / usernames.length)),
+  );
+  if (remainingAudience <= 0) throw new InstagramPlanLimitError("audience_limit", status);
+  let rows = limitarPorOrigem(
+    await carregarAudienciasDoCatalogo(admin, usernames),
+    usernames,
+    perSource,
+  );
+  const cacheComplete = usernames.every(
+    (source) => rows.filter((row) => row.sourceUsername === source).length >= perSource,
+  );
+  const estimatedCost = cacheComplete ? 0 : Math.max(0.02, usernames.length * perSource * 0.00115);
+  await reserveInstagramUsage({
+    admin,
+    orgId,
+    userId,
+    requestId,
+    action: "audience_hunter",
+    amount: {
+      audienceProfiles: usernames.length * perSource,
+      hunts: cacheComplete ? 0 : 1,
+      monthlyCostUsd: estimatedCost,
+    },
+  });
+  let actualCost = 0;
+  let jobId: string | null = null;
+  try {
+    if (!cacheComplete) {
+      const { data: source, error: sourceError } = await admin
+        .from("instagram_sources")
+        .insert({
+          org_id: orgId,
+          user_id: userId,
+          source_type: "competitor",
+          name: usernames.map((username) => `@${username}`).join(" × "),
+          config: { usernames, resultsLimit: perSource, collector: "followers" },
+        })
+        .select("id")
+        .single();
+      if (sourceError || !source)
+        throw new Error(sourceError?.message ?? "Falha ao registrar origem.");
+      const { data: job, error: jobError } = await admin
+        .from("instagram_discovery_jobs")
+        .insert({
+          org_id: orgId,
+          user_id: userId,
+          source_id: source.id,
+          request_id: requestId,
+          mode: "audience",
+          status: "running",
+          input: { usernames, resultsLimit: perSource },
+          estimated_cost_usd: estimatedCost,
+          month_ref: mesRefAtual(new Date()),
+          started_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
+      if (jobError || !job) throw new Error(jobError?.message ?? "Falha ao registrar caçada.");
+      jobId = String(job.id);
+      const run = await executarActor({
+        admin,
+        jobId,
+        orgId,
+        stepType: "collect_audience",
+        actorId: ACTOR_FOLLOWERS,
+        input: { usernames, resultsLimit: perSource },
+        requested: usernames.length * perSource,
+        ttlHours: 30 * 24,
+        maxCharge: Math.min(estimatedCost, TETO_REDES_RODADA_USD),
+      });
+      actualCost = run.cost;
+      const collected = run.items
+        .map(normalizarMembroAudiencia)
+        .filter((row): row is AudienceCatalogRow => Boolean(row));
+      await salvarCatalogoAudiencia(admin, collected);
+      rows = limitarPorOrigem(
+        await carregarAudienciasDoCatalogo(admin, usernames, false),
+        usernames,
+        perSource,
+      );
+    }
+    const newProfiles = await salvarOportunidadesAudiencia({ admin, orgId, userId, rows });
+    const grouped = Object.fromEntries(
+      usernames.map((source) => [source, rows.filter((row) => row.sourceUsername === source)]),
+    );
+    const response = {
+      ok: true,
+      jobId,
+      cacheHit: cacheComplete,
+      charged: actualCost > 0,
+      actualCost,
+      newProfiles,
+      total: rows.length,
+      sources: grouped,
+    };
+    if (jobId)
+      await admin
+        .from("instagram_discovery_jobs")
+        .update({
+          status: "completed",
+          stats: { total: rows.length, newProfiles, cacheHit: cacheComplete },
+          result: response,
+          actual_cost_usd: actualCost,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+    await finalizeInstagramUsage({
+      admin,
+      orgId,
+      requestId,
+      status: "completed",
+      amount: {
+        audienceProfiles: newProfiles,
+        hunts: cacheComplete ? 0 : 1,
+        monthlyCostUsd: actualCost,
+      },
+    });
+    if (jobId)
+      await registrarCustoInstagram({
+        admin,
+        jobId,
+        orgId,
+        userId,
+        action: "audience_hunter",
+        costUsd: actualCost,
+        status: "completed",
+      });
+    return json(response, 200, req);
+  } catch (error) {
+    if (error instanceof ActorRunError) actualCost += error.costUsd;
+    await finalizeInstagramUsage({
+      admin,
+      orgId,
+      requestId,
+      status: "failed",
+      amount: { monthlyCostUsd: actualCost },
+    });
+    if (jobId)
+      await admin
+        .from("instagram_discovery_jobs")
+        .update({
+          status: "failed",
+          actual_cost_usd: actualCost,
+          error: String(error).slice(0, 500),
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+    throw error;
+  }
+}
+
+async function cruzarAudiencias(params: {
+  req: Request;
+  admin: Admin;
+  orgId: string;
+  userId: string;
+  body: Rec;
+}): Promise<Response> {
+  const { req, admin, orgId, userId, body } = params;
+  const usernames = [
+    ...new Set(
+      (Array.isArray(body.usernames) ? body.usernames : [])
+        .map(String)
+        .map(normalizeInstagramUsername)
+        .filter(Boolean),
+    ),
+  ].slice(0, 5);
+  if (usernames.length < 2)
+    return json({ ok: false, error: "Informe pelo menos dois perfis para cruzar." }, 400, req);
+  const rows = await carregarAudienciasDoCatalogo(admin, usernames, false);
+  const crossed = crossInstagramAudiences(
+    usernames.map((source) => ({
+      source,
+      members: rows
+        .filter((row) => row.sourceUsername === source)
+        .map((row) => ({
+          username: row.username,
+          instagramUserId: row.instagramUserId,
+          fullName: row.fullName,
+        })),
+    })),
+  );
+  const plan = await getInstagramPlanStatus(admin, orgId);
+  if (!plan.features.overlap) {
+    return json(
+      {
+        ok: true,
+        locked: true,
+        preview: { total: crossed.all.length, overlap: crossed.overlap.length },
+        requiredPlan: "Pro",
+      },
+      200,
+      req,
+    );
+  }
+  const requestId = String(body.requestId ?? "").trim();
+  await reserveInstagramUsage({
+    admin,
+    orgId,
+    userId,
+    requestId,
+    action: "audience_overlap",
+    amount: { overlaps: 1 },
+  });
+  await finalizeInstagramUsage({
+    admin,
+    orgId,
+    requestId,
+    status: "completed",
+    amount: { overlaps: 1 },
+  });
+  return json({ ok: true, locked: false, ...crossed }, 200, req);
+}
+
+async function sincronizarOportunidadesDeEvidencias(
+  admin: Admin,
+  orgId: string,
+  userId: string,
+): Promise<void> {
+  const { data: evidenceRows } = await admin
+    .from("instagram_profile_evidence")
+    .select(
+      "username,lead_id,job_id,evidence_type,excerpt,source_url,intent_score,lead_score,decision,profile_snapshot,observed_at,created_at",
+    )
+    .eq("org_id", orgId)
+    .in("decision", ["qualified", "candidate", "duplicate"])
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (!evidenceRows?.length) return;
+  const grouped = new Map<string, Rec[]>();
+  for (const evidence of evidenceRows) {
+    const username = normalizeInstagramUsername(String(evidence.username));
+    if (username) grouped.set(username, [...(grouped.get(username) ?? []), evidence]);
+  }
+  const usernames = [...grouped.keys()];
+  const { data: existingProfiles } = await admin
+    .from("instagram_profile_catalog")
+    .select("identity_key,username")
+    .in("username", usernames);
+  const identityByUsername = new Map(
+    (existingProfiles ?? []).map((profile: Rec) => [
+      String(profile.username),
+      String(profile.identity_key),
+    ]),
+  );
+  const catalogRows: Rec[] = [];
+  const opportunityRows: Rec[] = [];
+  for (const [username, evidences] of grouped) {
+    const latest = evidences[0];
+    const profile =
+      latest.profile_snapshot && typeof latest.profile_snapshot === "object"
+        ? latest.profile_snapshot
+        : {};
+    const instagramUserId = String(profile.id ?? profile.instagramUserId ?? "").trim() || null;
+    const identityKey =
+      identityByUsername.get(username) ??
+      (instagramUserId ? `id:${instagramUserId}` : `username:${username}`);
+    const biography = String(profile.biography ?? "").trim();
+    const externalUrl = String(profile.externalUrl ?? "").trim() || null;
+    const intentScore = Math.max(...evidences.map((row) => Number(row.intent_score ?? 0)));
+    const sourceCount = new Set(evidences.map((row) => String(row.job_id ?? row.source_url ?? "")))
+      .size;
+    const ranked = rankInstagramOpportunity({
+      intentScore,
+      sourceCount: Math.max(1, sourceCount),
+      evidenceCount: evidences.length,
+      nicheMatch: evidences.some((row) => Number(row.lead_score ?? 0) >= 60),
+      locationMatch: false,
+      professional: perfilEhProfissionalInstagram(profile),
+      hasContact: Boolean(acharEmail(biography) || acharWhatsapp(biography) || externalUrl),
+      followers: Number(profile.followersCount ?? 0),
+    });
+    catalogRows.push({
+      identity_key: identityKey,
+      instagram_user_id: instagramUserId,
+      username,
+      full_name: String(profile.fullName ?? "").trim() || null,
+      biography: biography || null,
+      profile_pic_url: profile.profilePicUrlHD ?? profile.profilePicUrl ?? null,
+      followers_count: Number(profile.followersCount ?? 0) || null,
+      following_count: Number(profile.followsCount ?? profile.followingCount ?? 0) || null,
+      posts_count: Number(profile.postsCount ?? 0) || null,
+      professional: perfilEhProfissionalInstagram(profile),
+      business_category: profile.businessCategoryName ?? profile.category ?? null,
+      external_url: externalUrl,
+      public_payload: profile,
+      collected_at: latest.observed_at ?? latest.created_at,
+      updated_at: new Date().toISOString(),
+    });
+    const strongestLeadScore = Math.max(...evidences.map((row) => Number(row.lead_score ?? 0)));
+    opportunityRows.push({
+      org_id: orgId,
+      user_id: userId,
+      profile_identity_key: identityKey,
+      lead_id: latest.lead_id,
+      score: Math.max(ranked.score, strongestLeadScore),
+      temperature:
+        Math.max(ranked.score, strongestLeadScore) >= 75
+          ? "quente"
+          : Math.max(ranked.score, strongestLeadScore) >= 50
+            ? "morno"
+            : "frio",
+      reasons: ranked.reasons,
+      evidence: evidences.slice(0, 8).map((row) => ({
+        type: row.evidence_type,
+        excerpt: row.excerpt,
+        sourceUrl: row.source_url,
+        intentScore: row.intent_score,
+      })),
+      sources: ["comentários"],
+      suggested_approach: buildContextualApproach({
+        firstName: String(profile.fullName ?? username).split(" ")[0],
+        sourceName: "um perfil do seu mercado",
+        evidence: String(latest.excerpt ?? "este assunto"),
+        offer: "uma ideia prática para transformar esse interesse em resultado",
+      }),
+      last_seen_at: latest.observed_at ?? latest.created_at,
+      updated_at: new Date().toISOString(),
+    });
+  }
+  const { error: catalogError } = await admin
+    .from("instagram_profile_catalog")
+    .upsert(catalogRows, { onConflict: "identity_key" });
+  if (catalogError)
+    throw new Error(`Falha ao sincronizar perfis qualificados: ${catalogError.message}`);
+  const { error: opportunitiesError } = await admin
+    .from("instagram_opportunities")
+    .upsert(opportunityRows, { onConflict: "org_id,profile_identity_key" });
+  if (opportunitiesError)
+    throw new Error(`Falha ao sincronizar oportunidades: ${opportunitiesError.message}`);
+}
+
+async function enriquecerOportunidades(params: {
+  req: Request;
+  admin: Admin;
+  orgId: string;
+  userId: string;
+  body: Rec;
+}): Promise<Response> {
+  const { req, admin, orgId, userId, body } = params;
+  const requestId = String(body.requestId ?? "");
+  if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId))
+    return json({ ok: false, error: "request_id_invalido" }, 400, req);
+  const plan = await getInstagramPlanStatus(admin, orgId);
+  const remaining = Math.max(0, plan.limits.enrichments - plan.used.enrichments);
+  const limit = Math.min(inteiro(body.limit, 1, 50, 10), remaining);
+  if (limit <= 0) throw new InstagramPlanLimitError("enrichments_limit", plan);
+  const { data: opportunities } = await admin
+    .from("instagram_opportunities")
+    .select("id,profile_identity_key,score,reasons,evidence,sources")
+    .eq("org_id", orgId)
+    .in("status", ["new", "saved"])
+    .order("score", { ascending: false })
+    .limit(limit * 3);
+  const keys = (opportunities ?? []).map((row: Rec) => String(row.profile_identity_key));
+  const { data: profiles } = keys.length
+    ? await admin.from("instagram_profile_catalog").select("*").in("identity_key", keys)
+    : { data: [] };
+  const candidates = (profiles ?? [])
+    .filter((profile: Rec) => !profile.biography && !profile.public_payload?.private)
+    .slice(0, limit);
+  if (!candidates.length)
+    return json({ ok: true, enriched: 0, cacheHit: true, actualCost: 0 }, 200, req);
+  const estimatedCost = Math.max(0.02, candidates.length * 0.0035);
+  await reserveInstagramUsage({
+    admin,
+    orgId,
+    userId,
+    requestId,
+    action: "opportunity_enrichment",
+    amount: { enrichments: candidates.length, monthlyCostUsd: estimatedCost },
+  });
+  let actualCost = 0;
+  let jobId: string | null = null;
+  try {
+    const { data: job, error: jobError } = await admin
+      .from("instagram_discovery_jobs")
+      .insert({
+        org_id: orgId,
+        user_id: userId,
+        request_id: requestId,
+        mode: "profiles",
+        status: "running",
+        input: {
+          usernames: candidates.map((profile: Rec) => profile.username),
+          reason: "opportunity_enrichment",
+        },
+        estimated_cost_usd: estimatedCost,
+        month_ref: mesRefAtual(new Date()),
+        started_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (jobError || !job)
+      throw new Error(jobError?.message ?? "Falha ao registrar enriquecimento.");
+    jobId = String(job.id);
+    const run = await executarActor({
+      admin,
+      jobId,
+      orgId,
+      stepType: "enrich_profiles",
+      actorId: ACTOR_PROFILES,
+      input: {
+        usernames: candidates.map((profile: Rec) => profile.username),
+        includeAboutSection: false,
+      },
+      requested: candidates.length,
+      ttlHours: 7 * 24,
+      maxCharge: estimatedCost,
+    });
+    actualCost = run.cost;
+    const profileMap = perfilPorUsername(run.items);
+    let enriched = 0;
+    for (const candidate of candidates) {
+      const full = profileMap.get(String(candidate.username));
+      if (!full) continue;
+      const biography = String(full.biography ?? "");
+      const externalUrl = String(full.externalUrl ?? "").trim() || null;
+      await admin
+        .from("instagram_profile_catalog")
+        .update({
+          instagram_user_id: String(full.id ?? candidate.instagram_user_id ?? "") || null,
+          full_name: String(full.fullName ?? "").trim() || candidate.full_name,
+          biography: biography || null,
+          profile_pic_url: full.profilePicUrlHD ?? full.profilePicUrl ?? candidate.profile_pic_url,
+          followers_count: Number(full.followersCount ?? 0) || null,
+          following_count: Number(full.followsCount ?? 0) || null,
+          posts_count: Number(full.postsCount ?? 0) || null,
+          professional: perfilEhProfissionalInstagram(full),
+          business_category: full.businessCategoryName ?? full.category ?? null,
+          external_url: externalUrl,
+          public_payload: full,
+          collected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("identity_key", candidate.identity_key);
+      const opportunity = (opportunities ?? []).find(
+        (row: Rec) => row.profile_identity_key === candidate.identity_key,
+      );
+      if (opportunity) {
+        const evidence = Array.isArray(opportunity.evidence) ? opportunity.evidence : [];
+        const ranked = rankInstagramOpportunity({
+          intentScore: Math.max(0, ...evidence.map((row: Rec) => Number(row.intentScore ?? 0))),
+          sourceCount: Array.isArray(opportunity.sources) ? opportunity.sources.length : 1,
+          evidenceCount: evidence.length,
+          nicheMatch: false,
+          locationMatch: false,
+          professional: perfilEhProfissionalInstagram(full),
+          hasContact: Boolean(acharEmail(biography) || acharWhatsapp(biography) || externalUrl),
+          followers: Number(full.followersCount ?? 0),
+        });
+        await admin
+          .from("instagram_opportunities")
+          .update({
+            score: Math.max(Number(opportunity.score ?? 0), ranked.score),
+            temperature:
+              Math.max(Number(opportunity.score ?? 0), ranked.score) >= 75
+                ? "quente"
+                : Math.max(Number(opportunity.score ?? 0), ranked.score) >= 50
+                  ? "morno"
+                  : "frio",
+            reasons: [
+              ...new Set([
+                ...(Array.isArray(opportunity.reasons) ? opportunity.reasons : []),
+                ...ranked.reasons,
+              ]),
+            ].slice(0, 8),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", opportunity.id);
+      }
+      enriched++;
+    }
+    const response = { ok: true, jobId, enriched, cacheHit: run.cacheHit, actualCost };
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({
+        status: "completed",
+        stats: { enrichedProfiles: enriched, cacheHit: run.cacheHit },
+        result: response,
+        actual_cost_usd: actualCost,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+    await finalizeInstagramUsage({
+      admin,
+      orgId,
+      requestId,
+      status: "completed",
+      amount: { enrichments: enriched, monthlyCostUsd: actualCost },
+    });
+    await registrarCustoInstagram({
+      admin,
+      jobId,
+      orgId,
+      userId,
+      action: "opportunity_enrichment",
+      costUsd: actualCost,
+      status: "completed",
+    });
+    return json(response, 200, req);
+  } catch (error) {
+    if (error instanceof ActorRunError) actualCost += error.costUsd;
+    await finalizeInstagramUsage({
+      admin,
+      orgId,
+      requestId,
+      status: "failed",
+      amount: { monthlyCostUsd: actualCost },
+    });
+    if (jobId)
+      await admin
+        .from("instagram_discovery_jobs")
+        .update({
+          status: "failed",
+          actual_cost_usd: actualCost,
+          error: String(error).slice(0, 500),
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+    throw error;
+  }
+}
+
+async function listarOportunidades(
+  admin: Admin,
+  orgId: string,
+  userId: string,
+  req: Request,
+): Promise<Response> {
+  await sincronizarOportunidadesDeEvidencias(admin, orgId, userId);
+  const { data: opportunities, error } = await admin
+    .from("instagram_opportunities")
+    .select("*")
+    .eq("org_id", orgId)
+    .neq("status", "ignored")
+    .order("score", { ascending: false })
+    .limit(300);
+  if (error) return json({ ok: false, error: error.message }, 500, req);
+  const keys = (opportunities ?? []).map((row: Rec) => String(row.profile_identity_key));
+  const { data: profiles } = keys.length
+    ? await admin.from("instagram_profile_catalog").select("*").in("identity_key", keys)
+    : { data: [] };
+  const byKey = new Map((profiles ?? []).map((row: Rec) => [String(row.identity_key), row]));
+  return json(
+    {
+      ok: true,
+      opportunities: (opportunities ?? []).map((row: Rec) => ({
+        ...row,
+        profile: byKey.get(String(row.profile_identity_key)) ?? null,
+      })),
+    },
+    200,
+    req,
+  );
+}
+
+async function relatorioComercial(admin: Admin, orgId: string, req: Request): Promise<Response> {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000).toISOString();
+  const [{ data: opportunities }, { data: jobs }, { data: competitors }, { data: leads }] =
+    await Promise.all([
+      admin
+        .from("instagram_opportunities")
+        .select("score,temperature,status,sources")
+        .eq("org_id", orgId),
+      admin
+        .from("instagram_discovery_jobs")
+        .select("mode,status,actual_cost_usd,stats,created_at")
+        .eq("org_id", orgId)
+        .gte("created_at", since),
+      admin
+        .from("instagram_competitors")
+        .select("id,status")
+        .eq("org_id", orgId)
+        .neq("status", "archived"),
+      admin
+        .from("leads")
+        .select(
+          "id,status,origem_fonte,instagram_url,website,has_website,score,business_name,city,category",
+        )
+        .eq("org_id", orgId),
+    ]);
+  const hot = (opportunities ?? []).filter((row: Rec) => row.temperature === "quente").length;
+  const won = (opportunities ?? []).filter((row: Rec) => row.status === "won").length;
+  const cost = (jobs ?? []).reduce(
+    (sum: number, row: Rec) => sum + Number(row.actual_cost_usd ?? 0),
+    0,
+  );
+  const mapsInstagram = (leads ?? []).filter(
+    (lead: Rec) =>
+      lead.instagram_url &&
+      !String(lead.origem_fonte ?? "")
+        .toLowerCase()
+        .includes("instagram"),
+  );
+  return json(
+    {
+      ok: true,
+      report: {
+        periodDays: 30,
+        opportunities: (opportunities ?? []).length,
+        hot,
+        won,
+        competitors: (competitors ?? []).length,
+        runs: (jobs ?? []).length,
+        costUsd: cost,
+        costPerOpportunityUsd: opportunities?.length ? cost / opportunities.length : 0,
+        mapsInstagram: mapsInstagram.length,
+        weakDigitalPresence: mapsInstagram.filter((lead: Rec) => !lead.has_website || !lead.website)
+          .length,
+        modes: Object.entries(
+          (jobs ?? []).reduce((acc: Record<string, number>, row: Rec) => {
+            const mode = String(row.mode);
+            acc[mode] = (acc[mode] ?? 0) + 1;
+            return acc;
+          }, {}),
+        ),
+      },
+      mapsInstagram: mapsInstagram.slice(0, 100),
+    },
+    200,
+    req,
+  );
+}
+
+async function gerarAbordagemOportunidade(
+  admin: Admin,
+  orgId: string,
+  body: Rec,
+  req: Request,
+): Promise<Response> {
+  const opportunityId = String(body.opportunityId ?? "");
+  const { data: opportunity, error } = await admin
+    .from("instagram_opportunities")
+    .select("*")
+    .eq("id", opportunityId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error || !opportunity)
+    return json({ ok: false, error: "Oportunidade não encontrada." }, 404, req);
+  const { data: profile } = await admin
+    .from("instagram_profile_catalog")
+    .select("username,full_name")
+    .eq("identity_key", opportunity.profile_identity_key)
+    .maybeSingle();
+  const evidence = Array.isArray(opportunity.evidence) ? opportunity.evidence[0] : null;
+  const source = Array.isArray(opportunity.sources) ? opportunity.sources[0] : null;
+  const message = buildContextualApproach({
+    firstName: String(profile?.full_name ?? profile?.username ?? "tudo bem").split(" ")[0],
+    sourceName: source ? `@${source}` : "um conteúdo do seu mercado",
+    evidence: String(evidence?.excerpt ?? evidence?.source ?? "conteúdos deste assunto"),
+    offer: String(body.offer ?? "uma ideia prática para melhorar seus resultados"),
+  });
+  await admin
+    .from("instagram_opportunities")
+    .update({ suggested_approach: message, updated_at: new Date().toISOString() })
+    .eq("id", opportunityId)
+    .eq("org_id", orgId);
+  return json({ ok: true, message }, 200, req);
+}
+
+async function atualizarOportunidade(
+  admin: Admin,
+  orgId: string,
+  body: Rec,
+  req: Request,
+): Promise<Response> {
+  const allowed = new Set(["new", "saved", "contacted", "won", "lost", "ignored"]);
+  const status = String(body.status ?? "");
+  if (!allowed.has(status)) return json({ ok: false, error: "Status inválido." }, 400, req);
+  const { error } = await admin
+    .from("instagram_opportunities")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", String(body.opportunityId ?? ""))
+    .eq("org_id", orgId);
+  if (error) return json({ ok: false, error: error.message }, 500, req);
+  return json({ ok: true }, 200, req);
+}
+
+function respostaErroInstagram(error: unknown, req: Request): Response {
+  if (error instanceof InstagramPlanLimitError) {
+    return json(
+      { ok: false, reason: error.reason, error: error.message, plan: error.status },
+      409,
+      req,
+    );
+  }
+  return json(
+    { ok: false, error: error instanceof Error ? error.message : String(error) },
+    500,
+    req,
+  );
+}
+
+async function withInstagramPlanReservation(params: {
+  req: Request;
+  admin: Admin;
+  orgId: string;
+  userId: string;
+  requestId: string;
+  action: string;
+  estimated: InstagramUsageAmount;
+  run: () => Promise<Response>;
+}): Promise<Response> {
+  const { req, admin, orgId, userId, requestId, action, estimated, run } = params;
+  try {
+    await reserveInstagramUsage({ admin, orgId, userId, requestId, action, amount: estimated });
+    const response = await run();
+    const payload = (await response
+      .clone()
+      .json()
+      .catch(() => ({}))) as Rec;
+    const succeeded = response.ok && payload.ok !== false;
+    await finalizeInstagramUsage({
+      admin,
+      orgId,
+      requestId,
+      status: succeeded ? "completed" : "failed",
+      amount: {
+        leads: succeeded ? Number(payload.stats?.newLeads ?? 0) : 0,
+        hunts: succeeded ? Number(estimated.hunts ?? 0) : 0,
+        enrichments: succeeded ? Number(payload.stats?.enrichedProfiles ?? 0) : 0,
+        competitors: succeeded ? Number(estimated.competitors ?? 0) : 0,
+        monthlyCostUsd: Number(payload.actualCost ?? 0),
+      },
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof InstagramPlanLimitError) {
+      return json(
+        { ok: false, reason: error.reason, error: error.message, plan: error.status },
+        409,
+        req,
+      );
+    }
+    await finalizeInstagramUsage({ admin, orgId, requestId, status: "failed" }).catch(
+      (finalizeError) => console.error("Falha ao liberar reserva Instagram", finalizeError),
+    );
+    throw error;
+  }
+}
+
 export async function processarMonitoramentoConcorrente(params: {
   req: Request;
   admin: Admin;
@@ -1956,15 +2927,89 @@ Deno.serve(async (req) => {
     return json({ error: "Body inválido" }, 400, req);
   }
 
+  if (body.acao === "plano_status") {
+    return getInstagramPlanStatus(admin, orgId)
+      .then((plan) => json({ ok: true, plan }, 200, req))
+      .catch((error) => respostaErroInstagram(error, req));
+  }
+  if (body.acao === "buscar_audiencia") {
+    return buscarAudienciaConcorrentes({ req, admin, orgId, userId, body }).catch((error) =>
+      respostaErroInstagram(error, req),
+    );
+  }
+  if (body.acao === "cruzar_audiencia") {
+    return cruzarAudiencias({ req, admin, orgId, userId, body }).catch((error) =>
+      respostaErroInstagram(error, req),
+    );
+  }
+  if (body.acao === "listar_oportunidades") return listarOportunidades(admin, orgId, userId, req);
+  if (body.acao === "enriquecer_oportunidades") {
+    return enriquecerOportunidades({ req, admin, orgId, userId, body }).catch((error) =>
+      respostaErroInstagram(error, req),
+    );
+  }
+  if (body.acao === "gerar_abordagem") return gerarAbordagemOportunidade(admin, orgId, body, req);
+  if (body.acao === "atualizar_oportunidade") return atualizarOportunidade(admin, orgId, body, req);
+  if (body.acao === "relatorio_comercial") return relatorioComercial(admin, orgId, req);
   if (body.acao === "listar_concorrentes") return listarConcorrentes(admin, orgId, req);
   if (body.acao === "salvar_concorrente") {
-    return salvarConcorrente({ admin, orgId, userId, body, req });
+    const username = normalizeInstagramUsername(String(body.username ?? ""));
+    const { data: existingCompetitor } = await admin
+      .from("instagram_competitors")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("username", username)
+      .neq("status", "archived")
+      .maybeSingle();
+    if (existingCompetitor) return salvarConcorrente({ admin, orgId, userId, body, req });
+    const requestId = String(body.requestId ?? crypto.randomUUID());
+    return withInstagramPlanReservation({
+      req,
+      admin,
+      orgId,
+      userId,
+      requestId,
+      action: "save_competitor",
+      estimated: { competitors: 1 },
+      run: () => salvarConcorrente({ admin, orgId, userId, body, req }),
+    });
   }
   if (body.acao === "arquivar_concorrente") {
-    return arquivarConcorrente(admin, orgId, body, req);
+    const competitorId = String(body.competitorId ?? "");
+    const { data: activeCompetitor } = await admin
+      .from("instagram_competitors")
+      .select("id")
+      .eq("id", competitorId)
+      .eq("org_id", orgId)
+      .neq("status", "archived")
+      .maybeSingle();
+    const response = await arquivarConcorrente(admin, orgId, body, req);
+    if (response.ok && activeCompetitor) {
+      await admin.rpc("instagram_release_competitor", { p_org: orgId });
+    }
+    return response;
   }
   if (body.acao === "monitorar_concorrente") {
-    return processarMonitoramentoConcorrente({ req, admin, userId, orgId, body });
+    let input: EntradaMonitoramentoConcorrente;
+    try {
+      input = validarEntradaMonitoramento(body);
+    } catch (error) {
+      return json(
+        { ok: false, error: error instanceof Error ? error.message : String(error) },
+        400,
+        req,
+      );
+    }
+    return withInstagramPlanReservation({
+      req,
+      admin,
+      orgId,
+      userId,
+      requestId: input.requestId,
+      action: "competitor_monitor",
+      estimated: { hunts: 1, monthlyCostUsd: estimateCompetitorMonitoringCost(input) },
+      run: () => processarMonitoramentoConcorrente({ req, admin, userId, orgId, body }),
+    });
   }
 
   if (body.acao === "historico") {
@@ -1993,7 +3038,31 @@ Deno.serve(async (req) => {
   }
 
   if (body.acao === "buscar_conteudo") {
-    return processarDescobertaConteudo({ req, admin, userId, orgId, body });
+    let contentInput: EntradaConteudo;
+    try {
+      contentInput = validarEntradaConteudo(body);
+    } catch (error) {
+      return json(
+        { ok: false, error: error instanceof Error ? error.message : String(error) },
+        400,
+        req,
+      );
+    }
+    return withInstagramPlanReservation({
+      req,
+      admin,
+      orgId,
+      userId,
+      requestId: contentInput.requestId,
+      action: `content_${String(body.mode ?? "discovery")}`,
+      estimated: {
+        leads: contentInput.targetLeads,
+        hunts: 1,
+        enrichments: Math.min(60, contentInput.targetLeads * 3),
+        monthlyCostUsd: estimateInstagramContentDiscoveryCost(contentInput),
+      },
+      run: () => processarDescobertaConteudo({ req, admin, userId, orgId, body }),
+    });
   }
 
   let input: EntradaComments;
@@ -2101,6 +3170,33 @@ Deno.serve(async (req) => {
       409,
       req,
     );
+  }
+
+  const planReservation = await reserveInstagramUsage({
+    admin,
+    orgId,
+    userId,
+    requestId: input.requestId,
+    action: "comments_hunter",
+    amount: {
+      leads: input.targetLeads,
+      hunts: 1,
+      enrichments: Math.min(60, Math.max(10, input.targetLeads * 3)),
+      monthlyCostUsd: estimatedCost,
+    },
+  }).catch((error) => error);
+  if (planReservation instanceof Error) {
+    await admin
+      .from("instagram_discovery_jobs")
+      .update({
+        status: "budget_stopped",
+        stop_reason: "plan_limit",
+        error: planReservation.message,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", job.id);
+    return respostaErroInstagram(planReservation, req);
   }
 
   let actualCost = 0;
@@ -2532,6 +3628,18 @@ Deno.serve(async (req) => {
       costUsd: actualCost,
       status: qualified > 0 ? "completed" : "partial",
     });
+    await finalizeInstagramUsage({
+      admin,
+      orgId,
+      requestId: input.requestId,
+      status: "completed",
+      amount: {
+        leads: newLeads,
+        hunts: 1,
+        enrichments: profiles.length,
+        monthlyCostUsd: actualCost,
+      },
+    });
     return json(response, 200, req);
   } catch (error) {
     if (error instanceof ActorRunError) actualCost += error.costUsd;
@@ -2555,6 +3663,13 @@ Deno.serve(async (req) => {
       costUsd: actualCost,
       status: "failed",
     });
+    await finalizeInstagramUsage({
+      admin,
+      orgId,
+      requestId: input.requestId,
+      status: "failed",
+      amount: { monthlyCostUsd: actualCost },
+    }).catch((finalizeError) => console.error("Falha ao liberar reserva Instagram", finalizeError));
     return json({ ok: false, error: message, jobId: job.id, actualCost }, 500, req);
   }
 });

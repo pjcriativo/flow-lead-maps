@@ -1,6 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { json } from "../_shared/cors.ts";
 import { processarMonitoramentoConcorrente } from "../instagram-discovery/index.ts";
+import {
+  finalizeInstagramUsage,
+  getInstagramPlanStatus,
+  reserveInstagramUsage,
+} from "../_shared/instagram-plan.ts";
 
 // Edge Function: instagram-monitor-cron (Fase 6)
 // Chamada periodicamente pelo pg_cron via pg_net.
@@ -43,7 +48,10 @@ Deno.serve(async (req) => {
   }
 
   if (!competitors || competitors.length === 0) {
-    return json({ ok: true, message: "Nenhum concorrente na fila para monitoramento.", ran: 0 }, 200);
+    return json(
+      { ok: true, message: "Nenhum concorrente na fila para monitoramento.", ran: 0 },
+      200,
+    );
   }
 
   const results = [];
@@ -52,22 +60,54 @@ Deno.serve(async (req) => {
   // 2. Para cada concorrente, gerar payload e chamar a rotina central do instagram-discovery
   for (const comp of competitors) {
     const requestId = crypto.randomUUID();
-    
+
     // Atualizar next_analysis_at antes de iniciar para não encavalar se houver lentidão
-    const nextAnalysisAt = new Date(now.getTime() + comp.monitoring_interval_hours * 60 * 60 * 1000);
+    const nextAnalysisAt = new Date(
+      now.getTime() + comp.monitoring_interval_hours * 60 * 60 * 1000,
+    );
     await admin
       .from("instagram_competitors")
-      .update({ next_analysis_at: nextAnalysisAt.toISOString(), last_analyzed_at: now.toISOString() })
+      .update({
+        next_analysis_at: nextAnalysisAt.toISOString(),
+        last_analyzed_at: now.toISOString(),
+      })
       .eq("id", comp.id);
 
     try {
+      const plan = await getInstagramPlanStatus(admin, comp.org_id);
+      if (plan.monitoring === "manual") {
+        await admin
+          .from("instagram_competitors")
+          .update({ next_analysis_at: null })
+          .eq("id", comp.id);
+        results.push({ competitor: comp.username, status: "skipped", reason: "manual_plan" });
+        continue;
+      }
+      const minimumHours = plan.monitoring === "daily" ? 24 : 168;
+      if (comp.monitoring_interval_hours < minimumHours) {
+        await admin
+          .from("instagram_competitors")
+          .update({
+            monitoring_interval_hours: minimumHours,
+            next_analysis_at: new Date(now.getTime() + minimumHours * 60 * 60 * 1000).toISOString(),
+          })
+          .eq("id", comp.id);
+      }
+      await reserveInstagramUsage({
+        admin,
+        orgId: comp.org_id,
+        userId: comp.user_id,
+        requestId,
+        action: "competitor_monitor_cron",
+        amount: { hunts: 1, monthlyCostUsd: 0.25 },
+      });
       // Mockamos o corpo para as opções padrão de monitoramento
       const body = {
         requestId,
         competitorId: comp.id,
         maxPosts: 12,
         commentPosts: 3,
-        commentsPerPost: 30
+        commentsPerPost: 30,
       };
 
       const response = await processarMonitoramentoConcorrente({
@@ -75,12 +115,28 @@ Deno.serve(async (req) => {
         admin,
         userId: comp.user_id,
         orgId: comp.org_id,
-        body
+        body,
       });
 
       const responseData = await response.json();
+      await finalizeInstagramUsage({
+        admin,
+        orgId: comp.org_id,
+        requestId,
+        status: response.ok && responseData.ok !== false ? "completed" : "failed",
+        amount: {
+          hunts: response.ok && responseData.ok !== false ? 1 : 0,
+          monthlyCostUsd: Number(responseData.actualCost ?? 0),
+        },
+      });
       results.push({ competitor: comp.username, status: "success", data: responseData });
     } catch (err) {
+      await finalizeInstagramUsage({
+        admin,
+        orgId: comp.org_id,
+        requestId,
+        status: "failed",
+      }).catch(() => undefined);
       results.push({ competitor: comp.username, status: "error", error: String(err) });
     }
   }

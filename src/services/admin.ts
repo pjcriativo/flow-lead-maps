@@ -163,6 +163,16 @@ export type Plano = {
   has_whatsapp: boolean | null;
   has_redesign: boolean | null;
   has_publicar: boolean | null;
+  instagram_nivel: "basico" | "pro" | "agencia";
+  limite_instagram_leads: number;
+  limite_instagram_audiencia: number;
+  limite_instagram_concorrentes: number;
+  limite_instagram_cacadas: number;
+  limite_instagram_cruzamentos: number;
+  limite_instagram_enriquecimentos: number;
+  limite_instagram_marcas: number;
+  teto_instagram_usd: number;
+  monitoramento_instagram: "manual" | "weekly" | "daily";
   ativo: boolean;
   ordem: number;
 };

@@ -134,6 +134,7 @@ export async function saveInstagramCompetitor(input: {
 }): Promise<InstagramCompetitor> {
   const response = await invoke<{ competitor: InstagramCompetitor }>({
     acao: "salvar_concorrente",
+    requestId: crypto.randomUUID(),
     ...input,
   });
   return response.competitor;

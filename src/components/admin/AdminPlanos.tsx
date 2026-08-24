@@ -229,6 +229,9 @@ export function AdminPlanos({ planos, onMudou }: { planos: Plano[]; onMudou: () 
                       <ChipAcesso rotulo="WhatsApp: " valor={p.limite_whatsapp} />
                       <ChipAcesso rotulo="Modelos: " valor={p.limite_templates} />
                       <ChipAcesso rotulo="Segmentos: " valor={p.limite_segmentos} />
+                      <ChipAcesso rotulo={`Instagram ${p.instagram_nivel}`} tom="verde" />
+                      <ChipAcesso rotulo="Caçadas IG: " valor={p.limite_instagram_cacadas} />
+                      <ChipAcesso rotulo="Audiência IG: " valor={p.limite_instagram_audiencia} />
                     </div>
                   </td>
                   <td className="px-6 py-5 align-top">
@@ -429,6 +432,67 @@ function PlanoForm({
           valor={plano.limite_segmentos}
           onChange={(v) => set({ limite_segmentos: numOrNull(v) })}
         />
+      </div>
+      <div className="mt-6 rounded-xl border border-primary/15 bg-primary/[0.035] p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Instagram Caça-clientes</p>
+            <p className="text-xs text-muted-foreground">
+              Cotas mensais aplicadas no servidor antes de qualquer coleta externa.
+            </p>
+          </div>
+          <select
+            value={plano.instagram_nivel ?? "basico"}
+            onChange={(e) => set({ instagram_nivel: e.target.value as Plano["instagram_nivel"] })}
+            className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
+          >
+            <option value="basico">Básico</option>
+            <option value="pro">Pro</option>
+            <option value="agencia">Agência</option>
+          </select>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <LimiteInput
+            rotulo="Leads IG"
+            valor={plano.limite_instagram_leads}
+            onChange={(v) => set({ limite_instagram_leads: Number(v || 0) })}
+          />
+          <LimiteInput
+            rotulo="Perfis de audiência"
+            valor={plano.limite_instagram_audiencia}
+            onChange={(v) => set({ limite_instagram_audiencia: Number(v || 0) })}
+          />
+          <LimiteInput
+            rotulo="Concorrentes"
+            valor={plano.limite_instagram_concorrentes}
+            onChange={(v) => set({ limite_instagram_concorrentes: Number(v || 0) })}
+          />
+          <LimiteInput
+            rotulo="Caçadas"
+            valor={plano.limite_instagram_cacadas}
+            onChange={(v) => set({ limite_instagram_cacadas: Number(v || 0) })}
+          />
+          <LimiteInput
+            rotulo="Cruzamentos"
+            valor={plano.limite_instagram_cruzamentos}
+            onChange={(v) => set({ limite_instagram_cruzamentos: Number(v || 0) })}
+          />
+          <LimiteInput
+            rotulo="Enriquecimentos"
+            valor={plano.limite_instagram_enriquecimentos}
+            onChange={(v) => set({ limite_instagram_enriquecimentos: Number(v || 0) })}
+          />
+          <LimiteInput
+            rotulo="Marcas"
+            valor={plano.limite_instagram_marcas}
+            onChange={(v) => set({ limite_instagram_marcas: Number(v || 0) })}
+          />
+          <LimiteInput
+            rotulo="Teto interno (US$)"
+            valor={plano.teto_instagram_usd}
+            onChange={(v) => set({ teto_instagram_usd: Number(v || 0) })}
+          />
+        </div>
       </div>
       <div className="mt-5 flex items-center gap-2">
         <button

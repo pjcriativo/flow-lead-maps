@@ -411,6 +411,27 @@ Deno.serve(async (req) => {
         limite_whatsapp: num(p.limite_whatsapp),
         limite_templates: num(p.limite_templates),
         limite_segmentos: num(p.limite_segmentos),
+        has_instagram_search: p.has_instagram_search !== false,
+        instagram_nivel:
+          p.instagram_nivel === "agencia"
+            ? "agencia"
+            : p.instagram_nivel === "pro"
+              ? "pro"
+              : "basico",
+        limite_instagram_leads: num(p.limite_instagram_leads) ?? 30,
+        limite_instagram_audiencia: num(p.limite_instagram_audiencia) ?? 100,
+        limite_instagram_concorrentes: num(p.limite_instagram_concorrentes) ?? 1,
+        limite_instagram_cacadas: num(p.limite_instagram_cacadas) ?? 3,
+        limite_instagram_cruzamentos: num(p.limite_instagram_cruzamentos) ?? 0,
+        limite_instagram_enriquecimentos: num(p.limite_instagram_enriquecimentos) ?? 10,
+        limite_instagram_marcas: num(p.limite_instagram_marcas) ?? 1,
+        teto_instagram_usd: num(p.teto_instagram_usd) ?? 0.75,
+        monitoramento_instagram:
+          p.monitoramento_instagram === "daily"
+            ? "daily"
+            : p.monitoramento_instagram === "weekly"
+              ? "weekly"
+              : "manual",
         ativo: p.ativo !== false,
       };
       if (p.id) {

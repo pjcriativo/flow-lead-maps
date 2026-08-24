@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
     admin
       .from("planos")
       .select(
-        "id, nome, descricao, preco, periodo, limite_leads, limite_sites, limite_campanhas, limite_mensagens, limite_whatsapp, limite_templates, limite_segmentos, has_instagram_search, has_linkedin_search, has_propostas, has_contratos, has_financeiro, has_whatsapp, has_redesign, has_publicar, ativo, ordem",
+        "id, nome, descricao, preco, periodo, limite_leads, limite_sites, limite_campanhas, limite_mensagens, limite_whatsapp, limite_templates, limite_segmentos, has_instagram_search, has_linkedin_search, has_propostas, has_contratos, has_financeiro, has_whatsapp, has_redesign, has_publicar, instagram_nivel, limite_instagram_leads, limite_instagram_audiencia, limite_instagram_concorrentes, limite_instagram_cacadas, limite_instagram_cruzamentos, limite_instagram_enriquecimentos, limite_instagram_marcas, teto_instagram_usd, monitoramento_instagram, ativo, ordem",
       )
       .order("ordem", { ascending: true }),
     admin.from("memberships").select("user_id,org_id,criada_em").order("criada_em"),

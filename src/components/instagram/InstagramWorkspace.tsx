@@ -4,6 +4,7 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  Crosshair,
   ExternalLink,
   Eye,
   Instagram,
@@ -46,6 +47,7 @@ import {
   type InstagramScoreSort,
 } from "@/components/instagram/shared/InstagramScoreV2";
 import { InstagramInbox } from "@/components/instagram/inbox/InstagramInbox";
+import { InstagramClientHunter } from "@/components/instagram/hunter/InstagramClientHunter";
 import type { Estrategia, PedidoBusca } from "@/lib/fontes-prospeccao";
 import {
   instagramScoreValue,
@@ -214,16 +216,19 @@ export function InstagramWorkspace() {
               </p>
             </div>
           </div>
-          <Button onClick={() => setTab("discover")}>
-            <Search className="h-4 w-4" /> Nova prospecção
+          <Button onClick={() => setTab("hunter")}>
+            <Crosshair className="h-4 w-4" /> Caçar clientes
           </Button>
         </div>
       </header>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:grid-cols-4 lg:w-fit lg:grid-cols-8">
+        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:grid-cols-3 lg:w-fit lg:grid-cols-9">
           <TabsTrigger value="overview">
             <BarChart3 /> Visão geral
+          </TabsTrigger>
+          <TabsTrigger value="hunter">
+            <Crosshair /> Caça-clientes
           </TabsTrigger>
           <TabsTrigger value="discover">
             <Search /> Descobrir
@@ -250,6 +255,10 @@ export function InstagramWorkspace() {
 
         <TabsContent value="overview" className="mt-5 space-y-5">
           <InstagramAnalyticsDashboard refreshToken={dashboardRevision} />
+        </TabsContent>
+
+        <TabsContent value="hunter" className="mt-5">
+          <InstagramClientHunter />
         </TabsContent>
 
         <TabsContent value="discover" className="mt-5">
