@@ -361,8 +361,14 @@ insert into public.instagram_plan_usage(org_id, month_ref, leads, competitors, h
 select o.id, date_trunc('month', now())::date,
   coalesce((select count(*) from public.instagram_profiles ip where ip.org_id = o.id and ip.collected_at >= date_trunc('month', now())), 0)::int,
   coalesce((select count(*) from public.instagram_competitors ic where ic.org_id = o.id and ic.status <> 'archived'), 0)::int,
-  coalesce((select count(*) from public.instagram_discovery_jobs j where j.org_id = o.id and j.created_at >= date_trunc('month', now())), 0)::int,
-  coalesce((select sum(j.actual_cost_usd) from public.instagram_discovery_jobs j where j.org_id = o.id and j.created_at >= date_trunc('month', now())), 0)
+  (
+    coalesce((select count(*) from public.instagram_discovery_jobs j where j.org_id = o.id and j.created_at >= date_trunc('month', now())), 0)
+    + coalesce((select count(*) from public.redes_buscas r where r.org_id = o.id and r.fonte = 'instagram' and r.criado_em >= date_trunc('month', now()) and r.status <> 'parada_teto'), 0)
+  )::int,
+  (
+    coalesce((select sum(j.actual_cost_usd) from public.instagram_discovery_jobs j where j.org_id = o.id and j.created_at >= date_trunc('month', now())), 0)
+    + coalesce((select sum(r.custo_usd) from public.redes_buscas r where r.org_id = o.id and r.fonte = 'instagram' and r.criado_em >= date_trunc('month', now())), 0)
+  )
 from public.orgs o
 on conflict (org_id, month_ref) do update set
   leads = greatest(public.instagram_plan_usage.leads, excluded.leads),
