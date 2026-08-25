@@ -28,3 +28,12 @@ test("webhook público valida assinatura e rejeita replay antigo", () => {
   assert.match(webhookFunction, /unipile-signature/);
   assert.match(webhookFunction, /> 300/);
 });
+
+test("webhook mantém o estado da conta sincronizado em todo o ciclo de vida", () => {
+  assert.match(webhookFunction, /account\.add/);
+  assert.match(webhookFunction, /account\.reconnect/);
+  assert.match(webhookFunction, /account\.status\.running/);
+  assert.match(webhookFunction, /account\.status\.disconnected/);
+  assert.match(webhookFunction, /account\.status\.errored/);
+  assert.match(webhookFunction, /account\.remove/);
+});

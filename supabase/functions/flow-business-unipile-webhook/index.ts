@@ -78,8 +78,14 @@ Deno.serve(async (req) => {
   const admin = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  if (type.startsWith("account.status.")) {
-    const status = type === "account.status.running" ? "conectado" : "erro";
+  const accountConnected =
+    type === "account.add" || type === "account.reconnect" || type === "account.status.running";
+  const accountDisconnected =
+    type === "account.remove" ||
+    type === "account.status.disconnected" ||
+    type === "account.status.errored";
+  if (accountConnected || accountDisconnected) {
+    const status = accountConnected ? "conectado" : "erro";
     await admin
       .from("ig_instancias")
       .update({
