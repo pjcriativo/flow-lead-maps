@@ -25,6 +25,11 @@ const operationalCustomerFiles = [
   "../../../src/lib/leads-api.ts",
 ].map((relativePath) => new URL(relativePath, import.meta.url));
 
+const instagramWorkspace = new URL(
+  "../../../src/components/instagram/InstagramWorkspace.tsx",
+  import.meta.url,
+);
+
 test("a área do Instagram não expõe provedores nem integração oficial ao cliente", () => {
   const source = instagramCustomerFiles.map((file) => readFileSync(file, "utf8")).join("\n");
 
@@ -59,4 +64,9 @@ test("falhas da conexão do Instagram não retornam códigos internos ao cliente
   assert.match(connectionFunction, /instagram_connection_unavailable/);
   assert.match(connectionFunction, /instagram_message_failed/);
   assert.doesNotMatch(inbox, /if \(data\?\.error\)/);
+});
+
+test("a integração descontinuada não pode ser acionada pela interface do cliente", () => {
+  const source = readFileSync(instagramWorkspace, "utf8");
+  assert.doesNotMatch(source, /startAlternativeInstagramConnection/);
 });

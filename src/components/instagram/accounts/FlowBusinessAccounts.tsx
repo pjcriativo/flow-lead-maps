@@ -1,11 +1,4 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Instagram,
-  LockKeyhole,
-  PlugZap,
-  ShieldCheck,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Instagram, LockKeyhole, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { FlowBusinessAccount, FlowBusinessPlan } from "@/services/flow-business";
@@ -13,10 +6,9 @@ import type { FlowBusinessAccount, FlowBusinessPlan } from "@/services/flow-busi
 interface FlowBusinessAccountsProps {
   accounts: FlowBusinessAccount[];
   plan: FlowBusinessPlan;
-  onConnect: () => Promise<void>;
 }
 
-export function FlowBusinessAccounts({ accounts, plan, onConnect }: FlowBusinessAccountsProps) {
+export function FlowBusinessAccounts({ accounts, plan }: FlowBusinessAccountsProps) {
   const atLimit = plan.used.accounts >= plan.limits.accounts;
   const connectedAccounts = accounts.filter((account) => account.provider !== "evolution_legacy");
   const legacyAccounts = accounts.filter((account) => account.provider === "evolution_legacy");
@@ -29,16 +21,15 @@ export function FlowBusinessAccounts({ accounts, plan, onConnect }: FlowBusiness
             Contas do Instagram
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-            Conecte seu Instagram em poucos passos
+            Gerencie as contas do seu Instagram
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            A autenticação e a verificação em duas etapas acontecem em um ambiente protegido. O Flow
-            Business não recebe nem armazena sua senha. O Instagram pode solicitar uma nova
-            verificação ou reconexão para manter a conta segura.
+            A conexão de novos perfis está temporariamente indisponível enquanto preparamos uma
+            experiência mais estável e segura. Os recursos de prospecção pública continuam ativos.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button disabled={atLimit} onClick={() => void onConnect()}>
-              <PlugZap className="size-4" /> Conectar Instagram
+            <Button disabled>
+              <LockKeyhole className="size-4" /> Nova conexão em preparação
             </Button>
           </div>
         </div>
@@ -78,7 +69,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnect }: FlowBusiness
               <Instagram className="mx-auto size-9 text-muted-foreground/40" />
               <p className="mt-3 font-medium">Nenhuma conta conectada</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Conecte um perfil do Instagram para preparar conversas e sincronização.
+                As conexões existentes aparecerão aqui. Novos perfis serão liberados em breve.
               </p>
             </div>
           ) : null}

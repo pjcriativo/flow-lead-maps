@@ -4,6 +4,8 @@ import {
   AlertTriangle,
   BarChart3,
   CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CircleDollarSign,
   Clock3,
@@ -41,9 +43,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
 type StatusFilter = "todos" | "liberados" | "pendentes" | "com_custo";
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 const SERVICE_LABELS: Record<string, string> = {
   apify_maps: "Apify · Maps",
@@ -412,6 +416,130 @@ function UserDetailsDialog({
   );
 }
 
+function UserAnalyticsPanel({
+  resumo,
+  topConsumers,
+  onOpenUser,
+}: {
+  resumo?: OperacaoUsuariosResumo;
+  topConsumers: UsuarioPlataforma[];
+  onOpenUser: (user: UsuarioPlataforma) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex w-full items-center justify-between gap-4 p-5 text-left",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="rounded-lg bg-primary/10 p-2 text-primary">
+                <BarChart3 className="size-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold">Análise de consumo</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  Tendência dos últimos 14 dias e maiores consumidores do mês
+                </span>
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
+              {open ? "Ocultar" : "Ver análise"}
+              <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+            </span>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="grid gap-4 border-t pt-5 xl:grid-cols-[1.6fr_1fr]">
+            <div className="rounded-xl border border-border p-4">
+              <h3 className="text-sm font-semibold">Custo diário atribuído</h3>
+              <p className="text-xs text-muted-foreground">
+                Últimos 14 dias, apenas registros locais do livro-caixa.
+              </p>
+              <ChartContainer
+                config={{ custo: { label: "Custo API", color: "var(--primary)" } }}
+                className="mt-3 h-56 w-full"
+              >
+                <AreaChart data={resumo?.serie_14d ?? []} margin={{ left: 4, right: 12 }}>
+                  <defs>
+                    <linearGradient id="admin-user-cost" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-custo)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--color-custo)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} />
+                  <XAxis
+                    dataKey="data"
+                    tickFormatter={(value) => String(value).slice(5)}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={(value) => `$${Number(value).toFixed(2)}`}
+                    width={48}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ChartTooltip
+                    content={<ChartTooltipContent formatter={(value) => usd(Number(value))} />}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="custo_usd"
+                    name="custo"
+                    stroke="var(--color-custo)"
+                    fill="url(#admin-user-cost)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ChartContainer>
+            </div>
+            <div className="rounded-xl border border-border p-4">
+              <h3 className="text-sm font-semibold">Maiores consumidores do mês</h3>
+              <p className="text-xs text-muted-foreground">
+                Clique em uma conta para ver os detalhes.
+              </p>
+              <div className="mt-3 space-y-1">
+                {topConsumers.map((user, index) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => onOpenUser(user)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg p-2.5 text-left",
+                      "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    )}
+                  >
+                    <span className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">
+                        {user.full_name || user.email}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {user.operacao.requisicoes_mes} requisições
+                      </span>
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {usd(user.operacao.custo_mes_usd)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
 export function AdminUserOperations({
   usuarios,
   planos,
@@ -425,9 +553,12 @@ export function AdminUserOperations({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("todos");
+  const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
+  const [currentPage, setCurrentPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailUser, setDetailUser] = useState<UsuarioPlataforma | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTargets, setDeleteTargets] = useState<UsuarioPlataforma[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
@@ -453,12 +584,18 @@ export function AdminUserOperations({
       return true;
     });
   }, [filter, search, usuarios]);
-  const selectable = filtered.filter((user) => !user.acesso_liberado && !user.is_super_admin);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const page = Math.min(currentPage, totalPages);
+  const pageStart = (page - 1) * pageSize;
+  const paginatedUsers = filtered.slice(pageStart, pageStart + pageSize);
+  const selectable = paginatedUsers.filter((user) => !user.acesso_liberado && !user.is_super_admin);
   const selectedUsers = usuarios.filter((user) => selected.has(user.id));
   const allSelected = selectable.length > 0 && selectable.every((user) => selected.has(user.id));
   const topConsumers = [...usuarios]
     .sort((a, b) => b.operacao.custo_mes_usd - a.operacao.custo_mes_usd)
     .slice(0, 5);
+  const visibleStart = filtered.length ? pageStart + 1 : 0;
+  const visibleEnd = Math.min(pageStart + paginatedUsers.length, filtered.length);
 
   const toggle = (id: string, checked: boolean) =>
     setSelected((current) => {
@@ -516,10 +653,28 @@ export function AdminUserOperations({
     }
   };
 
-  const deleteSelected = async () => {
+  const openBulkDelete = () => {
+    setDeleteTargets(selectedUsers);
+    setDeleteConfirm("");
+    setDeleteOpen(true);
+  };
+
+  const deleteSingleUser = (user: UsuarioPlataforma) => {
+    setDeleteTargets([user]);
+    setDeleteConfirm("");
+    setDeleteOpen(true);
+  };
+
+  const deleteUsers = async () => {
+    if (!deleteTargets.length) return;
     setBusy(true);
     try {
-      const result = await adminAcao("users_delete_bulk", { user_ids: [...selected] });
+      const result =
+        deleteTargets.length === 1
+          ? await adminAcao("user_delete", { user_id: deleteTargets[0].id })
+          : await adminAcao("users_delete_bulk", {
+              user_ids: deleteTargets.map((user) => user.id),
+            });
       const deleted = Number(result.deleted ?? 0);
       const blocked = Number(result.blocked ?? 0);
       const failed = Number(result.failed ?? 0);
@@ -529,11 +684,13 @@ export function AdminUserOperations({
         );
       if (blocked)
         toast.warning(
-          `${blocked} conta${blocked === 1 ? "" : "s"} protegida${blocked === 1 ? "" : "s"} por possuir acesso ou dados.`,
+          `${blocked} conta${blocked === 1 ? " está" : "s estão"} protegida${blocked === 1 ? "" : "s"}. Bloqueie o acesso e preserve o histórico quando houver dados.`,
         );
       if (failed) toast.error(`${failed} exclusão${failed === 1 ? " falhou" : "ões falharam"}.`);
-      setSelected(new Set());
+      const targetIds = new Set(deleteTargets.map((user) => user.id));
+      setSelected((current) => new Set([...current].filter((id) => !targetIds.has(id))));
       setDeleteOpen(false);
+      setDeleteTargets([]);
       setDeleteConfirm("");
       onMudou();
     } catch (error) {
@@ -592,90 +749,15 @@ export function AdminUserOperations({
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Custo diário atribuído</CardTitle>
-            <CardDescription>
-              Últimos 14 dias, apenas registros locais do livro-caixa.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{ custo: { label: "Custo API", color: "var(--primary)" } }}
-              className="h-64 w-full"
-            >
-              <AreaChart data={resumo?.serie_14d ?? []} margin={{ left: 4, right: 12 }}>
-                <defs>
-                  <linearGradient id="admin-user-cost" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-custo)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="var(--color-custo)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="data"
-                  tickFormatter={(value) => String(value).slice(5)}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  tickFormatter={(value) => `$${Number(value).toFixed(2)}`}
-                  width={48}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <ChartTooltip
-                  content={<ChartTooltipContent formatter={(value) => usd(Number(value))} />}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="custo_usd"
-                  name="custo"
-                  stroke="var(--color-custo)"
-                  fill="url(#admin-user-cost)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Maiores consumidores do mês</CardTitle>
-            <CardDescription>Contas ordenadas pelo custo atribuído.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {topConsumers.map((user, index) => (
-              <button
-                key={user.id}
-                onClick={() => setDetailUser(user)}
-                className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left hover:bg-muted/60"
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {user.full_name || user.email}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {user.operacao.requisicoes_mes} requisições
-                  </span>
-                </span>
-                <span className="text-sm font-semibold">{usd(user.operacao.custo_mes_usd)}</span>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+      <UserAnalyticsPanel resumo={resumo} topConsumers={topConsumers} onOpenUser={setDetailUser} />
 
       <Card>
         <CardHeader className="gap-4 border-b pb-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
           <div>
             <CardTitle className="text-base">Contas da plataforma</CardTitle>
             <CardDescription>
-              Selecione contas pendentes para excluir em lote com validação de segurança.
+              Consulte cada conta, exclua individualmente ou selecione pendentes para exclusão em
+              lote com validação de segurança.
             </CardDescription>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -683,20 +765,42 @@ export function AdminUserOperations({
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Buscar nome, e-mail ou organização"
                 className="w-full pl-9 sm:w-72"
               />
             </div>
             <select
               value={filter}
-              onChange={(event) => setFilter(event.target.value as StatusFilter)}
+              onChange={(event) => {
+                setFilter(event.target.value as StatusFilter);
+                setCurrentPage(1);
+              }}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              aria-label="Filtrar usuários"
             >
               <option value="todos">Todos</option>
               <option value="liberados">Liberados</option>
               <option value="pendentes">Pendentes</option>
               <option value="com_custo">Com custo no mês</option>
+            </select>
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value) as (typeof PAGE_SIZE_OPTIONS)[number]);
+                setCurrentPage(1);
+              }}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              aria-label="Usuários por página"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size} por página
+                </option>
+              ))}
             </select>
           </div>
         </CardHeader>
@@ -710,7 +814,7 @@ export function AdminUserOperations({
               <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
                 Limpar
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+              <Button variant="destructive" size="sm" onClick={openBulkDelete}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Excluir selecionadas
               </Button>
@@ -725,7 +829,7 @@ export function AdminUserOperations({
                   <Checkbox
                     checked={allSelected}
                     onCheckedChange={(checked) => toggleAll(checked === true)}
-                    aria-label="Selecionar todas as contas pendentes visíveis"
+                    aria-label="Selecionar todas as contas pendentes desta página"
                   />
                 </th>
                 <th className="px-3 py-3">Usuário</th>
@@ -738,7 +842,7 @@ export function AdminUserOperations({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((user) => {
+              {paginatedUsers.map((user) => {
                 const plan = userPlan(user, planos);
                 const canSelect = !user.acesso_liberado && !user.is_super_admin;
                 return (
@@ -843,6 +947,21 @@ export function AdminUserOperations({
                               Liberar
                             </Button>
                           ))}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={!canSelect || rowBusy === user.id}
+                          onClick={() => deleteSingleUser(user)}
+                          aria-label={`Excluir conta de ${user.email}`}
+                          title={
+                            canSelect
+                              ? "Excluir conta pendente"
+                              : "Exclusão protegida: bloqueie a conta ou preserve o histórico"
+                          }
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -858,9 +977,36 @@ export function AdminUserOperations({
             </tbody>
           </table>
         </div>
-        <div className="border-t px-5 py-3 text-xs text-muted-foreground">
-          Exibindo {filtered.length} de {usuarios.length} usuários. Contas liberadas e super admins
-          não podem ser selecionados para exclusão.
+        <div className="flex flex-col gap-3 border-t px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Exibindo {visibleStart}–{visibleEnd} de {filtered.length} filtrados · {usuarios.length}{" "}
+            no total. Contas com histórico e super admins são protegidos contra exclusão.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setCurrentPage((value) => Math.max(1, value - 1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              Anterior
+            </Button>
+            <span className="min-w-24 text-center text-xs font-medium text-foreground">
+              Página {page} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setCurrentPage((value) => Math.min(totalPages, value + 1))}
+              aria-label="Próxima página"
+            >
+              Próxima
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -932,12 +1078,21 @@ export function AdminUserOperations({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          setDeleteOpen(open);
+          if (!open) {
+            setDeleteTargets([]);
+            setDeleteConfirm("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              Excluir {selected.size} conta{selected.size === 1 ? "" : "s"}
+              Excluir {deleteTargets.length} conta{deleteTargets.length === 1 ? "" : "s"}
             </DialogTitle>
             <DialogDescription>
               Somente contas pendentes e sem dados serão excluídas. Contas que já consumiram API,
@@ -946,7 +1101,7 @@ export function AdminUserOperations({
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-32 overflow-y-auto rounded-lg border bg-muted/30 p-3 text-xs">
-            {selectedUsers.map((user) => (
+            {deleteTargets.map((user) => (
               <p key={user.id} className="truncate">
                 {user.email}
               </p>
@@ -967,9 +1122,10 @@ export function AdminUserOperations({
             <Button
               variant="destructive"
               disabled={busy || deleteConfirm !== "EXCLUIR"}
-              onClick={deleteSelected}
+              onClick={deleteUsers}
             >
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Excluir contas elegíveis
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteTargets.length === 1 ? "Excluir conta elegível" : "Excluir contas elegíveis"}
             </Button>
           </DialogFooter>
         </DialogContent>

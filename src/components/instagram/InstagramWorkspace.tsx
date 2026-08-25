@@ -73,7 +73,6 @@ import {
   createFlowBusinessCadence,
   loadFlowBusinessWorkspace,
   moveFlowBusinessCard,
-  startAlternativeInstagramConnection,
   startFlowBusinessCadence,
   type FlowBusinessStage,
   type FlowBusinessTask,
@@ -293,20 +292,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       ) : null}
 
       {tab === "accounts" && business ? (
-        <FlowBusinessAccounts
-          accounts={business.accounts}
-          plan={business.plan}
-          onConnect={async () => {
-            try {
-              const authorizationUrl = await startAlternativeInstagramConnection();
-              window.location.assign(authorizationUrl);
-            } catch (error) {
-              toast.error(
-                error instanceof Error ? error.message : "Conexão do Instagram indisponível.",
-              );
-            }
-          }}
-        />
+        <FlowBusinessAccounts accounts={business.accounts} plan={business.plan} />
       ) : null}
 
       {tab === "overview" ? (
