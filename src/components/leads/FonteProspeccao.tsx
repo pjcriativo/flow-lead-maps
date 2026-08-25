@@ -11,6 +11,7 @@ import {
   Info,
   Check,
   AlertTriangle,
+  ArrowRight,
   Search,
   Loader2,
 } from "lucide-react";
@@ -79,25 +80,28 @@ const VIAB_CLS: Record<Viabilidade, string> = {
 export function FonteSelector({
   valor,
   onChange,
+  onOpenInstagram,
   disabled,
 }: {
   valor: FonteProspeccao;
   onChange: (f: FonteProspeccao) => void;
+  onOpenInstagram: () => void;
   disabled?: boolean;
 }) {
   return (
-    <div role="tablist" aria-label="Fonte de prospecção" className="grid gap-2 sm:grid-cols-3">
+    <div aria-label="Fonte de prospecção" className="grid gap-2 sm:grid-cols-3">
       {ORDEM_FONTES.map((id) => {
         const f = FONTES[id];
         const sel = valor === id;
+        const opensWorkspace = id === "instagram";
         return (
           <button
             key={id}
-            role="tab"
             type="button"
-            aria-selected={sel}
+            aria-pressed={opensWorkspace ? undefined : sel}
+            aria-label={opensWorkspace ? "Abrir o módulo Instagram" : undefined}
             disabled={disabled}
-            onClick={() => onChange(id)}
+            onClick={() => (opensWorkspace ? onOpenInstagram() : onChange(id))}
             className={cn(
               "group rounded-xl border border-border bg-card p-3 text-left transition-all duration-200",
               "hover:border-foreground/20 hover:shadow-[var(--shadow-card)]",
@@ -111,7 +115,11 @@ export function FonteSelector({
                 {ICONE[id]}
               </span>
               <span className="text-sm font-semibold">{f.label}</span>
-              {f.estado === "em_breve" ? (
+              {opensWorkspace ? (
+                <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-fuchsia-800">
+                  Abrir <ArrowRight className="h-3 w-3" />
+                </span>
+              ) : f.estado === "em_breve" ? (
                 <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Em breve
                 </span>
@@ -121,9 +129,13 @@ export function FonteSelector({
                 </span>
               )}
             </div>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{f.resumo}</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+              {opensWorkspace
+                ? "Abra o ambiente completo de prospecção, concorrentes, comentários e campanhas."
+                : f.resumo}
+            </p>
             <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-              {f.busca}
+              {opensWorkspace ? "módulo especializado" : f.busca}
             </p>
           </button>
         );

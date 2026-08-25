@@ -44,16 +44,11 @@ import {
 import { MapaBusca } from "./MapaBusca";
 import { NichoSelector } from "./NichoSelector";
 import { FonteSelector, FormEstrategias } from "./FonteProspeccao";
-import { buscarRedes, type ColetaRedes } from "@/services/whatsapp";
-import { InstagramSearchPanel } from "./instagram/InstagramSearchPanel";
-import { InstagramResultsTable, InstagramRunSummary } from "./instagram/InstagramResults";
 import {
   valoresPadrao,
   estrategiasDe,
   type FonteProspeccao,
   type ValoresBusca,
-  type Estrategia,
-  type PedidoBusca,
 } from "@/lib/fontes-prospeccao";
 import { geocodeCidade } from "@/lib/geo";
 import { criarListaComLeads, nomeAutoLista } from "@/lib/lists-api";
@@ -74,7 +69,13 @@ import {
   getBreakdown,
 } from "./leads-shared";
 
-export function SearchSection({ onFinished }: { onFinished?: () => void }) {
+export function SearchSection({
+  onFinished,
+  onOpenInstagram,
+}: {
+  onFinished?: () => void;
+  onOpenInstagram: () => void;
+}) {
   const [nicho, setNicho] = useState("");
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
@@ -109,7 +110,6 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [estrLi, setEstrLi] = useState<string>(() => estrategiasDe("linkedin")[0].id);
   const [valLi, setValLi] = useState<ValoresBusca>(valoresPadrao);
   const noMaps = fonteProsp === "google_maps";
-  const isInstagram = fonteProsp === "instagram";
 
   // Geocodifica a cidade e centraliza o mapa/pino nela (pino automático).
   const geocodar = async (c: string, u: string) => {
@@ -146,7 +146,6 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [status, setStatus] = useState("Pronto");
-  const [instagramResumo, setInstagramResumo] = useState<ColetaRedes["resumo"]>(undefined);
   const [progress, setProgress] = useState({ found: 0, target: 0 });
   const abortRef = useRef<AbortController | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -193,7 +192,6 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     }
     setRunning(true);
     setLeads([]);
-    setInstagramResumo(undefined);
     setLogs([]);
     setPagina(1);
     setProgress({ found: 0, target: limite });
@@ -310,104 +308,6 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     }
   };
 
-  const handleBuscarRedes = async (estrategia: Estrategia, pedido: PedidoBusca) => {
-    setRunning(true);
-    setLeads([]);
-    setInstagramResumo(undefined);
-    setLogs([]);
-    setPagina(1);
-    setProgress({ found: 0, target: pedido.limite });
-    insertedIdsRef.current = [];
-
-    setStatus(`Iniciando coletor na ${estrategia.fonte}... isso pode levar alguns minutos.`);
-    pushLog(`⏳ Chamando robô coletor para a estratégia ${estrategia.id}...`);
-
-    try {
-      const r = await buscarRedes(estrategia.id, pedido.campos, pedido.limite, {
-        somenteNovos: pedido.somenteNovos,
-      });
-      if (!r.ok) {
-        const msg =
-          r.reason === "teto"
-            ? `Teto de gasto: ${r.motivo}`
-            : r.reason === "limite_plano"
-              ? (r.motivo ?? "Limite de leads do plano atingido.")
-              : `Falha: ${r.reason}`;
-        setStatus(msg);
-        pushLog(`✖ ${msg}`);
-        return;
-      }
-
-      pushLog(
-        r.cacheHit
-          ? "✔ Resultado recente reutilizado do cache. Custo Apify: US$ 0,0000."
-          : `✔ Coleta concluída. Custo: US$ ${(r.custo ?? 0).toFixed(4)}.`,
-      );
-      if (r.avisoChaves) pushLog(`⚠️ ${r.avisoChaves}`);
-
-      setInstagramResumo(r.resumo);
-      const qtdInseridos = r.inseridos ?? 0;
-      const idsRetornados = r.leadIds ?? [];
-      if (idsRetornados.length > 0) {
-        setStatus(`Buscando os ${qtdInseridos} novos leads no banco...`);
-        const { data: novosLeads } = await supabase
-          .from("leads")
-          .select("*, score_breakdown")
-          .in("id", idsRetornados);
-
-        if (novosLeads) {
-          setLeads(novosLeads as Lead[]);
-          insertedIdsRef.current = novosLeads.map((l) => l.id);
-        }
-      }
-
-      setStatus(
-        r.resumo
-          ? `Concluído — ${r.resumo.novos} novos leads de ${r.resumo.analisados} perfis analisados`
-          : `Concluído — ${qtdInseridos} leads inseridos de ${r.encontrados ?? 0} perfis analisados`,
-      );
-      posthog.capture("search_redes_done", {
-        estrategia: estrategia.id,
-        inseridos: qtdInseridos,
-        custo: r.custo,
-      });
-
-      const ids = insertedIdsRef.current;
-      if (ids.length > 0) {
-        try {
-          const nichoStr = String(
-            pedido.campos.nicho ?? pedido.campos.setor ?? pedido.campos.termo ?? estrategia.id,
-          );
-          const cidadeStr = String(pedido.campos.cidade ?? pedido.campos.regiao ?? "");
-          const ufStr = String(pedido.campos.uf ?? "");
-          const nome = nomeAutoLista(nichoStr, cidadeStr, ufStr);
-          const lista = await criarListaComLeads({
-            name: nome,
-            niche: nichoStr,
-            city: cidadeStr,
-            uf: ufStr,
-            fonte: estrategia.fonte as FonteBusca,
-            radius: 0,
-            leadIds: ids,
-          });
-          pushLog(
-            `🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`,
-          );
-        } catch (le) {
-          const msg = le instanceof Error ? le.message : "erro";
-          pushLog(`⚠️ Leads salvos, mas falhou ao criar a lista: ${msg}`);
-        }
-      }
-      onFinished?.();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setStatus(`Erro: ${msg}`);
-      pushLog(`ERRO: ${msg}`);
-    } finally {
-      setRunning(false);
-    }
-  };
-
   const handleCancelar = () => {
     abortRef.current?.abort();
     setRunning(false);
@@ -419,14 +319,15 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4">
       {/* Formulário de busca */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        {/* FONTE DE PROSPECÇÃO — trocar aqui troca os campos abaixo (cada fonte prospecta
-            de um jeito). Só o Google Maps coleta hoje; as outras têm a interface pronta. */}
-        <FonteSelector valor={fonteProsp} onChange={setFonteProsp} disabled={running} />
+        {/* Instagram possui um ambiente próprio; este cartão funciona como acesso direto. */}
+        <FonteSelector
+          valor={fonteProsp}
+          onChange={setFonteProsp}
+          onOpenInstagram={onOpenInstagram}
+          disabled={running}
+        />
 
         <div key={fonteProsp} className="mt-4 animate-in fade-in duration-300">
-          {fonteProsp === "instagram" && (
-            <InstagramSearchPanel running={running} onBuscar={handleBuscarRedes} />
-          )}
           {fonteProsp === "linkedin" && (
             <FormEstrategias
               fonte="linkedin"
@@ -434,7 +335,6 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
               onEstrategia={setEstrLi}
               valores={valLi}
               onValores={setValLi}
-              onBuscar={handleBuscarRedes}
               isBuscaRunning={running}
             />
           )}
@@ -687,7 +587,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
       </div>
 
       {/* Resultados ao vivo — disponivel para todas as fontes agora */}
-      {(noMaps || leads.length > 0 || running || !!instagramResumo) && (
+      {(noMaps || leads.length > 0 || running) && (
         <div className="overflow-hidden rounded-2xl border-2 border-border bg-card shadow-[var(--shadow-card)]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-3">
             <div className="flex items-center gap-3">
@@ -708,23 +608,13 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
                 {status}
               </span>
             </div>
-            {isInstagram && instagramResumo ? (
-              <div className="flex items-center gap-4">
-                <Stat n={instagramResumo.analisados} label="analisados" />
-                <Stat n={instagramResumo.aprovados} label="relevantes" divider />
-                <Stat n={instagramResumo.novos} label="novos" color="text-primary" divider />
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <Stat n={leads.length} label="leads" />
-                <Stat n={goldCount} label="cliente-ouro" color="text-amber-600" divider />
-                <Stat n={emailCount} label="e-mails" color="text-[#16A34A]" divider />
-                <Stat n={igCount} label="instagram" color="text-pink-600" divider />
-              </div>
-            )}
+            <div className="flex items-center gap-4">
+              <Stat n={leads.length} label="leads" />
+              <Stat n={goldCount} label="cliente-ouro" color="text-amber-600" divider />
+              <Stat n={emailCount} label="e-mails" color="text-[#16A34A]" divider />
+              <Stat n={igCount} label="instagram" color="text-pink-600" divider />
+            </div>
           </div>
-
-          {isInstagram && <InstagramRunSummary resumo={instagramResumo} />}
 
           {running && (
             <div className="h-1 w-full overflow-hidden bg-secondary">
@@ -763,11 +653,7 @@ export function SearchSection({ onFinished }: { onFinished?: () => void }) {
 
           {sorted.length > 0 ? (
             <>
-              {isInstagram ? (
-                <InstagramResultsTable leads={paginados} />
-              ) : (
-                <LiveTable leads={paginados} />
-              )}
+              <LiveTable leads={paginados} />
               {sorted.length > PAGE_SIZE && (
                 <Paginacao total={sorted.length} page={paginaEfetiva} onPage={setPagina} />
               )}
@@ -910,21 +796,13 @@ function EmptyState({ running, fonte }: { running: boolean; fonte: FonteProspecc
       </div>
       <div>
         <div className="text-base font-semibold">
-          {running
-            ? fonte === "instagram"
-              ? "Analisando perfis no Instagram…"
-              : "Buscando negócios…"
-            : fonte === "instagram"
-              ? "Pronto para descobrir perfis"
-              : "Pronto para prospectar"}
+          {running ? "Buscando negócios…" : "Pronto para prospectar"}
         </div>
         <div className="mt-1 text-sm text-muted-foreground">
           {running
-            ? fonte === "instagram"
-              ? "A busca pode levar alguns minutos. Os motivos de descarte serão mostrados ao concluir."
-              : "Os leads aparecem aqui, já com score, conforme são qualificados."
-            : fonte === "instagram"
-              ? "Selecione nicho, estado e cidade para começar."
+            ? "Os leads aparecem aqui, já com score, conforme são qualificados."
+            : fonte === "linkedin"
+              ? "A prospecção pelo LinkedIn ainda está em preparação."
               : "Informe nicho, cidade e UF, e clique em Buscar leads."}
         </div>
       </div>

@@ -340,7 +340,7 @@ function Dashboard() {
       </div>
 
       <main className="min-w-0 flex-1 bg-white px-4 pb-10 pt-16 md:px-8 md:pt-8">
-        {section === "buscar" && <SearchSection />}
+        {section === "buscar" && <SearchSection onOpenInstagram={() => setSection("instagram")} />}
         {section === "instagram" && <InstagramWorkspace />}
         {section === "listas" && (
           <MinhasListasSection
