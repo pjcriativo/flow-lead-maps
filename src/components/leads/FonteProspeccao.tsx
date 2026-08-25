@@ -30,7 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { estimarCustoColeta, TETO_REDES_MES_USD, TETO_REDES_RODADA_USD } from "@/lib/redes-teto";
 import {
   FONTES,
   ORDEM_FONTES,
@@ -294,7 +293,6 @@ export function FormEstrategias({
   const pedido = useMemo(() => montarPedido(atual, valores), [atual, valores]);
   const camposOk = erros.length === 0;
   const quantidade = Number(valores.limite ?? 50);
-  const custoEstimado = estimarCustoColeta(quantidade);
   const [rodando, setRodando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
 
@@ -311,7 +309,7 @@ export function FormEstrategias({
       if (!r.ok) {
         const msg =
           r.reason === "teto"
-            ? `Teto de gasto: ${r.motivo}`
+            ? `Limite de processamento atingido: ${r.motivo}`
             : r.reason === "limite_plano"
               ? (r.motivo ?? "Limite de leads do plano atingido.")
               : `Não coletou: ${r.reason ?? "erro"}`;
@@ -322,8 +320,7 @@ export function FormEstrategias({
       const txt =
         `${r.inseridos} lead(s) novo(s) de ${r.encontrados} encontrado(s)` +
         (r.descartados ? ` · ${r.descartados} descartado(s) sem contato` : "") +
-        ` · ${r.cacheHit ? "cache compartilhado" : `custo US$ ${(r.custo ?? 0).toFixed(4)}`}` +
-        ` · gasto no mês US$ ${(r.gastoMesDepois ?? 0).toFixed(2)} de ${r.teto?.mes ?? TETO_REDES_MES_USD}`;
+        ` · ${r.cacheHit ? "base reaproveitada" : "nova busca concluída"}`;
       toast.success(`${r.inseridos} lead(s) coletado(s).`);
       setResultado(txt);
     } catch (e) {
@@ -506,7 +503,7 @@ export function FormEstrategias({
             className="h-10 min-w-[190px] font-semibold"
             disabled={!camposOk || rodando || isBuscaRunning}
             onClick={coletar}
-            title={camposOk ? "Coleta real — respeita o teto de gasto" : "Complete os campos"}
+            title={camposOk ? "Busca protegida contra duplicidade" : "Complete os campos"}
           >
             {rodando || isBuscaRunning ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -528,10 +525,8 @@ export function FormEstrategias({
           {atual.coleta ? (
             camposOk ? (
               <>
-                Estimativa para {quantidade} perfis: <b>até ~US$ {custoEstimado.toFixed(2)}</b>.
-                Busca idêntica recente usa cache e custa US$ 0. Proteção padrão: US${" "}
-                {TETO_REDES_RODADA_USD.toFixed(2)} por busca e US$ {TETO_REDES_MES_USD.toFixed(2)}{" "}
-                por usuário/mês.
+                A busca pode entregar até <b>{quantidade} perfis</b>. Consultas equivalentes
+                reaproveitam a base existente e priorizam somente novos resultados para sua conta.
               </>
             ) : (
               <>Complete os campos acima para poder buscar.</>

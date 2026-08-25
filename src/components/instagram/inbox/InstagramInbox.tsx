@@ -19,8 +19,8 @@ export function InstagramInbox({
   onOpenAccounts: () => void;
 }) {
   const [account, setAccount] = useState<FlowBusinessAccount | null>(
-    accounts.find((item) => item.provider === "meta_official") ??
-      accounts.find((item) => item.provider === "unipile") ??
+    accounts.find((item) => item.provider === "unipile") ??
+      accounts.find((item) => item.status === "conectado") ??
       accounts[0] ??
       null,
   );
@@ -150,18 +150,17 @@ export function InstagramInbox({
       {account.provider === "evolution_legacy" ? (
         <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm">
           <AlertTriangle className="size-4 text-warning" />
-          Esta é uma conexão legada. Migre para a conexão alternativa ou para a API oficial.
+          Esta conta precisa ser reconectada para usar a sincronização mais recente do Instagram.
         </div>
       ) : account.provider === "unipile" ? (
         <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm">
-          <ShieldCheck className="size-4 text-warning" />
-          Conexão alternativa: monitore o status da conta e reconecte se o Instagram solicitar uma
-          verificação.
+          <ShieldCheck className="size-4 text-warning" />A conexão está protegida. Reconecte a conta
+          se o Instagram solicitar uma nova verificação de segurança.
         </div>
       ) : (
         <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 p-3 text-sm">
           <ShieldCheck className="size-4 text-success" />
-          Mensagens oficiais respeitam a janela de atendimento iniciada pelo contato.
+          Conta conectada e pronta para acompanhar as conversas iniciadas pelos contatos.
         </div>
       )}
       <div className="flex gap-2 overflow-x-auto">
@@ -191,11 +190,7 @@ export function InstagramInbox({
             <span
               className={`text-[10px] font-medium px-2 py-1 rounded-full ${account.status === "conectado" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}
             >
-              {account.provider === "meta_official"
-                ? "Meta oficial"
-                : account.provider === "unipile"
-                  ? "Alternativa"
-                  : "Legado"}
+              {account.status === "conectado" ? "Conectado" : "Atenção"}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">

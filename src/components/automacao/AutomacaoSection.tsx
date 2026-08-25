@@ -1,5 +1,5 @@
 // Aba AUTOMAÇÃO — o dono cria uma RECEITA (1x) e o robô prepara sob demanda; o dono revisa e
-// aprova. O robô NUNCA envia (para no portão). TETO DE GASTO em destaque — o robô gasta dinheiro.
+// aprova. O robô NUNCA envia (para no portão). Limites internos protegem cada execução.
 // A revisão em lote da rodada acontece na aba Campanhas (fluxo que já existe).
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -11,7 +11,6 @@ import {
   Pencil,
   RefreshCw,
   ShieldAlert,
-  DollarSign,
   History,
   AlertTriangle,
 } from "lucide-react";
@@ -91,15 +90,13 @@ export function AutomacaoSection({ onRevisar }: { onRevisar?: () => void }) {
     try {
       const res = await rodarAgora(r.id);
       if (res.status === "parada_teto") {
-        toast.warning(`Pausada pelo teto: ${res.detalhe}`);
+        toast.warning(`Pausada pelo limite de segurança: ${res.detalhe}`);
       } else if ((res.leads_preparados ?? 0) > 0) {
         toast.success(
-          `${res.leads_preparados} leads prontos pra revisão (custo US$ ${(res.custo_usd ?? 0).toFixed(2)}). Revise na aba Campanhas.`,
+          `${res.leads_preparados} leads prontos pra revisão. Revise na aba Campanhas.`,
         );
       } else {
-        toast.info(
-          `Rodada concluída: ${res.leads_buscados ?? 0} buscados, nenhum qualificado (US$ ${(res.custo_usd ?? 0).toFixed(2)}).`,
-        );
+        toast.info(`Rodada concluída: ${res.leads_buscados ?? 0} buscados, nenhum qualificado.`);
       }
       carregar();
     } catch (e) {
@@ -160,9 +157,9 @@ export function AutomacaoSection({ onRevisar }: { onRevisar?: () => void }) {
               "O robô descarta leads sem telefone/e-mail e avalia o score de oportunidade antes de preparar o rascunho da proposta.",
           },
           {
-            termo: "📌 4. Teto de Gasto & Trava de Segurança",
+            termo: "📌 4. Limites & Trava de Segurança",
             texto:
-              "Cada rodada possui teto máximo de custo em dólar (ex: US$ 5/rodada) e limite de leads para proteger seu orçamento de APIs.",
+              "Cada rodada possui limites de volume e de leads para manter a automação previsível e protegida.",
           },
           {
             termo: "📌 5. Revisão em Lote",
@@ -172,15 +169,12 @@ export function AutomacaoSection({ onRevisar }: { onRevisar?: () => void }) {
         ]}
       />
 
-      {/* aviso de custo */}
       <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-50 p-3 text-sm text-amber-900">
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
         <span>
-          O robô gasta dinheiro sozinho (Apify + IA por site). Cada receita tem{" "}
-          <b>teto por rodada e por mês</b> (leads e US$) — ao bater, ele para e avisa, nunca estoura
-          calado. O agendamento automático nasce <b>desligado</b>: ligue o <b>Agendamento</b> na
-          receita e o robô roda sozinho (diária/semanal) respeitando os tetos — ou use{" "}
-          <b>Rodar agora</b> pra disparar na hora.
+          Cada receita possui <b>limites por rodada e por mês</b>. Ao atingir um limite, o robô para
+          e avisa. O agendamento automático nasce <b>desligado</b>: ligue o <b>Agendamento</b> para
+          rodar diária ou semanalmente, ou use <b>Rodar agora</b> para iniciar na hora.
         </span>
       </div>
 
@@ -251,7 +245,6 @@ function ReceitaCard({
   const [rodadas, setRodadas] = useState<Rodada[]>([]);
   const [verHist, setVerHist] = useState(false);
   const pctLeads = Math.min(100, Math.round((r.leads_mes / Math.max(1, r.max_leads_mes)) * 100));
-  const pctUsd = Math.min(100, Math.round((r.gasto_mes_usd / Math.max(0.01, r.max_usd_mes)) * 100));
 
   return (
     <div className="rounded-2xl border bg-card p-4">
@@ -284,7 +277,7 @@ function ReceitaCard({
       </div>
 
       {/* uso do teto no mês */}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3">
         <TetoBarra
           rotulo="Leads no mês"
           atual={r.leads_mes}
@@ -292,23 +285,13 @@ function ReceitaCard({
           pct={pctLeads}
           sufixo={`de ${r.max_leads_mes}`}
         />
-        <TetoBarra
-          rotulo="Gasto no mês"
-          atual={r.gasto_mes_usd}
-          max={r.max_usd_mes}
-          pct={pctUsd}
-          sufixo={`de US$ ${r.max_usd_mes}`}
-          usd
-        />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <label className="flex items-center gap-1.5">
           <Switch checked={r.ativa} onCheckedChange={onToggleAtiva} />
           Agendamento {r.ativa ? `ligado (${r.frequencia})` : "desligado"}
         </label>
-        <span>
-          Teto/rodada: {r.leads_por_rodada} leads · US$ {r.max_usd_rodada}
-        </span>
+        <span>Por rodada: até {r.leads_por_rodada} leads</span>
         {r.ultima_rodada_em && <span>Última: {formatData(r.ultima_rodada_em)}</span>}
         <button
           className="ml-auto flex items-center gap-1 text-primary hover:underline"
@@ -343,7 +326,7 @@ function ReceitaCard({
                 </span>
                 <span>
                   {rd.leads_preparados} prontos / {rd.leads_buscados} buscados ·{" "}
-                  {rd.leads_descartados} descartados · US$ {Number(rd.custo_usd).toFixed(2)}
+                  {rd.leads_descartados} descartados
                 </span>
               </div>
             ))
@@ -359,21 +342,19 @@ function TetoBarra({
   atual,
   pct,
   sufixo,
-  usd,
 }: {
   rotulo: string;
   atual: number;
   max: number;
   pct: number;
   sufixo: string;
-  usd?: boolean;
 }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{rotulo}</span>
         <span className="tabular-nums">
-          {usd ? `US$ ${Number(atual).toFixed(2)}` : atual} {sufixo}
+          {atual} {sufixo}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -466,7 +447,8 @@ function ReceitaDialog({
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-50 p-2.5 text-xs text-amber-900">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <span>
-                Nenhum chip de WhatsApp está conectado para disparo nesta organização. Conecte um chip na aba <b>WhatsApp</b> para disparar as abordagens desta receita.
+                Nenhum chip de WhatsApp está conectado para disparo nesta organização. Conecte um
+                chip na aba <b>WhatsApp</b> para disparar as abordagens desta receita.
               </span>
             </div>
           )}
@@ -533,10 +515,10 @@ function ReceitaDialog({
             </Campo>
           </div>
 
-          {/* TETOS em destaque */}
+          {/* Limites de volume em destaque */}
           <div className="rounded-xl border border-amber-500/30 bg-amber-50/40 p-3">
             <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-amber-900">
-              <DollarSign className="h-4 w-4" /> Teto de gasto (obrigatório)
+              <ShieldAlert className="h-4 w-4" /> Limites da automação
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Campo label="Leads por rodada">
@@ -558,22 +540,6 @@ function ReceitaDialog({
                   type="number"
                   value={f.max_leads_mes}
                   onChange={(e) => set({ max_leads_mes: num(e.target.value) })}
-                />
-              </Campo>
-              <Campo label="Máx. US$/rodada">
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={f.max_usd_rodada}
-                  onChange={(e) => set({ max_usd_rodada: num(e.target.value) })}
-                />
-              </Campo>
-              <Campo label="Máx. US$/mês">
-                <Input
-                  type="number"
-                  step="1"
-                  value={f.max_usd_mes}
-                  onChange={(e) => set({ max_usd_mes: num(e.target.value) })}
                 />
               </Campo>
               <Campo label="Frequência (quando ligar o agendamento)">

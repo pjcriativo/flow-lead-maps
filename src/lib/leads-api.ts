@@ -30,7 +30,7 @@ export type FonteBusca = "osm" | "geoapify" | "apify" | "places";
 export const FONTE_LABELS: Record<FonteBusca, string> = {
   osm: "OpenStreetMap (grátis)",
   geoapify: "Geoapify (grátis)",
-  apify: "Google Maps via Apify (rico — pago)",
+  apify: "Google Maps avançado",
   places: "Google Places (requer billing)",
 };
 

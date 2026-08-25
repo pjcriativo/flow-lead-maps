@@ -18,7 +18,6 @@ import {
   Target,
   UserRoundSearch,
   Users,
-  WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,7 +36,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { CitySelector } from "@/components/leads/instagram/CitySelector";
 import { NichoSelector } from "@/components/leads/NichoSelector";
 import {
-  estimateCommentsHunterCost,
   listCommentsHunterHistory,
   runCommentsHunter,
   type CommentLeadResult,
@@ -116,7 +114,6 @@ export function CommentsHunter({
     () => ({ ...input, postUrls: input.sourceType === "posts" ? parsedUrls : [] }),
     [input, parsedUrls],
   );
-  const estimatedCost = estimateCommentsHunterCost(effectiveInput);
   const requestedComments =
     (input.sourceType === "profile" ? input.maxPosts : Math.max(1, parsedUrls.length)) *
     input.commentsPerPost;
@@ -193,10 +190,12 @@ export function CommentsHunter({
             </div>
             <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
               <div className="flex items-center gap-2 font-medium">
-                <WalletCards className="size-4 text-primary" /> Custo máximo estimado
+                <CheckCircle2 className="size-4 text-primary" /> Busca protegida
               </div>
-              <div className="mt-1 text-xl font-semibold">US$ {estimatedCost.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground">cache recente custa US$ 0</div>
+              <div className="mt-1 text-base font-semibold">Base reaproveitada</div>
+              <div className="text-xs text-muted-foreground">
+                duplicados filtrados automaticamente
+              </div>
             </div>
           </div>
 
@@ -376,7 +375,7 @@ export function CommentsHunter({
           <div className="flex flex-col justify-between gap-4 border-t border-border pt-5 sm:flex-row sm:items-center">
             <div className="text-sm text-muted-foreground">
               <strong className="text-foreground">{requestedComments}</strong> comentários no teto ·
-              enriquecimento só dos melhores · limite duro de custo antes de rodar
+              enriquecimento só dos melhores · processamento controlado antes de rodar
             </div>
             <Button onClick={run} disabled={running} size="lg" className="min-w-52">
               {running ? <Loader2 className="size-4 animate-spin" /> : <Radar className="size-4" />}
@@ -422,8 +421,7 @@ export function CommentsHunter({
                   <Badge variant="outline">{job.status}</Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {job.input.niche} · {job.stats?.qualified ?? 0} qualificados · US${" "}
-                  {Number(job.actual_cost_usd ?? 0).toFixed(2)}
+                  {job.input.niche} · {job.stats?.qualified ?? 0} qualificados
                 </div>
               </button>
             ))}
@@ -472,7 +470,6 @@ function CommentsResults({
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline">{stats.posts} posts</Badge>
-          <Badge variant="outline">US$ {Number(result.actualCost ?? 0).toFixed(3)} real</Badge>
           {Object.values(stats.cache).some(Boolean) ? (
             <Badge variant="secondary">cache reutilizado</Badge>
           ) : null}

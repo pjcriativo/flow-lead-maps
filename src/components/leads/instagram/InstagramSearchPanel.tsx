@@ -13,7 +13,6 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { NichoSelector } from "../NichoSelector";
 import { UF_LIST } from "../leads-shared";
-import { estimarCustoColeta } from "@/lib/redes-teto";
 import { montarPlanoDescobertaInstagram } from "@/lib/instagram-discovery";
 import { estrategiaPorId, type Estrategia, type PedidoBusca } from "@/lib/fontes-prospeccao";
 import { CitySelector } from "./CitySelector";
@@ -44,10 +43,6 @@ export function InstagramSearchPanel({
     if (!nicho.trim() || !cidade.trim()) return null;
     return montarPlanoDescobertaInstagram({ nicho, cidade, metaQualificados: limite });
   }, [cidade, limite, nicho]);
-  const custo = useMemo(
-    () => estimarCustoColeta(plano?.maxCandidatos ?? limite),
-    [limite, plano?.maxCandidatos],
-  );
 
   const buscar = async () => {
     if (!podeBuscar) return;
@@ -251,9 +246,8 @@ export function InstagramSearchPanel({
           />
           <p className="mt-2 text-xs text-muted-foreground">
             Para entregar {limite}, o motor pode analisar até {plano?.maxCandidatos ?? limite}
-            perfis em consultas complementares e para assim que atingir a meta. Estimativa máxima:
-            <b className="text-foreground"> US$ {custo.toFixed(2)}</b>; buscas recentes idênticas
-            usam cache e custam US$ 0.
+            perfis em consultas complementares e para assim que atingir a meta. Buscas equivalentes
+            reaproveitam a base existente e priorizam somente perfis novos para sua conta.
           </p>
         </div>
       </section>

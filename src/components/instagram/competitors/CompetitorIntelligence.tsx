@@ -25,7 +25,6 @@ import {
   Target,
   TrendingUp,
   Users,
-  WalletCards,
 } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -70,7 +69,6 @@ import {
 } from "@/components/instagram/shared/InstagramDiscoveryFields";
 import {
   archiveInstagramCompetitor,
-  estimateCompetitorCost,
   listInstagramCompetitors,
   monitorInstagramCompetitor,
   saveInstagramCompetitor,
@@ -151,8 +149,6 @@ export function CompetitorIntelligence({ onNavigate }: { onNavigate?: (tab: stri
     () => alerts.filter((item) => item.competitor_id === selectedId),
     [alerts, selectedId],
   );
-  const estimatedCost = estimateCompetitorCost({ competitorId: selectedId ?? "", ...monitor });
-
   const analyze = async (competitorId: string) => {
     setRunningId(competitorId);
     try {
@@ -263,8 +259,8 @@ export function CompetitorIntelligence({ onNavigate }: { onNavigate?: (tab: stri
           </div>
           <div className="flex flex-wrap gap-2">
             <div className="rounded-xl border border-border bg-muted/40 px-4 py-2 text-sm">
-              <span className="text-muted-foreground">Próxima análise: </span>
-              <strong>US$ {estimatedCost.toFixed(2)}</strong>
+              <strong>{competitors.length}</strong>
+              <span className="text-muted-foreground"> perfis monitorados</span>
             </div>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="size-4" /> Adicionar concorrente

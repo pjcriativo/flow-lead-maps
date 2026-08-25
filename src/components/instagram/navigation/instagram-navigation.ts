@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
-  Bot,
   BriefcaseBusiness,
   Crosshair,
   Eye,
@@ -29,7 +28,6 @@ export type InstagramView =
   | "campaigns"
   | "accounts"
   | "inbox"
-  | "flows"
   | "overview";
 
 type NavigationItem = {
@@ -133,23 +131,12 @@ export const instagramNavigation: NavigationGroup[] = [
     ],
   },
   {
-    label: "Automação",
-    items: [
-      {
-        id: "flows",
-        label: "Flow Builder",
-        description: "Fluxos oficiais estilo ManyChat",
-        Icon: Bot,
-      },
-    ],
-  },
-  {
     label: "Inteligência",
     items: [
       {
         id: "overview",
         label: "Desempenho",
-        description: "Conversão, custos e tendências",
+        description: "Conversão, qualidade e tendências",
         Icon: BarChart3,
       },
     ],

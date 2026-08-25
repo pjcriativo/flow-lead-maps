@@ -32,7 +32,7 @@ export function FlowBusinessToday({
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
               Cada ação pública é guiada e registrada. Mensagens automáticas só entram em cena
-              depois que o contato inicia uma interação permitida pela Meta.
+              depois que o contato inicia uma interação com o perfil.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button onClick={() => onNavigate("hunter")}>Encontrar oportunidades</Button>
@@ -82,10 +82,10 @@ export function FlowBusinessToday({
         />
         <Metric
           icon={CheckCircle2}
-          label="Automações"
-          value={plan.used.flows}
-          limit={plan.limits.flows}
-          detail={`${plan.limits.flows} no plano`}
+          label="Contas conectadas"
+          value={plan.used.accounts}
+          limit={plan.limits.accounts}
+          detail={`${plan.limits.accounts} no plano`}
         />
       </section>
 

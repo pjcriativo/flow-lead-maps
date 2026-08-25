@@ -269,7 +269,7 @@ export type Estrategia = {
   nota?: string;
   /** onde a coleta (Apify) vai plugar quando ligarmos */
   pluga: string;
-  /** true = coletor JÁ LIGADO (ator verificado + teto de gasto). As demais seguem "em breve". */
+  /** true = coletor JÁ LIGADO e protegido por limites internos. As demais seguem "em breve". */
   coleta?: boolean;
 };
 
@@ -322,8 +322,7 @@ export const ESTRATEGIAS: Estrategia[] = [
     descricao: "Quem já paga anúncio — tem verba e prova que investe em marketing.",
     campos: ["nicho", "cidade"],
     viabilidade: "viavel",
-    pluga:
-      "Biblioteca de Anúncios da Meta (pública) — fonte separada e mais estável que o scraper.",
+    pluga: "Biblioteca pública de anúncios — fonte separada e mais estável que a coleta de perfis.",
     coleta: true,
   },
 

@@ -151,7 +151,7 @@ function OpportunityCard({
         "uma análise rápida e personalizada",
       );
       setMessage(result);
-      toast.success("Abordagem contextual criada sem custo de IA.");
+      toast.success("Abordagem contextual criada e pronta para revisão.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao gerar abordagem.");
     } finally {
@@ -294,7 +294,7 @@ export function InstagramClientHunter() {
       await refresh();
       toast.success(
         result.cacheHit
-          ? `${result.total} perfis vieram da base, sem nova cobrança.`
+          ? `${result.total} perfis foram reaproveitados da base existente.`
           : `${result.total} perfis analisados; ${result.newProfiles} eram novos para sua conta.`,
       );
     } catch (error) {
@@ -357,7 +357,7 @@ export function InstagramClientHunter() {
             </CardTitle>
             <CardDescription>
               Informe perfis do mesmo mercado. A base compartilhada é consultada antes de qualquer
-              coleta paga.
+              busca complementar.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -405,8 +405,8 @@ export function InstagramClientHunter() {
               {!plan.features.overlap ? <LockKeyhole className="ml-auto h-3.5 w-3.5" /> : null}
             </Button>
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3 text-xs text-emerald-800 dark:text-emerald-300">
-              <Database className="mb-1 h-4 w-4" /> Perfis já conhecidos são reutilizados. Uma nova
-              cobrança só ocorre quando a base ainda não tem a amostra solicitada.
+              <Database className="mb-1 h-4 w-4" /> Perfis já conhecidos são reutilizados. A busca
+              complementar procura apenas o que ainda não existe na base.
             </div>
           </CardContent>
         </Card>
@@ -579,12 +579,6 @@ export function InstagramClientHunter() {
                   label="Conversões ganhas"
                   value={report.won}
                   detail="Marcadas pela equipe"
-                />
-                <Metric
-                  icon={Database}
-                  label="Custo Apify"
-                  value={`US$ ${report.costUsd.toFixed(2)}`}
-                  detail={`US$ ${report.costPerOpportunityUsd.toFixed(3)} por oportunidade`}
                 />
                 <Metric
                   icon={MapPin}

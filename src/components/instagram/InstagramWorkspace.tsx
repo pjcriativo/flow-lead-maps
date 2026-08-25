@@ -39,7 +39,6 @@ import { FlowBusinessToday } from "@/components/instagram/dashboard/FlowBusiness
 import { FlowBusinessCrm } from "@/components/instagram/crm/FlowBusinessCrm";
 import { FlowBusinessCadences } from "@/components/instagram/cadences/FlowBusinessCadences";
 import { FlowBusinessAccounts } from "@/components/instagram/accounts/FlowBusinessAccounts";
-import { FlowBusinessFlowBuilder } from "@/components/instagram/flows/FlowBusinessFlowBuilder";
 import {
   InstagramScoreBars,
   InstagramScoreControls,
@@ -74,11 +73,8 @@ import {
   createFlowBusinessCadence,
   loadFlowBusinessWorkspace,
   moveFlowBusinessCard,
-  publishFlowBusinessFlow,
-  saveFlowBusinessFlow,
   startAlternativeInstagramConnection,
   startFlowBusinessCadence,
-  startMetaInstagramConnection,
   type FlowBusinessStage,
   type FlowBusinessTask,
   type FlowBusinessWorkspace,
@@ -300,58 +296,14 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         <FlowBusinessAccounts
           accounts={business.accounts}
           plan={business.plan}
-          onConnectAlternative={async () => {
+          onConnect={async () => {
             try {
               const authorizationUrl = await startAlternativeInstagramConnection();
               window.location.assign(authorizationUrl);
             } catch (error) {
               toast.error(
-                error instanceof Error ? error.message : "Conexão alternativa indisponível.",
+                error instanceof Error ? error.message : "Conexão do Instagram indisponível.",
               );
-            }
-          }}
-          onConnectOfficial={async () => {
-            try {
-              const authorizationUrl = await startMetaInstagramConnection();
-              window.location.assign(authorizationUrl);
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : "Integração Meta indisponível.");
-            }
-          }}
-        />
-      ) : null}
-
-      {tab === "flows" && business ? (
-        <FlowBusinessFlowBuilder
-          flows={business.flows}
-          accounts={business.accounts}
-          plan={business.plan}
-          onSave={async (draft) => {
-            try {
-              const id = await saveFlowBusinessFlow({
-                ...draft,
-                triggerConfig: draft.keyword ? { keyword: draft.keyword } : {},
-              });
-              await refreshBusiness();
-              toast.success("Rascunho salvo.");
-              return id;
-            } catch (error) {
-              toast.error(
-                error instanceof Error ? error.message : "Não foi possível salvar o fluxo.",
-              );
-              throw error;
-            }
-          }}
-          onPublish={async (flowId) => {
-            try {
-              await publishFlowBusinessFlow(flowId);
-              await refreshBusiness();
-              toast.success("Fluxo publicado.");
-            } catch (error) {
-              toast.error(
-                error instanceof Error ? error.message : "Não foi possível publicar o fluxo.",
-              );
-              throw error;
             }
           }}
         />

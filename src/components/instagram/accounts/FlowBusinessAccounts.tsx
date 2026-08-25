@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  ExternalLink,
   Instagram,
   LockKeyhole,
   PlugZap,
@@ -14,16 +13,10 @@ import type { FlowBusinessAccount, FlowBusinessPlan } from "@/services/flow-busi
 interface FlowBusinessAccountsProps {
   accounts: FlowBusinessAccount[];
   plan: FlowBusinessPlan;
-  onConnectAlternative: () => Promise<void>;
-  onConnectOfficial: () => Promise<void>;
+  onConnect: () => Promise<void>;
 }
 
-export function FlowBusinessAccounts({
-  accounts,
-  plan,
-  onConnectAlternative,
-  onConnectOfficial,
-}: FlowBusinessAccountsProps) {
+export function FlowBusinessAccounts({ accounts, plan, onConnect }: FlowBusinessAccountsProps) {
   const atLimit = plan.used.accounts >= plan.limits.accounts;
   const connectedAccounts = accounts.filter((account) => account.provider !== "evolution_legacy");
   const legacyAccounts = accounts.filter((account) => account.provider === "evolution_legacy");
@@ -33,31 +26,19 @@ export function FlowBusinessAccounts({
       <section className="grid gap-6 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)] lg:grid-cols-[minmax(0,1fr)_340px]">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-instagram-pink">
-            Conexão alternativa
+            Contas do Instagram
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-            Conecte seu Instagram sem depender da aprovação da Meta
+            Conecte seu Instagram em poucos passos
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            A autenticação e o 2FA acontecem no ambiente seguro do provedor. O Flow Business não
-            recebe nem armazena sua senha. Como essa conexão não usa a API oficial do Instagram, a
-            conta pode solicitar verificações ou reconexões periódicas.
+            A autenticação e a verificação em duas etapas acontecem em um ambiente protegido. O Flow
+            Business não recebe nem armazena sua senha. O Instagram pode solicitar uma nova
+            verificação ou reconexão para manter a conta segura.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button disabled={atLimit} onClick={() => void onConnectAlternative()}>
+            <Button disabled={atLimit} onClick={() => void onConnect()}>
               <PlugZap className="size-4" /> Conectar Instagram
-            </Button>
-            <Button variant="outline" disabled={atLimit} onClick={() => void onConnectOfficial()}>
-              Usar API oficial da Meta
-            </Button>
-            <Button variant="ghost" asChild>
-              <a
-                href="https://developer.unipile.com/v2.0/docs/authenticate-with-hosted-auth"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Como funciona <ExternalLink className="size-3.5" />
-              </a>
             </Button>
           </div>
         </div>
@@ -73,9 +54,9 @@ export function FlowBusinessAccounts({
             className="mt-3"
           />
           <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-muted-foreground">
-            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />A chave do provedor fica
-            somente no backend. Cada organização enxerga apenas as próprias contas e a cota é
-            validada novamente no banco.
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />A conexão fica protegida
+            no backend. Cada organização enxerga apenas as próprias contas e o limite do plano é
+            validado novamente no banco.
           </div>
         </div>
       </section>
@@ -123,11 +104,9 @@ export function FlowBusinessAccounts({
   );
 }
 
-function providerLabel(account: FlowBusinessAccount): string {
-  if (account.provider === "unipile") return "Conexão alternativa · Hosted Auth";
-  if (account.provider === "meta_official")
-    return `Meta oficial · ${account.accountType || "profissional"}`;
-  return "Evolution API · legado";
+function connectionLabel(account: FlowBusinessAccount): string {
+  if (account.provider === "evolution_legacy") return "Conexão existente · migração recomendada";
+  return account.accountType ? `Perfil ${account.accountType}` : "Perfil profissional";
 }
 
 function AccountCard({ account }: { account: FlowBusinessAccount }) {
@@ -147,7 +126,7 @@ function AccountCard({ account }: { account: FlowBusinessAccount }) {
       <h4 className="mt-4 font-semibold">
         {account.username ? `@${account.username}` : account.name}
       </h4>
-      <p className="mt-1 text-xs text-muted-foreground">{providerLabel(account)}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{connectionLabel(account)}</p>
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs">
         <span className="text-muted-foreground">Status</span>
         <span className={connected ? "font-semibold text-success" : "font-semibold text-warning"}>
@@ -156,7 +135,7 @@ function AccountCard({ account }: { account: FlowBusinessAccount }) {
       </div>
       {account.errorMessage ? (
         <p className="mt-3 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
-          {account.errorMessage}
+          Esta conta precisa de atenção. Reconecte o Instagram para continuar usando as conversas.
         </p>
       ) : null}
     </article>

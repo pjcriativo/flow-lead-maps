@@ -1,5 +1,5 @@
 // Fase 2 — CAMPANHAS (portão do site). Modelo SOB DEMANDA: criar campanha de uma lista
-// NÃO gera nada (todos os leads entram 'pendente', custo zero). O usuário SELECIONA
+// NÃO gera nada (todos os leads entram 'pendente'). O usuário SELECIONA
 // quem preparar → só esses geram site (reusando redesign pronto) + proposta rascunho,
 // revisada por PREVIEW (iframe, sem publicar). Publicar (URL) só na aprovação.
 import { useEffect, useMemo, useState } from "react";
@@ -329,9 +329,7 @@ function CriarCampanhaDialog({
     setCriandoId(l.id);
     try {
       const r = await criarCampanhaDaLista(l.id, l.name);
-      toast.success(
-        `Campanha criada com ${r.total} leads pendentes (custo zero). Selecione quem preparar.`,
-      );
+      toast.success(`Campanha criada com ${r.total} leads pendentes. Selecione quem preparar.`);
       onCriada(r.campanha_id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao criar a campanha");
@@ -831,7 +829,7 @@ function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: (
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {progresso.gerados} gerados · {progresso.reusados} reusados (redesign pronto) ·{" "}
-            {progresso.erros} erro. Cada geração nova custa IA (~US$ 0,01–0,05); reuso é grátis.
+            {progresso.erros} erro. Conteúdos já preparados são reaproveitados automaticamente.
           </div>
         </div>
       )}

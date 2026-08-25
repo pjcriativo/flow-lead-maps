@@ -86,8 +86,8 @@ export function FlowBusinessFlowBuilder({
   const [publishing, setPublishing] = useState(false);
   const [actionToAdd, setActionToAdd] = useState<FlowNodeSubtype>("send_message");
   const atLimit = !draft.id && plan.used.flows >= plan.limits.flows;
-  const officialAccounts = accounts.filter(
-    (account) => account.provider === "meta_official" && account.status === "conectado",
+  const connectedAccounts = accounts.filter(
+    (account) => account.provider !== "evolution_legacy" && account.status === "conectado",
   );
 
   const editFlow = (flow: FlowBusinessFlow) =>
@@ -195,7 +195,7 @@ export function FlowBusinessFlowBuilder({
               <h2 className="text-lg font-semibold">Construtor de fluxos</h2>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Monte respostas e ações oficiais em uma sequência simples.
+              Monte respostas e ações automáticas em uma sequência simples.
             </p>
           </div>
           <div className="flex gap-2">
@@ -241,7 +241,7 @@ export function FlowBusinessFlowBuilder({
               />
             </div>
             <div>
-              <Label>Conta oficial</Label>
+              <Label>Conta conectada</Label>
               <Select
                 value={draft.accountId ?? "none"}
                 onValueChange={(value) =>
@@ -256,7 +256,7 @@ export function FlowBusinessFlowBuilder({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sem conta · rascunho</SelectItem>
-                  {officialAccounts.map((account) => (
+                  {connectedAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.username ? `@${account.username}` : account.name}
                     </SelectItem>
@@ -328,7 +328,7 @@ export function FlowBusinessFlowBuilder({
               icon={Bot}
               title={`Quando: ${TRIGGERS.find((trigger) => trigger.value === draft.triggerType)?.label || "Evento"}`}
               detail={
-                draft.keyword ? `Palavra-chave: ${draft.keyword}` : "Entrada validada pela Meta"
+                draft.keyword ? `Palavra-chave: ${draft.keyword}` : "Entrada recebida pelo perfil"
               }
             />
             {draft.nodes.map((node, index) => (

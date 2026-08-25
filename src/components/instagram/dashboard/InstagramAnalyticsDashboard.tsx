@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BadgeCheck,
-  CircleDollarSign,
   ContactRound,
   Database,
   Instagram,
@@ -174,7 +173,7 @@ function DashboardContent({
               </h2>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Aquisição, qualidade e custo real consolidados de todas as fontes do Instagram.
+              Aquisição, qualidade e evolução consolidadas de todas as fontes do Instagram.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -211,7 +210,7 @@ function DashboardContent({
         ) : null}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           icon={Database}
           label="Base qualificada"
@@ -230,12 +229,6 @@ function DashboardContent({
           label="Taxa de qualificação"
           value={`${efficiency.qualificationRate.toFixed(1)}%`}
           helper={`${formatNumber(dashboard.funnel.qualified)} perfis aprovados`}
-        />
-        <MetricCard
-          icon={CircleDollarSign}
-          label="Custo por novo lead"
-          value={formatUsd(efficiency.costPerNewLead)}
-          helper={`${formatUsd(dashboard.allCost)} investidos no total`}
         />
         <MetricCard
           icon={Sparkles}
@@ -294,7 +287,7 @@ function DashboardContent({
       <div className="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
         <Panel
           title="Evolução da prospecção"
-          text="Qualificados e novos leads por dia; custo real aparece no resumo do período."
+          text="Qualificados e novos leads por dia para acompanhar a evolução da operação."
         >
           {timeline.length ? (
             <div className="h-72 pt-4">
@@ -353,10 +346,10 @@ function DashboardContent({
 
       <Panel
         title="Performance por fonte"
-        text="Ranking comercial separado da inteligência de concorrentes; custo é o valor real informado pela Apify."
+        text="Ranking comercial separado da inteligência de concorrentes, com volume e conversão."
       >
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[920px] text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="border-y border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-3">Fonte</th>
@@ -365,8 +358,6 @@ function DashboardContent({
                 <th className="px-3 py-3">Qualificados</th>
                 <th className="px-3 py-3">Novos</th>
                 <th className="px-3 py-3">Conversão</th>
-                <th className="px-3 py-3">Custo</th>
-                <th className="px-3 py-3">Custo/lead</th>
               </tr>
             </thead>
             <tbody>
@@ -396,10 +387,6 @@ function DashboardContent({
                     {source.kind === "intelligence" ? "—" : formatNumber(source.newLeads)}
                   </td>
                   <td className="px-3 py-3 tabular-nums">{source.qualificationRate.toFixed(1)}%</td>
-                  <td className="px-3 py-3 tabular-nums">{formatUsd(source.cost)}</td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {source.kind === "intelligence" ? "—" : formatUsd(source.costPerNewLead)}
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -465,7 +452,7 @@ function DashboardContent({
 
       <Panel
         title="Execuções recentes"
-        text="Histórico auditável de buscas e monitoramentos, com resultado e custo."
+        text="Histórico auditável de buscas e monitoramentos, com os resultados entregues."
       >
         <div className="mt-4 divide-y divide-border">
           {dashboard.recentRuns.map((run) => (
@@ -499,7 +486,6 @@ function DashboardContent({
                     ? `${run.qualified} oportunidades`
                     : `${run.newLeads} novos`}
                 </span>
-                <span>{formatUsd(run.cost)}</span>
                 <StatusBadge status={run.status} />
               </div>
             </div>
@@ -776,9 +762,6 @@ function humanize(value: string): string {
 
 function formatNumber(value: number): string {
   return Math.round(value).toLocaleString("pt-BR");
-}
-function formatUsd(value: number): string {
-  return `US$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
 }
 function formatDateTime(value: string): string {
   const date = new Date(value);

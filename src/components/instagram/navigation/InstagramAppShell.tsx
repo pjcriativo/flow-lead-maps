@@ -116,7 +116,7 @@ export function InstagramAppShell({
               Base protegida
             </div>
             <p className="mt-1.5 text-[10px] leading-relaxed text-sidebar-foreground/45">
-              Leads já encontrados são reaproveitados para reduzir custo e evitar duplicidade.
+              Leads já encontrados são reaproveitados para evitar duplicidade nas próximas buscas.
             </p>
           </div>
         </div>

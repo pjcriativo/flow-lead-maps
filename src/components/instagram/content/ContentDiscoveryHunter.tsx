@@ -20,7 +20,6 @@ import {
   SearchCheck,
   Sparkles,
   Users,
-  WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -56,7 +55,6 @@ import {
   normalizeInstagramProfileInputs,
 } from "@/lib/instagram-content-discovery";
 import {
-  estimateContentDiscoveryCost,
   listContentDiscoveryHistory,
   runContentDiscovery,
   type ContentDiscoveryHistory,
@@ -157,7 +155,6 @@ export function ContentDiscoveryHunter({
     () => ({ ...input, hashtags, profileInputs }),
     [hashtags, input, profileInputs],
   );
-  const estimatedCost = estimateContentDiscoveryCost(effectiveInput);
   const requestedContent =
     instagramDiscoverySourceCount(effectiveInput) *
     (effectiveInput.mode === "imports" ? 1 : input.postsPerSource);
@@ -242,16 +239,18 @@ export function ContentDiscoveryHunter({
                 </div>
                 <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
                   Encontra sinais de compra em hashtags, lugares, Reels e menções; importa listas e
-                  expande perfis relacionados sem pagar enriquecimento desnecessário.
+                  expande perfis relacionados sem repetir processamento desnecessário.
                 </p>
               </div>
             </div>
             <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
               <div className="flex items-center gap-2 font-medium">
-                <WalletCards className="size-4 text-primary" /> Teto estimado
+                <CheckCircle2 className="size-4 text-primary" /> Descoberta protegida
               </div>
-              <div className="mt-1 text-xl font-semibold">US$ {estimatedCost.toFixed(2)}</div>
-              <div className="text-xs text-muted-foreground">cache reutilizado custa US$ 0</div>
+              <div className="mt-1 text-base font-semibold">Base inteligente</div>
+              <div className="text-xs text-muted-foreground">
+                resultados conhecidos são reaproveitados
+              </div>
             </div>
           </div>
 
@@ -601,8 +600,7 @@ export function ContentDiscoveryHunter({
                   <Badge variant="outline">{job.status}</Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {job.input.niche} · {Number(job.stats?.qualified ?? 0)} qualificados · US${" "}
-                  {Number(job.actual_cost_usd ?? 0).toFixed(2)}
+                  {job.input.niche} · {Number(job.stats?.qualified ?? 0)} qualificados
                 </div>
               </button>
             ))}
@@ -655,7 +653,6 @@ function ContentResults({
             Score médio {stats.averageContentScore}/100 · evidência preservada em cada perfil.
           </p>
         </div>
-        <Badge variant="outline">Custo real US$ {Number(result.actualCost ?? 0).toFixed(3)}</Badge>
       </div>
       <div className="grid gap-px bg-border sm:grid-cols-2 xl:grid-cols-5">
         {funnel.map(({ label, value, icon: Icon }) => (

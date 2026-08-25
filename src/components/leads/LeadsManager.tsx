@@ -288,7 +288,7 @@ export function LeadsManager({
     if (!ids.length) return;
     if (
       !confirm(
-        `Gerar site para ${ids.length} lead(s)? Cada geração usa IA (custo real) e leva alguns segundos. Os sites nascem como rascunho, sem publicar.`,
+        `Gerar site para ${ids.length} lead(s)? A preparação leva alguns segundos. Os sites nascem como rascunho, sem publicar.`,
       )
     )
       return;

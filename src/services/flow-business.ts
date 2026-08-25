@@ -355,13 +355,11 @@ function workspaceFromJson(value: Json | null): FlowBusinessWorkspace {
 
 function friendlyError(message: string): Error {
   if (message.includes("UNIPILE") || message.includes("unipile"))
-    return new Error(
-      "A conexão alternativa do Instagram ainda não foi ativada pelo administrador.",
-    );
+    return new Error("A conexão do Instagram ainda não foi ativada pelo administrador.");
   if (message.includes("flow_business_limit"))
     return new Error("O limite deste recurso no seu plano foi atingido.");
   if (message.includes("official_account_required"))
-    return new Error("Conecte uma conta profissional pela API oficial da Meta antes de publicar.");
+    return new Error("Este recurso ainda não está disponível para a conta conectada.");
   if (message.includes("outbound_requires_customer_entry_point"))
     return new Error("Mensagens automáticas exigem que o contato tenha iniciado a interação.");
   if (message.includes("flow_not_available_on_plan"))
@@ -476,16 +474,6 @@ export async function publishFlowBusinessFlow(flowId: string) {
   raiseIfError(error);
 }
 
-export async function startMetaInstagramConnection(): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("flow-business-meta", {
-    body: { action: "start" },
-  });
-  if (error) throw friendlyError(error.message);
-  if (!isRecord(data) || typeof data.authorizationUrl !== "string")
-    throw new Error("A integração oficial da Meta ainda não foi configurada pelo administrador.");
-  return data.authorizationUrl;
-}
-
 export async function startAlternativeInstagramConnection(): Promise<string> {
   const { data, error } = await supabase.functions.invoke("flow-business-unipile", {
     body: { action: "start" },
@@ -496,6 +484,6 @@ export async function startAlternativeInstagramConnection(): Promise<string> {
     throw friendlyError(details || error.message);
   }
   if (!isRecord(data) || typeof data.authorizationUrl !== "string")
-    throw new Error("A conexão alternativa do Instagram ainda não foi configurada.");
+    throw new Error("A conexão do Instagram ainda não foi configurada.");
   return data.authorizationUrl;
 }
