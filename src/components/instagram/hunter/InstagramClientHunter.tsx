@@ -320,6 +320,14 @@ export function InstagramClientHunter() {
       setRunning(false);
     }
   };
+
+  if (loading || !plan)
+    return (
+      <div className="flex min-h-72 items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
+      </div>
+    );
+
   const enrichOpportunities = async () => {
     setEnriching(true);
     try {
@@ -337,13 +345,6 @@ export function InstagramClientHunter() {
       setEnriching(false);
     }
   };
-
-  if (loading || !plan)
-    return (
-      <div className="flex min-h-72 items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
-      </div>
-    );
 
   return (
     <div className="space-y-5">

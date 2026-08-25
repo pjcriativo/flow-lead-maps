@@ -26,6 +26,7 @@ import {
   Bell,
   Lock,
   Instagram,
+  GraduationCap,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { posthog } from "@/lib/posthog";
 import { SearchSection } from "@/components/leads/SearchSection";
 import { InstagramWorkspace } from "@/components/instagram/InstagramWorkspace";
+import { FlowAcademyComingSoon } from "@/components/academy/FlowAcademyComingSoon";
 import { PipelineSection } from "@/components/leads/PipelineSection";
 import { LeadsManager } from "@/components/leads/LeadsManager";
 import { PropostasSection } from "@/components/propostas/PropostasSection";
@@ -111,13 +113,14 @@ type Section =
   | "publicar"
   | "suporte"
   | "notificacoes"
+  | "academy"
   // "sheets" (Google Sheets) segue no código como DEPRECATED — fora da navegação
   // (o dono não usa). A seção ainda renderiza p/ não quebrar o callback de OAuth.
   | "sheets"
   | "settings";
 
 // "Google Sheets" saiu da sidebar (deprecated). No lugar entrou "Campanhas".
-const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
+const NAV: { id: Section; label: string; Icon: typeof Search; badge?: string }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
   { id: "instagram", label: "Instagram", Icon: Instagram },
   { id: "listas", label: "Minhas Listas", Icon: FolderOpen },
@@ -133,6 +136,7 @@ const NAV: { id: Section; label: string; Icon: typeof Search }[] = [
   { id: "publicar", label: "Publicar", Icon: Rocket },
   { id: "suporte", label: "Suporte", Icon: LifeBuoy },
   { id: "notificacoes", label: "Notificações", Icon: Bell },
+  { id: "academy", label: "Flow Academy", Icon: GraduationCap, badge: "Em breve" },
   { id: "settings", label: "Meu Perfil", Icon: User },
 ];
 
@@ -232,7 +236,12 @@ function Dashboard() {
 
   return (
     <div className="flex min-h-screen w-full bg-white text-foreground">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
+      <aside
+        className={cn(
+          "hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
+          section === "instagram" ? "md:hidden" : "md:flex",
+        )}
+      >
         <Link to="/" className="flex items-center px-4 py-5">
           <FlowLeadsLogo variant="dark" className="h-12 w-auto" />
         </Link>
@@ -255,6 +264,11 @@ function Dashboard() {
               >
                 <item.Icon className="h-4 w-4" />
                 <span>{item.label}</span>
+                {item.badge && !isLocked && (
+                  <span className="ml-auto rounded-full border border-gold/35 bg-gold/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-gold">
+                    {item.badge}
+                  </span>
+                )}
                 {isLocked && (
                   <span className="ml-auto flex items-center gap-1 rounded-full border border-gold/40 bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold text-gold uppercase">
                     <Lock className="h-2.5 w-2.5" /> PRO
@@ -322,7 +336,12 @@ function Dashboard() {
       </aside>
 
       {/* Mobile top tabs */}
-      <div className="fixed left-0 right-0 top-0 z-30 flex items-center gap-1 overflow-x-auto border-b border-border bg-sidebar px-2 py-2 md:hidden">
+      <div
+        className={cn(
+          "fixed left-0 right-0 top-0 z-30 items-center gap-1 overflow-x-auto border-b border-border bg-sidebar px-2 py-2 md:hidden",
+          section === "instagram" ? "hidden" : "flex",
+        )}
+      >
         {NAV.map((item) => (
           <button
             key={item.id}
@@ -334,14 +353,24 @@ function Dashboard() {
                 : "text-sidebar-foreground/70",
             )}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.badge ? (
+              <span className="ml-1 rounded-full bg-gold/15 px-1 py-0.5 text-[8px] font-semibold uppercase text-gold">
+                {item.badge}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
 
-      <main className="min-w-0 flex-1 bg-white px-4 pb-10 pt-16 md:px-8 md:pt-8">
+      <main
+        className={cn(
+          "min-w-0 flex-1 bg-white",
+          section === "instagram" ? "p-0" : "px-4 pb-10 pt-16 md:px-8 md:pt-8",
+        )}
+      >
         {section === "buscar" && <SearchSection onOpenInstagram={() => setSection("instagram")} />}
-        {section === "instagram" && <InstagramWorkspace />}
+        {section === "instagram" && <InstagramWorkspace onExit={() => setSection("buscar")} />}
         {section === "listas" && (
           <MinhasListasSection
             onOpenRedesign={(leadId) => {
@@ -382,6 +411,7 @@ function Dashboard() {
             }
           />
         )}
+        {section === "academy" && <FlowAcademyComingSoon />}
         {/* DEPRECATED: Google Sheets saiu da sidebar. Render mantido só para não
             quebrar o callback de OAuth (?sheets_connected=true). Remover em passo à parte. */}
         {section === "sheets" && (

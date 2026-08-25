@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
   Check,
   CheckCircle2,
   Copy,
-  Crosshair,
   ExternalLink,
   Eye,
   Instagram,
@@ -13,10 +11,7 @@ import {
   Mail,
   Megaphone,
   MessageCircle,
-  MessageCircleMore,
-  Radar,
   Search,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,7 +28,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { InstagramSearchPanel } from "@/components/leads/instagram/InstagramSearchPanel";
 import { InstagramRunSummary } from "@/components/leads/instagram/InstagramResults";
@@ -41,6 +35,7 @@ import { CommentsHunter } from "@/components/instagram/comments/CommentsHunter";
 import { CompetitorIntelligence } from "@/components/instagram/competitors/CompetitorIntelligence";
 import { ContentDiscoveryHunter } from "@/components/instagram/content/ContentDiscoveryHunter";
 import { InstagramAnalyticsDashboard } from "@/components/instagram/dashboard/InstagramAnalyticsDashboard";
+import { InstagramHome } from "@/components/instagram/dashboard/InstagramHome";
 import {
   InstagramScoreBars,
   InstagramScoreControls,
@@ -48,6 +43,11 @@ import {
 } from "@/components/instagram/shared/InstagramScoreV2";
 import { InstagramInbox } from "@/components/instagram/inbox/InstagramInbox";
 import { InstagramClientHunter } from "@/components/instagram/hunter/InstagramClientHunter";
+import { InstagramAppShell } from "@/components/instagram/navigation/InstagramAppShell";
+import {
+  isInstagramView,
+  type InstagramView,
+} from "@/components/instagram/navigation/instagram-navigation";
 import type { Estrategia, PedidoBusca } from "@/lib/fontes-prospeccao";
 import {
   instagramScoreValue,
@@ -70,7 +70,7 @@ import { cn } from "@/lib/utils";
 const TEMPLATE_PADRAO =
   "Oi, {{nome}}! Vi o trabalho de vocês em {{cidade}} e gostei muito do perfil. Posso te mostrar uma ideia rápida para transformar mais visitas do Instagram em oportunidades?";
 
-export function InstagramWorkspace() {
+export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   const [leads, setLeads] = useState<InstagramLead[]>([]);
   const [campaigns, setCampaigns] = useState<InstagramCampaign[]>([]);
   const [tasks, setTasks] = useState<InstagramOutreachTask[]>([]);
@@ -85,7 +85,7 @@ export function InstagramWorkspace() {
   const [campaignName, setCampaignName] = useState("");
   const [message, setMessage] = useState(TEMPLATE_PADRAO);
   const [lastRun, setLastRun] = useState<ColetaRedes | null>(null);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState<InstagramView>("home");
   const [profileScoreSort, setProfileScoreSort] = useState<InstagramScoreSort>("total");
   const [profileMinScore, setProfileMinScore] = useState(0);
   const [dashboardRevision, setDashboardRevision] = useState(0);
@@ -196,72 +196,29 @@ export function InstagramWorkspace() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-5">
-      <header className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-        <div className="h-1.5 bg-[linear-gradient(90deg,var(--instagram-orange),var(--instagram-pink),var(--instagram-purple))]" />
-        <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(145deg,var(--instagram-orange),var(--instagram-pink),var(--instagram-purple))] text-white shadow-lg">
-              <Instagram className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-semibold">Instagram Prospect</h1>
-                <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
-                  Ativo
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Descoberta, inteligência de perfil e abordagem assistida em um só ambiente.
-              </p>
-            </div>
-          </div>
-          <Button onClick={() => setTab("hunter")}>
-            <Crosshair className="h-4 w-4" /> Caçar clientes
-          </Button>
-        </div>
-      </header>
+    <InstagramAppShell activeView={tab} onViewChange={setTab} onExit={onExit}>
+      {tab === "home" ? (
+        <InstagramHome
+          leadsCount={leads.length}
+          campaigns={campaigns}
+          tasks={tasks}
+          selectedCampaignName={
+            campaigns.find((campaign) => campaign.id === selectedCampaign)?.nome
+          }
+          onNavigate={setTab}
+        />
+      ) : null}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:grid-cols-3 lg:w-fit lg:grid-cols-9">
-          <TabsTrigger value="overview">
-            <BarChart3 /> Visão geral
-          </TabsTrigger>
-          <TabsTrigger value="hunter">
-            <Crosshair /> Caça-clientes
-          </TabsTrigger>
-          <TabsTrigger value="discover">
-            <Search /> Descobrir
-          </TabsTrigger>
-          <TabsTrigger value="comments">
-            <MessageCircleMore /> Comentários
-          </TabsTrigger>
-          <TabsTrigger value="radar">
-            <Radar /> Radar
-          </TabsTrigger>
-          <TabsTrigger value="competitors">
-            <Eye /> Concorrentes
-          </TabsTrigger>
-          <TabsTrigger value="leads">
-            <Users /> Perfis
-          </TabsTrigger>
-          <TabsTrigger value="campaigns">
-            <Megaphone /> Direct
-          </TabsTrigger>
-          <TabsTrigger value="inbox">
-            <MessageCircle /> Inbox
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="mt-5 space-y-5">
+      {tab === "overview" ? (
+        <div className="space-y-5">
           <InstagramAnalyticsDashboard refreshToken={dashboardRevision} />
-        </TabsContent>
+        </div>
+      ) : null}
 
-        <TabsContent value="hunter" className="mt-5">
-          <InstagramClientHunter />
-        </TabsContent>
+      {tab === "hunter" ? <InstagramClientHunter /> : null}
 
-        <TabsContent value="discover" className="mt-5">
+      {tab === "discover" ? (
+        <div>
           <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] sm:p-6">
             <InstagramSearchPanel running={running} onBuscar={handleSearch} />
           </div>
@@ -270,25 +227,21 @@ export function InstagramWorkspace() {
               <InstagramRunSummary resumo={lastRun.resumo} />
             </div>
           ) : null}
-        </TabsContent>
+        </div>
+      ) : null}
 
-        <TabsContent value="comments" className="mt-5">
-          <CommentsHunter onLeadsChanged={load} />
-        </TabsContent>
+      {tab === "comments" ? <CommentsHunter onLeadsChanged={load} /> : null}
 
-        <TabsContent value="radar" className="mt-5">
-          <ContentDiscoveryHunter onLeadsChanged={load} />
-        </TabsContent>
+      {tab === "radar" ? <ContentDiscoveryHunter onLeadsChanged={load} /> : null}
 
-        <TabsContent value="competitors" className="mt-5">
-          <CompetitorIntelligence onNavigate={setTab} />
-        </TabsContent>
+      {tab === "competitors" ? (
+        <CompetitorIntelligence onNavigate={(view) => isInstagramView(view) && setTab(view)} />
+      ) : null}
 
-        <TabsContent value="inbox" className="mt-5">
-          <InstagramInbox />
-        </TabsContent>
+      {tab === "inbox" ? <InstagramInbox /> : null}
 
-        <TabsContent value="leads" className="mt-5 space-y-4">
+      {tab === "leads" ? (
+        <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
             <div className="relative min-w-64 flex-1 sm:max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -373,9 +326,11 @@ export function InstagramWorkspace() {
               text="Faça uma busca para montar sua base de prospecção no Instagram."
             />
           )}
-        </TabsContent>
+        </div>
+      ) : null}
 
-        <TabsContent value="campaigns" className="mt-5 grid gap-5 xl:grid-cols-[340px_1fr]">
+      {tab === "campaigns" ? (
+        <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
           <aside className="space-y-3">
             <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
               <h2 className="font-semibold">Campanhas de Direct</h2>
@@ -435,8 +390,8 @@ export function InstagramWorkspace() {
               )}
             </div>
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+      ) : null}
 
       <ProfileDialog profile={profile} onClose={() => setProfile(null)} />
       <Dialog open={campaignOpen} onOpenChange={setCampaignOpen}>
@@ -482,7 +437,7 @@ export function InstagramWorkspace() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </InstagramAppShell>
   );
 }
 
