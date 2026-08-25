@@ -242,7 +242,7 @@ async function sendMessage(req: Request, admin: AdminClient, body: JsonRecord): 
     },
   );
   const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) return json({ error: "unipile_send_failed" }, 502, req);
+  if (!response.ok) return json({ error: "instagram_message_failed" }, 502, req);
   const responseRecord = isRecord(payload) ? payload : null;
   const externalMessageId = firstString(
     [responseRecord, responseRecord ? recordAt(responseRecord, "data") : null],
@@ -276,20 +276,26 @@ async function sendMessage(req: Request, admin: AdminClient, body: JsonRecord): 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   const admin = adminClient();
+  let requestedAction = "";
   try {
     if (req.method === "GET") return await callback(req, admin);
     if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405, req);
     const body: unknown = await req.json().catch(() => null);
     if (!isRecord(body)) return json({ error: "invalid_body" }, 400, req);
+    requestedAction = typeof body.action === "string" ? body.action : "";
     if (body.action === "start") return await startConnection(req, admin);
     if (body.action === "send") return await sendMessage(req, admin, body);
     return json({ error: "invalid_action" }, 400, req);
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
+    console.error("flow-business Instagram connection error", {
+      method: req.method,
+      message,
+    });
     if (req.method === "GET")
       return redirectWithResult(
         "error",
-        message.startsWith("missing_config") ? "not_configured" : message,
+        message.startsWith("missing_config") ? "not_configured" : "connection_failed",
       );
     const status =
       message === "unauthorized"
@@ -299,6 +305,16 @@ Deno.serve(async (req) => {
           : message.startsWith("missing_config")
             ? 503
             : 500;
-    return json({ error: message }, status, req);
+    const publicError =
+      message === "unauthorized"
+        ? "unauthorized"
+        : message.startsWith("flow_business_limit")
+          ? "flow_business_limit"
+          : message.startsWith("missing_config")
+            ? "instagram_connection_unavailable"
+            : requestedAction === "send"
+              ? "instagram_message_failed"
+              : "instagram_connection_failed";
+    return json({ error: publicError }, status, req);
   }
 });

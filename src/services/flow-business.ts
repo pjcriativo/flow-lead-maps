@@ -354,8 +354,22 @@ function workspaceFromJson(value: Json | null): FlowBusinessWorkspace {
 }
 
 function friendlyError(message: string): Error {
+  if (message.includes("unauthorized"))
+    return new Error("Sua sessão expirou. Entre novamente para continuar.");
+  if (message.includes("invalid_message"))
+    return new Error("Revise o texto da mensagem antes de enviar.");
+  if (message.includes("conversation_not_found"))
+    return new Error("Esta conversa não está mais disponível.");
   if (message.includes("UNIPILE") || message.includes("unipile"))
     return new Error("A conexão do Instagram ainda não foi ativada pelo administrador.");
+  if (message.includes("instagram_connection_unavailable"))
+    return new Error("A conexão do Instagram ainda não foi ativada pelo administrador.");
+  if (message.includes("instagram_connection_failed"))
+    return new Error("Não foi possível conectar a conta do Instagram. Tente novamente.");
+  if (message.includes("instagram_message_failed"))
+    return new Error("Não foi possível enviar a mensagem. Tente novamente.");
+  if (message.includes("alternative_account_required"))
+    return new Error("Reconecte esta conta do Instagram antes de enviar mensagens.");
   if (message.includes("flow_business_limit"))
     return new Error("O limite deste recurso no seu plano foi atingido.");
   if (message.includes("official_account_required"))
@@ -486,4 +500,29 @@ export async function startAlternativeInstagramConnection(): Promise<string> {
   if (!isRecord(data) || typeof data.authorizationUrl !== "string")
     throw new Error("A conexão do Instagram ainda não foi configurada.");
   return data.authorizationUrl;
+}
+
+export async function sendInstagramConversationMessage(input: {
+  provider: FlowBusinessAccount["provider"];
+  conversationId: string;
+  text: string;
+}): Promise<void> {
+  const modernConnection = input.provider === "meta_official" || input.provider === "unipile";
+  const functionName =
+    input.provider === "meta_official"
+      ? "flow-business-meta"
+      : input.provider === "unipile"
+        ? "flow-business-unipile"
+        : "ig-send";
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    body: modernConnection
+      ? { action: "send", conversationId: input.conversationId, text: input.text }
+      : { conversaId: input.conversationId, text: input.text },
+  });
+  if (error) {
+    const details =
+      error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+    throw friendlyError(details || error.message);
+  }
+  if (isRecord(data) && typeof data.error === "string") throw friendlyError(data.error);
 }

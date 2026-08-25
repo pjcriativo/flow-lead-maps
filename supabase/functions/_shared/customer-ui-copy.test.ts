@@ -44,3 +44,19 @@ test("as telas operacionais do cliente não exibem custos internos de API", () =
     /US\$|custo (?:máximo|real|Apify|por novo lead|zero)|custos e tendências|sem nova cobrança|nova cobrança|teto de gasto|gasto no mês|custa US\$|sem custo de IA|usa IA \(custo/i,
   );
 });
+
+test("falhas da conexão do Instagram não retornam códigos internos ao cliente", () => {
+  const connectionFunction = readFileSync(
+    new URL("../flow-business-unipile/index.ts", import.meta.url),
+    "utf8",
+  );
+  const inbox = readFileSync(
+    new URL("../../../src/components/instagram/inbox/InstagramInbox.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(connectionFunction, /json\(\{ error: "unipile/i);
+  assert.match(connectionFunction, /instagram_connection_unavailable/);
+  assert.match(connectionFunction, /instagram_message_failed/);
+  assert.doesNotMatch(inbox, /if \(data\?\.error\)/);
+});

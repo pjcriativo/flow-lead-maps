@@ -108,6 +108,14 @@ verify_jwt = false
 [functions.flow-business-webhook]
 verify_jwt = false
 
+[functions.flow-business-unipile]
+# Callback da conexão: público, protegido por state único, expirável e vinculado à organização.
+verify_jwt = false
+
+[functions.flow-business-unipile-webhook]
+# Eventos em tempo real: público, protegido por assinatura HMAC e janela antireplay.
+verify_jwt = false
+
 [functions.expirar-sites]
 # Cron job para expirar sites. PÚBLICO — chamado pelo Supabase Cron.
 verify_jwt = false

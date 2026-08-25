@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import type { FlowBusinessAccount } from "@/services/flow-business";
+import {
+  sendInstagramConversationMessage,
+  type FlowBusinessAccount,
+} from "@/services/flow-business";
 
 type Conversation = Tables<"ig_conversas">;
 type Message = Tables<"ig_mensagens">;
@@ -95,21 +98,11 @@ export function InstagramInbox({
     setInputText("");
 
     try {
-      const functionName =
-        account?.provider === "meta_official"
-          ? "flow-business-meta"
-          : account?.provider === "unipile"
-            ? "flow-business-unipile"
-            : "ig-send";
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body:
-          account?.provider === "meta_official" || account?.provider === "unipile"
-            ? { action: "send", conversationId: activeConvId, text: textToSend }
-            : { conversaId: activeConvId, text: textToSend },
+      await sendInstagramConversationMessage({
+        provider: account?.provider ?? "evolution_legacy",
+        conversationId: activeConvId,
+        text: textToSend,
       });
-
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao enviar mensagem");
       setInputText(textToSend); // rollback
