@@ -1,19 +1,25 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Bot,
+  BriefcaseBusiness,
   Crosshair,
   Eye,
   LayoutDashboard,
   Megaphone,
   MessageCircle,
   MessageCircleMore,
+  PlugZap,
   Radar,
+  Route,
   Search,
   Users,
 } from "lucide-react";
 
 export type InstagramView =
   | "home"
+  | "crm"
+  | "cadences"
   | "hunter"
   | "discover"
   | "comments"
@@ -21,7 +27,9 @@ export type InstagramView =
   | "competitors"
   | "leads"
   | "campaigns"
+  | "accounts"
   | "inbox"
+  | "flows"
   | "overview";
 
 type NavigationItem = {
@@ -43,8 +51,20 @@ export const instagramNavigation: NavigationGroup[] = [
       {
         id: "home",
         label: "Hoje",
-        description: "Sua operação em um só lugar",
+        description: "Prioridades e ações do dia",
         Icon: LayoutDashboard,
+      },
+      {
+        id: "crm",
+        label: "CRM de oportunidades",
+        description: "Do perfil encontrado ao cliente",
+        Icon: BriefcaseBusiness,
+      },
+      {
+        id: "cadences",
+        label: "Cadências",
+        description: "Aquecimento e follow-up assistido",
+        Icon: Route,
       },
       {
         id: "hunter",
@@ -99,10 +119,27 @@ export const instagramNavigation: NavigationGroup[] = [
         Icon: Megaphone,
       },
       {
+        id: "accounts",
+        label: "Contas conectadas",
+        description: "Instagram profissional e permissões",
+        Icon: PlugZap,
+      },
+      {
         id: "inbox",
         label: "Conversas",
         description: "Acompanhe respostas e avanços",
         Icon: MessageCircle,
+      },
+    ],
+  },
+  {
+    label: "Automação",
+    items: [
+      {
+        id: "flows",
+        label: "Flow Builder",
+        description: "Fluxos oficiais estilo ManyChat",
+        Icon: Bot,
       },
     ],
   },

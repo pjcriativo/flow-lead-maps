@@ -102,6 +102,12 @@ verify_jwt = false
 # Cron job de follow-up. PÚBLICO — chamado pelo Supabase Cron, sem usuário.
 verify_jwt = false
 
+[functions.flow-business-meta]
+verify_jwt = false
+
+[functions.flow-business-webhook]
+verify_jwt = false
+
 [functions.expirar-sites]
 # Cron job para expirar sites. PÚBLICO — chamado pelo Supabase Cron.
 verify_jwt = false

@@ -99,7 +99,7 @@ export function FonteSelector({
             key={id}
             type="button"
             aria-pressed={opensWorkspace ? undefined : sel}
-            aria-label={opensWorkspace ? "Abrir o módulo Instagram" : undefined}
+            aria-label={opensWorkspace ? "Abrir o Flow Business" : undefined}
             disabled={disabled}
             onClick={() => (opensWorkspace ? onOpenInstagram() : onChange(id))}
             className={cn(
@@ -131,11 +131,11 @@ export function FonteSelector({
             </div>
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
               {opensWorkspace
-                ? "Abra o ambiente completo de prospecção, concorrentes, comentários e campanhas."
+                ? "Abra o Flow Business: descoberta, CRM, cadências, contas e automações do Instagram."
                 : f.resumo}
             </p>
             <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-              {opensWorkspace ? "módulo especializado" : f.busca}
+              {opensWorkspace ? "Instagram Client OS" : f.busca}
             </p>
           </button>
         );

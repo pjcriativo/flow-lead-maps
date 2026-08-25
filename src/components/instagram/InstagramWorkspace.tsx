@@ -35,7 +35,11 @@ import { CommentsHunter } from "@/components/instagram/comments/CommentsHunter";
 import { CompetitorIntelligence } from "@/components/instagram/competitors/CompetitorIntelligence";
 import { ContentDiscoveryHunter } from "@/components/instagram/content/ContentDiscoveryHunter";
 import { InstagramAnalyticsDashboard } from "@/components/instagram/dashboard/InstagramAnalyticsDashboard";
-import { InstagramHome } from "@/components/instagram/dashboard/InstagramHome";
+import { FlowBusinessToday } from "@/components/instagram/dashboard/FlowBusinessToday";
+import { FlowBusinessCrm } from "@/components/instagram/crm/FlowBusinessCrm";
+import { FlowBusinessCadences } from "@/components/instagram/cadences/FlowBusinessCadences";
+import { FlowBusinessAccounts } from "@/components/instagram/accounts/FlowBusinessAccounts";
+import { FlowBusinessFlowBuilder } from "@/components/instagram/flows/FlowBusinessFlowBuilder";
 import {
   InstagramScoreBars,
   InstagramScoreControls,
@@ -65,6 +69,19 @@ import {
   type InstagramLead,
   type InstagramOutreachTask,
 } from "@/services/instagram";
+import {
+  completeFlowBusinessTask,
+  createFlowBusinessCadence,
+  loadFlowBusinessWorkspace,
+  moveFlowBusinessCard,
+  publishFlowBusinessFlow,
+  saveFlowBusinessFlow,
+  startFlowBusinessCadence,
+  startMetaInstagramConnection,
+  type FlowBusinessStage,
+  type FlowBusinessTask,
+  type FlowBusinessWorkspace,
+} from "@/services/flow-business";
 import { cn } from "@/lib/utils";
 
 const TEMPLATE_PADRAO =
@@ -85,19 +102,26 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   const [campaignName, setCampaignName] = useState("");
   const [message, setMessage] = useState(TEMPLATE_PADRAO);
   const [lastRun, setLastRun] = useState<ColetaRedes | null>(null);
-  const [tab, setTab] = useState<InstagramView>("home");
+  const [tab, setTab] = useState<InstagramView>(() => {
+    if (typeof window === "undefined") return "home";
+    const requested = new URLSearchParams(window.location.search).get("instagram_view");
+    return requested && isInstagramView(requested) ? requested : "home";
+  });
   const [profileScoreSort, setProfileScoreSort] = useState<InstagramScoreSort>("total");
   const [profileMinScore, setProfileMinScore] = useState(0);
   const [dashboardRevision, setDashboardRevision] = useState(0);
+  const [business, setBusiness] = useState<FlowBusinessWorkspace | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [profiles, instagramCampaigns] = await Promise.all([
+      const [profiles, instagramCampaigns, workspace] = await Promise.all([
         listarInstagramLeads(),
         listarCampanhasInstagram(),
+        loadFlowBusinessWorkspace(),
       ]);
       setLeads(profiles);
       setCampaigns(instagramCampaigns);
+      setBusiness(workspace);
       setSelectedCampaign((current) => current || instagramCampaigns[0]?.id || "");
       setDashboardRevision((current) => current + 1);
     } catch (error) {
@@ -105,6 +129,11 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const refreshBusiness = useCallback(async () => {
+    setBusiness(await loadFlowBusinessWorkspace());
+    setDashboardRevision((current) => current + 1);
   }, []);
 
   useEffect(() => {
@@ -195,17 +224,125 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
     setDashboardRevision((current) => current + 1);
   };
 
+  const completeCrmTask = async (task: FlowBusinessTask) => {
+    try {
+      await completeFlowBusinessTask(task.id);
+      await refreshBusiness();
+      toast.success("Ação concluída e CRM atualizado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível concluir a ação.");
+    }
+  };
+
+  const moveCrmCard = async (cardId: string, stage: FlowBusinessStage) => {
+    try {
+      await moveFlowBusinessCard(cardId, stage);
+      await refreshBusiness();
+      toast.success("Oportunidade movida.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível mover a oportunidade.",
+      );
+    }
+  };
+
+  const startCadence = async (cardId: string, cadenceId: string) => {
+    try {
+      await startFlowBusinessCadence(cardId, cadenceId);
+      await refreshBusiness();
+      toast.success("Cadência iniciada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível iniciar a cadência.");
+    }
+  };
+
   return (
     <InstagramAppShell activeView={tab} onViewChange={setTab} onExit={onExit}>
-      {tab === "home" ? (
-        <InstagramHome
-          leadsCount={leads.length}
-          campaigns={campaigns}
-          tasks={tasks}
-          selectedCampaignName={
-            campaigns.find((campaign) => campaign.id === selectedCampaign)?.nome
-          }
+      {tab === "home" && business ? (
+        <FlowBusinessToday
+          tasks={business.tasks}
+          plan={business.plan}
+          onComplete={completeCrmTask}
           onNavigate={setTab}
+        />
+      ) : null}
+
+      {tab === "crm" && business ? (
+        <FlowBusinessCrm
+          cards={business.cards}
+          cadences={business.cadences}
+          onMove={moveCrmCard}
+          onStartCadence={startCadence}
+        />
+      ) : null}
+
+      {tab === "cadences" && business ? (
+        <FlowBusinessCadences
+          cadences={business.cadences}
+          plan={business.plan}
+          onCreate={async (input) => {
+            try {
+              await createFlowBusinessCadence(input);
+              await refreshBusiness();
+              toast.success("Cadência criada.");
+            } catch (error) {
+              toast.error(
+                error instanceof Error ? error.message : "Não foi possível criar a cadência.",
+              );
+              throw error;
+            }
+          }}
+        />
+      ) : null}
+
+      {tab === "accounts" && business ? (
+        <FlowBusinessAccounts
+          accounts={business.accounts}
+          plan={business.plan}
+          onConnect={async () => {
+            try {
+              const authorizationUrl = await startMetaInstagramConnection();
+              window.location.assign(authorizationUrl);
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Integração Meta indisponível.");
+            }
+          }}
+        />
+      ) : null}
+
+      {tab === "flows" && business ? (
+        <FlowBusinessFlowBuilder
+          flows={business.flows}
+          accounts={business.accounts}
+          plan={business.plan}
+          onSave={async (draft) => {
+            try {
+              const id = await saveFlowBusinessFlow({
+                ...draft,
+                triggerConfig: draft.keyword ? { keyword: draft.keyword } : {},
+              });
+              await refreshBusiness();
+              toast.success("Rascunho salvo.");
+              return id;
+            } catch (error) {
+              toast.error(
+                error instanceof Error ? error.message : "Não foi possível salvar o fluxo.",
+              );
+              throw error;
+            }
+          }}
+          onPublish={async (flowId) => {
+            try {
+              await publishFlowBusinessFlow(flowId);
+              await refreshBusiness();
+              toast.success("Fluxo publicado.");
+            } catch (error) {
+              toast.error(
+                error instanceof Error ? error.message : "Não foi possível publicar o fluxo.",
+              );
+              throw error;
+            }
+          }}
         />
       ) : null}
 
@@ -238,7 +375,9 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         <CompetitorIntelligence onNavigate={(view) => isInstagramView(view) && setTab(view)} />
       ) : null}
 
-      {tab === "inbox" ? <InstagramInbox /> : null}
+      {tab === "inbox" && business ? (
+        <InstagramInbox accounts={business.accounts} onOpenAccounts={() => setTab("accounts")} />
+      ) : null}
 
       {tab === "leads" ? (
         <div className="space-y-4">

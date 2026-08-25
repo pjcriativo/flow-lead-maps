@@ -122,7 +122,7 @@ type Section =
 // "Google Sheets" saiu da sidebar (deprecated). No lugar entrou "Campanhas".
 const NAV: { id: Section; label: string; Icon: typeof Search; badge?: string }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
-  { id: "instagram", label: "Instagram", Icon: Instagram },
+  { id: "instagram", label: "Flow Business", Icon: Instagram },
   { id: "listas", label: "Minhas Listas", Icon: FolderOpen },
   { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
   { id: "leads", label: "Meus Leads", Icon: Users },
@@ -214,6 +214,14 @@ function Dashboard() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("sheets_connected") === "true") setSection("sheets");
+    if (params.get("flow_business_connected") === "true") {
+      setSection("instagram");
+      toast.success("Conta profissional conectada ao Flow Business.");
+    }
+    if (params.get("flow_business_error")) {
+      setSection("instagram");
+      toast.error("Não foi possível conectar a conta. Confira a configuração do app Meta.");
+    }
     // deep-link de seção (ex.: /dashboard?secao=automacao — usado pelo painel /admin)
     const secao = params.get("secao");
     if (secao === "configuracoes" || secao === "perfil") setSection("settings");

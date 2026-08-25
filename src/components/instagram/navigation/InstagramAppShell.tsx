@@ -48,19 +48,19 @@ export function InstagramAppShell({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-semibold tracking-tight">Flow Instagram</span>
+                <span className="font-semibold tracking-tight">Flow Business</span>
                 <span className="rounded-full border border-sidebar-border bg-sidebar-accent px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
                   Pro
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-sidebar-foreground/50">Client acquisition OS</p>
+              <p className="mt-0.5 text-xs text-sidebar-foreground/50">Instagram Client OS</p>
             </div>
           </div>
         </div>
 
         <nav
           className="flex-1 space-y-6 overflow-y-auto px-3 py-5"
-          aria-label="Módulos do Flow Instagram"
+          aria-label="Módulos do Flow Business"
         >
           {instagramNavigation.map((group) => (
             <div key={group.label}>
@@ -139,7 +139,7 @@ export function InstagramAppShell({
               </div>
               <div className="hidden items-center gap-2 lg:flex">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-instagram-pink">
-                  Flow Instagram
+                  Flow Business
                 </span>
                 <span className="size-1 rounded-full bg-muted-foreground/30" />
                 <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
