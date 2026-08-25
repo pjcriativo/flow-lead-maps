@@ -19,7 +19,7 @@ import { json } from "../_shared/cors.ts";
 import { montarFrom } from "../_shared/remetente.ts";
 import { resolverChave } from "../_shared/chaves.ts";
 
-const DEFAULT_FROM = "Flow Leads <onboarding@resend.dev>";
+const DEFAULT_FROM = "Flow Business <onboarding@resend.dev>";
 const DIAS = 3;
 const BATCH = 1000; // teto de segurança de candidatos lidos por rodada
 

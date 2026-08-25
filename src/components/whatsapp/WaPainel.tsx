@@ -1,5 +1,5 @@
 // Aba PAINEL (dashboard) — cara do S-zap/Kaptar: banner de conexão + 4 números + campanhas
-// recentes + bloco de privacidade ADAPTADO à realidade do Flow Leads (roda no servidor, dados no
+// recentes + bloco de privacidade ADAPTADO à realidade do Flow Business (roda no servidor, dados no
 // Supabase da org — nada de "só no seu PC", que seria mentira aqui).
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -62,8 +62,7 @@ export function WaPainel({
         itens={[
           {
             termo: "📌 Status de Conexão",
-            texto:
-              "Indica se há pelo menos 1 chip de WhatsApp ativo e pronto para uso no sistema.",
+            texto: "Indica se há pelo menos 1 chip de WhatsApp ativo e pronto para uso no sistema.",
           },
           {
             termo: "📌 Leads com WhatsApp",
@@ -72,8 +71,7 @@ export function WaPainel({
           },
           {
             termo: "📌 Campanhas Enviadas",
-            texto:
-              "Total de campanhas criadas e disparadas com sucesso pela sua equipe.",
+            texto: "Total de campanhas criadas e disparadas com sucesso pela sua equipe.",
           },
           {
             termo: "📌 Conversas Ativas",
@@ -191,9 +189,9 @@ export function WaPainel({
         <div className="text-sm">
           <div className="font-medium">Seus dados ficam na sua organização</div>
           <p className="text-muted-foreground">
-            O WhatsApp do Flow Leads roda no servidor (Evolution) e os leads, conversas e histórico
-            de campanhas ficam no banco da sua organização (Supabase), isolados por conta — nenhuma
-            outra org acessa. Nada roda no seu PC.
+            O WhatsApp do Flow Business roda no servidor (Evolution) e os leads, conversas e
+            histórico de campanhas ficam no banco da sua organização (Supabase), isolados por conta
+            — nenhuma outra org acessa. Nada roda no seu PC.
           </p>
         </div>
       </div>

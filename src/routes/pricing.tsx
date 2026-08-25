@@ -30,13 +30,13 @@ import {
 export const Route = createFileRoute("/pricing")({
   head: () => ({
     meta: [
-      { title: "Preços — Flow Leads" },
+      { title: "Preços — Flow Business" },
       {
         name: "description",
         content:
-          "Preços simples e transparentes do Flow Leads. Escolha o plano ideal e escale suas vendas hoje.",
+          "Preços simples e transparentes do Flow Business. Escolha o plano ideal e escale suas vendas hoje.",
       },
-      { property: "og:title", content: "Preços do Flow Leads — Planos para todo time" },
+      { property: "og:title", content: "Preços do Flow Business — Planos para todo time" },
       {
         property: "og:description",
         content: `Planos Básico, Pro e Agência. Economize ${ANNUAL_DISCOUNT_PERCENT}% na cobrança anual.`,
@@ -421,8 +421,8 @@ function PricingPage() {
             Pronto para transformar sua captação?
           </h2>
           <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-            Junte-se a centenas de agências e SDRs que usam o Flow Leads para encher a agenda todos
-            os dias.
+            Junte-se a centenas de agências e SDRs que usam o Flow Business para encher a agenda
+            todos os dias.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/auth" search={{ mode: "signup" }} preload="render">

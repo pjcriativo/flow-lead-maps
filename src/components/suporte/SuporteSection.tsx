@@ -244,7 +244,7 @@ function TicketThread({ ticket, onVoltar }: { ticket: Ticket; onVoltar: () => vo
             )}
           >
             <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {r.eh_admin ? "Suporte Flow Leads" : "Você"}
+              {r.eh_admin ? "Suporte Flow Business" : "Você"}
             </p>
             <p className="whitespace-pre-wrap">{r.texto}</p>
           </div>

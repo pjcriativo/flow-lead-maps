@@ -6,7 +6,7 @@ import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 // controle) e o visitante não é super_admin. O guard fica em _authenticated/route.tsx.
 export const Route = createFileRoute("/manutencao")({
   head: () => ({
-    meta: [{ title: "Manutenção — Flow Leads" }],
+    meta: [{ title: "Manutenção — Flow Business" }],
   }),
   component: ManutencaoPage,
 });

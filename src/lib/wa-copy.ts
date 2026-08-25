@@ -21,7 +21,7 @@ export type WaLeadDados = {
 
 export type WaVariacao = { id: string; texto: string; ativa: boolean };
 
-/** Tokens que a UI oferece. {{bairro}} existe no set mas o Flow Leads não coleta bairro. */
+/** Tokens que a UI oferece. {{bairro}} existe no set mas o Flow Business não coleta bairro. */
 export const WA_TOKENS = [
   "nome",
   "cidade",

@@ -14,6 +14,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { initPostHog, posthog } from "@/lib/posthog";
 import { Toaster } from "@/components/ui/sonner";
 import { lerConfigPublica } from "@/services/config-publica";
+import {
+  BRAND_NAME,
+  BRAND_OG_IMAGE_URL,
+  BRAND_PRODUCT_DESCRIPTION,
+  BRAND_SITE_URL,
+} from "@/lib/brand";
 
 function NotFoundComponent() {
   return (
@@ -77,34 +83,30 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Flow Leads — Encontre leads no Google Maps em segundos" },
+      { title: `${BRAND_NAME} — Prospecção e vendas em um só lugar` },
       {
         name: "description",
-        content:
-          "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora.",
+        content: BRAND_PRODUCT_DESCRIPTION,
       },
-      { name: "author", content: "Flow Leads" },
+      { name: "author", content: BRAND_NAME },
       { name: "theme-color", content: "#1a1a2e" },
-      { property: "og:site_name", content: "Flow Leads" },
-      { property: "og:title", content: "Flow Leads — Encontre leads no Google Maps em segundos" },
+      { property: "og:site_name", content: BRAND_NAME },
+      { property: "og:title", content: `${BRAND_NAME} — Prospecção e vendas em um só lugar` },
       {
         property: "og:description",
-        content:
-          "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora.",
+        content: BRAND_PRODUCT_DESCRIPTION,
       },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://flowleads.com.br/og-image.png" },
+      { property: "og:image", content: BRAND_OG_IMAGE_URL },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@FlowLeads" },
-      { name: "twitter:title", content: "Flow Leads — Encontre leads no Google Maps em segundos" },
+      { name: "twitter:title", content: `${BRAND_NAME} — Prospecção e vendas em um só lugar` },
       {
         name: "twitter:description",
-        content:
-          "Encontre leads de empresas qualificados no Google Maps em segundos. Exporte para Excel ou Google Sheets na hora.",
+        content: BRAND_PRODUCT_DESCRIPTION,
       },
-      { name: "twitter:image", content: "https://flowleads.com.br/og-image.png" },
+      { name: "twitter:image", content: BRAND_OG_IMAGE_URL },
     ],
     links: [
       {
@@ -129,10 +131,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "Organization",
-          name: "Flow Leads",
-          url: "https://flowleads.com.br",
-          logo: "https://flowleads.com.br/favicon.ico",
-          description: "Encontre leads de empresas qualificados no Google Maps em segundos.",
+          name: BRAND_NAME,
+          url: BRAND_SITE_URL,
+          logo: `${BRAND_SITE_URL}/favicon.ico`,
+          description: BRAND_PRODUCT_DESCRIPTION,
         }),
       },
       {
@@ -140,10 +142,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebSite",
-          name: "Flow Leads",
-          url: "https://flowleads.com.br",
-          description:
-            "Gere leads de empresas qualificados a partir do Google Maps e exporte para Excel ou Google Sheets.",
+          name: BRAND_NAME,
+          url: BRAND_SITE_URL,
+          description: BRAND_PRODUCT_DESCRIPTION,
         }),
       },
     ],

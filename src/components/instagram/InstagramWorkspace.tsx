@@ -76,6 +76,7 @@ import {
   moveFlowBusinessCard,
   publishFlowBusinessFlow,
   saveFlowBusinessFlow,
+  startAlternativeInstagramConnection,
   startFlowBusinessCadence,
   startMetaInstagramConnection,
   type FlowBusinessStage,
@@ -299,7 +300,17 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         <FlowBusinessAccounts
           accounts={business.accounts}
           plan={business.plan}
-          onConnect={async () => {
+          onConnectAlternative={async () => {
+            try {
+              const authorizationUrl = await startAlternativeInstagramConnection();
+              window.location.assign(authorizationUrl);
+            } catch (error) {
+              toast.error(
+                error instanceof Error ? error.message : "Conexão alternativa indisponível.",
+              );
+            }
+          }}
+          onConnectOfficial={async () => {
             try {
               const authorizationUrl = await startMetaInstagramConnection();
               window.location.assign(authorizationUrl);

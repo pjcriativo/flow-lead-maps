@@ -34,7 +34,7 @@ export function NotificacoesSection({ onMudou }: { onMudou?: () => void } = {}) 
         <h1 className="flex items-center gap-2 text-xl font-semibold">
           <Bell className="h-5 w-5 text-primary" /> Notificações
         </h1>
-        <p className="text-sm text-muted-foreground">Avisos enviados pela Flow Leads.</p>
+        <p className="text-sm text-muted-foreground">Avisos enviados pela Flow Business.</p>
       </div>
 
       <div className="divide-y divide-border rounded-xl border border-border bg-card">

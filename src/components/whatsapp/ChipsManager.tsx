@@ -336,7 +336,7 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
           {
             termo: "📌 8. Ativar Recebimento",
             texto:
-              "Em chips de 'Conversa', ativa a sincronização para que as mensagens dos leads caiam direto na aba Conversas do Flow Leads.",
+              "Em chips de 'Conversa', ativa a sincronização para que as mensagens dos leads caiam direto na aba Conversas do Flow Business.",
           },
         ]}
       />

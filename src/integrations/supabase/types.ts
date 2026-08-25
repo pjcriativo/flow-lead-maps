@@ -977,6 +977,7 @@ export type Database = {
           connected_by: string | null;
           criada_em: string;
           error_message: string | null;
+          external_account_id: string | null;
           id: string;
           last_webhook_at: string | null;
           meta_ig_user_id: string | null;
@@ -996,6 +997,7 @@ export type Database = {
           connected_by?: string | null;
           criada_em?: string;
           error_message?: string | null;
+          external_account_id?: string | null;
           id?: string;
           last_webhook_at?: string | null;
           meta_ig_user_id?: string | null;
@@ -1015,6 +1017,7 @@ export type Database = {
           connected_by?: string | null;
           criada_em?: string;
           error_message?: string | null;
+          external_account_id?: string | null;
           id?: string;
           last_webhook_at?: string | null;
           meta_ig_user_id?: string | null;
@@ -2531,6 +2534,7 @@ export type Database = {
           created_at: string;
           expires_at: string;
           org_id: string;
+          provider: string;
           redirect_to: string;
           state: string;
           used_at: string | null;
@@ -2540,6 +2544,7 @@ export type Database = {
           created_at?: string;
           expires_at?: string;
           org_id: string;
+          provider?: string;
           redirect_to?: string;
           state: string;
           used_at?: string | null;
@@ -2549,6 +2554,7 @@ export type Database = {
           created_at?: string;
           expires_at?: string;
           org_id?: string;
+          provider?: string;
           redirect_to?: string;
           state?: string;
           used_at?: string | null;
@@ -5326,6 +5332,20 @@ export type Database = {
           p_source?: string;
           p_text: string;
           p_window_hours?: number;
+        };
+        Returns: Json;
+      };
+      flow_business_ingest_unipile_message: {
+        Args: {
+          p_account_id: string;
+          p_chat_id: string;
+          p_direction: string;
+          p_external_message_id: string;
+          p_metadata?: Json;
+          p_occurred_at: string;
+          p_sender_id: string;
+          p_sender_name: string;
+          p_text: string;
         };
         Returns: Json;
       };

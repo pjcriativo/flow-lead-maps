@@ -79,6 +79,6 @@ export type SiteData = {
   contatoVar: 0 | 1 | 2;
 
   /** Crédito do rodapé (profiles.site_credito). null = SEM crédito — o default.
-   *  NUNCA cita a plataforma: o lead é prospect da agência, não cliente do Flow Leads. */
+   *  NUNCA cita a plataforma: o lead é prospect da agência, não cliente do Flow Business. */
   creditoRodape: string | null;
 };

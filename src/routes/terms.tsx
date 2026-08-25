@@ -5,16 +5,16 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Termos de Uso — Flow Leads" },
+      { title: "Termos de Uso — Flow Business" },
       {
         name: "description",
         content:
-          "Termos de Uso do Flow Leads, ferramenta de geração de leads a partir do Google Maps.",
+          "Termos de Uso do Flow Business, plataforma de prospecção, relacionamento e vendas.",
       },
-      { property: "og:title", content: "Termos de Uso — Flow Leads" },
+      { property: "og:title", content: "Termos de Uso — Flow Business" },
       {
         property: "og:description",
-        content: "As regras para uso do serviço de geração de leads do Flow Leads.",
+        content: "As regras para uso dos serviços do Flow Business.",
       },
       { property: "og:url", content: "https://flowleads.com.br/terms" },
     ],
@@ -52,17 +52,17 @@ function TermsPage() {
           <div>
             <h2 className="text-lg font-semibold text-foreground">1. Aceitação dos Termos</h2>
             <p className="mt-2">
-              Ao acessar ou utilizar o Flow Leads ("Serviço"), você concorda em se vincular a estes
-              Termos de Uso. Caso não concorde, não utilize o Serviço. Estes Termos são regidos pela
-              legislação brasileira, incluindo o Código de Defesa do Consumidor (Lei 8.078/1990) e a
-              Lei Geral de Proteção de Dados — LGPD (Lei 13.709/2018).
+              Ao acessar ou utilizar o Flow Business ("Serviço"), você concorda em se vincular a
+              estes Termos de Uso. Caso não concorde, não utilize o Serviço. Estes Termos são
+              regidos pela legislação brasileira, incluindo o Código de Defesa do Consumidor (Lei
+              8.078/1990) e a Lei Geral de Proteção de Dados — LGPD (Lei 13.709/2018).
             </p>
           </div>
 
           <div>
             <h2 className="text-lg font-semibold text-foreground">2. Descrição do Serviço</h2>
             <p className="mt-2">
-              O Flow Leads é uma ferramenta de geração de leads que auxilia o usuário a localizar
+              O Flow Business é uma plataforma de prospecção que auxilia o usuário a localizar
               informações comerciais publicamente disponíveis no Google Maps e a exportá-las para
               planilhas e para o Google Sheets.
             </p>
@@ -80,8 +80,8 @@ function TermsPage() {
           <div>
             <h2 className="text-lg font-semibold text-foreground">4. Uso Aceitável</h2>
             <p className="mt-2">
-              Você concorda em não utilizar o Flow Leads para: (a) violar qualquer lei aplicável ou
-              direitos de terceiros; (b) enviar comunicações não solicitadas em massa (spam) em
+              Você concorda em não utilizar o Flow Business para: (a) violar qualquer lei aplicável
+              ou direitos de terceiros; (b) enviar comunicações não solicitadas em massa (spam) em
               desacordo com a legislação aplicável; (c) revender dados brutos de leads sem agregar
               valor; ou (d) interferir na infraestrutura do Serviço.
             </p>
@@ -95,8 +95,9 @@ function TermsPage() {
               Os dados pessoais de leads que você coleta, armazena e utiliza por meio do Serviço são
               de sua exclusiva responsabilidade. Para os fins da LGPD,{" "}
               <strong>você é o Controlador</strong> desses dados, cabendo a você definir as
-              finalidades e os meios do tratamento. O Flow Leads atua como <strong>Operador</strong>
-              , tratando esses dados apenas conforme suas instruções e para prestação do Serviço.
+              finalidades e os meios do tratamento. O Flow Business atua como{" "}
+              <strong>Operador</strong>, tratando esses dados apenas conforme suas instruções e para
+              prestação do Serviço.
             </p>
             <p className="mt-2">
               Como Controlador, você é o único responsável por: (a) possuir{" "}
@@ -105,8 +106,8 @@ function TermsPage() {
               titulares e respeitar seus direitos; e (c) garantir mecanismo de{" "}
               <strong>consentimento e descadastramento (opt-out)</strong> em todo envio de mensagens
               de marketing por e-mail, WhatsApp, SMS ou outros canais, em conformidade com a LGPD e
-              as boas práticas de mercado. O Flow Leads não se responsabiliza pelo uso que você faz
-              dos dados coletados nem pelas mensagens que você envia.
+              as boas práticas de mercado. O Flow Business não se responsabiliza pelo uso que você
+              faz dos dados coletados nem pelas mensagens que você envia.
             </p>
           </div>
 
@@ -137,7 +138,7 @@ function TermsPage() {
           <div>
             <h2 className="text-lg font-semibold text-foreground">8. Propriedade Intelectual</h2>
             <p className="mt-2">
-              O Flow Leads e sua marca pertencem a nós. Você recebe uma licença limitada, não
+              O Flow Business e sua marca pertencem a nós. Você recebe uma licença limitada, não
               exclusiva e intransferível para usar o Serviço para sua finalidade durante a vigência
               da sua assinatura.
             </p>
@@ -156,7 +157,7 @@ function TermsPage() {
               10. Limitação de Responsabilidade
             </h2>
             <p className="mt-2">
-              Na máxima extensão permitida pela lei, o Flow Leads não será responsável por danos
+              Na máxima extensão permitida pela lei, o Flow Business não será responsável por danos
               indiretos, incidentais ou consequenciais decorrentes do uso do Serviço. Nada nestes
               Termos limita direitos que a lei assegura ao consumidor.
             </p>

@@ -1,4 +1,4 @@
-// Tipos centrais do Flow Leads.
+// Tipos centrais do Flow Business.
 // REGRA-MÃE (anti-retrabalho): TODA tela consome os tipos daqui. Nada de objeto
 // inline com campos inventados. As Edge Functions futuras devolverão estes mesmos
 // formatos, então ligar a API = trocar o corpo do serviço, sem tocar nas telas.

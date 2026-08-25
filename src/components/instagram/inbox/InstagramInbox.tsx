@@ -19,7 +19,10 @@ export function InstagramInbox({
   onOpenAccounts: () => void;
 }) {
   const [account, setAccount] = useState<FlowBusinessAccount | null>(
-    accounts.find((item) => item.provider === "meta_official") ?? accounts[0] ?? null,
+    accounts.find((item) => item.provider === "meta_official") ??
+      accounts.find((item) => item.provider === "unipile") ??
+      accounts[0] ??
+      null,
   );
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -92,10 +95,15 @@ export function InstagramInbox({
     setInputText("");
 
     try {
-      const functionName = account?.provider === "meta_official" ? "flow-business-meta" : "ig-send";
+      const functionName =
+        account?.provider === "meta_official"
+          ? "flow-business-meta"
+          : account?.provider === "unipile"
+            ? "flow-business-unipile"
+            : "ig-send";
       const { data, error } = await supabase.functions.invoke(functionName, {
         body:
-          account?.provider === "meta_official"
+          account?.provider === "meta_official" || account?.provider === "unipile"
             ? { action: "send", conversationId: activeConvId, text: textToSend }
             : { conversaId: activeConvId, text: textToSend },
       });
@@ -126,7 +134,7 @@ export function InstagramInbox({
         </div>
         <h2 className="mt-4 text-xl font-semibold">Conecte uma conta profissional</h2>
         <p className="mt-2 text-sm text-muted-foreground max-w-md">
-          A caixa de entrada oficial depende de uma conta Business ou Creator conectada pela Meta.
+          Conecte uma conta do Instagram para sincronizar e responder suas conversas.
         </p>
         <Button className="mt-6" onClick={onOpenAccounts}>
           Abrir contas conectadas
@@ -142,7 +150,13 @@ export function InstagramInbox({
       {account.provider === "evolution_legacy" ? (
         <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm">
           <AlertTriangle className="size-4 text-warning" />
-          Esta é uma conexão legada. Migre para a API oficial da Meta para usar os novos fluxos.
+          Esta é uma conexão legada. Migre para a conexão alternativa ou para a API oficial.
+        </div>
+      ) : account.provider === "unipile" ? (
+        <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm">
+          <ShieldCheck className="size-4 text-warning" />
+          Conexão alternativa: monitore o status da conta e reconecte se o Instagram solicitar uma
+          verificação.
         </div>
       ) : (
         <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 p-3 text-sm">
@@ -177,7 +191,11 @@ export function InstagramInbox({
             <span
               className={`text-[10px] font-medium px-2 py-1 rounded-full ${account.status === "conectado" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}
             >
-              {account.provider === "meta_official" ? "Meta oficial" : "Legado"}
+              {account.provider === "meta_official"
+                ? "Meta oficial"
+                : account.provider === "unipile"
+                  ? "Alternativa"
+                  : "Legado"}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">

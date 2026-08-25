@@ -5,13 +5,13 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const Route = createFileRoute("/refund")({
   head: () => ({
     meta: [
-      { title: "Política de Reembolso — Flow Leads" },
+      { title: "Política de Reembolso — Flow Business" },
       {
         name: "description",
         content:
-          "Política de reembolso dos planos de assinatura do Flow Leads, incluindo o direito de arrependimento de 7 dias (CDC).",
+          "Política de reembolso dos planos de assinatura do Flow Business, incluindo o direito de arrependimento de 7 dias (CDC).",
       },
-      { property: "og:title", content: "Política de Reembolso — Flow Leads" },
+      { property: "og:title", content: "Política de Reembolso — Flow Business" },
       {
         property: "og:description",
         content:

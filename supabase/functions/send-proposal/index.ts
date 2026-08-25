@@ -16,7 +16,7 @@ import { resolverChave } from "../_shared/chaves.ts";
 // todas as orgs). TODO (blueprint — identidade de envio por org): cada org deve ter
 // subdomínio/remetente próprio + reply-to da org, para não compartilhar reputação.
 // Quando isso existir, ler o remetente da config da org (não do env global).
-const DEFAULT_FROM = "Flow Leads <onboarding@resend.dev>";
+const DEFAULT_FROM = "Flow Business <onboarding@resend.dev>";
 
 const SELECT =
   "id, lead_id, assunto, corpo, valor, status, criada_em, enviada_em, respondida_em, email_message_id, email_para, leads(business_name)";

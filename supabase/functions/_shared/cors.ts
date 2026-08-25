@@ -1,5 +1,5 @@
 // CORS compartilhado entre as Edge Functions.
-// 🔒 HARDENING: origin restrito aos domínios do Flow Leads (antes era "*").
+// 🔒 HARDENING: origin restrito aos domínios do Flow Business (antes era "*").
 
 const ALLOWED_ORIGINS = [
   "https://flow-leads-dusky.vercel.app",

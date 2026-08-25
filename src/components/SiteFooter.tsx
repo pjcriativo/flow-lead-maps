@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export function SiteFooter() {
-  // ⚙️ CMS (admin → Conteúdos do site): texto após o ano — vazio = usa "Flow Leads".
+  // ⚙️ CMS (admin → Conteúdos do site): texto após o ano — vazio = usa a marca padrão.
   const [texto, setTexto] = useState<string | null>(null);
   useEffect(() => {
     supabase
@@ -18,7 +18,7 @@ export function SiteFooter() {
     <footer className="border-t border-border py-8">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 text-sm text-muted-foreground sm:flex-row">
         <p>
-          © {new Date().getFullYear()} {texto || "Flow Leads"}
+          © {new Date().getFullYear()} {texto || "Flow Business"}
         </p>
         <nav className="flex items-center gap-6">
           <Link to="/pricing" className="hover:text-foreground">

@@ -280,7 +280,7 @@ export function AdminCms() {
       <Bloco titulo="Rodapé">
         <Campo
           rotulo="Texto de copyright"
-          fonte='hoje: "© {ano} Flow Leads" — o ano é sempre automático'
+          fonte='hoje: "© {ano} Flow Business" — o ano é sempre automático'
           valor={campo("footer_texto")}
           onChange={set("footer_texto")}
         />

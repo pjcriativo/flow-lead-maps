@@ -25,7 +25,7 @@ export function FlowBusinessToday({
         <div className="grid gap-6 p-6 sm:p-8 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-instagram-pink">
-              Flow Business · Central de execução
+              Instagram · Central de execução
             </p>
             <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
               Hoje você trabalha oportunidades, não listas soltas.

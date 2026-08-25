@@ -1,5 +1,5 @@
 // Painel /admin — casca visual com DADOS REAIS (layout inspirado no LeadzenAI; identidade
-// 100% Flow Leads: navy + dourado + serif nos títulos — nada de laranja).
+// 100% Flow Business: navy + dourado + serif nos títulos — nada de laranja).
 // Regra anti-mentira: todo número vem de src/services/admin.ts (rastreável). O que não tem
 // base ainda aparece como "Em breve" — nunca um placeholder inventado.
 import { useEffect, useState } from "react";

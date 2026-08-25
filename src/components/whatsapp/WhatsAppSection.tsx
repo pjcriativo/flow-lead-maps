@@ -1,5 +1,5 @@
 // Tela WhatsApp — TUDO de zap num lugar só, no layout do S-zap/Kaptar (SÓ referência visual; a
-// marca e os recursos são do Flow Leads). Abas internas: [Painel][WhatsApp][Campanhas][Conversas]
+// marca e os recursos são do Flow Business). Abas internas: [Painel][WhatsApp][Campanhas][Conversas]
 // [Scripts]. O MOTOR de campanha é COMPARTILHADO (canal='whatsapp'); a gestão de N chips + rodízio
 // (ETAPAS 1-3) fica na aba WhatsApp. Nenhum item novo na sidebar — tudo aqui dentro.
 import { useCallback, useEffect, useState } from "react";

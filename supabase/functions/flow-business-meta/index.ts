@@ -129,6 +129,7 @@ async function callback(req: Request, admin: AdminClient): Promise<Response> {
     .from("instagram_oauth_states")
     .select("org_id,user_id,expires_at,used_at")
     .eq("state", state)
+    .eq("provider", "meta_official")
     .maybeSingle();
   if (!oauthState || oauthState.used_at || new Date(oauthState.expires_at).getTime() <= Date.now())
     return redirectWithResult("error", "invalid_state");

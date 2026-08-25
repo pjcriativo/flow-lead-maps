@@ -7,13 +7,13 @@ import { lerConfigPublica } from "@/services/config-publica";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Política de Privacidade — Flow Leads" },
+      { title: "Política de Privacidade — Flow Business" },
       {
         name: "description",
         content:
-          "Como o Flow Leads coleta, usa e protege seus dados, em conformidade com a LGPD (Lei 13.709/2018).",
+          "Como o Flow Business coleta, usa e protege seus dados, em conformidade com a LGPD (Lei 13.709/2018).",
       },
-      { property: "og:title", content: "Política de Privacidade — Flow Leads" },
+      { property: "og:title", content: "Política de Privacidade — Flow Business" },
       {
         property: "og:description",
         content:
@@ -63,8 +63,8 @@ function PrivacyPage() {
         ) : (
           <>
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Esta Política descreve como o Flow Leads trata dados pessoais, em conformidade com a
-              Lei Geral de Proteção de Dados — LGPD (Lei 13.709/2018). Ao usar o Serviço, você
+              Esta Política descreve como o Flow Business trata dados pessoais, em conformidade com
+              a Lei Geral de Proteção de Dados — LGPD (Lei 13.709/2018). Ao usar o Serviço, você
               concorda com as práticas aqui descritas.
             </p>
 
@@ -73,7 +73,7 @@ function PrivacyPage() {
                 <h2 className="text-lg font-semibold text-foreground">1. Dados que Coletamos</h2>
                 <p className="mt-2">
                   Coletamos os dados que você fornece diretamente (e-mail da conta, dados de
-                  cobrança), os dados gerados durante o uso do Flow Leads (consultas de busca,
+                  cobrança), os dados gerados durante o uso do Flow Business (consultas de busca,
                   tarefas de coleta, leads exportados) e dados técnicos mínimos (endereço IP, tipo
                   de navegador) necessários para operar o Serviço.
                 </p>
@@ -235,7 +235,7 @@ function PrivacyPage() {
                   10. Crianças e Adolescentes
                 </h2>
                 <p className="mt-2">
-                  O Flow Leads não é direcionado a menores de 18 anos e não coletamos, de forma
+                  O Flow Business não é direcionado a menores de 18 anos e não coletamos, de forma
                   consciente, dados de crianças e adolescentes.
                 </p>
               </div>

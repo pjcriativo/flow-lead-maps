@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { z } from "zod";
@@ -91,7 +92,7 @@ export type FlowBusinessAccount = {
   id: string;
   name: string;
   username: string | null;
-  provider: "meta_official" | "evolution_legacy";
+  provider: "meta_official" | "unipile" | "evolution_legacy";
   status: string;
   accountType: string | null;
   profilePictureUrl: string | null;
@@ -311,7 +312,7 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
           id: z.string().uuid(),
           name: z.string(),
           username: z.string().nullable(),
-          provider: z.enum(["meta_official", "evolution_legacy"]),
+          provider: z.enum(["meta_official", "unipile", "evolution_legacy"]),
           status: z.string(),
           accountType: z.string().nullable(),
           profilePictureUrl: z.string().nullable(),
@@ -353,6 +354,10 @@ function workspaceFromJson(value: Json | null): FlowBusinessWorkspace {
 }
 
 function friendlyError(message: string): Error {
+  if (message.includes("UNIPILE") || message.includes("unipile"))
+    return new Error(
+      "A conexão alternativa do Instagram ainda não foi ativada pelo administrador.",
+    );
   if (message.includes("flow_business_limit"))
     return new Error("O limite deste recurso no seu plano foi atingido.");
   if (message.includes("official_account_required"))
@@ -478,5 +483,19 @@ export async function startMetaInstagramConnection(): Promise<string> {
   if (error) throw friendlyError(error.message);
   if (!isRecord(data) || typeof data.authorizationUrl !== "string")
     throw new Error("A integração oficial da Meta ainda não foi configurada pelo administrador.");
+  return data.authorizationUrl;
+}
+
+export async function startAlternativeInstagramConnection(): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("flow-business-unipile", {
+    body: { action: "start" },
+  });
+  if (error) {
+    const details =
+      error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+    throw friendlyError(details || error.message);
+  }
+  if (!isRecord(data) || typeof data.authorizationUrl !== "string")
+    throw new Error("A conexão alternativa do Instagram ainda não foi configurada.");
   return data.authorizationUrl;
 }

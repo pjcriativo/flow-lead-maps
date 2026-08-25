@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import {
   User,
@@ -67,23 +67,29 @@ import { lerConfigPublica } from "@/services/config-publica";
 import { setFusoHorario } from "@/lib/format";
 import { lerPerfilEmail, salvarNomeRemetente, salvarReplyTo, emailValido } from "@/services/perfil";
 import { toast } from "sonner";
+import { BRAND_NAME, BRAND_PRODUCT_DESCRIPTION, BRAND_SITE_URL } from "@/lib/brand";
+import {
+  dashboardSectionFromSearch,
+  dashboardUrlForSection,
+  type DashboardSection,
+} from "@/lib/dashboard-navigation";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "Painel — Flow Leads" },
+      { title: `Painel — ${BRAND_NAME}` },
       {
         name: "description",
-        content: "Prospecte, qualifique e gerencie seus leads no painel do Flow Leads.",
+        content: BRAND_PRODUCT_DESCRIPTION,
       },
-      { property: "og:title", content: "Painel — Flow Leads" },
+      { property: "og:title", content: `Painel — ${BRAND_NAME}` },
       {
         property: "og:description",
-        content: "Prospecte, qualifique e gerencie seus leads no painel do Flow Leads.",
+        content: BRAND_PRODUCT_DESCRIPTION,
       },
-      { property: "og:url", content: "https://flowleads.com.br/dashboard" },
+      { property: "og:url", content: `${BRAND_SITE_URL}/dashboard` },
     ],
-    links: [{ rel: "canonical", href: "https://flowleads.com.br/dashboard" }],
+    links: [{ rel: "canonical", href: `${BRAND_SITE_URL}/dashboard` }],
   }),
   component: Dashboard,
 });
@@ -97,32 +103,12 @@ function getUserId(): string {
   return currentUserId;
 }
 
-type Section =
-  | "buscar"
-  | "instagram"
-  | "listas"
-  | "pipeline"
-  | "leads"
-  | "propostas"
-  | "campanhas"
-  | "whatsapp"
-  | "automacao"
-  | "contratos"
-  | "financeiro"
-  | "redesign"
-  | "publicar"
-  | "suporte"
-  | "notificacoes"
-  | "academy"
-  // "sheets" (Google Sheets) segue no código como DEPRECATED — fora da navegação
-  // (o dono não usa). A seção ainda renderiza p/ não quebrar o callback de OAuth.
-  | "sheets"
-  | "settings";
+type Section = DashboardSection;
 
 // "Google Sheets" saiu da sidebar (deprecated). No lugar entrou "Campanhas".
 const NAV: { id: Section; label: string; Icon: typeof Search; badge?: string }[] = [
   { id: "buscar", label: "Buscar", Icon: Search },
-  { id: "instagram", label: "Flow Business", Icon: Instagram },
+  { id: "instagram", label: "Instagram", Icon: Instagram },
   { id: "listas", label: "Minhas Listas", Icon: FolderOpen },
   { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
   { id: "leads", label: "Meus Leads", Icon: Users },
@@ -143,7 +129,9 @@ const NAV: { id: Section; label: string; Icon: typeof Search; badge?: string }[]
 function Dashboard() {
   const navigate = useNavigate();
   const planPerms = usePlanPermissions();
-  const [section, setSection] = useState<Section>("buscar");
+  const [section, setSection] = useState<Section>(() =>
+    typeof window === "undefined" ? "buscar" : dashboardSectionFromSearch(window.location.search),
+  );
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetVerified, setSheetVerified] = useState(false);
@@ -172,12 +160,23 @@ function Dashboard() {
     "publicar",
   ];
 
+  const selectSection = useCallback((nextSection: Section) => {
+    setSection(nextSection);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(
+        {},
+        "",
+        dashboardUrlForSection(window.location.href, nextSection),
+      );
+    }
+  }, []);
+
   const handleNavClick = (id: Section, label: string) => {
     if (restrictedSections.includes(id) && !planPerms.canAccessPropostas && !planPerms.loading) {
       setUpgradeModal({ isOpen: true, recurso: label });
       return;
     }
-    setSection(id);
+    selectSection(id);
   };
 
   useEffect(() => {
@@ -213,20 +212,20 @@ function Dashboard() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("sheets_connected") === "true") setSection("sheets");
+    if (params.get("sheets_connected") === "true") selectSection("sheets");
     if (params.get("flow_business_connected") === "true") {
-      setSection("instagram");
-      toast.success("Conta profissional conectada ao Flow Business.");
+      selectSection("instagram");
+      toast.success("Conta do Instagram conectada ao Flow Business.");
     }
     if (params.get("flow_business_error")) {
-      setSection("instagram");
-      toast.error("Não foi possível conectar a conta. Confira a configuração do app Meta.");
+      selectSection("instagram");
+      toast.error("Não foi possível conectar a conta do Instagram.");
     }
     // deep-link de seção (ex.: /dashboard?secao=automacao — usado pelo painel /admin)
     const secao = params.get("secao");
-    if (secao === "configuracoes" || secao === "perfil") setSection("settings");
-    else if (secao && NAV.some((n) => n.id === secao)) setSection(secao as Section);
-  }, []);
+    if (secao === "configuracoes" || secao === "perfil") selectSection("settings");
+    else if (secao && NAV.some((n) => n.id === secao)) selectSection(secao as Section);
+  }, [selectSection]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -296,7 +295,7 @@ function Dashboard() {
         <div className="border-t border-sidebar-border p-3 space-y-2">
           <button
             type="button"
-            onClick={() => setSection("settings")}
+            onClick={() => selectSection("settings")}
             className={cn(
               "flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-all border",
               section === "settings"
@@ -377,13 +376,15 @@ function Dashboard() {
           section === "instagram" ? "p-0" : "px-4 pb-10 pt-16 md:px-8 md:pt-8",
         )}
       >
-        {section === "buscar" && <SearchSection onOpenInstagram={() => setSection("instagram")} />}
-        {section === "instagram" && <InstagramWorkspace onExit={() => setSection("buscar")} />}
+        {section === "buscar" && (
+          <SearchSection onOpenInstagram={() => selectSection("instagram")} />
+        )}
+        {section === "instagram" && <InstagramWorkspace onExit={() => selectSection("buscar")} />}
         {section === "listas" && (
           <MinhasListasSection
             onOpenRedesign={(leadId) => {
               setFocusRedesignLead(leadId);
-              setSection("redesign");
+              selectSection("redesign");
             }}
           />
         )}
@@ -392,14 +393,16 @@ function Dashboard() {
           <LeadsManager
             onOpenRedesign={(leadId) => {
               setFocusRedesignLead(leadId);
-              setSection("redesign");
+              selectSection("redesign");
             }}
           />
         )}
         {section === "propostas" && <PropostasSection />}
         {section === "campanhas" && <CampanhasSection />}
         {section === "whatsapp" && <WhatsAppSection />}
-        {section === "automacao" && <AutomacaoSection onRevisar={() => setSection("campanhas")} />}
+        {section === "automacao" && (
+          <AutomacaoSection onRevisar={() => selectSection("campanhas")} />
+        )}
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}
         {section === "redesign" && (

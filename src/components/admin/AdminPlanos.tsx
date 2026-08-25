@@ -1,5 +1,5 @@
 // Tela PLANOS do painel admin (billing camada 1 — cadastro). Padrão visual da referência
-// (LeadzenAI) com a identidade Flow Leads: breadcrumb, toolbar de busca/filtros, linhas com
+// (LeadzenAI) com a identidade Flow Business: breadcrumb, toolbar de busca/filtros, linhas com
 // descrição + limites empilhados + chips de acesso + pill de status + toggle/editar/excluir.
 // Preços SEMPRE em R$ (real brasileiro). Tudo grava de verdade (Edge admin-acoes, guard
 // super_admin); a COBRANÇA (gateway) segue TODO em docs/DIVIDAS.md.

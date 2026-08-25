@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   if (number.length < 12)
     return json({ error: "Número inválido — use DDI+DDD (ex.: 5511987654321)." }, 400);
   const text =
-    (body.text || "").trim() || "✅ Teste do Flow Leads — conexão do WhatsApp funcionando!";
+    (body.text || "").trim() || "✅ Teste do Flow Business — conexão do WhatsApp funcionando!";
 
   // Instância DA ORG (não cria: se ela não tem, não há o que enviar).
   const inst = await resolverInstanciaDaOrg(admin, userId, false);

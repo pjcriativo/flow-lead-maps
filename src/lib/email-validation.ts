@@ -1,5 +1,5 @@
 /**
- * Validador de E-mails Autênticos do Flow Leads.
+ * Validador de E-mails Autênticos do Flow Business.
  * Impede o cadastro e aprovação de e-mails falsos, temporários ou de teste (@teste, @fake, etc.).
  */
 

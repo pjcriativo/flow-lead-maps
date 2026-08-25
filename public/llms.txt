@@ -1,8 +1,8 @@
-# Flow Leads
+# Flow Business
 
-> Find qualified business leads on Google Maps in seconds. Export names, phones, emails, and websites to Excel or Google Sheets.
+> Plataforma de prospecção, relacionamento e vendas com Google Maps, Instagram, CRM e automações.
 
 ## Pages
 
 - [Home](/): Landing page with features, how it works, and pricing.
-- [Dashboard](/dashboard): Generate leads, view results, and sync to Google Sheets.
+- [Dashboard](/dashboard): Encontre leads, trabalhe oportunidades no CRM e acompanhe suas conversas.

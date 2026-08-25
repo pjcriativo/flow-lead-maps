@@ -9,7 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
-    meta: [{ title: "Redefinir senha — Flow Leads" }],
+    meta: [{ title: "Redefinir senha — Flow Business" }],
   }),
   component: ResetPasswordPage,
 });

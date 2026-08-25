@@ -38,8 +38,8 @@ export const Route = createFileRoute("/auth")({
   validateSearch: authSearchSchema,
   head: () => ({
     meta: [
-      { title: "Entrar ou Criar Conta — Flow Leads" },
-      { name: "description", content: "Acesse ou crie sua conta no Flow Leads." },
+      { title: "Entrar ou Criar Conta — Flow Business" },
+      { name: "description", content: "Acesse ou crie sua conta no Flow Business." },
     ],
   }),
   component: AuthPage,
@@ -193,7 +193,7 @@ function AuthPage() {
         <div className="absolute inset-0 z-0">
           <img
             src="/auth-hero.png"
-            alt="Flow Leads Prospecção B2B"
+            alt="Flow Business — Prospecção B2B"
             className="h-full w-full object-cover object-center opacity-55 transition-transform duration-1000 hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/20" />
@@ -236,7 +236,7 @@ function AuthPage() {
 
         {/* Rodapé da Coluna Esquerda */}
         <div className="relative z-10 flex items-center justify-between border-t border-white/10 pt-6 text-xs text-slate-400">
-          <p>© {new Date().getFullYear()} Flow Leads. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} Flow Business. Todos os direitos reservados.</p>
           <Link to="/privacy" className="transition-colors hover:text-white">
             Privacidade
           </Link>

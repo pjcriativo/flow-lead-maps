@@ -1,7 +1,7 @@
 {
-  "name": "Flow Leads",
-  "short_name": "Flow Leads",
-  "description": "Geração de leads a partir do Google Maps.",
+  "name": "Flow Business",
+  "short_name": "Flow Business",
+  "description": "Prospecção, relacionamento e vendas com Maps, Instagram, CRM e automações.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a2e",

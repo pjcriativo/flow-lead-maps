@@ -5,7 +5,7 @@
 //     usuário, sem verificar o domínio dele, é spoofing → spam. NÃO se mexe nisso aqui.
 //   - NOME DE EXIBIÇÃO do From: livre. É o que o lead lê na caixa dele.
 //
-// O lead é prospect da AGÊNCIA, não cliente da plataforma: ele não pode ver "Flow Leads" na
+// O lead é prospect da AGÊNCIA, não cliente da plataforma: ele não pode ver "Flow Business" na
 // caixa de entrada. E a copy é pessoal ("Peguei o que já é público de vocês e refiz a página")
 // — assinada por uma ferramenta, soava falsa. Então o nome de exibição é o full_name da org
 // (o MESMO que assina o corpo), e o endereço continua o do domínio verificado.

@@ -30,7 +30,7 @@ export const Route = createFileRoute("/aguardando-aprovacao")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Aguardando liberação — Flow Leads" },
+      { title: "Aguardando liberação — Flow Business" },
       {
         name: "description",
         content: "Seu cadastro está aguardando a liberação do administrador.",
@@ -92,7 +92,7 @@ export function AguardandoAprovacaoPage() {
   };
 
   const whatsappSuporteUrl = `https://wa.me/5511999999999?text=${encodeURIComponent(
-    `Olá! Acabei de criar minha conta no Flow Leads${
+    `Olá! Acabei de criar minha conta no Flow Business${
       email ? ` (${email})` : ""
     }. Gostaria de confirmar meu pagamento e solicitar a liberação do meu acesso.`,
   )}`;
@@ -105,14 +105,18 @@ export function AguardandoAprovacaoPage() {
           <DialogHeader className="space-y-3 text-center sm:text-left">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary w-fit mx-auto sm:mx-0">
               <Sparkles className="size-3.5 text-primary" />
-              <span>Bem-vindo ao Flow Leads</span>
+              <span>Bem-vindo ao Flow Business</span>
             </div>
             <DialogTitle className="text-xl font-bold tracking-tight">
               Sua conta foi cadastrada com sucesso! 🎉
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
               Para sua segurança e controle da plataforma, o acesso a todas as ferramentas de busca,
-              prospecção e disparos é <strong className="text-foreground font-semibold">liberado exclusivamente após a confirmação do pagamento</strong> e aprovação do administrador.
+              prospecção e disparos é{" "}
+              <strong className="text-foreground font-semibold">
+                liberado exclusivamente após a confirmação do pagamento
+              </strong>{" "}
+              e aprovação do administrador.
             </DialogDescription>
           </DialogHeader>
 
@@ -120,7 +124,8 @@ export function AguardandoAprovacaoPage() {
             <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
               <ShieldAlert className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
               <p className="leading-relaxed">
-                <strong>Importante:</strong> Em hipótese alguma a plataforma é liberada de forma automática sem a confirmação prévia da assinatura/pagamento pelo suporte.
+                <strong>Importante:</strong> Em hipótese alguma a plataforma é liberada de forma
+                automática sem a confirmação prévia da assinatura/pagamento pelo suporte.
               </p>
             </div>
 
@@ -170,7 +175,7 @@ export function AguardandoAprovacaoPage() {
           <div className="space-y-2">
             <CardTitle className="text-2xl">Cadastro em análise</CardTitle>
             <CardDescription className="text-sm leading-relaxed">
-              Sua conta foi criada, mas o acesso aos recursos do Flow Leads só é ativado após a
+              Sua conta foi criada, mas o acesso aos recursos do Flow Business só é ativado após a
               confirmação do pagamento e aprovação do suporte.
             </CardDescription>
           </div>
@@ -182,8 +187,9 @@ export function AguardandoAprovacaoPage() {
               <div>
                 <p className="text-sm font-medium">Aguardando liberação pelo admin</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Conta registada: <strong className="text-foreground">{email || "Sua conta"}</strong>.
-                  Envie o comprovante de pagamento para acelerar a liberação.
+                  Conta registada:{" "}
+                  <strong className="text-foreground">{email || "Sua conta"}</strong>. Envie o
+                  comprovante de pagamento para acelerar a liberação.
                 </p>
               </div>
             </div>
@@ -237,4 +243,3 @@ export function AguardandoAprovacaoPage() {
     </main>
   );
 }
-

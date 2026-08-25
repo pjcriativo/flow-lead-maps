@@ -1,6 +1,6 @@
 // Tela CONFIGURAÇÕES do painel admin — layout de referência (LeadzenAI): 3 colunas
 // ("Navegue até" em caixas · conteúdo em cards · "Painel de controle" com toggles), com a
-// identidade Flow Leads (navy/gold/Georgia). Cada campo controla algo REAL — o rastro de
+// identidade Flow Business (navy/gold/Georgia). Cada campo controla algo REAL — o rastro de
 // onde cada um é lido está no help text; o que não tem base ainda fica "Em breve" com o
 // motivo, nunca decorativo. config_plataforma via config_ler/config_salvar; chaves de API
 // via cofre cifrado (chave_salvar — escrita-apenas, o valor nunca volta).
@@ -1635,10 +1635,10 @@ export function AdminConfiguracoes() {
                 <Campo
                   rotulo="Título do site"
                   obrigatorio
-                  fonte='Marca exibida no logo e nas telas — hoje: "Flow Leads"'
+                  fonte='Marca exibida no logo e nas telas — padrão: "Flow Business"'
                   valor={campo("nome_plataforma")}
                   onChange={set("nome_plataforma")}
-                  placeholder="Flow Leads"
+                  placeholder="Flow Business"
                 />
                 <CampoSelect
                   rotulo="Moeda"
@@ -1852,7 +1852,7 @@ export function AdminConfiguracoes() {
                 fonte='send-proposal / follow-up-cron — quando a org não cadastrou "Seu nome"'
                 valor={campo("remetente_nome_padrao")}
                 onChange={set("remetente_nome_padrao")}
-                placeholder="Flow Leads"
+                placeholder="Flow Business"
               />
               <Campo
                 rotulo="E-mail padrão do remetente"
@@ -1882,7 +1882,7 @@ export function AdminConfiguracoes() {
                 fonte="document.title da landing — o que aparece na aba e no Google"
                 valor={campo("seo_titulo")}
                 onChange={set("seo_titulo")}
-                placeholder="Flow Leads — Encontre leads no Google Maps em segundos"
+                placeholder="Flow Business — Prospecção e vendas em um só lugar"
               />
               <div className="hidden sm:block" />
               <CampoArea

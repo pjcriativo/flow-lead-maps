@@ -38,7 +38,7 @@ function montarContratoHtml(nome: string, valor: number, data: string): string {
   );
   return `
     <h2>Contrato de Prestação de Serviços</h2>
-    <p><strong>CONTRATADA:</strong> Flow Leads — desenvolvimento e reformulação de sites.</p>
+    <p><strong>CONTRATADA:</strong> Flow Business — desenvolvimento e reformulação de sites.</p>
     <p><strong>CONTRATANTE:</strong> ${nome}.</p>
     <h3>1. Objeto</h3>
     <p>Desenvolvimento de um novo site responsivo para a CONTRATANTE, com foco em
@@ -55,7 +55,7 @@ function montarContratoHtml(nome: string, valor: number, data: string): string {
     propriedade. O site entregue é de uso exclusivo da CONTRATANTE.</p>
     <p style="margin-top:24px">Data: ${data}</p>
     <p style="margin-top:32px">__________________________________<br/>CONTRATANTE — ${nome}</p>
-    <p style="margin-top:16px">__________________________________<br/>CONTRATADA — Flow Leads</p>
+    <p style="margin-top:16px">__________________________________<br/>CONTRATADA — Flow Business</p>
   `;
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { lerConfigPublica } from "@/services/config-publica";
+import { BRAND_NAME } from "@/lib/brand";
 
 interface FlowLeadsLogoProps {
   className?: string;
@@ -23,7 +24,7 @@ export function FlowLeadsLogo({ className, variant = "light" }: FlowLeadsLogoPro
     return (
       <img
         src={logoUrl}
-        alt={nome || "Flow Leads"}
+        alt={nome || BRAND_NAME}
         className={cn("h-9 w-auto object-contain", className)}
       />
     );
@@ -34,11 +35,11 @@ export function FlowLeadsLogo({ className, variant = "light" }: FlowLeadsLogoPro
   const tileFg = isDark ? "#1a1a2e" : "#ffffff";
   const wordmark = isDark ? "#ffffff" : "#1a1a2e";
   const accent = "#4f8ef7";
-  const texto = nome || "Flow Leads";
+  const texto = nome || BRAND_NAME;
 
   return (
     <svg
-      viewBox="0 0 210 36"
+      viewBox="0 0 250 36"
       xmlns="http://www.w3.org/2000/svg"
       className={cn("h-9 w-auto", className)}
       role="img"

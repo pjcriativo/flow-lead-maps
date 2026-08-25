@@ -57,7 +57,7 @@ function useConteudo() {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Flow Leads — O Fim da Prospecção Manual" },
+      { title: "Flow Business — O Fim da Prospecção Manual" },
       {
         name: "description",
         content:
@@ -218,7 +218,7 @@ function Index() {
               <div className="absolute top-0 right-0 -mt-4 -mr-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
                 <TrendingUp className="h-6 w-6" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900">A Solução Flow Leads</h3>
+              <h3 className="text-2xl font-bold text-slate-900">A Solução Flow Business</h3>
               <p className="mt-2 text-slate-600 font-medium">
                 O antídoto definitivo para a falência B2B.
               </p>
@@ -251,9 +251,9 @@ function Index() {
               O Arsenal Completo
             </h2>
             <p className="mt-6 text-lg text-slate-600 font-medium">
-              Transformamos prospecção em engenharia reversa. O Flow Leads não é apenas um extrator,
-              é o ecossistema que agências de elite usam para triturar a concorrência. E o melhor:
-              você para de pagar mensalidade pra 5 ferramentas diferentes.
+              Transformamos prospecção em engenharia reversa. O Flow Business não é apenas um
+              extrator, é o ecossistema que agências de elite usam para triturar a concorrência. E o
+              melhor: você para de pagar mensalidade pra 5 ferramentas diferentes.
             </p>
           </div>
 
@@ -327,8 +327,8 @@ function Index() {
               Previsibilidade de Receita
             </h2>
             <p className="mt-6 text-lg text-slate-600 max-w-2xl mx-auto font-medium">
-              A matemática é inegável. Se você fechar 2 clientes usando o Flow Leads, a plataforma
-              já se paga por anos. Veja como faturar seus primeiros R$ 3.500:
+              A matemática é inegável. Se você fechar 2 clientes usando o Flow Business, a
+              plataforma já se paga por anos. Veja como faturar seus primeiros R$ 3.500:
             </p>
           </div>
 
