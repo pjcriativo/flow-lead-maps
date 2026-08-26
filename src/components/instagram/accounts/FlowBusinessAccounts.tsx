@@ -370,7 +370,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
               >
                 {connecting ? <Loader2 className="size-4 animate-spin" /> : null}
                 {connectStep === "approval"
-                  ? "Já aprovei — continuar"
+                  ? "Já aprovei continuar"
                   : connectStep === "code"
                     ? "Validar código"
                     : "Conectar"}
@@ -450,7 +450,7 @@ function ApprovalStep({
           },
           {
             icon: <CheckCircle2 className="size-4" />,
-            label: 'Volte aqui e clique em "Já aprovei — continuar"',
+            label: 'Volte aqui e clique em "Já aprovei continuar"',
             done: false,
           },
         ].map((step, i) => (
@@ -474,7 +474,7 @@ function ApprovalStep({
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
         <p className="text-sm leading-5 text-muted-foreground">
           Não feche esta janela. Após aprovar no Instagram, clique em{" "}
-          <strong className="text-foreground">"Já aprovei — continuar"</strong> para finalizar a
+          <strong className="text-foreground">"Já aprovei continuar"</strong> para finalizar a
           conexão.
         </p>
       </div>
