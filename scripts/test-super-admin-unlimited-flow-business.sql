@@ -89,7 +89,7 @@ begin
     1000000,
     1000000,
     1000000,
-    1000000
+    1000
   );
   if coalesce((v_reservation->>'ok')::boolean, false) is not true then
     raise exception 'super_admin_usage_reservation_was_blocked:%', v_reservation;
