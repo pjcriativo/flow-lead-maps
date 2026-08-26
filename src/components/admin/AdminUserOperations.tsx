@@ -948,8 +948,8 @@ export function AdminUserOperations({
                             </Button>
                           ))}
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant={canSelect ? "outline" : "ghost"}
+                          size="sm"
                           disabled={!canSelect || rowBusy === user.id}
                           onClick={() => deleteSingleUser(user)}
                           aria-label={`Excluir conta de ${user.email}`}
@@ -958,9 +958,22 @@ export function AdminUserOperations({
                               ? "Excluir conta pendente"
                               : "Exclusão protegida: bloqueie a conta ou preserve o histórico"
                           }
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          className={cn(
+                            canSelect &&
+                              "border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive",
+                          )}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {canSelect ? (
+                            <>
+                              <Trash2 className="mr-1.5 h-4 w-4" />
+                              Excluir
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck className="mr-1.5 h-4 w-4" />
+                              Protegida
+                            </>
+                          )}
                         </Button>
                       </div>
                     </td>

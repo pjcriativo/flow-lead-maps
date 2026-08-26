@@ -10,6 +10,7 @@ const source = readFileSync(
 test("a tabela de usuários oferece exclusão individual segura", () => {
   assert.match(source, /deleteSingleUser/);
   assert.match(source, /aria-label={`Excluir conta de \$\{user\.email\}`}/);
+  assert.match(source, /<Trash2 className="mr-1\.5 h-4 w-4" \/>\s+Excluir/);
 });
 
 test("a lista de usuários é paginada em vez de renderizar toda a base", () => {
