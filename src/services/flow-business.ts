@@ -105,6 +105,7 @@ export type FlowBusinessAccount = {
   connectedAt: string | null;
   lastWebhookAt: string | null;
   errorMessage: string | null;
+  pendingChallengeMode: "app_approval" | "verification_code" | null;
 };
 
 export type FlowNodeSubtype =
@@ -362,6 +363,7 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
           connectedAt: z.string().nullable(),
           lastWebhookAt: z.string().nullable(),
           errorMessage: z.string().nullable(),
+          pendingChallengeMode: z.enum(["app_approval", "verification_code"]).nullable(),
         })
         .strict(),
     ),

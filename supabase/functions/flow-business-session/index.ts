@@ -144,6 +144,7 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
       .update({
         status: "aguardando",
         error_message: null,
+        pending_challenge_mode: "verification_code",
         atualizado_em: new Date().toISOString(),
       })
       .eq("id", instanceId)
@@ -151,19 +152,21 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
     return json({ needsTwoFactor: true, instanceId }, 200, req);
   }
   if (response.status === 409 && workerCode === "challenge_required") {
+    const challengeMode = detail?.mode === "verification_code" ? "verification_code" : "app_approval";
     await admin
       .from("ig_instancias")
       .update({
         status: "aguardando",
         error_message: null,
+        pending_challenge_mode: challengeMode,
         atualizado_em: new Date().toISOString(),
       })
       .eq("id", instanceId)
       .eq("org_id", orgId);
     return json(
       {
-        needsApproval: detail?.mode !== "verification_code",
-        needsTwoFactor: detail?.mode === "verification_code",
+        needsApproval: challengeMode === "app_approval",
+        needsTwoFactor: challengeMode === "verification_code",
         instanceId,
       },
       200,
@@ -187,6 +190,7 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
       account_type: "session",
       connected_at: new Date().toISOString(),
       error_message: null,
+      pending_challenge_mode: null,
       atualizado_em: new Date().toISOString(),
     })
     .eq("id", instanceId)

@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  Clock,
   Instagram,
   Loader2,
   LockKeyhole,
   LogOut,
+  Phone,
   PlugZap,
   RotateCcw,
   ShieldCheck,
+  Smartphone,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -49,44 +52,78 @@ interface FlowBusinessAccountsProps {
   onConnected: () => Promise<void>;
 }
 
+type ConnectStep = "credentials" | "approval" | "code";
+
 export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusinessAccountsProps) {
   const atLimit = planLimitReached(plan.used.accounts, plan.limits.accounts);
   const connectedAccounts = accounts.filter((account) => account.provider !== "evolution_legacy");
   const legacyAccounts = accounts.filter((account) => account.provider === "evolution_legacy");
+
   const [connectOpen, setConnectOpen] = useState(false);
+  const [connectStep, setConnectStep] = useState<ConnectStep>("credentials");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
-  const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
-  const [needsApproval, setNeedsApproval] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [approvalTimeout, setApprovalTimeout] = useState(false);
+  const approvalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [accountAction, setAccountAction] = useState<{
     account: FlowBusinessAccount;
     action: "disconnect" | "delete";
   } | null>(null);
   const [changingAccount, setChangingAccount] = useState(false);
 
+  // Limpa o timer ao fechar o dialog
+  const clearApprovalTimer = () => {
+    if (approvalTimerRef.current) {
+      clearTimeout(approvalTimerRef.current);
+      approvalTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => clearApprovalTimer();
+  }, []);
+
   const closeConnection = () => {
+    clearApprovalTimer();
     setConnectOpen(false);
+    setConnectStep("credentials");
     setUsername("");
     setPassword("");
     setVerificationCode("");
-    setNeedsTwoFactor(false);
-    setNeedsApproval(false);
+    setApprovalTimeout(false);
   };
 
-  const connect = async () => {
+  const startApprovalTimer = () => {
+    clearApprovalTimer();
+    setApprovalTimeout(false);
+    approvalTimerRef.current = setTimeout(() => {
+      setApprovalTimeout(true);
+    }, 2 * 60 * 1000); // 2 minutos
+  };
+
+  const connect = async (event: React.FormEvent) => {
+    event.preventDefault();
     setConnecting(true);
     try {
-      const result = await connectInstagramSession({ username, password, verificationCode });
+      const result = await connectInstagramSession({
+        username,
+        password,
+        verificationCode: connectStep === "code" ? verificationCode : "",
+      });
+
       if (result.needsTwoFactor) {
-        setNeedsTwoFactor(true);
-        setNeedsApproval(false);
+        setConnectStep("code");
+        setApprovalTimeout(false);
+        clearApprovalTimer();
         toast.info("Informe o código de verificação para concluir.");
         return;
       }
       if (result.needsApproval) {
-        setNeedsApproval(true);
+        setConnectStep("approval");
+        startApprovalTimer();
         toast.info("Aprove esta tentativa no aplicativo do Instagram e depois continue aqui.");
         return;
       }
@@ -103,12 +140,22 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
     }
   };
 
+  /** Abre o dialog já no passo correto conforme o challenge pendente da conta */
   const reconnect = (account: FlowBusinessAccount) => {
     setUsername(account.username ?? "");
     setPassword("");
     setVerificationCode("");
-    setNeedsTwoFactor(false);
-    setNeedsApproval(false);
+    setApprovalTimeout(false);
+    clearApprovalTimer();
+
+    if (account.pendingChallengeMode === "app_approval") {
+      setConnectStep("approval");
+      startApprovalTimer();
+    } else if (account.pendingChallengeMode === "verification_code") {
+      setConnectStep("code");
+    } else {
+      setConnectStep("credentials");
+    }
     setConnectOpen(true);
   };
 
@@ -118,174 +165,192 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
     try {
       if (accountAction.action === "disconnect") {
         await disconnectInstagramSession(accountAction.account.id);
-        toast.success("Conta desconectada. Você pode conectá-la novamente quando quiser.");
+        toast.success("Conta desconectada.");
       } else {
         await deleteInstagramSession(accountAction.account.id);
-        toast.success("Conta removida da sua área.");
+        toast.success("Conta removida.");
       }
-      setAccountAction(null);
       await onConnected();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível alterar esta conta.");
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível alterar esta conta.",
+      );
     } finally {
       setChangingAccount(false);
+      setAccountAction(null);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-6 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)] lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-instagram-pink">
-            Contas do Instagram
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-            Gerencie as contas do seu Instagram
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Conecte e gerencie seus perfis em um só lugar. Contas com conexão interrompida podem ser
-            reconectadas ou removidas a qualquer momento.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button disabled={atLimit} onClick={() => setConnectOpen(true)}>
-              <PlugZap className="size-4" /> Conectar conta
-            </Button>
-          </div>
+    <div className="space-y-8">
+      {/* Progress do plano */}
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium">Contas conectadas</span>
+          <span className="text-muted-foreground">
+            {planLimitLabel(plan.used.accounts, plan.limits.accounts)}
+          </span>
         </div>
-        <div className="rounded-2xl border border-border bg-muted/35 p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Contas do seu plano</span>
-            <span className="text-sm font-semibold tabular-nums">
-              {planLimitLabel(plan.used.accounts, plan.limits.accounts)}
-            </span>
-          </div>
-          <Progress
-            value={planLimitProgress(plan.used.accounts, plan.limits.accounts)}
-            className="mt-3"
-          />
-          <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-muted-foreground">
-            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />A conexão fica protegida
-            no backend. Cada organização enxerga apenas as próprias contas e o limite do plano é
-            validado novamente no banco.
-          </div>
-        </div>
-      </section>
+        <Progress
+          className="mt-3 h-1.5"
+          value={planLimitProgress(plan.used.accounts, plan.limits.accounts)}
+        />
+      </div>
 
-      {atLimit ? (
-        <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm">
-          <LockKeyhole className="size-4 text-warning" /> Você atingiu o limite de contas do plano.
-        </div>
-      ) : null}
-
-      <section>
-        <h3 className="mb-3 text-lg font-semibold">Suas contas</h3>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {/* Lista de contas session_worker / unipile / meta */}
+      {connectedAccounts.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {connectedAccounts.map((account) => (
             <AccountCard
               key={account.id}
               account={account}
-              busy={changingAccount && accountAction?.account.id === account.id}
               onReconnect={() => reconnect(account)}
               onDisconnect={() => setAccountAction({ account, action: "disconnect" })}
               onDelete={() => setAccountAction({ account, action: "delete" })}
             />
           ))}
-          {!connectedAccounts.length ? (
-            <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center">
-              <Instagram className="mx-auto size-9 text-muted-foreground/40" />
-              <p className="mt-3 font-medium">Nenhuma conta conectada</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Use o botão acima para conectar sua primeira conta.
-              </p>
-            </div>
-          ) : null}
         </div>
-      </section>
+      )}
 
-      {legacyAccounts.length ? (
-        <section>
-          <div className="mb-3 flex items-center gap-2">
-            <h3 className="text-lg font-semibold">Conexões legadas</h3>
-            <span className="rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-semibold text-warning">
-              MIGRAÇÃO RECOMENDADA
-            </span>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {/* Contas legadas */}
+      {legacyAccounts.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Conexões anteriores
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {legacyAccounts.map((account) => (
               <AccountCard key={account.id} account={account} />
             ))}
           </div>
-        </section>
-      ) : null}
+        </div>
+      )}
 
+      {/* Botão adicionar conta */}
+      {!atLimit && (
+        <Button
+          size="lg"
+          className="gap-2"
+          onClick={() => {
+            setUsername("");
+            setPassword("");
+            setVerificationCode("");
+            setConnectStep("credentials");
+            setApprovalTimeout(false);
+            clearApprovalTimer();
+            setConnectOpen(true);
+          }}
+        >
+          <PlugZap className="size-4" />
+          Conectar conta do Instagram
+        </Button>
+      )}
+      {atLimit && (
+        <p className="text-sm text-muted-foreground">
+          Limite de contas atingido no seu plano.
+        </p>
+      )}
+
+      {/* Dialog de conexão / challenge */}
       <Dialog
         open={connectOpen}
         onOpenChange={(open) => {
-          if (connecting) return;
-          if (open) setConnectOpen(true);
-          else closeConnection();
+          if (!open && !connecting) closeConnection();
         }}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Conectar conta</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Instagram className="size-5 text-instagram-pink" />
+              {connectStep === "approval"
+                ? "Aprovação no Instagram"
+                : connectStep === "code"
+                  ? "Código de verificação"
+                  : "Conectar Instagram"}
+            </DialogTitle>
             <DialogDescription>
-              Sua senha é usada somente nesta tentativa de login e não é armazenada. O estado da
-              sessão fica protegido no servidor.
+              {connectStep === "credentials"
+                ? "Use suas credenciais do Instagram para conectar a conta."
+                : connectStep === "approval"
+                  ? "O Instagram está esperando sua confirmação no aplicativo."
+                  : "O Instagram enviou um código para confirmar sua identidade."}
             </DialogDescription>
           </DialogHeader>
-          <form
-            className="space-y-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void connect();
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="instagram-username">Usuário do Instagram</Label>
-              <Input
-                id="instagram-username"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="seuperfil"
-                autoComplete="username"
-                disabled={needsTwoFactor || needsApproval || connecting}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="instagram-password">Senha</Label>
-              <Input
-                id="instagram-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                disabled={needsApproval || connecting}
-                required
-              />
-            </div>
-            {needsTwoFactor ? (
-              <div className="space-y-2">
-                <Label htmlFor="instagram-verification">Código de verificação</Label>
-                <Input
-                  id="instagram-verification"
-                  value={verificationCode}
-                  onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={8}
-                  disabled={connecting}
-                  required
-                />
+
+          <form onSubmit={(e) => void connect(e)} className="space-y-4 pt-1">
+            {connectStep === "credentials" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="instagram-username">Usuário do Instagram</Label>
+                  <Input
+                    id="instagram-username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="seuperfil"
+                    autoComplete="username"
+                    disabled={connecting}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="instagram-password">Senha</Label>
+                  <Input
+                    id="instagram-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    disabled={connecting}
+                    required
+                  />
+                </div>
+                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3 text-xs leading-5 text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  Sua senha é enviada diretamente ao Instagram e nunca é armazenada.
+                </div>
+              </>
+            )}
+
+            {connectStep === "approval" && (
+              <ApprovalStep timeout={approvalTimeout} onSwitchToCode={() => {
+                clearApprovalTimer();
+                setConnectStep("code");
+                setApprovalTimeout(false);
+              }} />
+            )}
+
+            {connectStep === "code" && (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                  <Phone className="mt-0.5 size-5 shrink-0 text-blue-500" />
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Código enviado</p>
+                    <p className="mt-1 leading-5">
+                      O Instagram enviou um código por SMS ou e-mail. Insira abaixo para concluir a
+                      conexão.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="instagram-verification">Código de verificação</Label>
+                  <Input
+                    id="instagram-verification"
+                    value={verificationCode}
+                    onChange={(e) =>
+                      setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 8))
+                    }
+                    placeholder="000000"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={8}
+                    disabled={connecting}
+                    required
+                    className="text-center text-lg tracking-[0.4em] font-mono"
+                  />
+                </div>
               </div>
-            ) : null}
-            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-5 text-muted-foreground">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-              {needsApproval
-                ? "Abra o Instagram, aprove a tentativa de login e volte aqui sem fechar esta janela. Depois clique em Continuar conexão."
-                : "Confirme a tentativa no aplicativo caso o Instagram solicite."}
-            </div>
+            )}
+
             <DialogFooter>
               <Button
                 type="button"
@@ -295,15 +360,18 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={connecting || !username.trim() || !password}>
-                {connecting ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <ShieldCheck className="size-4" />
-                )}
-                {needsApproval
-                  ? "Continuar conexão"
-                  : needsTwoFactor
+              <Button
+                type="submit"
+                disabled={
+                  connecting ||
+                  (connectStep === "credentials" && (!username.trim() || !password)) ||
+                  (connectStep === "code" && verificationCode.length < 4)
+                }
+              >
+                {connecting ? <Loader2 className="size-4 animate-spin" /> : null}
+                {connectStep === "approval"
+                  ? "Já aprovei — continuar"
+                  : connectStep === "code"
                     ? "Validar código"
                     : "Conectar"}
               </Button>
@@ -312,6 +380,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
         </DialogContent>
       </Dialog>
 
+      {/* AlertDialog de disconnect / delete */}
       <AlertDialog
         open={accountAction !== null}
         onOpenChange={(open) => {
@@ -335,8 +404,8 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
             <AlertDialogCancel disabled={changingAccount}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               disabled={changingAccount}
-              onClick={(event) => {
-                event.preventDefault();
+              onClick={(e) => {
+                e.preventDefault();
                 void confirmAccountAction();
               }}
               className={
@@ -355,10 +424,102 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
   );
 }
 
+// ─── Approval Step ────────────────────────────────────────────────────────────
+
+function ApprovalStep({
+  timeout,
+  onSwitchToCode,
+}: {
+  timeout: boolean;
+  onSwitchToCode: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Steps visuais */}
+      <ol className="space-y-3">
+        {[
+          {
+            icon: <Smartphone className="size-4" />,
+            label: "Abra o aplicativo do Instagram no seu celular",
+            done: true,
+          },
+          {
+            icon: <ShieldCheck className="size-4" />,
+            label: 'Toque em "Aprovar" na notificação de nova tentativa de login',
+            done: false,
+          },
+          {
+            icon: <CheckCircle2 className="size-4" />,
+            label: 'Volte aqui e clique em "Já aprovei — continuar"',
+            done: false,
+          },
+        ].map((step, i) => (
+          <li key={i} className="flex items-start gap-3">
+            <span
+              className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                step.done
+                  ? "border-success/30 bg-success/10 text-success"
+                  : "border-warning/30 bg-warning/10 text-warning"
+              }`}
+            >
+              {step.icon}
+            </span>
+            <p className="pt-0.5 text-sm leading-5 text-muted-foreground">{step.label}</p>
+          </li>
+        ))}
+      </ol>
+
+      {/* Alerta principal */}
+      <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/8 p-4">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+        <p className="text-sm leading-5 text-muted-foreground">
+          Não feche esta janela. Após aprovar no Instagram, clique em{" "}
+          <strong className="text-foreground">"Já aprovei — continuar"</strong> para finalizar a
+          conexão.
+        </p>
+      </div>
+
+      {/* Timeout: o botão não apareceu no app */}
+      {timeout && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-sm">
+          <p className="font-medium text-destructive">A notificação não apareceu?</p>
+          <p className="mt-1 text-muted-foreground">
+            Às vezes o Instagram envia um código por SMS ou e-mail em vez da notificação.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={onSwitchToCode}
+          >
+            <Phone className="size-4" />
+            Recebi um código por SMS / e-mail
+          </Button>
+        </div>
+      )}
+
+      {/* Indicador de espera animado */}
+      {!timeout && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Clock className="size-3.5 animate-pulse" />
+          Aguardando aprovação no app…
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function connectionLabel(account: FlowBusinessAccount): string {
-  if (account.provider === "evolution_legacy") return "Conexão existente · migração recomendada";
+  if (account.provider === "evolution_legacy") return "Conexão existente — migração recomendada";
   if (account.provider === "session_worker") {
     if (account.status === "conectado") return "Conta conectada";
+    if (account.status === "aguardando" && account.pendingChallengeMode === "app_approval")
+      return "Aprovação pendente no app";
+    if (account.status === "aguardando" && account.pendingChallengeMode === "verification_code")
+      return "Código de verificação necessário";
     if (account.status === "aguardando") return "Conexão pendente";
     if (account.status === "erro") return "Conexão incompleta";
     return "Conta desconectada";
@@ -374,6 +535,8 @@ function statusLabel(status: string): string {
   return "Indisponível";
 }
 
+// ─── AccountCard ──────────────────────────────────────────────────────────────
+
 interface AccountCardProps {
   account: FlowBusinessAccount;
   busy?: boolean;
@@ -385,6 +548,11 @@ interface AccountCardProps {
 function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: AccountCardProps) {
   const connected = account.status === "conectado";
   const sessionAccount = account.provider === "session_worker";
+  const pendingAppApproval =
+    account.pendingChallengeMode === "app_approval" && account.status === "aguardando";
+  const pendingCode =
+    account.pendingChallengeMode === "verification_code" && account.status === "aguardando";
+
   return (
     <article className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
       <div className="flex items-start justify-between gap-3">
@@ -397,21 +565,54 @@ function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: Acc
           <AlertTriangle className="size-5 text-warning" />
         )}
       </div>
+
       <h4 className="mt-4 font-semibold">
         {account.username ? `@${account.username}` : account.name}
       </h4>
       <p className="mt-1 text-xs text-muted-foreground">{connectionLabel(account)}</p>
+
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs">
         <span className="text-muted-foreground">Status</span>
         <span className={connected ? "font-semibold text-success" : "font-semibold text-warning"}>
           {statusLabel(account.status)}
         </span>
       </div>
-      {account.errorMessage ? (
+
+      {/* Banner de challenge pendente — aprovação no app */}
+      {pendingAppApproval && (
+        <div className="mt-4 rounded-xl border border-warning/30 bg-warning/8 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-warning">
+            <Smartphone className="size-3.5" />
+            Aprovação pendente no Instagram
+          </div>
+          <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+            Abra o app do Instagram e aprove a tentativa de login para reconectar esta conta.
+          </p>
+        </div>
+      )}
+
+      {/* Banner de challenge pendente — código */}
+      {pendingCode && (
+        <div className="mt-4 rounded-xl border border-blue-500/20 bg-blue-500/5 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-blue-500">
+            <Phone className="size-3.5" />
+            Código de verificação necessário
+          </div>
+          <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+            O Instagram enviou um código por SMS ou e-mail. Clique em "Inserir código" para
+            continuar.
+          </p>
+        </div>
+      )}
+
+      {/* Erro genérico */}
+      {account.errorMessage && !pendingAppApproval && !pendingCode ? (
         <p className="mt-3 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
           Esta conta precisa de atenção. Reconecte o Instagram para continuar usando as conversas.
         </p>
       ) : null}
+
+      {/* Botões de ação */}
       {sessionAccount ? (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
           {connected ? (
@@ -420,8 +621,25 @@ function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: Acc
             </Button>
           ) : (
             <>
-              <Button size="sm" variant="outline" disabled={busy} onClick={onReconnect}>
-                <RotateCcw className="size-4" /> Reconectar
+              <Button
+                size="sm"
+                variant={pendingAppApproval ? "default" : "outline"}
+                disabled={busy}
+                onClick={onReconnect}
+              >
+                {pendingAppApproval ? (
+                  <>
+                    <Smartphone className="size-4" /> Aprovar e continuar
+                  </>
+                ) : pendingCode ? (
+                  <>
+                    <Phone className="size-4" /> Inserir código
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="size-4" /> Reconectar
+                  </>
+                )}
               </Button>
               <Button size="sm" variant="destructive" disabled={busy} onClick={onDelete}>
                 <Trash2 className="size-4" /> Excluir
