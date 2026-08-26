@@ -105,17 +105,27 @@ async def supabase_rpc(name: str, payload: dict[str, Any]) -> Any:
     return response.json()
 
 
-async def persist_session(instance_id: str, settings: dict[str, Any]) -> None:
+async def persist_session(
+    instance_id: str,
+    settings: dict[str, Any],
+    *,
+    verified: bool = True,
+    error_code: str | None = None,
+    pending_challenge: dict[str, Any] | None = None,
+) -> None:
+    stored: dict[str, Any] = {"clientSettings": scrub_settings(settings)}
+    if pending_challenge:
+        stored["pendingChallenge"] = scrub_settings(pending_challenge)
     encrypted = Fernet(required_env("CONNECTOR_ENCRYPTION_KEY")).encrypt(
-        json.dumps(scrub_settings(settings), separators=(",", ":")).encode()
+        json.dumps(stored, separators=(",", ":")).encode()
     ).decode()
     base = required_env("SUPABASE_URL").rstrip("/")
     payload = {
         "instance_id": instance_id,
         "encrypted_settings": encrypted,
-        "settings_version": 1,
-        "last_verified_at": datetime.now(timezone.utc).isoformat(),
-        "last_error_code": None,
+        "settings_version": 2,
+        "last_verified_at": datetime.now(timezone.utc).isoformat() if verified else None,
+        "last_error_code": error_code,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     async with httpx.AsyncClient(timeout=20) as http:
@@ -128,14 +138,14 @@ async def persist_session(instance_id: str, settings: dict[str, Any]) -> None:
         raise HTTPException(status_code=502, detail="session_persistence_failed")
 
 
-async def load_session(instance_id: str) -> dict[str, Any]:
+async def load_stored_session(instance_id: str) -> dict[str, Any]:
     base = required_env("SUPABASE_URL").rstrip("/")
     async with httpx.AsyncClient(timeout=20) as http:
         response = await http.get(
             f"{base}/rest/v1/instagram_connector_sessions",
             headers=supabase_headers(),
             params={
-                "select": "encrypted_settings",
+                "select": "encrypted_settings,settings_version",
                 "instance_id": f"eq.{instance_id}",
                 "limit": "1",
             },
@@ -150,12 +160,81 @@ async def load_session(instance_id: str) -> dict[str, Any]:
         raise RuntimeError("session_invalid")
     try:
         raw = Fernet(required_env("CONNECTOR_ENCRYPTION_KEY")).decrypt(encrypted.encode())
-        settings = json.loads(raw)
+        stored = json.loads(raw)
     except (InvalidToken, json.JSONDecodeError) as error:
         raise RuntimeError("session_invalid") from error
+    if not isinstance(stored, dict):
+        raise RuntimeError("session_invalid")
+    if int(rows[0].get("settings_version") or 1) >= 2:
+        settings = stored.get("clientSettings")
+        pending = stored.get("pendingChallenge")
+        if not isinstance(settings, dict) or (pending is not None and not isinstance(pending, dict)):
+            raise RuntimeError("session_invalid")
+        return {"clientSettings": settings, "pendingChallenge": pending}
+    return {"clientSettings": stored, "pendingChallenge": None}
+
+
+async def load_session(instance_id: str) -> dict[str, Any]:
+    stored = await load_stored_session(instance_id)
+    return stored["clientSettings"]
+
+
+async def optional_stored_session(instance_id: str) -> dict[str, Any] | None:
+    try:
+        return await load_stored_session(instance_id)
+    except RuntimeError as error:
+        if str(error) == "session_not_found":
+            return None
+        raise
+
+
+def pending_challenge(client: Client) -> dict[str, Any]:
+    raw = client.last_json if isinstance(client.last_json, dict) else {}
+    raw_challenge = raw.get("challenge") if isinstance(raw.get("challenge"), dict) else {}
+    last_json = {
+        key: raw[key]
+        for key in ("bloks_action", "challenge_context", "step_name", "action", "type", "status")
+        if key in raw
+    }
+    if raw_challenge:
+        last_json["challenge"] = {
+            key: raw_challenge[key]
+            for key in ("api_path", "native_flow", "challenge_context")
+            if key in raw_challenge
+        }
+    bloks_approval = last_json.get("bloks_action") == "com.bloks.www.ig.challenge.redirect.async"
+    app_approval = bool(
+        bloks_approval
+        or (isinstance(last_json.get("challenge"), dict) and last_json["challenge"].get("native_flow"))
+        or str(last_json.get("challenge", {}).get("api_path", "")).startswith("/auth_platform/")
+    )
+    return {
+        "mode": "app_approval" if app_approval else "verification_code",
+        "resume": "bloks_dismiss" if bloks_approval else "retry_login",
+        "lastJson": last_json,
+    }
+
+
+def restore_pending_challenge(client: Client, stored: dict[str, Any] | None) -> dict[str, str] | None:
+    if not stored:
+        return None
+    settings = stored.get("clientSettings")
     if not isinstance(settings, dict):
         raise RuntimeError("session_invalid")
-    return settings
+    client.set_settings(settings)
+    pending = stored.get("pendingChallenge")
+    if not isinstance(pending, dict):
+        return None
+    last_json = pending.get("lastJson")
+    if isinstance(last_json, dict):
+        client.last_json = last_json
+    mode = pending.get("mode")
+    resume = pending.get("resume")
+    if mode not in {"app_approval", "verification_code"}:
+        return None
+    if resume not in {"bloks_dismiss", "retry_login"}:
+        resume = "bloks_dismiss" if last_json.get("bloks_action") == "com.bloks.www.ig.challenge.redirect.async" else "retry_login"
+    return {"mode": mode, "resume": resume}
 
 
 def parse_timestamp(value: str) -> datetime:
@@ -373,7 +452,12 @@ async def connect(
 
     client = Client()
     client.delay_range = [1, 3]
+    stored = await optional_stored_session(data.instanceId)
+    challenge_state = restore_pending_challenge(client, stored)
+    client.challenge_code_handler = lambda _username, _choice: data.verificationCode.strip()
     try:
+        if challenge_state and challenge_state["resume"] == "bloks_dismiss":
+            await run_in_threadpool(client.challenge_bloks_redirect_dismiss)
         await run_in_threadpool(
             client.login,
             data.username,
@@ -381,16 +465,41 @@ async def connect(
             verification_code=data.verificationCode,
         )
         account = await run_in_threadpool(client.account_info)
-        await persist_session(data.instanceId, client.get_settings())
+        await persist_session(data.instanceId, client.get_settings(), verified=True)
         return {
             "connected": True,
             "username": account.username,
             "fullName": account.full_name,
         }
     except TwoFactorRequired as error:
+        await persist_session(
+            data.instanceId,
+            client.get_settings(),
+            verified=False,
+            error_code="two_factor_required",
+        )
         raise HTTPException(status_code=409, detail={"code": "two_factor_required"}) from error
     except ChallengeRequired as error:
-        raise HTTPException(status_code=409, detail={"code": "challenge_required"}) from error
+        challenge = pending_challenge(client)
+        logger.info(
+            "Instagram connection requires a resumable challenge",
+            extra={
+                "instance_id": data.instanceId,
+                "mode": challenge["mode"],
+                "resume": challenge["resume"],
+            },
+        )
+        await persist_session(
+            data.instanceId,
+            client.get_settings(),
+            verified=False,
+            error_code="challenge_required",
+            pending_challenge=challenge,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "challenge_required", "mode": challenge["mode"]},
+        ) from error
     except BadPassword as error:
         raise HTTPException(status_code=401, detail={"code": "invalid_credentials"}) from error
     except LoginRequired as error:

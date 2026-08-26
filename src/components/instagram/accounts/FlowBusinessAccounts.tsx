@@ -42,6 +42,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
   const [password, setPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
+  const [needsApproval, setNeedsApproval] = useState(false);
   const [connecting, setConnecting] = useState(false);
 
   const closeConnection = () => {
@@ -50,6 +51,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
     setPassword("");
     setVerificationCode("");
     setNeedsTwoFactor(false);
+    setNeedsApproval(false);
   };
 
   const connect = async () => {
@@ -58,7 +60,13 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
       const result = await connectInstagramSession({ username, password, verificationCode });
       if (result.needsTwoFactor) {
         setNeedsTwoFactor(true);
+        setNeedsApproval(false);
         toast.info("Informe o código de verificação para concluir.");
+        return;
+      }
+      if (result.needsApproval) {
+        setNeedsApproval(true);
+        toast.info("Aprove esta tentativa no aplicativo do Instagram e depois continue aqui.");
         return;
       }
       if (!result.connected) throw new Error("Não foi possível confirmar a conexão.");
@@ -184,7 +192,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
                 onChange={(event) => setUsername(event.target.value)}
                 placeholder="seuperfil"
                 autoComplete="username"
-                disabled={needsTwoFactor || connecting}
+                disabled={needsTwoFactor || needsApproval || connecting}
                 required
               />
             </div>
@@ -196,7 +204,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
-                disabled={connecting}
+                disabled={needsApproval || connecting}
                 required
               />
             </div>
@@ -217,8 +225,9 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
             ) : null}
             <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-5 text-muted-foreground">
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-              Confirme a tentativa no aplicativo caso o Instagram solicite. Use apenas uma conta
-              preparada para o piloto.
+              {needsApproval
+                ? "Abra o Instagram, aprove a tentativa de login e volte aqui sem fechar esta janela. Depois clique em Continuar conexão."
+                : "Confirme a tentativa no aplicativo caso o Instagram solicite. Use apenas uma conta preparada para o piloto."}
             </div>
             <DialogFooter>
               <Button
@@ -235,7 +244,11 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
                 ) : (
                   <ShieldCheck className="size-4" />
                 )}
-                {needsTwoFactor ? "Validar código" : "Conectar"}
+                {needsApproval
+                  ? "Continuar conexão"
+                  : needsTwoFactor
+                    ? "Validar código"
+                    : "Conectar"}
               </Button>
             </DialogFooter>
           </form>

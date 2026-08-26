@@ -622,7 +622,7 @@ export async function connectInstagramSession(input: {
   username: string;
   password: string;
   verificationCode?: string;
-}): Promise<{ connected: boolean; needsTwoFactor: boolean }> {
+}): Promise<{ connected: boolean; needsTwoFactor: boolean; needsApproval: boolean }> {
   const { data, error } = await supabase.functions.invoke("flow-business-session", {
     body: {
       action: "connect",
@@ -640,6 +640,7 @@ export async function connectInstagramSession(input: {
   return {
     connected: data.connected === true,
     needsTwoFactor: data.needsTwoFactor === true,
+    needsApproval: data.needsApproval === true,
   };
 }
 

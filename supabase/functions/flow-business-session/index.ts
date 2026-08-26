@@ -126,7 +126,36 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
         : "connection_failed";
 
   if (response.status === 409 && workerCode === "two_factor_required") {
+    await admin
+      .from("ig_instancias")
+      .update({
+        status: "aguardando",
+        error_message: null,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", instanceId)
+      .eq("org_id", orgId);
     return json({ needsTwoFactor: true, instanceId }, 200, req);
+  }
+  if (response.status === 409 && workerCode === "challenge_required") {
+    await admin
+      .from("ig_instancias")
+      .update({
+        status: "aguardando",
+        error_message: null,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", instanceId)
+      .eq("org_id", orgId);
+    return json(
+      {
+        needsApproval: detail?.mode !== "verification_code",
+        needsTwoFactor: detail?.mode === "verification_code",
+        instanceId,
+      },
+      200,
+      req,
+    );
   }
   if (!response.ok) {
     await admin
