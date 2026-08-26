@@ -27,6 +27,9 @@ test("impõe idempotência no evento e no trabalho antes de qualquer envio", () 
   assert.match(migration, /idempotency_key text not null unique/i);
   assert.match(migration, /unique \(event_id\)/i);
   assert.match(migration, /on conflict \(instance_id, external_comment_id\) do nothing/i);
+  assert.match(migration, /previous\.external_commenter_id/);
+  assert.match(migration, /interval '30 days'/);
+  assert.match(migration, /contact_cooldown/);
 });
 
 test("não repete uma entrega cujo resultado ficou desconhecido", () => {

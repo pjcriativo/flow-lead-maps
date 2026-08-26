@@ -87,6 +87,10 @@ create index if not exists instagram_automation_events_org_created_idx
   on public.instagram_automation_events(org_id, created_at desc);
 create index if not exists instagram_automation_events_flow_status_idx
   on public.instagram_automation_events(flow_id, status, created_at desc);
+create index if not exists instagram_automation_events_contact_cooldown_idx
+  on public.instagram_automation_events(
+    instance_id, flow_id, external_commenter_id, created_at desc
+  ) where status in ('queued','processed');
 
 create table if not exists public.instagram_automation_jobs (
   id uuid primary key default gen_random_uuid(),
@@ -459,6 +463,26 @@ begin
     where id = v_event_id;
     return jsonb_build_object('accepted', true, 'duplicate', false,
       'matched', true, 'queued', false, 'reason', 'flow_message_empty');
+  end if;
+
+  -- Um novo comentario do mesmo contato nao deve recriar a mesma abordagem.
+  -- O evento permanece auditavel, mas nao gera outro job durante a janela.
+  if exists (
+    select 1 from public.instagram_automation_events previous
+    where previous.org_id = v_instance.org_id
+      and previous.instance_id = v_instance.id
+      and previous.flow_id = v_flow.id
+      and previous.external_commenter_id = trim(p_external_commenter_id)
+      and previous.id <> v_event_id
+      and previous.status in ('queued','processed')
+      and previous.created_at >= now() - interval '30 days'
+  ) then
+    update public.instagram_automation_events
+    set flow_id = v_flow.id, matched_keyword = v_keyword, status = 'skipped',
+        error_code = 'contact_cooldown', processed_at = now()
+    where id = v_event_id;
+    return jsonb_build_object('accepted', true, 'duplicate', false,
+      'matched', true, 'queued', false, 'reason', 'contact_cooldown');
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended(
