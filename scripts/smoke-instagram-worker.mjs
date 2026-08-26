@@ -35,6 +35,21 @@ const signed = await fetch(`${base}/v1/connect`, {
 });
 assert.equal(signed.status, 422, "assinatura válida deve alcançar a validação do payload");
 
+const automationSigned = await fetch(`${base}/v1/automation/run`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-Flow-Timestamp": timestamp,
+    "X-Flow-Signature": signature,
+  },
+  body,
+});
+assert.equal(
+  automationSigned.status,
+  422,
+  "o motor deve validar o payload antes de consultar contas ou executar mensagens",
+);
+
 const gateway = await fetch(
   "https://lyitsavnqwtsoouhcjie.supabase.co/functions/v1/flow-business-session",
   {
@@ -44,4 +59,4 @@ const gateway = await fetch(
   },
 );
 assert.equal(gateway.status, 401, "gateway deve rejeitar chamadas sem sessão do usuário");
-console.log("OK: worker assinado, validação de payload e gateway autenticado verificados.");
+console.log("OK: worker assinado, motor isolado e gateway autenticado verificados sem envio real.");

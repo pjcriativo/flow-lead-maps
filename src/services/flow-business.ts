@@ -149,6 +149,43 @@ export type FlowBusinessWorkspace = {
   flows: FlowBusinessFlow[];
 };
 
+export type FlowBusinessFlowDraft = {
+  id?: string;
+  name: string;
+  description: string;
+  accountId: string | null;
+  triggerType: "comment_keyword";
+  keyword: string;
+  nodes: FlowBusinessNode[];
+};
+
+export type FlowBusinessAutomationAccount = {
+  instanceId: string;
+  enabled: boolean;
+  lastPolledAt: string | null;
+  lastSuccessAt: string | null;
+  nextPollAt: string | null;
+  consecutiveFailures: number;
+  pausedReason: string | null;
+};
+
+export type FlowBusinessAutomationEvent = {
+  id: string;
+  username: string;
+  commentText: string;
+  matchedKeyword: string | null;
+  status: "received" | "unmatched" | "queued" | "processed" | "failed" | "skipped";
+  errorCode: string | null;
+  createdAt: string;
+};
+
+export type FlowBusinessAutomationSnapshot = {
+  limits: { monthly: number; daily: number; monitorMinutes: number };
+  usage: { monthly: number; daily: number; queued: number };
+  accounts: FlowBusinessAutomationAccount[];
+  recentEvents: FlowBusinessAutomationEvent[];
+};
+
 const flowBusinessActionSchema = z.enum([
   "analyze",
   "visit_profile",
@@ -343,6 +380,51 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
   })
   .strict();
 
+const automationSnapshotSchema: z.ZodType<FlowBusinessAutomationSnapshot> = z
+  .object({
+    limits: z
+      .object({
+        monthly: z.number().int().nonnegative(),
+        daily: z.number().int().nonnegative(),
+        monitorMinutes: z.number().int().positive(),
+      })
+      .strict(),
+    usage: z
+      .object({
+        monthly: z.number().int().nonnegative(),
+        daily: z.number().int().nonnegative(),
+        queued: z.number().int().nonnegative(),
+      })
+      .strict(),
+    accounts: z.array(
+      z
+        .object({
+          instanceId: z.string().uuid(),
+          enabled: z.boolean(),
+          lastPolledAt: z.string().nullable(),
+          lastSuccessAt: z.string().nullable(),
+          nextPollAt: z.string().nullable(),
+          consecutiveFailures: z.number().int().nonnegative(),
+          pausedReason: z.string().nullable(),
+        })
+        .strict(),
+    ),
+    recentEvents: z.array(
+      z
+        .object({
+          id: z.string().uuid(),
+          username: z.string(),
+          commentText: z.string(),
+          matchedKeyword: z.string().nullable(),
+          status: z.enum(["received", "unmatched", "queued", "processed", "failed", "skipped"]),
+          errorCode: z.string().nullable(),
+          createdAt: z.string(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -388,6 +470,18 @@ function friendlyError(message: string): Error {
     return new Error("Fluxos de comentário permitem uma única resposta privada inicial.");
   if (message.includes("flow_message_empty"))
     return new Error("Preencha o texto de todas as mensagens antes de publicar.");
+  if (message.includes("connected_account_required"))
+    return new Error("Conecte e selecione uma conta antes de publicar o fluxo.");
+  if (message.includes("session_account_required"))
+    return new Error("Selecione uma conta conectada nesta área para publicar o fluxo.");
+  if (message.includes("active_comment_flow_required"))
+    return new Error("Publique ao menos um fluxo de comentário antes de ativar o monitoramento.");
+  if (message.includes("comment_trigger_required"))
+    return new Error("Este monitor aceita apenas fluxos por palavra-chave em comentário.");
+  if (message.includes("trigger_not_available"))
+    return new Error("Este gatilho ainda não está disponível para a conta conectada.");
+  if (message.includes("comment_flow_requires_one_message"))
+    return new Error("O fluxo precisa ter exatamente uma mensagem privada.");
   if (message.includes("task_already_closed")) return new Error("Esta tarefa já foi concluída.");
   return new Error(message);
 }
@@ -402,6 +496,24 @@ export async function loadFlowBusinessWorkspace(): Promise<FlowBusinessWorkspace
   });
   raiseIfError(error);
   return workspaceFromJson(data);
+}
+
+export async function loadFlowBusinessAutomationSnapshot(): Promise<FlowBusinessAutomationSnapshot> {
+  const { data, error } = await supabase.rpc("flow_business_automation_snapshot");
+  raiseIfError(error);
+  const parsed = automationSnapshotSchema.safeParse(data);
+  if (parsed.success) return parsed.data;
+  throw new Error(
+    `Resposta inválida do monitor do Instagram: ${parsed.error.issues[0]?.message ?? "formato desconhecido"}`,
+  );
+}
+
+export async function setFlowBusinessSessionAutomation(instanceId: string, enabled: boolean) {
+  const { error } = await supabase.rpc("flow_business_set_session_automation", {
+    p_instance_id: instanceId,
+    p_enabled: enabled,
+  });
+  raiseIfError(error);
 }
 
 export async function addLeadToFlowBusiness(leadId: string): Promise<string> {

@@ -27,6 +27,8 @@ test("reconhece palavra-chave sem depender de caixa ou acentuação", () => {
 test("não ativa fluxo de comentário quando a palavra-chave está vazia ou ausente", () => {
   assert.equal(commentMatchesKeyword("Quero saber mais", ""), false);
   assert.equal(commentMatchesKeyword("Pode me explicar?", "quero"), false);
+  assert.equal(commentMatchesKeyword("Esse produto é tudo o que quero", "tudo o que quero"), true);
+  assert.equal(commentMatchesKeyword("Ainda naoquero receber", "quero"), false);
 });
 
 test("considera aberta apenas uma janela com expiração futura válida", () => {

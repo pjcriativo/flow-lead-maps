@@ -5316,6 +5316,7 @@ export type Database = {
         Args: { p_outcome?: string; p_task_id: string };
         Returns: Json;
       };
+      flow_business_automation_snapshot: { Args: never; Returns: Json };
       flow_business_create_cadence: {
         Args: { p_description: string; p_name: string; p_steps: Json };
         Returns: string;
@@ -5357,6 +5358,10 @@ export type Database = {
       flow_business_publish_flow: {
         Args: { p_flow_id: string };
         Returns: undefined;
+      };
+      flow_business_set_session_automation: {
+        Args: { p_enabled: boolean; p_instance_id: string };
+        Returns: Json;
       };
       flow_business_save_flow: {
         Args: {

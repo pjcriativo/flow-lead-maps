@@ -122,3 +122,7 @@ verify_jwt = false
 
 [functions.flow-business-session]
 verify_jwt = true
+
+[functions.instagram-session-automation-cron]
+# Chamado pelo pg_cron; protegido por segredo e assinatura HMAC ate o worker.
+verify_jwt = false

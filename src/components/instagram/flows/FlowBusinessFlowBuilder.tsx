@@ -24,19 +24,13 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
   FlowBusinessAccount,
   FlowBusinessFlow,
+  FlowBusinessFlowDraft,
   FlowBusinessNode,
   FlowBusinessPlan,
   FlowNodeSubtype,
 } from "@/services/flow-business";
 
-const TRIGGERS = [
-  { value: "incoming_message", label: "Mensagem recebida" },
-  { value: "comment_keyword", label: "Palavra-chave em comentário" },
-  { value: "story_reply", label: "Resposta ao story" },
-  { value: "story_mention", label: "Menção no story" },
-  { value: "ig_referral", label: "Link de referência" },
-  { value: "manual", label: "Início manual" },
-];
+const TRIGGERS = [{ value: "comment_keyword", label: "Palavra-chave em comentário" }];
 
 const ACTIONS: Array<{
   subtype: FlowNodeSubtype;
@@ -49,21 +43,11 @@ const ACTIONS: Array<{
   { subtype: "create_task", label: "Criar tarefa", nodeType: "action" },
 ];
 
-type Draft = {
-  id?: string;
-  name: string;
-  description: string;
-  accountId: string | null;
-  triggerType: string;
-  keyword: string;
-  nodes: FlowBusinessNode[];
-};
-
-const EMPTY_DRAFT: Draft = {
+const EMPTY_DRAFT: FlowBusinessFlowDraft = {
   name: "",
   description: "",
   accountId: null,
-  triggerType: "incoming_message",
+  triggerType: "comment_keyword",
   keyword: "",
   nodes: [],
 };
@@ -78,17 +62,28 @@ export function FlowBusinessFlowBuilder({
   flows: FlowBusinessFlow[];
   accounts: FlowBusinessAccount[];
   plan: FlowBusinessPlan;
-  onSave: (draft: Draft) => Promise<string>;
+  onSave: (draft: FlowBusinessFlowDraft) => Promise<string>;
   onPublish: (flowId: string) => Promise<void>;
 }) {
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<FlowBusinessFlowDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [actionToAdd, setActionToAdd] = useState<FlowNodeSubtype>("send_message");
   const atLimit = !draft.id && plan.used.flows >= plan.limits.flows;
   const connectedAccounts = accounts.filter(
-    (account) => account.provider !== "evolution_legacy" && account.status === "conectado",
+    (account) => account.provider === "session_worker" && account.status === "conectado",
   );
+  const messageNodeCount = draft.nodes.filter((node) => node.subtype === "send_message").length;
+  const hasCompleteMessage = draft.nodes.some(
+    (node) => node.subtype === "send_message" && String(node.config.text ?? "").trim().length > 0,
+  );
+  const canPublish =
+    Boolean(draft.name.trim()) &&
+    Boolean(draft.accountId) &&
+    Boolean(draft.keyword.trim()) &&
+    messageNodeCount === 1 &&
+    hasCompleteMessage &&
+    !atLimit;
 
   const editFlow = (flow: FlowBusinessFlow) =>
     setDraft({
@@ -96,7 +91,7 @@ export function FlowBusinessFlowBuilder({
       name: flow.name,
       description: flow.description ?? "",
       accountId: flow.accountId,
-      triggerType: flow.triggerType,
+      triggerType: "comment_keyword",
       keyword: typeof flow.triggerConfig.keyword === "string" ? flow.triggerConfig.keyword : "",
       nodes: flow.nodes.map(({ id: _id, ...node }) => node),
     });
@@ -104,6 +99,8 @@ export function FlowBusinessFlowBuilder({
   const addAction = () => {
     const action = ACTIONS.find((item) => item.subtype === actionToAdd);
     if (!action) return;
+    if (action.subtype === "send_message" && messageNodeCount >= 1) return;
+    if (action.subtype === "send_message") setActionToAdd("add_tag");
     setDraft((current) => ({
       ...current,
       nodes: [
@@ -206,10 +203,7 @@ export function FlowBusinessFlowBuilder({
             >
               <Save className="size-4" /> Salvar
             </Button>
-            <Button
-              disabled={publishing || !draft.name.trim() || !draft.nodes.length || atLimit}
-              onClick={() => void publish()}
-            >
+            <Button disabled={publishing || !canPublish} onClick={() => void publish()}>
               <CirclePlay className="size-4" /> Publicar
             </Button>
           </div>
@@ -255,7 +249,7 @@ export function FlowBusinessFlowBuilder({
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sem conta · rascunho</SelectItem>
+                  <SelectItem value="none">Selecione para publicar</SelectItem>
                   {connectedAccounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
                       {account.username ? `@${account.username}` : account.name}
@@ -284,20 +278,21 @@ export function FlowBusinessFlowBuilder({
                 </SelectContent>
               </Select>
             </div>
-            {draft.triggerType === "comment_keyword" ? (
-              <div>
-                <Label htmlFor="flow-keyword">Palavra-chave</Label>
-                <Input
-                  id="flow-keyword"
-                  value={draft.keyword}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, keyword: event.target.value }))
-                  }
-                  className="mt-1.5"
-                  placeholder="QUERO"
-                />
-              </div>
-            ) : null}
+            <div>
+              <Label htmlFor="flow-keyword">Palavra-chave</Label>
+              <Input
+                id="flow-keyword"
+                value={draft.keyword}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, keyword: event.target.value }))
+                }
+                className="mt-1.5"
+                placeholder="QUERO"
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                A palavra ou frase precisa aparecer completa no comentário.
+              </p>
+            </div>
             <div className="rounded-xl border border-border p-3">
               <p className="text-xs font-medium">Adicionar etapa</p>
               <div className="mt-2 flex gap-2">
@@ -309,7 +304,9 @@ export function FlowBusinessFlowBuilder({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACTIONS.map((action) => (
+                    {ACTIONS.filter(
+                      (action) => action.subtype !== "send_message" || messageNodeCount === 0,
+                    ).map((action) => (
                       <SelectItem key={action.subtype} value={action.subtype}>
                         {action.label}
                       </SelectItem>
@@ -494,7 +491,7 @@ function move<T>(items: T[], from: number, to: number): T[] {
 }
 
 function updateNodeConfig(
-  setDraft: Dispatch<SetStateAction<Draft>>,
+  setDraft: Dispatch<SetStateAction<FlowBusinessFlowDraft>>,
   index: number,
   key: string,
   value: string,

@@ -87,7 +87,7 @@ function main() {
     if (!value) throw new Error(`Falta ${name} para publicar o conector.`);
   }
 
-  console.log("1/6 Aplicando a estrutura segura de sessão...");
+  console.log("1/8 Aplicando a estrutura segura de sessão...");
   run(
     "node",
     ["scripts/sql.mjs", "-f", "supabase/migrations/098_instagram_session_connector.sql"],
@@ -95,22 +95,27 @@ function main() {
       env: { ...process.env, ...environment },
     },
   );
+  run(
+    "node",
+    ["scripts/sql.mjs", "-f", "supabase/migrations/099_instagram_session_automation.sql"],
+    { env: { ...process.env, ...environment } },
+  );
 
-  console.log("2/6 Vinculando o worker isolado...");
+  console.log("2/8 Vinculando o worker isolado...");
   run("npx.cmd", ["vercel", "link", "--yes", "--project", "flow-business-instagram-connector"], {
     cwd: worker,
   });
 
-  console.log("3/6 Sincronizando segredos sem exibi-los...");
+  console.log("3/8 Sincronizando segredos sem exibi-los...");
   for (const [name, value] of Object.entries(required)) setVercelEnv(name, value, "production");
 
-  console.log("4/6 Publicando o worker piloto...");
+  console.log("4/8 Publicando o worker controlado...");
   const deployOutput = run("npx.cmd", ["vercel", "deploy", "--prod", "--yes"], { cwd: worker });
   const urls = deployOutput.match(/https:\/\/[^\s]+\.vercel\.app/g) ?? [];
   const workerUrl = urls.at(-1)?.replace(/\x1b\[[0-9;]*m/g, "");
   if (!workerUrl) throw new Error("O deploy terminou sem informar a URL do worker.");
 
-  console.log("5/6 Configurando o gateway autenticado...");
+  console.log("5/8 Configurando os gateways autenticados...");
   const cliEnv = {
     ...process.env,
     ...environment,
@@ -123,8 +128,16 @@ function main() {
     "'; exit $LASTEXITCODE";
   run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command], { env: cliEnv });
   run("node", ["scripts/deploy-edge.mjs", "flow-business-session"], { env: cliEnv });
+  run("node", ["scripts/deploy-edge.mjs", "instagram-session-automation-cron"], { env: cliEnv });
 
-  console.log("6/6 Validando saúde do worker...");
+  console.log("6/8 Ativando o agendamento somente após os serviços estarem publicados...");
+  run(
+    "node",
+    ["scripts/sql.mjs", "-f", "supabase/migrations/100_instagram_session_automation_schedule.sql"],
+    { env: { ...process.env, ...environment } },
+  );
+
+  console.log("7/8 Validando saúde do worker...");
   const health = run("powershell.exe", [
     "-NoProfile",
     "-NonInteractive",
@@ -132,7 +145,9 @@ function main() {
     `$response=Invoke-RestMethod -Uri '${workerUrl}/v1/health'; if ($response.status -ne 'ok') { exit 1 }`,
   ]);
   void health;
-  console.log(`OK: worker piloto publicado e gateway configurado em ${workerUrl}`);
+  console.log("8/8 Validando autenticação sem conectar conta ou enviar mensagem...");
+  run("node", ["scripts/smoke-instagram-worker.mjs"], { env: cliEnv });
+  console.log(`OK: worker controlado, gateways e agendamento publicados em ${workerUrl}`);
 }
 
 try {

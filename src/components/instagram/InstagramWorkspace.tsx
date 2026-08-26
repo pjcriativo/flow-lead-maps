@@ -39,6 +39,7 @@ import { FlowBusinessToday } from "@/components/instagram/dashboard/FlowBusiness
 import { FlowBusinessCrm } from "@/components/instagram/crm/FlowBusinessCrm";
 import { FlowBusinessCadences } from "@/components/instagram/cadences/FlowBusinessCadences";
 import { FlowBusinessAccounts } from "@/components/instagram/accounts/FlowBusinessAccounts";
+import { FlowBusinessAutomationPanel } from "@/components/instagram/flows/FlowBusinessAutomationPanel";
 import {
   InstagramScoreBars,
   InstagramScoreControls,
@@ -71,9 +72,15 @@ import {
 import {
   completeFlowBusinessTask,
   createFlowBusinessCadence,
+  loadFlowBusinessAutomationSnapshot,
   loadFlowBusinessWorkspace,
   moveFlowBusinessCard,
+  publishFlowBusinessFlow,
+  saveFlowBusinessFlow,
+  setFlowBusinessSessionAutomation,
   startFlowBusinessCadence,
+  type FlowBusinessAutomationSnapshot,
+  type FlowBusinessFlowDraft,
   type FlowBusinessStage,
   type FlowBusinessTask,
   type FlowBusinessWorkspace,
@@ -107,17 +114,21 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   const [profileMinScore, setProfileMinScore] = useState(0);
   const [dashboardRevision, setDashboardRevision] = useState(0);
   const [business, setBusiness] = useState<FlowBusinessWorkspace | null>(null);
+  const [automation, setAutomation] = useState<FlowBusinessAutomationSnapshot | null>(null);
+  const [togglingAccountId, setTogglingAccountId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [profiles, instagramCampaigns, workspace] = await Promise.all([
+      const [profiles, instagramCampaigns, workspace, automationSnapshot] = await Promise.all([
         listarInstagramLeads(),
         listarCampanhasInstagram(),
         loadFlowBusinessWorkspace(),
+        loadFlowBusinessAutomationSnapshot(),
       ]);
       setLeads(profiles);
       setCampaigns(instagramCampaigns);
       setBusiness(workspace);
+      setAutomation(automationSnapshot);
       setSelectedCampaign((current) => current || instagramCampaigns[0]?.id || "");
       setDashboardRevision((current) => current + 1);
     } catch (error) {
@@ -128,7 +139,12 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   }, []);
 
   const refreshBusiness = useCallback(async () => {
-    setBusiness(await loadFlowBusinessWorkspace());
+    const [workspace, automationSnapshot] = await Promise.all([
+      loadFlowBusinessWorkspace(),
+      loadFlowBusinessAutomationSnapshot(),
+    ]);
+    setBusiness(workspace);
+    setAutomation(automationSnapshot);
     setDashboardRevision((current) => current + 1);
   }, []);
 
@@ -249,6 +265,47 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       toast.success("Cadência iniciada.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível iniciar a cadência.");
+    }
+  };
+
+  const saveAutomationFlow = async (draft: FlowBusinessFlowDraft) => {
+    try {
+      const flowId = await saveFlowBusinessFlow({
+        ...draft,
+        triggerConfig: { keyword: draft.keyword.trim() },
+      });
+      await refreshBusiness();
+      toast.success("Fluxo salvo como rascunho.");
+      return flowId;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o fluxo.");
+      throw error;
+    }
+  };
+
+  const publishAutomationFlow = async (flowId: string) => {
+    try {
+      await publishFlowBusinessFlow(flowId);
+      await refreshBusiness();
+      toast.success("Fluxo publicado. Ative o monitoramento da conta quando estiver pronto.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível publicar o fluxo.");
+      throw error;
+    }
+  };
+
+  const toggleAutomation = async (instanceId: string, enabled: boolean) => {
+    setTogglingAccountId(instanceId);
+    try {
+      await setFlowBusinessSessionAutomation(instanceId, enabled);
+      await refreshBusiness();
+      toast.success(enabled ? "Monitoramento ativado." : "Monitoramento desativado.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível alterar o monitoramento.",
+      );
+    } finally {
+      setTogglingAccountId(null);
     }
   };
 
@@ -422,64 +479,82 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       ) : null}
 
       {tab === "campaigns" ? (
-        <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
-          <aside className="space-y-3">
-            <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-              <h2 className="font-semibold">Campanhas de Direct</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Fluxo assistido e rastreável, sem automação não autorizada.
-              </p>
-            </div>
-            {campaigns.map((campaign) => (
-              <button
-                key={campaign.id}
-                onClick={() => setSelectedCampaign(campaign.id)}
-                className={cn(
-                  "w-full rounded-xl border bg-card p-4 text-left transition",
-                  selectedCampaign === campaign.id
-                    ? "border-primary ring-2 ring-primary/10"
-                    : "border-border hover:border-primary/40",
-                )}
-              >
-                <div className="font-medium">{campaign.nome}</div>
-                <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                  <span>
-                    {campaign.sent}/{campaign.total} enviados
-                  </span>
-                  <span>{campaign.replied} respostas</span>
-                </div>
-                <Progress
-                  value={campaign.total ? (campaign.sent / campaign.total) * 100 : 0}
-                  className="mt-2 h-1.5"
-                />
-              </button>
-            ))}
-            {!campaigns.length && (
-              <Empty
-                title="Nenhuma campanha"
-                text="Selecione perfis e prepare sua primeira abordagem."
-              />
-            )}
-          </aside>
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-            <div className="border-b border-border p-5">
-              <h2 className="font-semibold">Fila de abordagem</h2>
-              <p className="text-sm text-muted-foreground">
-                Copie a mensagem, abra o perfil e registre o que aconteceu.
-              </p>
-            </div>
-            <div className="divide-y divide-border">
-              {tasks.map((task) => (
-                <TaskRow key={task.id} task={task} onUpdate={updateTask} />
-              ))}
-              {!tasks.length && (
-                <div className="p-8">
-                  <Empty
-                    title="Fila vazia"
-                    text="Escolha uma campanha ou crie uma nova a partir dos perfis."
+        <div className="space-y-8">
+          {business && automation ? (
+            <FlowBusinessAutomationPanel
+              workspace={business}
+              automation={automation}
+              togglingAccountId={togglingAccountId}
+              onToggle={toggleAutomation}
+              onSave={saveAutomationFlow}
+              onPublish={publishAutomationFlow}
+            />
+          ) : null}
+          <div>
+            <h2 className="text-lg font-semibold">Abordagem assistida</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Organize contatos que exigem uma ação manual e acompanhe cada resultado.
+            </p>
+          </div>
+          <div className="grid gap-5 xl:grid-cols-[340px_1fr]">
+            <aside className="space-y-3">
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+                <h2 className="font-semibold">Campanhas de Direct</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Fluxo assistido e rastreável, sem automação não autorizada.
+                </p>
+              </div>
+              {campaigns.map((campaign) => (
+                <button
+                  key={campaign.id}
+                  onClick={() => setSelectedCampaign(campaign.id)}
+                  className={cn(
+                    "w-full rounded-xl border bg-card p-4 text-left transition",
+                    selectedCampaign === campaign.id
+                      ? "border-primary ring-2 ring-primary/10"
+                      : "border-border hover:border-primary/40",
+                  )}
+                >
+                  <div className="font-medium">{campaign.nome}</div>
+                  <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      {campaign.sent}/{campaign.total} enviados
+                    </span>
+                    <span>{campaign.replied} respostas</span>
+                  </div>
+                  <Progress
+                    value={campaign.total ? (campaign.sent / campaign.total) * 100 : 0}
+                    className="mt-2 h-1.5"
                   />
-                </div>
+                </button>
+              ))}
+              {!campaigns.length && (
+                <Empty
+                  title="Nenhuma campanha"
+                  text="Selecione perfis e prepare sua primeira abordagem."
+                />
               )}
+            </aside>
+            <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+              <div className="border-b border-border p-5">
+                <h2 className="font-semibold">Fila de abordagem</h2>
+                <p className="text-sm text-muted-foreground">
+                  Copie a mensagem, abra o perfil e registre o que aconteceu.
+                </p>
+              </div>
+              <div className="divide-y divide-border">
+                {tasks.map((task) => (
+                  <TaskRow key={task.id} task={task} onUpdate={updateTask} />
+                ))}
+                {!tasks.length && (
+                  <div className="p-8">
+                    <Empty
+                      title="Fila vazia"
+                      text="Escolha uma campanha ou crie uma nova a partir dos perfis."
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

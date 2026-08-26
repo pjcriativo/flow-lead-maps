@@ -16,6 +16,7 @@ export function normalizeInstagramKeyword(value: string): string {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}_]+/gu, " ")
     .trim()
     .toLocaleLowerCase("pt-BR");
 }
@@ -23,7 +24,8 @@ export function normalizeInstagramKeyword(value: string): string {
 export function commentMatchesKeyword(comment: string, keyword: string): boolean {
   const normalizedKeyword = normalizeInstagramKeyword(keyword);
   return (
-    normalizedKeyword.length > 0 && normalizeInstagramKeyword(comment).includes(normalizedKeyword)
+    normalizedKeyword.length > 0 &&
+    ` ${normalizeInstagramKeyword(comment)} `.includes(` ${normalizedKeyword} `)
   );
 }
 

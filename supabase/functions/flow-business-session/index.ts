@@ -149,6 +149,20 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
     })
     .eq("id", instanceId)
     .eq("org_id", orgId);
+  const { error: automationStateError } = await admin.from("instagram_automation_accounts").upsert(
+    {
+      instance_id: instanceId,
+      org_id: orgId,
+      enabled: false,
+      next_poll_at: new Date().toISOString(),
+      consecutive_failures: 0,
+      paused_reason: null,
+      lease_owner: null,
+      lease_until: null,
+    },
+    { onConflict: "instance_id" },
+  );
+  if (automationStateError) throw automationStateError;
   return json({ connected: true, instanceId, username }, 200, req);
 }
 
