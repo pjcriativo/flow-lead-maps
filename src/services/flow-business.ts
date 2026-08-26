@@ -447,6 +447,14 @@ function friendlyError(message: string): Error {
     return new Error("Revise o texto da mensagem antes de enviar.");
   if (message.includes("conversation_not_found"))
     return new Error("Esta conversa não está mais disponível.");
+  if (message.includes("instagram_account_not_found"))
+    return new Error("Esta conta não está mais disponível. Atualize a página.");
+  if (message.includes("instagram_account_must_be_disconnected"))
+    return new Error("Desconecte a conta antes de excluí-la.");
+  if (message.includes("instagram_account_provider_not_supported"))
+    return new Error("Esta conexão antiga precisa ser migrada antes de ser alterada.");
+  if (message.includes("instagram_account_change_failed"))
+    return new Error("Não foi possível alterar esta conta. Tente novamente.");
   if (message.includes("UNIPILE") || message.includes("unipile"))
     return new Error("A conexão do Instagram ainda não foi ativada pelo administrador.");
   if (message.includes("instagram_connection_unavailable"))
@@ -647,6 +655,34 @@ export async function connectInstagramSession(input: {
     needsTwoFactor: data.needsTwoFactor === true,
     needsApproval: data.needsApproval === true,
   };
+}
+
+async function changeInstagramSession(
+  action: "disconnect" | "delete",
+  instanceId: string,
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("flow-business-session", {
+    body: { action, instanceId },
+  });
+  if (error) {
+    const details =
+      error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+    throw friendlyError(details || error.message);
+  }
+  if (
+    !isRecord(data) ||
+    (action === "disconnect" ? data.disconnected !== true : data.deleted !== true)
+  ) {
+    throw new Error("Não foi possível alterar esta conta. Tente novamente.");
+  }
+}
+
+export async function disconnectInstagramSession(instanceId: string): Promise<void> {
+  await changeInstagramSession("disconnect", instanceId);
+}
+
+export async function deleteInstagramSession(instanceId: string): Promise<void> {
+  await changeInstagramSession("delete", instanceId);
 }
 
 export async function sendInstagramConversationMessage(input: {

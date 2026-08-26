@@ -110,6 +110,11 @@ function main() {
     ["scripts/sql.mjs", "-f", "supabase/migrations/102_super_admin_unlimited_instagram.sql"],
     { env: { ...process.env, ...environment } },
   );
+  run(
+    "node",
+    ["scripts/sql.mjs", "-f", "supabase/migrations/103_instagram_account_lifecycle.sql"],
+    { env: { ...process.env, ...environment } },
+  );
 
   console.log("2/8 Vinculando o worker isolado...");
   run("npx.cmd", ["vercel", "link", "--yes", "--project", "flow-business-instagram-connector"], {

@@ -45,3 +45,13 @@ test("o desafio preserva o mesmo dispositivo e vira um segundo passo na interfac
   assert.match(gateway, /needsApproval/);
   assert.match(accountUi, /Continuar conexão/);
 });
+
+test("a conta possui ciclo de vida completo para reconectar, desconectar e excluir", () => {
+  assert.match(gateway, /body\.action === "disconnect"/);
+  assert.match(gateway, /body\.action === "delete"/);
+  assert.match(gateway, /flow_business_disconnect_instagram_instance/);
+  assert.match(gateway, /flow_business_delete_instagram_instance/);
+  assert.match(accountUi, /Reconectar/);
+  assert.match(accountUi, /Desconectar/);
+  assert.match(accountUi, /Excluir/);
+});

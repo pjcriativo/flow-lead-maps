@@ -21,6 +21,17 @@ function normalizeUsername(value: unknown): string {
   return username;
 }
 
+function normalizeInstanceId(value: unknown): string {
+  if (typeof value !== "string") throw new Error("invalid_instance_id");
+  const instanceId = value.trim().toLowerCase();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(instanceId)
+  ) {
+    throw new Error("invalid_instance_id");
+  }
+  return instanceId;
+}
+
 async function authenticatedContext(req: Request, admin: AdminClient) {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) throw new Error("unauthorized");
@@ -197,6 +208,27 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
   return json({ connected: true, instanceId, username }, 200, req);
 }
 
+async function changeAccountLifecycle(
+  req: Request,
+  body: JsonRecord,
+  admin: AdminClient,
+  action: "disconnect" | "delete",
+) {
+  const { orgId } = await authenticatedContext(req, admin);
+  const instanceId = normalizeInstanceId(body.instanceId);
+  const functionName =
+    action === "disconnect"
+      ? "flow_business_disconnect_instagram_instance"
+      : "flow_business_delete_instagram_instance";
+  const { data, error } = await admin.rpc(functionName, {
+    p_instance_id: instanceId,
+    p_org: orgId,
+  });
+  if (error) throw error;
+  if (data !== true) throw new Error("instagram_account_change_failed");
+  return json(action === "disconnect" ? { disconnected: true } : { deleted: true }, 200, req);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405, req);
@@ -207,6 +239,12 @@ Deno.serve(async (req) => {
     const body: unknown = await req.json();
     if (!isRecord(body)) throw new Error("invalid_body");
     if (body.action === "connect") return await connect(req, body, admin);
+    if (body.action === "disconnect") {
+      return await changeAccountLifecycle(req, body, admin, "disconnect");
+    }
+    if (body.action === "delete") {
+      return await changeAccountLifecycle(req, body, admin, "delete");
+    }
     return json({ error: "invalid_action" }, 400, req);
   } catch (error) {
     const message = error instanceof Error ? error.message : "instagram_connection_failed";
@@ -215,8 +253,13 @@ Deno.serve(async (req) => {
     const safe = [
       "unauthorized",
       "invalid_username",
+      "invalid_instance_id",
       "invalid_credentials",
       "flow_business_limit:accounts",
+      "instagram_account_not_found",
+      "instagram_account_provider_not_supported",
+      "instagram_account_must_be_disconnected",
+      "instagram_account_change_failed",
       "two_factor_required",
       "challenge_required",
       "instagram_connection_failed",

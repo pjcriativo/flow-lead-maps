@@ -5,10 +5,23 @@ import {
   Instagram,
   Loader2,
   LockKeyhole,
+  LogOut,
   PlugZap,
+  RotateCcw,
   ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +37,8 @@ import { Progress } from "@/components/ui/progress";
 import { planLimitLabel, planLimitProgress, planLimitReached } from "@/lib/flow-business-limits";
 import {
   connectInstagramSession,
+  deleteInstagramSession,
+  disconnectInstagramSession,
   type FlowBusinessAccount,
   type FlowBusinessPlan,
 } from "@/services/flow-business";
@@ -45,6 +60,11 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
   const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
   const [needsApproval, setNeedsApproval] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [accountAction, setAccountAction] = useState<{
+    account: FlowBusinessAccount;
+    action: "disconnect" | "delete";
+  } | null>(null);
+  const [changingAccount, setChangingAccount] = useState(false);
 
   const closeConnection = () => {
     setConnectOpen(false);
@@ -83,6 +103,35 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
     }
   };
 
+  const reconnect = (account: FlowBusinessAccount) => {
+    setUsername(account.username ?? "");
+    setPassword("");
+    setVerificationCode("");
+    setNeedsTwoFactor(false);
+    setNeedsApproval(false);
+    setConnectOpen(true);
+  };
+
+  const confirmAccountAction = async () => {
+    if (!accountAction) return;
+    setChangingAccount(true);
+    try {
+      if (accountAction.action === "disconnect") {
+        await disconnectInstagramSession(accountAction.account.id);
+        toast.success("Conta desconectada. Você pode conectá-la novamente quando quiser.");
+      } else {
+        await deleteInstagramSession(accountAction.account.id);
+        toast.success("Conta removida da sua área.");
+      }
+      setAccountAction(null);
+      await onConnected();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível alterar esta conta.");
+    } finally {
+      setChangingAccount(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <section className="grid gap-6 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)] lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -94,12 +143,12 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
             Gerencie as contas do seu Instagram
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Conecte uma conta de teste para centralizar o relacionamento e preparar suas próximas
-            automações. Comece com baixo volume enquanto validamos a estabilidade da sessão.
+            Conecte e gerencie seus perfis em um só lugar. Contas com conexão interrompida podem ser
+            reconectadas ou removidas a qualquer momento.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Button disabled={atLimit} onClick={() => setConnectOpen(true)}>
-              <PlugZap className="size-4" /> Conectar conta de teste
+              <PlugZap className="size-4" /> Conectar conta
             </Button>
           </div>
         </div>
@@ -129,17 +178,24 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
       ) : null}
 
       <section>
-        <h3 className="mb-3 text-lg font-semibold">Contas conectadas</h3>
+        <h3 className="mb-3 text-lg font-semibold">Suas contas</h3>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {connectedAccounts.map((account) => (
-            <AccountCard key={account.id} account={account} />
+            <AccountCard
+              key={account.id}
+              account={account}
+              busy={changingAccount && accountAction?.account.id === account.id}
+              onReconnect={() => reconnect(account)}
+              onDisconnect={() => setAccountAction({ account, action: "disconnect" })}
+              onDelete={() => setAccountAction({ account, action: "delete" })}
+            />
           ))}
           {!connectedAccounts.length ? (
             <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center">
               <Instagram className="mx-auto size-9 text-muted-foreground/40" />
               <p className="mt-3 font-medium">Nenhuma conta conectada</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Use o botão acima para conectar a primeira conta de teste.
+                Use o botão acima para conectar sua primeira conta.
               </p>
             </div>
           ) : null}
@@ -172,7 +228,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Conectar conta de teste</DialogTitle>
+            <DialogTitle>Conectar conta</DialogTitle>
             <DialogDescription>
               Sua senha é usada somente nesta tentativa de login e não é armazenada. O estado da
               sessão fica protegido no servidor.
@@ -228,7 +284,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
               <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
               {needsApproval
                 ? "Abra o Instagram, aprove a tentativa de login e volte aqui sem fechar esta janela. Depois clique em Continuar conexão."
-                : "Confirme a tentativa no aplicativo caso o Instagram solicite. Use apenas uma conta preparada para o piloto."}
+                : "Confirme a tentativa no aplicativo caso o Instagram solicite."}
             </div>
             <DialogFooter>
               <Button
@@ -255,18 +311,80 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={accountAction !== null}
+        onOpenChange={(open) => {
+          if (!open && !changingAccount) setAccountAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {accountAction?.action === "disconnect"
+                ? "Desconectar esta conta?"
+                : "Excluir esta conta?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {accountAction?.action === "disconnect"
+                ? "A sessão será encerrada no Flow Business e as automações desta conta serão pausadas. Seus leads e histórico serão preservados."
+                : "O registro desta conexão será removido. As listas de leads continuarão preservadas."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={changingAccount}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={changingAccount}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmAccountAction();
+              }}
+              className={
+                accountAction?.action === "delete"
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : undefined
+              }
+            >
+              {changingAccount ? <Loader2 className="size-4 animate-spin" /> : null}
+              {accountAction?.action === "disconnect" ? "Desconectar" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 function connectionLabel(account: FlowBusinessAccount): string {
   if (account.provider === "evolution_legacy") return "Conexão existente · migração recomendada";
-  if (account.provider === "session_worker") return "Conta conectada";
+  if (account.provider === "session_worker") {
+    if (account.status === "conectado") return "Conta conectada";
+    if (account.status === "aguardando") return "Conexão pendente";
+    if (account.status === "erro") return "Conexão incompleta";
+    return "Conta desconectada";
+  }
   return account.accountType ? `Perfil ${account.accountType}` : "Perfil profissional";
 }
 
-function AccountCard({ account }: { account: FlowBusinessAccount }) {
+function statusLabel(status: string): string {
+  if (status === "conectado") return "Conectada";
+  if (status === "aguardando") return "Pendente";
+  if (status === "erro") return "Precisa de atenção";
+  if (status === "desconectado") return "Desconectada";
+  return "Indisponível";
+}
+
+interface AccountCardProps {
+  account: FlowBusinessAccount;
+  busy?: boolean;
+  onReconnect?: () => void;
+  onDisconnect?: () => void;
+  onDelete?: () => void;
+}
+
+function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: AccountCardProps) {
   const connected = account.status === "conectado";
+  const sessionAccount = account.provider === "session_worker";
   return (
     <article className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
       <div className="flex items-start justify-between gap-3">
@@ -286,13 +404,31 @@ function AccountCard({ account }: { account: FlowBusinessAccount }) {
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs">
         <span className="text-muted-foreground">Status</span>
         <span className={connected ? "font-semibold text-success" : "font-semibold text-warning"}>
-          {account.status}
+          {statusLabel(account.status)}
         </span>
       </div>
       {account.errorMessage ? (
         <p className="mt-3 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
           Esta conta precisa de atenção. Reconecte o Instagram para continuar usando as conversas.
         </p>
+      ) : null}
+      {sessionAccount ? (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+          {connected ? (
+            <Button size="sm" variant="outline" disabled={busy} onClick={onDisconnect}>
+              <LogOut className="size-4" /> Desconectar
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" disabled={busy} onClick={onReconnect}>
+                <RotateCcw className="size-4" /> Reconectar
+              </Button>
+              <Button size="sm" variant="destructive" disabled={busy} onClick={onDelete}>
+                <Trash2 className="size-4" /> Excluir
+              </Button>
+            </>
+          )}
+        </div>
       ) : null}
     </article>
   );
