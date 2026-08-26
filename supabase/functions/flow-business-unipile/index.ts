@@ -76,9 +76,11 @@ async function assertAccountCapacity(admin: AdminClient, orgId: string) {
   if (error || !isRecord(data)) throw error || new Error("plan_not_found");
   const limits = recordAt(data, "limits");
   const used = recordAt(data, "used");
-  const limit = typeof limits?.accounts === "number" ? limits.accounts : 0;
+  const rawLimit = limits?.accounts;
+  if (rawLimit !== null && typeof rawLimit !== "number") throw new Error("plan_not_found");
+  const limit = rawLimit;
   const current = typeof used?.accounts === "number" ? used.accounts : 0;
-  if (current >= limit) throw new Error("flow_business_limit:accounts");
+  if (limit !== null && current >= limit) throw new Error("flow_business_limit:accounts");
 }
 
 async function startConnection(req: Request, admin: AdminClient): Promise<Response> {

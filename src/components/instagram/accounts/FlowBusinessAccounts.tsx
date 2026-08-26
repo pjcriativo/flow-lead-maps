@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { planLimitLabel, planLimitProgress, planLimitReached } from "@/lib/flow-business-limits";
 import {
   connectInstagramSession,
   type FlowBusinessAccount,
@@ -34,7 +35,7 @@ interface FlowBusinessAccountsProps {
 }
 
 export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusinessAccountsProps) {
-  const atLimit = plan.used.accounts >= plan.limits.accounts;
+  const atLimit = planLimitReached(plan.used.accounts, plan.limits.accounts);
   const connectedAccounts = accounts.filter((account) => account.provider !== "evolution_legacy");
   const legacyAccounts = accounts.filter((account) => account.provider === "evolution_legacy");
   const [connectOpen, setConnectOpen] = useState(false);
@@ -106,11 +107,11 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Contas do seu plano</span>
             <span className="text-sm font-semibold tabular-nums">
-              {plan.used.accounts}/{plan.limits.accounts}
+              {planLimitLabel(plan.used.accounts, plan.limits.accounts)}
             </span>
           </div>
           <Progress
-            value={plan.limits.accounts ? (plan.used.accounts / plan.limits.accounts) * 100 : 100}
+            value={planLimitProgress(plan.used.accounts, plan.limits.accounts)}
             className="mt-3"
           />
           <div className="mt-5 flex items-start gap-3 text-xs leading-5 text-muted-foreground">

@@ -27,7 +27,12 @@ export type FlowBusinessAction =
   | "custom";
 
 export type FlowBusinessPlan = {
-  limits: { accounts: number; crmContacts: number; cadences: number; flows: number };
+  limits: {
+    accounts: number | null;
+    crmContacts: number | null;
+    cadences: number | null;
+    flows: number | null;
+  };
   used: { accounts: number; crmContacts: number; cadences: number; flows: number };
   features: { officialAccounts: boolean; automations: boolean; teamAssignment: boolean };
 };
@@ -180,7 +185,7 @@ export type FlowBusinessAutomationEvent = {
 };
 
 export type FlowBusinessAutomationSnapshot = {
-  limits: { monthly: number; daily: number; monitorMinutes: number };
+  limits: { monthly: number | null; daily: number | null; monitorMinutes: number };
   usage: { monthly: number; daily: number; queued: number };
   accounts: FlowBusinessAutomationAccount[];
   recentEvents: FlowBusinessAutomationEvent[];
@@ -253,10 +258,10 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
       .object({
         limits: z
           .object({
-            accounts: z.number().int().nonnegative(),
-            crmContacts: z.number().int().nonnegative(),
-            cadences: z.number().int().nonnegative(),
-            flows: z.number().int().nonnegative(),
+            accounts: z.number().int().nonnegative().nullable(),
+            crmContacts: z.number().int().nonnegative().nullable(),
+            cadences: z.number().int().nonnegative().nullable(),
+            flows: z.number().int().nonnegative().nullable(),
           })
           .strict(),
         used: z
@@ -384,8 +389,8 @@ const automationSnapshotSchema: z.ZodType<FlowBusinessAutomationSnapshot> = z
   .object({
     limits: z
       .object({
-        monthly: z.number().int().nonnegative(),
-        daily: z.number().int().nonnegative(),
+        monthly: z.number().int().nonnegative().nullable(),
+        daily: z.number().int().nonnegative().nullable(),
         monitorMinutes: z.number().int().positive(),
       })
       .strict(),

@@ -1,6 +1,7 @@
 import { ArrowUpRight, CheckCircle2, Clock3, ExternalLink, ListChecks, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { planLimitDetail, planLimitProgress } from "@/lib/flow-business-limits";
 import type { FlowBusinessPlan, FlowBusinessTask } from "@/services/flow-business";
 import type { InstagramView } from "@/components/instagram/navigation/instagram-navigation";
 
@@ -71,21 +72,21 @@ export function FlowBusinessToday({
           label="Contatos no CRM"
           value={plan.used.crmContacts}
           limit={plan.limits.crmContacts}
-          detail={`${plan.limits.crmContacts} no plano`}
+          detail={planLimitDetail(plan.limits.crmContacts)}
         />
         <Metric
           icon={Clock3}
           label="Cadências ativas"
           value={plan.used.cadences}
           limit={plan.limits.cadences}
-          detail={`${plan.limits.cadences} no plano`}
+          detail={planLimitDetail(plan.limits.cadences)}
         />
         <Metric
           icon={CheckCircle2}
           label="Contas conectadas"
           value={plan.used.accounts}
           limit={plan.limits.accounts}
-          detail={`${plan.limits.accounts} no plano`}
+          detail={planLimitDetail(plan.limits.accounts)}
         />
       </section>
 
@@ -161,7 +162,7 @@ function Metric({
   icon: typeof Users;
   label: string;
   value: number;
-  limit: number;
+  limit: number | null;
   detail: string;
 }) {
   return (
@@ -171,10 +172,7 @@ function Metric({
         <Icon className="size-4 text-muted-foreground" />
       </div>
       <p className="mt-1 text-sm font-medium">{label}</p>
-      <Progress
-        value={limit > 0 ? Math.min(100, (value / limit) * 100) : 0}
-        className="mt-4 h-1.5"
-      />
+      <Progress value={planLimitProgress(value, limit)} className="mt-4 h-1.5" />
       <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
     </div>
   );

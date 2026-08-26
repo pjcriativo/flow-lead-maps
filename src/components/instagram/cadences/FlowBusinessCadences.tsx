@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { planLimitLabel, planLimitReached } from "@/lib/flow-business-limits";
 import type {
   FlowBusinessAction,
   FlowBusinessCadence,
@@ -82,7 +83,7 @@ export function FlowBusinessCadences({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
-  const atLimit = plan.used.cadences >= plan.limits.cadences;
+  const atLimit = planLimitReached(plan.used.cadences, plan.limits.cadences);
 
   const create = async () => {
     setSaving(true);
@@ -107,7 +108,7 @@ export function FlowBusinessCadences({
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground">
-            {plan.used.cadences}/{plan.limits.cadences} no plano
+            {planLimitLabel(plan.used.cadences, plan.limits.cadences)}
           </span>
           <Button disabled={atLimit} onClick={() => setOpen(true)}>
             <Plus className="size-4" /> Nova cadência

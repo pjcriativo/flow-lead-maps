@@ -1,6 +1,7 @@
 import { Activity, Clock3, MessageCircleReply, Radio, ShieldCheck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { FlowBusinessFlowBuilder } from "@/components/instagram/flows/FlowBusinessFlowBuilder";
+import { planFeatureAvailable, planLimitLabel } from "@/lib/flow-business-limits";
 import type {
   FlowBusinessAutomationSnapshot,
   FlowBusinessFlowDraft,
@@ -27,7 +28,7 @@ export function FlowBusinessAutomationPanel({
   const sessionAccounts = workspace.accounts.filter(
     (account) => account.provider === "session_worker" && account.status === "conectado",
   );
-  const planAllowsAutomation = automation.limits.monthly > 0;
+  const planAllowsAutomation = planFeatureAvailable(automation.limits.monthly);
 
   return (
     <section className="space-y-5">
@@ -55,7 +56,7 @@ export function FlowBusinessAutomationPanel({
           <Metric
             icon={MessageCircleReply}
             label="Respostas neste mês"
-            value={`${automation.usage.monthly}/${automation.limits.monthly}`}
+            value={planLimitLabel(automation.usage.monthly, automation.limits.monthly)}
           />
           <Metric
             icon={Clock3}

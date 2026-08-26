@@ -2007,7 +2007,9 @@ async function enriquecerOportunidades(params: {
   if (!/^[a-zA-Z0-9-]{16,64}$/.test(requestId))
     return json({ ok: false, error: "request_id_invalido" }, 400, req);
   const plan = await getInstagramPlanStatus(admin, orgId);
-  const remaining = Math.max(0, plan.limits.enrichments - plan.used.enrichments);
+  const remaining = plan.unlimited
+    ? 50
+    : Math.max(0, plan.limits.enrichments - plan.used.enrichments);
   const limit = Math.min(inteiro(body.limit, 1, 50, 10), remaining);
   if (limit <= 0) throw new InstagramPlanLimitError("enrichments_limit", plan);
   const { data: opportunities } = await admin

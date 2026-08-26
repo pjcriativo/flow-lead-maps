@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { planFeatureAvailable, planLimitReached } from "@/lib/flow-business-limits";
 import type {
   FlowBusinessAccount,
   FlowBusinessFlow,
@@ -69,7 +70,8 @@ export function FlowBusinessFlowBuilder({
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [actionToAdd, setActionToAdd] = useState<FlowNodeSubtype>("send_message");
-  const atLimit = !draft.id && plan.used.flows >= plan.limits.flows;
+  const atLimit = !draft.id && planLimitReached(plan.used.flows, plan.limits.flows);
+  const flowsAvailable = planFeatureAvailable(plan.limits.flows);
   const connectedAccounts = accounts.filter(
     (account) => account.provider === "session_worker" && account.status === "conectado",
   );
@@ -143,12 +145,12 @@ export function FlowBusinessFlowBuilder({
       <aside className="space-y-3">
         <Button
           className="w-full"
-          disabled={plan.limits.flows === 0 || atLimit}
+          disabled={!flowsAvailable || atLimit}
           onClick={() => setDraft({ ...EMPTY_DRAFT })}
         >
           <Plus className="size-4" /> Novo fluxo
         </Button>
-        {plan.limits.flows === 0 ? (
+        {!flowsAvailable ? (
           <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs leading-5">
             <LockKeyhole className="mb-2 size-4 text-warning" />O Flow Builder está disponível a
             partir do plano Pro.

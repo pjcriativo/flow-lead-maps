@@ -94,13 +94,17 @@ function UsagePanel({ plan }: { plan: InstagramPlanStatus }) {
         {usageItems.map(({ key, label }) => {
           const used = Number(plan.used[key]);
           const limit = Number(plan.limits[key]);
-          const percent = limit > 0 ? Math.min(100, (used / limit) * 100) : 100;
+          const percent = plan.unlimited
+            ? 0
+            : limit > 0
+              ? Math.min(100, (used / limit) * 100)
+              : 100;
           return (
             <div key={key} className="rounded-xl border border-border/70 bg-background/70 p-3">
               <div className="mb-2 flex items-center justify-between gap-2 text-xs">
                 <span className="text-muted-foreground">{label}</span>
                 <span className="font-semibold">
-                  {used}/{limit}
+                  {plan.unlimited ? `${used} · Ilimitado` : `${used}/${limit}`}
                 </span>
               </div>
               <Progress
@@ -331,7 +335,9 @@ export function InstagramClientHunter() {
   const enrichOpportunities = async () => {
     setEnriching(true);
     try {
-      const remaining = Math.max(0, plan.limits.enrichments - plan.used.enrichments);
+      const remaining = plan.unlimited
+        ? 10
+        : Math.max(0, plan.limits.enrichments - plan.used.enrichments);
       const result = await enrichInstagramOpportunities(Math.min(10, remaining));
       await refresh();
       toast.success(
@@ -378,7 +384,7 @@ export function InstagramClientHunter() {
               <Input
                 type="number"
                 min={20}
-                max={Math.min(2_000, plan.limits.audienceProfiles)}
+                max={plan.unlimited ? 2_000 : Math.min(2_000, plan.limits.audienceProfiles)}
                 value={limit}
                 onChange={(event) => setLimit(Number(event.target.value))}
               />
@@ -485,7 +491,10 @@ export function InstagramClientHunter() {
                   <Button
                     variant="outline"
                     onClick={enrichOpportunities}
-                    disabled={enriching || plan.used.enrichments >= plan.limits.enrichments}
+                    disabled={
+                      enriching ||
+                      (!plan.unlimited && plan.used.enrichments >= plan.limits.enrichments)
+                    }
                   >
                     {enriching ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

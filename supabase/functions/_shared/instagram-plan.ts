@@ -18,6 +18,7 @@ export type InstagramPlanStatus = {
   planId: string;
   planName: string;
   tier: "basico" | "pro" | "agencia";
+  unlimited: boolean;
   monitoring: "manual" | "weekly" | "daily";
   limits: Required<InstagramUsageAmount>;
   used: Required<InstagramUsageAmount>;

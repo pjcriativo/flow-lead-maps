@@ -3,13 +3,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function planAllowsFlowExecution(plan: unknown): boolean {
-  return (
-    isRecord(plan) &&
-    isRecord(plan.limits) &&
-    typeof plan.limits.flows === "number" &&
-    Number.isInteger(plan.limits.flows) &&
-    plan.limits.flows > 0
-  );
+  if (!isRecord(plan) || !isRecord(plan.limits)) return false;
+  const limit = plan.limits.flows;
+  return limit === null || (typeof limit === "number" && Number.isInteger(limit) && limit > 0);
 }
 
 export function normalizeInstagramKeyword(value: string): string {

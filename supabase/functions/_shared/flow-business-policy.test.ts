@@ -13,6 +13,7 @@ import {
 
 test("permite execução somente quando o plano possui pelo menos um fluxo", () => {
   assert.equal(planAllowsFlowExecution({ limits: { flows: 10 } }), true);
+  assert.equal(planAllowsFlowExecution({ limits: { flows: null } }), true);
 });
 
 test("bloqueia execução no plano Básico e em snapshots malformados", () => {

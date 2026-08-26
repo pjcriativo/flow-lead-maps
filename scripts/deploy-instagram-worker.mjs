@@ -105,6 +105,11 @@ function main() {
     ["scripts/sql.mjs", "-f", "supabase/migrations/101_instagram_connector_pending_challenge.sql"],
     { env: { ...process.env, ...environment } },
   );
+  run(
+    "node",
+    ["scripts/sql.mjs", "-f", "supabase/migrations/102_super_admin_unlimited_instagram.sql"],
+    { env: { ...process.env, ...environment } },
+  );
 
   console.log("2/8 Vinculando o worker isolado...");
   run("npx.cmd", ["vercel", "link", "--yes", "--project", "flow-business-instagram-connector"], {
@@ -133,6 +138,9 @@ function main() {
     "'; exit $LASTEXITCODE";
   run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command], { env: cliEnv });
   run("node", ["scripts/deploy-edge.mjs", "flow-business-session"], { env: cliEnv });
+  run("node", ["scripts/deploy-edge.mjs", "flow-business-unipile"], { env: cliEnv });
+  run("node", ["scripts/deploy-edge.mjs", "flow-business-webhook"], { env: cliEnv });
+  run("node", ["scripts/deploy-edge.mjs", "instagram-discovery"], { env: cliEnv });
   run("node", ["scripts/deploy-edge.mjs", "instagram-session-automation-cron"], { env: cliEnv });
 
   console.log("6/8 Ativando o agendamento somente após os serviços estarem publicados...");
