@@ -457,13 +457,18 @@ async def connect(
     client.challenge_code_handler = lambda _username, _choice: data.verificationCode.strip()
     try:
         if challenge_state and challenge_state["resume"] == "bloks_dismiss":
+            # O usuário aprovou no app. Fazemos o dismiss do challenge e verificamos
+            # a sessão diretamente — NÃO chamamos login() de novo, pois isso geraria
+            # um novo challenge_required (loop infinito).
             await run_in_threadpool(client.challenge_bloks_redirect_dismiss)
-        await run_in_threadpool(
-            client.login,
-            data.username,
-            data.password,
-            verification_code=data.verificationCode,
-        )
+        else:
+            # Login normal (primeira tentativa ou resume via retry_login / código).
+            await run_in_threadpool(
+                client.login,
+                data.username,
+                data.password,
+                verification_code=data.verificationCode,
+            )
         account = await run_in_threadpool(client.account_info)
         await persist_session(data.instanceId, client.get_settings(), verified=True)
         return {
