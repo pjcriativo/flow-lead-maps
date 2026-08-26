@@ -92,7 +92,7 @@ export type FlowBusinessAccount = {
   id: string;
   name: string;
   username: string | null;
-  provider: "meta_official" | "unipile" | "evolution_legacy";
+  provider: "meta_official" | "unipile" | "session_worker" | "evolution_legacy";
   status: string;
   accountType: string | null;
   profilePictureUrl: string | null;
@@ -312,7 +312,7 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
           id: z.string().uuid(),
           name: z.string(),
           username: z.string().nullable(),
-          provider: z.enum(["meta_official", "unipile", "evolution_legacy"]),
+          provider: z.enum(["meta_official", "unipile", "session_worker", "evolution_legacy"]),
           status: z.string(),
           accountType: z.string().nullable(),
           profilePictureUrl: z.string().nullable(),
@@ -366,6 +366,10 @@ function friendlyError(message: string): Error {
     return new Error("A conexão do Instagram ainda não foi ativada pelo administrador.");
   if (message.includes("instagram_connection_failed"))
     return new Error("Não foi possível conectar a conta do Instagram. Tente novamente.");
+  if (message.includes("invalid_credentials"))
+    return new Error("Usuário ou senha inválidos. Revise os dados e tente novamente.");
+  if (message.includes("challenge_required"))
+    return new Error("Confirme a tentativa no aplicativo do Instagram e tente novamente.");
   if (message.includes("instagram_message_failed"))
     return new Error("Não foi possível enviar a mensagem. Tente novamente.");
   if (message.includes("alternative_account_required"))
@@ -500,6 +504,31 @@ export async function startAlternativeInstagramConnection(): Promise<string> {
   if (!isRecord(data) || typeof data.authorizationUrl !== "string")
     throw new Error("A conexão do Instagram ainda não foi configurada.");
   return data.authorizationUrl;
+}
+
+export async function connectInstagramSession(input: {
+  username: string;
+  password: string;
+  verificationCode?: string;
+}): Promise<{ connected: boolean; needsTwoFactor: boolean }> {
+  const { data, error } = await supabase.functions.invoke("flow-business-session", {
+    body: {
+      action: "connect",
+      username: input.username,
+      password: input.password,
+      verificationCode: input.verificationCode ?? "",
+    },
+  });
+  if (error) {
+    const details =
+      error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+    throw friendlyError(details || error.message);
+  }
+  if (!isRecord(data)) throw new Error("Resposta inválida ao conectar o Instagram.");
+  return {
+    connected: data.connected === true,
+    needsTwoFactor: data.needsTwoFactor === true,
+  };
 }
 
 export async function sendInstagramConversationMessage(input: {

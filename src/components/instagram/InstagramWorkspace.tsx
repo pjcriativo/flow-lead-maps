@@ -292,7 +292,11 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       ) : null}
 
       {tab === "accounts" && business ? (
-        <FlowBusinessAccounts accounts={business.accounts} plan={business.plan} />
+        <FlowBusinessAccounts
+          accounts={business.accounts}
+          plan={business.plan}
+          onConnected={refreshBusiness}
+        />
       ) : null}
 
       {tab === "overview" ? (

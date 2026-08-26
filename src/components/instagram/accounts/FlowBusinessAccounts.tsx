@@ -1,17 +1,78 @@
-import { AlertTriangle, CheckCircle2, Instagram, LockKeyhole, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Instagram,
+  Loader2,
+  LockKeyhole,
+  PlugZap,
+  ShieldCheck,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import type { FlowBusinessAccount, FlowBusinessPlan } from "@/services/flow-business";
+import {
+  connectInstagramSession,
+  type FlowBusinessAccount,
+  type FlowBusinessPlan,
+} from "@/services/flow-business";
 
 interface FlowBusinessAccountsProps {
   accounts: FlowBusinessAccount[];
   plan: FlowBusinessPlan;
+  onConnected: () => Promise<void>;
 }
 
-export function FlowBusinessAccounts({ accounts, plan }: FlowBusinessAccountsProps) {
+export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusinessAccountsProps) {
   const atLimit = plan.used.accounts >= plan.limits.accounts;
   const connectedAccounts = accounts.filter((account) => account.provider !== "evolution_legacy");
   const legacyAccounts = accounts.filter((account) => account.provider === "evolution_legacy");
+  const [connectOpen, setConnectOpen] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  const closeConnection = () => {
+    setConnectOpen(false);
+    setUsername("");
+    setPassword("");
+    setVerificationCode("");
+    setNeedsTwoFactor(false);
+  };
+
+  const connect = async () => {
+    setConnecting(true);
+    try {
+      const result = await connectInstagramSession({ username, password, verificationCode });
+      if (result.needsTwoFactor) {
+        setNeedsTwoFactor(true);
+        toast.info("Informe o código de verificação para concluir.");
+        return;
+      }
+      if (!result.connected) throw new Error("Não foi possível confirmar a conexão.");
+      toast.success("Instagram conectado com sucesso.");
+      closeConnection();
+      await onConnected();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível conectar o Instagram.",
+      );
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -24,12 +85,12 @@ export function FlowBusinessAccounts({ accounts, plan }: FlowBusinessAccountsPro
             Gerencie as contas do seu Instagram
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            A conexão de novos perfis está temporariamente indisponível enquanto preparamos uma
-            experiência mais estável e segura. Os recursos de prospecção pública continuam ativos.
+            Conecte uma conta de teste para centralizar o relacionamento e preparar suas próximas
+            automações. Comece com baixo volume enquanto validamos a estabilidade da sessão.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button disabled>
-              <LockKeyhole className="size-4" /> Nova conexão em preparação
+            <Button disabled={atLimit} onClick={() => setConnectOpen(true)}>
+              <PlugZap className="size-4" /> Conectar conta de teste
             </Button>
           </div>
         </div>
@@ -69,7 +130,7 @@ export function FlowBusinessAccounts({ accounts, plan }: FlowBusinessAccountsPro
               <Instagram className="mx-auto size-9 text-muted-foreground/40" />
               <p className="mt-3 font-medium">Nenhuma conta conectada</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                As conexões existentes aparecerão aqui. Novos perfis serão liberados em breve.
+                Use o botão acima para conectar a primeira conta de teste.
               </p>
             </div>
           ) : null}
@@ -91,12 +152,102 @@ export function FlowBusinessAccounts({ accounts, plan }: FlowBusinessAccountsPro
           </div>
         </section>
       ) : null}
+
+      <Dialog
+        open={connectOpen}
+        onOpenChange={(open) => {
+          if (connecting) return;
+          if (open) setConnectOpen(true);
+          else closeConnection();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Conectar conta de teste</DialogTitle>
+            <DialogDescription>
+              Sua senha é usada somente nesta tentativa de login e não é armazenada. O estado da
+              sessão fica protegido no servidor.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void connect();
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="instagram-username">Usuário do Instagram</Label>
+              <Input
+                id="instagram-username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="seuperfil"
+                autoComplete="username"
+                disabled={needsTwoFactor || connecting}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="instagram-password">Senha</Label>
+              <Input
+                id="instagram-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                disabled={connecting}
+                required
+              />
+            </div>
+            {needsTwoFactor ? (
+              <div className="space-y-2">
+                <Label htmlFor="instagram-verification">Código de verificação</Label>
+                <Input
+                  id="instagram-verification"
+                  value={verificationCode}
+                  onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={8}
+                  disabled={connecting}
+                  required
+                />
+              </div>
+            ) : null}
+            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-5 text-muted-foreground">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+              Confirme a tentativa no aplicativo caso o Instagram solicite. Use apenas uma conta
+              preparada para o piloto.
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeConnection}
+                disabled={connecting}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={connecting || !username.trim() || !password}>
+                {connecting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="size-4" />
+                )}
+                {needsTwoFactor ? "Validar código" : "Conectar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function connectionLabel(account: FlowBusinessAccount): string {
   if (account.provider === "evolution_legacy") return "Conexão existente · migração recomendada";
+  if (account.provider === "session_worker") return "Conta conectada";
   return account.accountType ? `Perfil ${account.accountType}` : "Perfil profissional";
 }
 

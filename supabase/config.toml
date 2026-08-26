@@ -119,3 +119,6 @@ verify_jwt = false
 [functions.expirar-sites]
 # Cron job para expirar sites. PÚBLICO — chamado pelo Supabase Cron.
 verify_jwt = false
+
+[functions.flow-business-session]
+verify_jwt = true
