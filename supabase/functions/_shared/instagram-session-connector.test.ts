@@ -63,4 +63,7 @@ test("desafio nativo não reinicia o login e orienta a validação manual", () =
   assert.match(gateway, /needsManualVerification/);
   assert.match(accountUi, /Validação no Instagram necessária/);
   assert.match(accountUi, /Não clique em continuar novamente/);
+  assert.match(worker, /@app\.post\("\/v1\/manual-verification"\)/);
+  assert.match(gateway, /body\.action === "manual_verification"/);
+  assert.match(accountUi, /Abrir verificação no Instagram/);
 });

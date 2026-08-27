@@ -36,6 +36,11 @@ class ConnectRequest(BaseModel):
     verificationCode: str = Field(default="", max_length=20)
 
 
+class ManualVerificationRequest(BaseModel):
+    requestId: str = Field(min_length=10, max_length=100)
+    instanceId: str = Field(min_length=36, max_length=36)
+
+
 class AutomationRunRequest(BaseModel):
     requestId: str = Field(min_length=10, max_length=100)
     maxAccounts: int = Field(default=1, ge=1, le=1)
@@ -222,6 +227,20 @@ def pending_challenge(client: Client) -> dict[str, Any]:
         "resume": "bloks_dismiss" if bloks_approval else "retry_login",
         "lastJson": last_json,
     }
+
+
+def manual_verification_url(last_json: Any) -> str | None:
+    if not isinstance(last_json, dict):
+        return None
+    challenge = last_json.get("challenge")
+    if not isinstance(challenge, dict):
+        return None
+    api_path = challenge.get("api_path")
+    if not isinstance(api_path, str) or not api_path.startswith("/challenge/"):
+        return None
+    if len(api_path) > 512 or "?" in api_path or "#" in api_path:
+        return None
+    return f"https://www.instagram.com{api_path}"
 
 
 def restore_pending_challenge(client: Client, stored: dict[str, Any] | None) -> dict[str, str] | None:
@@ -537,6 +556,30 @@ async def connect(
         raise
     except Exception as error:
         raise HTTPException(status_code=502, detail={"code": "connection_failed"}) from error
+
+
+@app.post("/v1/manual-verification")
+async def manual_verification(
+    request: Request,
+    x_flow_timestamp: str | None = Header(default=None),
+    x_flow_signature: str | None = Header(default=None),
+) -> dict[str, str]:
+    raw = await request.body()
+    verify_signature(raw, x_flow_timestamp, x_flow_signature)
+    try:
+        data = ManualVerificationRequest.model_validate_json(raw)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="invalid_body") from error
+
+    client = Client()
+    stored = await optional_stored_session(data.instanceId)
+    challenge_state = restore_pending_challenge(client, stored)
+    if not challenge_state or challenge_state["resume"] != "manual_only":
+        raise HTTPException(status_code=409, detail={"code": "manual_verification_unavailable"})
+    challenge_url = manual_verification_url(client.last_json)
+    if not challenge_url:
+        raise HTTPException(status_code=409, detail={"code": "manual_verification_unavailable"})
+    return {"challengeUrl": challenge_url}
 
 
 @app.post("/v1/automation/run")

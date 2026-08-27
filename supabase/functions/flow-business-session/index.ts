@@ -246,6 +246,30 @@ async function changeAccountLifecycle(
   return json(action === "disconnect" ? { disconnected: true } : { deleted: true }, 200, req);
 }
 
+async function manualVerification(req: Request, body: JsonRecord, admin: AdminClient) {
+  const { orgId } = await authenticatedContext(req, admin);
+  const instanceId = normalizeInstanceId(body.instanceId);
+  const { data: account, error: accountError } = await admin
+    .from("ig_instancias")
+    .select("id, pending_challenge_mode")
+    .eq("id", instanceId)
+    .eq("org_id", orgId)
+    .eq("provider", "session_worker")
+    .maybeSingle();
+  if (accountError || !account || account.pending_challenge_mode !== "manual_verification") {
+    throw new Error("manual_verification_unavailable");
+  }
+  const { response, result } = await callWorker("/v1/manual-verification", {
+    requestId: crypto.randomUUID(),
+    instanceId,
+  });
+  const challengeUrl = typeof result.challengeUrl === "string" ? result.challengeUrl : "";
+  if (!response.ok || !/^https:\/\/www\.instagram\.com\/challenge\//.test(challengeUrl)) {
+    throw new Error("manual_verification_unavailable");
+  }
+  return json({ challengeUrl }, 200, req);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405, req);
@@ -262,6 +286,7 @@ Deno.serve(async (req) => {
     if (body.action === "delete") {
       return await changeAccountLifecycle(req, body, admin, "delete");
     }
+    if (body.action === "manual_verification") return await manualVerification(req, body, admin);
     return json({ error: "invalid_action" }, 400, req);
   } catch (error) {
     const message = error instanceof Error ? error.message : "instagram_connection_failed";

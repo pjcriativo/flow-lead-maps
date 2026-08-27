@@ -644,6 +644,7 @@ export async function connectInstagramSession(input: {
   needsTwoFactor: boolean;
   needsApproval: boolean;
   needsManualVerification: boolean;
+  instanceId: string | null;
 }> {
   const { data, error } = await supabase.functions.invoke("flow-business-session", {
     body: {
@@ -664,7 +665,23 @@ export async function connectInstagramSession(input: {
     needsTwoFactor: data.needsTwoFactor === true,
     needsApproval: data.needsApproval === true,
     needsManualVerification: data.needsManualVerification === true,
+    instanceId: typeof data.instanceId === "string" ? data.instanceId : null,
   };
+}
+
+export async function getInstagramManualVerificationUrl(instanceId: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("flow-business-session", {
+    body: { action: "manual_verification", instanceId },
+  });
+  if (error) {
+    const details =
+      error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+    throw friendlyError(details || error.message);
+  }
+  if (!isRecord(data) || typeof data.challengeUrl !== "string") {
+    throw new Error("A validação do Instagram não está disponível para esta tentativa.");
+  }
+  return data.challengeUrl;
 }
 
 async function changeInstagramSession(

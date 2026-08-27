@@ -42,6 +42,7 @@ import {
   connectInstagramSession,
   deleteInstagramSession,
   disconnectInstagramSession,
+  getInstagramManualVerificationUrl,
   type FlowBusinessAccount,
   type FlowBusinessPlan,
 } from "@/services/flow-business";
@@ -66,6 +67,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
   const [verificationCode, setVerificationCode] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [approvalTimeout, setApprovalTimeout] = useState(false);
+  const [manualInstanceId, setManualInstanceId] = useState<string | null>(null);
   const approvalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [accountAction, setAccountAction] = useState<{
@@ -94,6 +96,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
     setPassword("");
     setVerificationCode("");
     setApprovalTimeout(false);
+    setManualInstanceId(null);
   };
 
   const startApprovalTimer = () => {
@@ -116,6 +119,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
 
       if (result.needsManualVerification) {
         setConnectStep("manual_verification");
+        setManualInstanceId(result.instanceId);
         setApprovalTimeout(false);
         clearApprovalTimer();
         toast.info("O Instagram exige uma validação de segurança fora desta tela.");
@@ -154,6 +158,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
     setPassword("");
     setVerificationCode("");
     setApprovalTimeout(false);
+    setManualInstanceId(null);
     clearApprovalTimer();
 
     if (account.pendingChallengeMode === "app_approval") {
@@ -163,10 +168,29 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
       setConnectStep("code");
     } else if (account.pendingChallengeMode === "manual_verification") {
       setConnectStep("manual_verification");
+      setManualInstanceId(account.id);
     } else {
       setConnectStep("credentials");
     }
     setConnectOpen(true);
+  };
+
+  const openManualVerification = async (instanceId: string) => {
+    const verificationWindow = window.open("about:blank", "_blank");
+    try {
+      const challengeUrl = await getInstagramManualVerificationUrl(instanceId);
+      if (verificationWindow) {
+        verificationWindow.opener = null;
+        verificationWindow.location.replace(challengeUrl);
+      } else {
+        window.location.assign(challengeUrl);
+      }
+    } catch (error) {
+      verificationWindow?.close();
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível abrir a validação do Instagram.",
+      );
+    }
   };
 
   const confirmAccountAction = async () => {
@@ -215,6 +239,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
               key={account.id}
               account={account}
               onReconnect={() => reconnect(account)}
+              onOpenManualVerification={() => void openManualVerification(account.id)}
               onDisconnect={() => setAccountAction({ account, action: "disconnect" })}
               onDelete={() => setAccountAction({ account, action: "delete" })}
             />
@@ -247,6 +272,7 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
             setVerificationCode("");
             setConnectStep("credentials");
             setApprovalTimeout(false);
+            setManualInstanceId(null);
             clearApprovalTimer();
             setConnectOpen(true);
           }}
@@ -365,7 +391,13 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
               </div>
             )}
 
-            {connectStep === "manual_verification" && <ManualVerificationStep />}
+            {connectStep === "manual_verification" && (
+              <ManualVerificationStep
+                onOpenVerification={
+                  manualInstanceId ? () => void openManualVerification(manualInstanceId) : undefined
+                }
+              />
+            )}
 
             <DialogFooter>
               <Button
@@ -530,7 +562,7 @@ function ApprovalStep({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function ManualVerificationStep() {
+function ManualVerificationStep({ onOpenVerification }: { onOpenVerification?: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/8 p-4">
@@ -560,6 +592,11 @@ function ManualVerificationStep() {
       <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
         Não clique em continuar novamente: esta validação não é concluída por esta tela.
       </p>
+      {onOpenVerification && (
+        <Button type="button" className="w-full" onClick={onOpenVerification}>
+          Abrir verificação no Instagram
+        </Button>
+      )}
     </div>
   );
 }
@@ -595,11 +632,19 @@ interface AccountCardProps {
   account: FlowBusinessAccount;
   busy?: boolean;
   onReconnect?: () => void;
+  onOpenManualVerification?: () => void;
   onDisconnect?: () => void;
   onDelete?: () => void;
 }
 
-function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: AccountCardProps) {
+function AccountCard({
+  account,
+  busy,
+  onReconnect,
+  onOpenManualVerification,
+  onDisconnect,
+  onDelete,
+}: AccountCardProps) {
   const connected = account.status === "conectado";
   const sessionAccount = account.provider === "session_worker";
   const pendingAppApproval =
@@ -694,7 +739,7 @@ function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: Acc
                 size="sm"
                 variant={pendingAppApproval ? "default" : "outline"}
                 disabled={busy}
-                onClick={onReconnect}
+                onClick={pendingManualVerification ? onOpenManualVerification : onReconnect}
               >
                 {pendingAppApproval ? (
                   <>
@@ -706,7 +751,7 @@ function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: Acc
                   </>
                 ) : pendingManualVerification ? (
                   <>
-                    <LockKeyhole className="size-4" /> Ver instruções
+                    <LockKeyhole className="size-4" /> Abrir verificação
                   </>
                 ) : (
                   <>
