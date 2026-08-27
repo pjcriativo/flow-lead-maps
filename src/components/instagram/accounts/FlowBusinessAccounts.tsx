@@ -52,7 +52,7 @@ interface FlowBusinessAccountsProps {
   onConnected: () => Promise<void>;
 }
 
-type ConnectStep = "credentials" | "approval" | "code";
+type ConnectStep = "credentials" | "approval" | "code" | "manual_verification";
 
 export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusinessAccountsProps) {
   const atLimit = planLimitReached(plan.used.accounts, plan.limits.accounts);
@@ -114,6 +114,14 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
         verificationCode: connectStep === "code" ? verificationCode : "",
       });
 
+      if (result.needsManualVerification) {
+        setConnectStep("manual_verification");
+        setApprovalTimeout(false);
+        clearApprovalTimer();
+        toast.info("O Instagram exige uma validação de segurança fora desta tela.");
+        await onConnected();
+        return;
+      }
       if (result.needsTwoFactor) {
         setConnectStep("code");
         setApprovalTimeout(false);
@@ -153,6 +161,8 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
       startApprovalTimer();
     } else if (account.pendingChallengeMode === "verification_code") {
       setConnectStep("code");
+    } else if (account.pendingChallengeMode === "manual_verification") {
+      setConnectStep("manual_verification");
     } else {
       setConnectStep("credentials");
     }
@@ -266,6 +276,8 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
                 ? "Aprovação no Instagram"
                 : connectStep === "code"
                   ? "Código de verificação"
+                  : connectStep === "manual_verification"
+                    ? "Validação no Instagram necessária"
                   : "Conectar Instagram"}
             </DialogTitle>
             <DialogDescription>
@@ -273,7 +285,9 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
                 ? "Use suas credenciais do Instagram para conectar a conta."
                 : connectStep === "approval"
                   ? "O Instagram está esperando sua confirmação no aplicativo."
-                  : "O Instagram enviou um código para confirmar sua identidade."}
+                  : connectStep === "code"
+                    ? "O Instagram enviou um código para confirmar sua identidade."
+                    : "Esta tentativa precisa ser validada em um dispositivo confiável."}
             </DialogDescription>
           </DialogHeader>
 
@@ -351,6 +365,8 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
               </div>
             )}
 
+            {connectStep === "manual_verification" && <ManualVerificationStep />}
+
             <DialogFooter>
               <Button
                 type="button"
@@ -358,23 +374,25 @@ export function FlowBusinessAccounts({ accounts, plan, onConnected }: FlowBusine
                 onClick={closeConnection}
                 disabled={connecting}
               >
-                Cancelar
+                {connectStep === "manual_verification" ? "Fechar" : "Cancelar"}
               </Button>
-              <Button
-                type="submit"
-                disabled={
-                  connecting ||
-                  (connectStep === "credentials" && (!username.trim() || !password)) ||
-                  (connectStep === "code" && verificationCode.length < 4)
-                }
-              >
-                {connecting ? <Loader2 className="size-4 animate-spin" /> : null}
-                {connectStep === "approval"
-                  ? "Já aprovei continuar"
-                  : connectStep === "code"
-                    ? "Validar código"
-                    : "Conectar"}
-              </Button>
+              {connectStep !== "manual_verification" && (
+                <Button
+                  type="submit"
+                  disabled={
+                    connecting ||
+                    (connectStep === "credentials" && (!username.trim() || !password)) ||
+                    (connectStep === "code" && verificationCode.length < 4)
+                  }
+                >
+                  {connecting ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {connectStep === "approval"
+                    ? "Já aprovei continuar"
+                    : connectStep === "code"
+                      ? "Validar código"
+                      : "Conectar"}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -512,6 +530,40 @@ function ApprovalStep({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function ManualVerificationStep() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/8 p-4">
+        <LockKeyhole className="mt-0.5 size-5 shrink-0 text-warning" />
+        <div className="text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Verificação de segurança necessária</p>
+          <p className="mt-1 leading-5">
+            O Instagram solicitou uma validação que precisa ser concluída diretamente em
+            um dispositivo no qual esta conta já é usada.
+          </p>
+        </div>
+      </div>
+      <ol className="space-y-3 text-sm text-muted-foreground">
+        <li className="flex gap-3">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">1</span>
+          Abra o Instagram no celular ou navegador que você normalmente usa com esta conta.
+        </li>
+        <li className="flex gap-3">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">2</span>
+          Conclua qualquer aviso de confirmação ou segurança que aparecer na conta.
+        </li>
+        <li className="flex gap-3">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">3</span>
+          Remova esta tentativa e inicie uma nova conexão após a validação.
+        </li>
+      </ol>
+      <p className="rounded-lg bg-muted px-3 py-2 text-xs leading-5 text-muted-foreground">
+        Não clique em continuar novamente: esta validação não é concluída por esta tela.
+      </p>
+    </div>
+  );
+}
+
 function connectionLabel(account: FlowBusinessAccount): string {
   if (account.provider === "evolution_legacy") return "Conexão existente — migração recomendada";
   if (account.provider === "session_worker") {
@@ -520,6 +572,8 @@ function connectionLabel(account: FlowBusinessAccount): string {
       return "Aprovação pendente no app";
     if (account.status === "aguardando" && account.pendingChallengeMode === "verification_code")
       return "Código de verificação necessário";
+    if (account.status === "aguardando" && account.pendingChallengeMode === "manual_verification")
+      return "Validação no Instagram necessária";
     if (account.status === "aguardando") return "Conexão pendente";
     if (account.status === "erro") return "Conexão incompleta";
     return "Conta desconectada";
@@ -552,6 +606,8 @@ function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: Acc
     account.pendingChallengeMode === "app_approval" && account.status === "aguardando";
   const pendingCode =
     account.pendingChallengeMode === "verification_code" && account.status === "aguardando";
+  const pendingManualVerification =
+    account.pendingChallengeMode === "manual_verification" && account.status === "aguardando";
 
   return (
     <article className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
@@ -605,8 +661,21 @@ function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: Acc
         </div>
       )}
 
+      {pendingManualVerification && (
+        <div className="mt-4 rounded-xl border border-warning/30 bg-warning/8 p-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-warning">
+            <LockKeyhole className="size-3.5" />
+            Validação no Instagram necessária
+          </div>
+          <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+            Esta tentativa deve ser validada no seu dispositivo confiável. Abra as instruções
+            ou exclua a tentativa para conectar novamente depois.
+          </p>
+        </div>
+      )}
+
       {/* Erro genérico */}
-      {account.errorMessage && !pendingAppApproval && !pendingCode ? (
+      {account.errorMessage && !pendingAppApproval && !pendingCode && !pendingManualVerification ? (
         <p className="mt-3 rounded-lg bg-destructive/10 p-2 text-xs text-destructive">
           Esta conta precisa de atenção. Reconecte o Instagram para continuar usando as conversas.
         </p>
@@ -634,6 +703,10 @@ function AccountCard({ account, busy, onReconnect, onDisconnect, onDelete }: Acc
                 ) : pendingCode ? (
                   <>
                     <Phone className="size-4" /> Inserir código
+                  </>
+                ) : pendingManualVerification ? (
+                  <>
+                    <LockKeyhole className="size-4" /> Ver instruções
                   </>
                 ) : (
                   <>

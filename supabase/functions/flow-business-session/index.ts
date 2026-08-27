@@ -173,6 +173,19 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
       req,
     );
   }
+  if (response.status === 409 && workerCode === "manual_verification_required") {
+    await admin
+      .from("ig_instancias")
+      .update({
+        status: "aguardando",
+        error_message: null,
+        pending_challenge_mode: "manual_verification",
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq("id", instanceId)
+      .eq("org_id", orgId);
+    return json({ needsManualVerification: true, instanceId }, 200, req);
+  }
   if (!response.ok) {
     await admin
       .from("ig_instancias")

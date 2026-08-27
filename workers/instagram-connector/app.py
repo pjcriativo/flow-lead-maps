@@ -203,13 +203,22 @@ def pending_challenge(client: Client) -> dict[str, Any]:
             if key in raw_challenge
         }
     bloks_approval = last_json.get("bloks_action") == "com.bloks.www.ig.challenge.redirect.async"
-    app_approval = bool(
-        bloks_approval
-        or (isinstance(last_json.get("challenge"), dict) and last_json["challenge"].get("native_flow"))
-        or str(last_json.get("challenge", {}).get("api_path", "")).startswith("/auth_platform/")
+    challenge = last_json.get("challenge") if isinstance(last_json.get("challenge"), dict) else {}
+    native_verification = bool(
+        challenge.get("native_flow")
+        or str(challenge.get("api_path", "")).startswith("/auth_platform/")
     )
+    # Somente o redirect Bloks possui uma continuação programática no instagrapi.
+    # Os challenges nativos precisam ser concluídos no dispositivo confiável do usuário;
+    # tratá-los como "aprovação" e repetir login cria um loop de tentativas.
+    if native_verification and not bloks_approval:
+        return {
+            "mode": "manual_verification",
+            "resume": "manual_only",
+            "lastJson": last_json,
+        }
     return {
-        "mode": "app_approval" if app_approval else "verification_code",
+        "mode": "app_approval" if bloks_approval else "verification_code",
         "resume": "bloks_dismiss" if bloks_approval else "retry_login",
         "lastJson": last_json,
     }
@@ -230,10 +239,20 @@ def restore_pending_challenge(client: Client, stored: dict[str, Any] | None) -> 
         client.last_json = last_json
     mode = pending.get("mode")
     resume = pending.get("resume")
+    challenge = last_json.get("challenge") if isinstance(last_json, dict) and isinstance(last_json.get("challenge"), dict) else {}
+    native_verification = bool(
+        challenge.get("native_flow")
+        or str(challenge.get("api_path", "")).startswith("/auth_platform/")
+    )
+    bloks_approval = isinstance(last_json, dict) and last_json.get("bloks_action") == "com.bloks.www.ig.challenge.redirect.async"
+    # Normaliza sessões criadas antes desta proteção. Assim, a próxima tentativa
+    # não volta a chamar login() para um desafio nativo que o worker não pode concluir.
+    if native_verification and not bloks_approval:
+        return {"mode": "manual_verification", "resume": "manual_only"}
     if mode not in {"app_approval", "verification_code"}:
         return None
     if resume not in {"bloks_dismiss", "retry_login"}:
-        resume = "bloks_dismiss" if last_json.get("bloks_action") == "com.bloks.www.ig.challenge.redirect.async" else "retry_login"
+        resume = "bloks_dismiss" if bloks_approval else "retry_login"
     return {"mode": mode, "resume": resume}
 
 
@@ -456,6 +475,11 @@ async def connect(
     challenge_state = restore_pending_challenge(client, stored)
     client.challenge_code_handler = lambda _username, _choice: data.verificationCode.strip()
     try:
+        if challenge_state and challenge_state["resume"] == "manual_only":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "manual_verification_required", "mode": "manual_verification"},
+            )
         if challenge_state and challenge_state["resume"] == "bloks_dismiss":
             # O usuário aprovou no app. Fazemos o dismiss do challenge e verificamos
             # a sessão diretamente — NÃO chamamos login() de novo, pois isso geraria

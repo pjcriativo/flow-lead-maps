@@ -115,6 +115,21 @@ function main() {
     ["scripts/sql.mjs", "-f", "supabase/migrations/103_instagram_account_lifecycle.sql"],
     { env: { ...process.env, ...environment } },
   );
+  run(
+    "node",
+    ["scripts/sql.mjs", "-f", "supabase/migrations/104_instagram_pending_challenge.sql"],
+    { env: { ...process.env, ...environment } },
+  );
+  run(
+    "node",
+    ["scripts/sql.mjs", "-f", "supabase/migrations/105_workspace_snapshot_pending_challenge.sql"],
+    { env: { ...process.env, ...environment } },
+  );
+  run(
+    "node",
+    ["scripts/sql.mjs", "-f", "supabase/migrations/106_instagram_manual_verification_challenge.sql"],
+    { env: { ...process.env, ...environment } },
+  );
 
   console.log("2/8 Vinculando o worker isolado...");
   run("npx.cmd", ["vercel", "link", "--yes", "--project", "flow-business-instagram-connector"], {

@@ -105,7 +105,7 @@ export type FlowBusinessAccount = {
   connectedAt: string | null;
   lastWebhookAt: string | null;
   errorMessage: string | null;
-  pendingChallengeMode: "app_approval" | "verification_code" | null;
+  pendingChallengeMode: "app_approval" | "verification_code" | "manual_verification" | null;
 };
 
 export type FlowNodeSubtype =
@@ -363,7 +363,9 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
           connectedAt: z.string().nullable(),
           lastWebhookAt: z.string().nullable(),
           errorMessage: z.string().nullable(),
-          pendingChallengeMode: z.enum(["app_approval", "verification_code"]).nullable(),
+          pendingChallengeMode: z
+            .enum(["app_approval", "verification_code", "manual_verification"])
+            .nullable(),
         })
         .strict(),
     ),
@@ -637,7 +639,12 @@ export async function connectInstagramSession(input: {
   username: string;
   password: string;
   verificationCode?: string;
-}): Promise<{ connected: boolean; needsTwoFactor: boolean; needsApproval: boolean }> {
+}): Promise<{
+  connected: boolean;
+  needsTwoFactor: boolean;
+  needsApproval: boolean;
+  needsManualVerification: boolean;
+}> {
   const { data, error } = await supabase.functions.invoke("flow-business-session", {
     body: {
       action: "connect",
@@ -656,6 +663,7 @@ export async function connectInstagramSession(input: {
     connected: data.connected === true,
     needsTwoFactor: data.needsTwoFactor === true,
     needsApproval: data.needsApproval === true,
+    needsManualVerification: data.needsManualVerification === true,
   };
 }
 

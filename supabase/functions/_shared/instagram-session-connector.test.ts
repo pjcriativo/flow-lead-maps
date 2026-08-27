@@ -33,7 +33,7 @@ test("o gateway assina a chamada ao worker e aplica o limite do plano", () => {
 });
 
 test("a interface informa que a senha não é armazenada e trata 2FA", () => {
-  assert.match(accountUi, /Sua senha é usada somente nesta tentativa de login e não é armazenada/);
+  assert.match(accountUi, /Sua senha é enviada diretamente ao Instagram e nunca é armazenada/);
   assert.match(accountUi, /needsTwoFactor/);
   assert.match(accountUi, /autoComplete="one-time-code"/);
 });
@@ -43,7 +43,7 @@ test("o desafio preserva o mesmo dispositivo e vira um segundo passo na interfac
   assert.match(worker, /pendingChallenge/);
   assert.match(worker, /challenge_bloks_redirect_dismiss/);
   assert.match(gateway, /needsApproval/);
-  assert.match(accountUi, /Continuar conexão/);
+  assert.match(accountUi, /Já aprovei continuar/);
 });
 
 test("a conta possui ciclo de vida completo para reconectar, desconectar e excluir", () => {
@@ -54,4 +54,13 @@ test("a conta possui ciclo de vida completo para reconectar, desconectar e exclu
   assert.match(accountUi, /Reconectar/);
   assert.match(accountUi, /Desconectar/);
   assert.match(accountUi, /Excluir/);
+});
+
+test("desafio nativo não reinicia o login e orienta a validação manual", () => {
+  assert.match(worker, /"manual_verification"/);
+  assert.match(worker, /"manual_only"/);
+  assert.match(worker, /"manual_verification_required"/);
+  assert.match(gateway, /needsManualVerification/);
+  assert.match(accountUi, /Validação no Instagram necessária/);
+  assert.match(accountUi, /Não clique em continuar novamente/);
 });
