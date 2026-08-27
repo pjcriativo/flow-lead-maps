@@ -6,64 +6,62 @@ const migration = readFileSync(
   new URL("../../migrations/098_instagram_session_connector.sql", import.meta.url),
   "utf8",
 );
-const challengeMigration = readFileSync(
-  new URL("../../migrations/101_instagram_connector_pending_challenge.sql", import.meta.url),
+const lifecycleMigration = readFileSync(
+  new URL("../../migrations/107_instagram_official_connection_hardening.sql", import.meta.url),
   "utf8",
 );
 const worker = readFileSync(
   new URL("../../../workers/instagram-connector/app.py", import.meta.url),
   "utf8",
 );
-const gateway = readFileSync(new URL("../flow-business-session/index.ts", import.meta.url), "utf8");
+const sessionGateway = readFileSync(new URL("../flow-business-session/index.ts", import.meta.url), "utf8");
+const officialGateway = readFileSync(new URL("../flow-business-meta/index.ts", import.meta.url), "utf8");
 const accountUi = readFileSync(
   new URL("../../../src/components/instagram/accounts/FlowBusinessAccounts.tsx", import.meta.url),
   "utf8",
 );
 
-test("a senha não possui coluna e somente a sessão cifrada é persistida", () => {
+test("a sessao legada nao possui coluna de senha e fica cifrada", () => {
   assert.match(migration, /encrypted_settings text not null/);
   assert.doesNotMatch(migration, /\b(?:password|senha)\s+(?:text|varchar)/i);
   assert.match(migration, /revoke all .* from anon, authenticated/);
 });
 
-test("o gateway assina a chamada ao worker e aplica o limite do plano", () => {
-  assert.match(gateway, /crypto\.subtle\.sign\("HMAC"/);
-  assert.match(gateway, /assertAccountCapacity/);
-  assert.match(gateway, /provider: "session_worker"/);
+test("o gateway legado assina a chamada ao worker", () => {
+  assert.match(sessionGateway, /crypto\.subtle\.sign\("HMAC"/);
+  assert.match(sessionGateway, /assertAccountCapacity/);
+  assert.match(sessionGateway, /provider: "session_worker"/);
 });
 
-test("a interface informa que a senha não é armazenada e trata 2FA", () => {
-  assert.match(accountUi, /Sua senha é enviada diretamente ao Instagram e nunca é armazenada/);
-  assert.match(accountUi, /needsTwoFactor/);
-  assert.match(accountUi, /autoComplete="one-time-code"/);
+test("a interface inicia a autorizacao sem receber senha ou codigo", () => {
+  assert.match(accountUi, /startOfficialInstagramConnection/);
+  assert.match(accountUi, /window\.location\.assign\(authorizationUrl\)/);
+  assert.match(accountUi, /Sua senha não é solicitada pelo/);
+  assert.doesNotMatch(accountUi, /\bconnectInstagramSession\s*\(/);
+  assert.doesNotMatch(accountUi, /autoComplete="one-time-code"/);
 });
 
-test("o desafio preserva o mesmo dispositivo e vira um segundo passo na interface", () => {
-  assert.match(challengeMigration, /last_verified_at drop not null/);
-  assert.match(worker, /pendingChallenge/);
-  assert.match(worker, /challenge_bloks_redirect_dismiss/);
-  assert.match(gateway, /needsApproval/);
-  assert.match(accountUi, /Já aprovei continuar/);
+test("o conector oficial reserva a vaga e consome o state uma unica vez", () => {
+  assert.match(officialGateway, /flow_business_reserve_instagram_oauth_state/);
+  assert.match(officialGateway, /async function consumeState/);
+  assert.match(officialGateway, /\.is\("used_at", null\)/);
+  assert.match(lifecycleMigration, /for update/);
+  assert.match(lifecycleMigration, /flow_business_limit:accounts/);
 });
 
-test("a conta possui ciclo de vida completo para reconectar, desconectar e excluir", () => {
-  assert.match(gateway, /body\.action === "disconnect"/);
-  assert.match(gateway, /body\.action === "delete"/);
-  assert.match(gateway, /flow_business_disconnect_instagram_instance/);
-  assert.match(gateway, /flow_business_delete_instagram_instance/);
-  assert.match(accountUi, /Reconectar/);
+test("a conta pode ser desconectada ou excluida depois de uma tentativa", () => {
+  assert.match(sessionGateway, /body\.action === "disconnect"/);
+  assert.match(sessionGateway, /body\.action === "delete"/);
   assert.match(accountUi, /Desconectar/);
   assert.match(accountUi, /Excluir/);
+  assert.match(lifecycleMigration, /delete from public\.ig_instancia_tokens/);
+  assert.doesNotMatch(lifecycleMigration, /v_provider <> 'session_worker'/);
 });
 
-test("desafio nativo não reinicia o login e orienta a validação manual", () => {
+test("o desafio legado nao volta a ser oferecido na interface", () => {
   assert.match(worker, /"manual_verification"/);
-  assert.match(worker, /"manual_only"/);
-  assert.match(worker, /"manual_verification_required"/);
-  assert.match(gateway, /needsManualVerification/);
-  assert.match(accountUi, /Validação no Instagram necessária/);
-  assert.match(accountUi, /Não clique em continuar novamente/);
-  assert.match(worker, /@app\.post\("\/v1\/manual-verification"\)/);
-  assert.match(gateway, /body\.action === "manual_verification"/);
-  assert.match(accountUi, /Abrir verificação no Instagram/);
+  assert.match(sessionGateway, /body\.action === "manual_verification"/);
+  assert.doesNotMatch(accountUi, /manual_verification/);
+  assert.doesNotMatch(accountUi, /Aprovar e continuar/);
+  assert.doesNotMatch(accountUi, /Abrir verificação no Instagram/);
 });

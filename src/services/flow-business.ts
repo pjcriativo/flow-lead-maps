@@ -635,6 +635,21 @@ export async function startAlternativeInstagramConnection(): Promise<string> {
   return data.authorizationUrl;
 }
 
+export async function startOfficialInstagramConnection(): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("flow-business-meta", {
+    body: { action: "start" },
+  });
+  if (error) {
+    const details =
+      error instanceof FunctionsHttpError ? await error.context.text() : error.message;
+    throw friendlyError(details || error.message);
+  }
+  if (!isRecord(data) || typeof data.authorizationUrl !== "string") {
+    throw new Error("A conexão do Instagram ainda não está disponível.");
+  }
+  return data.authorizationUrl;
+}
+
 export async function connectInstagramSession(input: {
   username: string;
   password: string;

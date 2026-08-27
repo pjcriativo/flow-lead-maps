@@ -59,6 +59,19 @@ async function authenticatedContext(req: Request, admin: AdminClient) {
   return { userId: data.user.id, orgId: membership.org_id as string };
 }
 
+async function reserveAccountConnection(
+  admin: AdminClient,
+  input: { state: string; orgId: string; userId: string },
+) {
+  const { error } = await admin.rpc("flow_business_reserve_instagram_oauth_state", {
+    p_state: input.state,
+    p_org: input.orgId,
+    p_user: input.userId,
+    p_provider: "meta_official",
+  });
+  if (error) throw error;
+}
+
 async function startConnection(req: Request, admin: AdminClient): Promise<Response> {
   const { userId, orgId } = await authenticatedContext(req, admin);
   const clientId = env("META_INSTAGRAM_APP_ID");
@@ -67,13 +80,7 @@ async function startConnection(req: Request, admin: AdminClient): Promise<Respon
   await validateFlowBusinessTokenKey();
 
   const state = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
-  const { error } = await admin.from("instagram_oauth_states").insert({
-    state,
-    org_id: orgId,
-    user_id: userId,
-    redirect_to: "/dashboard?secao=flow-business",
-  });
-  if (error) throw error;
+  await reserveAccountConnection(admin, { state, orgId, userId });
 
   const authorization = new URL("https://www.instagram.com/oauth/authorize");
   authorization.searchParams.set("enable_fb_login", "0");
@@ -119,20 +126,33 @@ async function exchangeCode(code: string) {
   return { accessToken: body.access_token as string, expiresIn: 0 };
 }
 
+async function consumeState(admin: AdminClient, state: string) {
+  const now = new Date().toISOString();
+  const { data, error } = await admin
+    .from("instagram_oauth_states")
+    .update({ used_at: now })
+    .eq("state", state)
+    .eq("provider", "meta_official")
+    .is("used_at", null)
+    .gt("expires_at", now)
+    .select("org_id,user_id")
+    .maybeSingle();
+  if (error || !data) throw new Error("invalid_state");
+  return { orgId: data.org_id as string, userId: data.user_id as string };
+}
+
 async function callback(req: Request, admin: AdminClient): Promise<Response> {
   const url = new URL(req.url);
   const code = url.searchParams.get("code")?.replace(/#_$/, "");
   const state = url.searchParams.get("state");
   if (!code || !state) return redirectWithResult("error", "oauth_cancelled");
 
-  const { data: oauthState } = await admin
-    .from("instagram_oauth_states")
-    .select("org_id,user_id,expires_at,used_at")
-    .eq("state", state)
-    .eq("provider", "meta_official")
-    .maybeSingle();
-  if (!oauthState || oauthState.used_at || new Date(oauthState.expires_at).getTime() <= Date.now())
+  let oauthState: { orgId: string; userId: string };
+  try {
+    oauthState = await consumeState(admin, state);
+  } catch {
     return redirectWithResult("error", "invalid_state");
+  }
 
   const token = await exchangeCode(code);
   const profileUrl = new URL(`https://graph.instagram.com/${graphVersion()}/me`);
@@ -150,7 +170,7 @@ async function callback(req: Request, admin: AdminClient): Promise<Response> {
     .from("ig_instancias")
     .upsert(
       {
-        org_id: oauthState.org_id,
+        org_id: oauthState.orgId,
         nome: `meta_${metaUserId}`,
         username_ig: profile.username,
         status: "conectado",
@@ -160,7 +180,7 @@ async function callback(req: Request, admin: AdminClient): Promise<Response> {
         profile_picture_url: profile.profile_picture_url || null,
         permissions: SCOPES,
         token_expires_at: expiresAt,
-        connected_by: oauthState.user_id,
+        connected_by: oauthState.userId,
         connected_at: new Date().toISOString(),
         error_message: null,
         atualizado_em: new Date().toISOString(),
@@ -180,10 +200,6 @@ async function callback(req: Request, admin: AdminClient): Promise<Response> {
     atualizado_em: new Date().toISOString(),
   });
   if (tokenError) throw tokenError;
-  await admin
-    .from("instagram_oauth_states")
-    .update({ used_at: new Date().toISOString() })
-    .eq("state", state);
   return redirectWithResult("connected", "true");
 }
 
@@ -295,6 +311,14 @@ Deno.serve(async (req) => {
         : message.startsWith("missing_config") || message.startsWith("invalid_config")
           ? 503
           : 500;
-    return json({ error: message }, status, req);
+    const safeError =
+      message.startsWith("missing_config") || message.startsWith("invalid_config")
+        ? "instagram_connection_unavailable"
+        : message === "flow_business_limit:accounts"
+          ? "flow_business_limit:accounts"
+          : message === "unauthorized"
+            ? "unauthorized"
+            : "instagram_connection_failed";
+    return json({ error: safeError }, status, req);
   }
 });
