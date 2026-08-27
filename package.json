@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "setup:instagram": "node scripts/setup-instagram-connection.mjs",
+    "setup:instagram:official": "node scripts/setup-instagram-official.mjs",
     "deploy:instagram-worker": "node scripts/deploy-instagram-worker.mjs",
     "smoke:instagram-worker": "node scripts/smoke-instagram-worker.mjs",
     "test": "node --experimental-strip-types --test \"supabase/functions/_shared/*.test.ts\" \"scripts/*.test.mjs\"",
