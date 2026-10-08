@@ -27,6 +27,7 @@ import {
   Lock,
   Instagram,
   GraduationCap,
+  Network,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import { posthog } from "@/lib/posthog";
 import { SearchSection } from "@/components/leads/SearchSection";
 import { InstagramWorkspace } from "@/components/instagram/InstagramWorkspace";
 import { FlowAcademyComingSoon } from "@/components/academy/FlowAcademyComingSoon";
+import { BusinessNetworkComingSoon } from "@/components/network/BusinessNetworkComingSoon";
 import { PipelineSection } from "@/components/leads/PipelineSection";
 import { LeadsManager } from "@/components/leads/LeadsManager";
 import { PropostasSection } from "@/components/propostas/PropostasSection";
@@ -122,7 +124,8 @@ const NAV: { id: Section; label: string; Icon: typeof Search; badge?: string }[]
   { id: "publicar", label: "Publicar", Icon: Rocket },
   { id: "suporte", label: "Suporte", Icon: LifeBuoy },
   { id: "notificacoes", label: "Notificações", Icon: Bell },
-  { id: "academy", label: "Flow Academy", Icon: GraduationCap, badge: "Em breve" },
+  { id: "academy", label: "Business Academy", Icon: GraduationCap, badge: "Em breve" },
+  { id: "network", label: "Business Network", Icon: Network, badge: "Em breve" },
   { id: "settings", label: "Meu Perfil", Icon: User },
 ];
 
@@ -423,6 +426,7 @@ function Dashboard() {
           />
         )}
         {section === "academy" && <FlowAcademyComingSoon />}
+        {section === "network" && <BusinessNetworkComingSoon />}
         {/* DEPRECATED: Google Sheets saiu da sidebar. Render mantido só para não
             quebrar o callback de OAuth (?sheets_connected=true). Remover em passo à parte. */}
         {section === "sheets" && (

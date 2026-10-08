@@ -1,38 +1,41 @@
 import {
-  BookOpen,
-  CalendarDays,
-  GraduationCap,
+  Briefcase,
+  Handshake,
   LockKeyhole,
-  PlayCircle,
+  Network,
+  ShieldCheck,
   Sparkles,
   Users,
 } from "lucide-react";
 
-const academyTracks = [
+const networkTracks = [
   {
-    Icon: PlayCircle,
-    title: "Aulas práticas",
+    Icon: Handshake,
+    title: "Parcerias Estratégicas & Co-Selling",
     description:
-      "Conteúdo direto ao ponto para transformar a plataforma em uma operação comercial.",
+      "Conecte-se com agências e operadores complementares para formar alianças, atender clientes maiores e trocar indicações qualificadas.",
   },
   {
-    Icon: BookOpen,
-    title: "Playbooks privados",
-    description: "Scripts, processos e estratégias aplicáveis a cada canal de prospecção.",
-  },
-  {
-    Icon: CalendarDays,
-    title: "Mentorias ao vivo",
-    description: "Encontros para revisar campanhas, oferta, abordagem e execução.",
+    Icon: Briefcase,
+    title: "Bolsa de Demandas & Projetos",
+    description:
+      "Compartilhe overflow de demandas, contrate squads especializados e encontre parceiros de execução para seus projetos.",
   },
   {
     Icon: Users,
-    title: "Comunidade de execução",
-    description: "Troca de aprendizados com quem também está construindo sua máquina de vendas.",
+    title: "Rodadas de Negócios & Networking",
+    description:
+      "Encontros exclusivos e rodadas estratégicas para discutir benchmarks de mercado, ofertas validadas e novas oportunidades.",
+  },
+  {
+    Icon: ShieldCheck,
+    title: "Selo de Membro Verificado",
+    description:
+      "Ganhe visibilidade e credibilidade com perfil corporativo verificado e histórico comprovado dentro da plataforma.",
   },
 ];
 
-export function BusinessAcademyComingSoon() {
+export function BusinessNetworkComingSoon() {
   return (
     <div className="mx-auto w-full max-w-6xl py-4 sm:py-8">
       <section className="relative overflow-hidden rounded-3xl border border-border bg-sidebar px-6 py-12 text-sidebar-foreground shadow-xl sm:px-10 sm:py-16 lg:px-16">
@@ -40,26 +43,28 @@ export function BusinessAcademyComingSoon() {
         <div className="absolute -bottom-32 left-1/4 size-72 rounded-full bg-gold/10 blur-3xl" />
         <div className="relative mx-auto max-w-3xl text-center">
           <div className="mx-auto flex size-16 items-center justify-center rounded-3xl border border-sidebar-border bg-sidebar-accent shadow-lg">
-            <GraduationCap className="size-8 text-gold" />
+            <Network className="size-8 text-gold" />
           </div>
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gold">
             <Sparkles className="size-3.5" />
             Em breve
           </div>
-          <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-5xl">Business Academy</h1>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-5xl">
+            Business Network
+          </h1>
           <p className="mx-auto mt-5 max-w-2xl text-sm leading-6 text-sidebar-foreground/65 sm:text-base sm:leading-7">
-            Não queremos entregar apenas ferramentas. A Business Academy será o ambiente privado para
-            aprender a construir, operar e escalar uma prospecção que gera oportunidades reais.
+            O ecossistema exclusivo de conexões corporativas e novos negócios. Um ambiente seguro
+            para agências, consultorias e empresas gerarem sinergia, indicações e parcerias de alto impacto.
           </p>
           <div className="mt-8 inline-flex items-center gap-2 rounded-xl border border-sidebar-border bg-sidebar-accent/70 px-4 py-3 text-sm text-sidebar-foreground/70">
             <LockKeyhole className="size-4 text-gold" />
-            Conteúdo exclusivo em preparação
+            Rede corporativa exclusiva em preparação
           </div>
         </div>
       </section>
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2">
-        {academyTracks.map(({ Icon, title, description }) => (
+        {networkTracks.map(({ Icon, title, description }) => (
           <article
             key={title}
             className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] sm:p-6"
@@ -84,6 +89,3 @@ export function BusinessAcademyComingSoon() {
     </div>
   );
 }
-
-export const FlowAcademyComingSoon = BusinessAcademyComingSoon;
-

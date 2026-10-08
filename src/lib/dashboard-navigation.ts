@@ -15,6 +15,7 @@ export const DASHBOARD_SECTION_IDS = [
   "suporte",
   "notificacoes",
   "academy",
+  "network",
   "sheets",
   "settings",
 ] as const;

@@ -18,6 +18,12 @@ test("abre e preserva o módulo Instagram pela URL do dashboard", () => {
     dashboardUrlForSection("https://flowleads.com.br/dashboard?foo=bar", "instagram"),
     "/dashboard?foo=bar&secao=instagram",
   );
+  assert.equal(dashboardSectionFromSearch("?secao=academy"), "academy");
+  assert.equal(dashboardSectionFromSearch("?secao=network"), "network");
+  assert.equal(
+    dashboardUrlForSection("https://flowleads.com.br/dashboard", "network"),
+    "/dashboard?secao=network",
+  );
   assert.equal(
     dashboardUrlForSection("https://flowleads.com.br/dashboard?secao=instagram", "buscar"),
     "/dashboard?secao=buscar",
