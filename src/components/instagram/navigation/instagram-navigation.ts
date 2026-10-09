@@ -49,19 +49,19 @@ export const instagramNavigation: NavigationGroup[] = [
       {
         id: "hunter",
         label: "Prospecção",
-        description: "Encontre a próxima oportunidade",
+        description: "Descubra e encontre clientes",
         Icon: Crosshair,
       },
       {
         id: "competitors",
         label: "Inteligência",
-        description: "Monitore perfis estratégicos",
+        description: "Análises e insights",
         Icon: Eye,
       },
       {
         id: "crm",
         label: "Leads & CRM",
-        description: "Do perfil encontrado ao cliente",
+        description: "Gerencie seus contatos",
         Icon: Users,
       },
     ],
@@ -72,13 +72,13 @@ export const instagramNavigation: NavigationGroup[] = [
       {
         id: "cadences",
         label: "Automações",
-        description: "Aquecimento e follow-up assistido",
+        description: "Cadências e follow-up",
         Icon: Workflow,
       },
       {
         id: "inbox",
         label: "Conversas",
-        description: "Acompanhe respostas e avanços",
+        description: "Mensagens e interações",
         Icon: MessagesSquare,
       },
     ],
@@ -89,7 +89,7 @@ export const instagramNavigation: NavigationGroup[] = [
       {
         id: "accounts",
         label: "Configurações",
-        description: "Instagram profissional e permissões",
+        description: "Contas, limites e preferências",
         Icon: Settings,
       },
     ],

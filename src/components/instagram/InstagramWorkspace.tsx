@@ -47,6 +47,7 @@ import {
 } from "@/components/instagram/shared/InstagramScoreV2";
 import { InstagramInbox } from "@/components/instagram/inbox/InstagramInbox";
 import { InstagramClientHunter } from "@/components/instagram/hunter/InstagramClientHunter";
+import { InstagramProspectingView } from "@/components/instagram/prospecting/InstagramProspectingView";
 import { InstagramAppShell } from "@/components/instagram/navigation/InstagramAppShell";
 import {
   isInstagramView,
@@ -385,7 +386,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         </div>
       ) : null}
 
-      {tab === "hunter" ? <InstagramClientHunter /> : null}
+      {tab === "hunter" ? <InstagramProspectingView onNavigate={setTab} /> : null}
 
       {tab === "discover" ? (
         <div>
