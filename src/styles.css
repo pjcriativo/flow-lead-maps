@@ -68,6 +68,18 @@
   --color-instagram-pink: var(--instagram-pink);
   --color-instagram-purple: var(--instagram-purple);
   --color-instagram-orange: var(--instagram-orange);
+  --color-ig-sidebar: var(--ig-sidebar);
+  --color-ig-background: var(--ig-background);
+  --color-ig-surface: var(--ig-surface);
+  --color-ig-text-primary: var(--ig-text-primary);
+  --color-ig-text-secondary: var(--ig-text-secondary);
+  --color-ig-border: var(--ig-border);
+  --color-ig-blue: var(--ig-blue);
+  --color-ig-pink: var(--ig-pink);
+  --color-ig-magenta: var(--ig-magenta);
+  --color-ig-purple: var(--ig-purple);
+  --color-ig-orange: var(--ig-orange);
+  --color-ig-green: var(--ig-green);
 }
 
 :root {
@@ -120,6 +132,21 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #1f2a44;
   --sidebar-ring: #2563eb;
+
+  /* Instagram Pro theme tokens */
+  --ig-sidebar: #101829;
+  --ig-background: #F8FAFC;
+  --ig-surface: #FFFFFF;
+  --ig-text-primary: #101828;
+  --ig-text-secondary: #667085;
+  --ig-border: #E5E7EB;
+  --ig-blue: #2563EB;
+  --ig-pink: #E1306C;
+  --ig-magenta: #F72585;
+  --ig-purple: #833AB4;
+  --ig-orange: #F77737;
+  --ig-green: #10B981;
+  --ig-gradient: linear-gradient(120deg, #F77737 0%, #E1306C 48%, #833AB4 100%);
 }
 
 .dark {

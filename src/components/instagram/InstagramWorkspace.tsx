@@ -311,10 +311,33 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
 
   return (
     <InstagramAppShell activeView={tab} onViewChange={setTab} onExit={onExit}>
+      {tab === "home" && !business ? (
+        <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Carregando visão geral">
+          <div className="h-56 rounded-3xl bg-slate-200/70" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="h-28 rounded-2xl bg-slate-200/70" />
+            <div className="h-28 rounded-2xl bg-slate-200/70" />
+            <div className="h-28 rounded-2xl bg-slate-200/70" />
+            <div className="h-28 rounded-2xl bg-slate-200/70" />
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
+            <div className="h-96 rounded-3xl bg-slate-200/70" />
+            <div className="space-y-6">
+              <div className="h-52 rounded-3xl bg-slate-200/70" />
+              <div className="h-52 rounded-3xl bg-slate-200/70" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {tab === "home" && business ? (
         <FlowBusinessToday
           tasks={business.tasks}
           plan={business.plan}
+          cards={business.cards}
+          cadences={business.cadences}
+          accounts={business.accounts}
+          automation={automation}
           onComplete={completeCrmTask}
           onNavigate={setTab}
         />

@@ -265,7 +265,10 @@ export function FlowBusinessFlowBuilder({
               <Select
                 value={draft.triggerType}
                 onValueChange={(value) =>
-                  setDraft((current) => ({ ...current, triggerType: value }))
+                  setDraft((current) => ({
+                    ...current,
+                    triggerType: value as "comment_keyword",
+                  }))
                 }
               >
                 <SelectTrigger className="mt-1.5">

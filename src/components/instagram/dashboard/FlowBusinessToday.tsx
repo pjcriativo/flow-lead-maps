@@ -1,179 +1,103 @@
-import { ArrowUpRight, CheckCircle2, Clock3, ExternalLink, ListChecks, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { planLimitDetail, planLimitProgress } from "@/lib/flow-business-limits";
-import type { FlowBusinessPlan, FlowBusinessTask } from "@/services/flow-business";
+import { useMemo } from "react";
+import { TodayHero } from "./components/TodayHero";
+import { TodayKpiGrid } from "./components/TodayKpiGrid";
+import { TodayTaskQueue } from "./components/TodayTaskQueue";
+import { TodayUpcomingActions } from "./components/TodayUpcomingActions";
+import { TodayInsights } from "./components/TodayInsights";
+import type {
+  FlowBusinessAccount,
+  FlowBusinessCadence,
+  FlowBusinessCard,
+  FlowBusinessPlan,
+  FlowBusinessTask,
+  FlowBusinessAutomationSnapshot,
+} from "@/services/flow-business";
 import type { InstagramView } from "@/components/instagram/navigation/instagram-navigation";
+
+export interface FlowBusinessTodayProps {
+  tasks: FlowBusinessTask[];
+  plan: FlowBusinessPlan;
+  cards?: FlowBusinessCard[];
+  cadences?: FlowBusinessCadence[];
+  accounts?: FlowBusinessAccount[];
+  automation?: FlowBusinessAutomationSnapshot | null;
+  onComplete: (task: FlowBusinessTask) => Promise<void>;
+  onNavigate: (view: InstagramView) => void;
+}
 
 export function FlowBusinessToday({
   tasks,
   plan,
+  cards = [],
+  cadences = [],
+  accounts = [],
+  automation = null,
   onComplete,
   onNavigate,
-}: {
-  tasks: FlowBusinessTask[];
-  plan: FlowBusinessPlan;
-  onComplete: (task: FlowBusinessTask) => Promise<void>;
-  onNavigate: (view: InstagramView) => void;
-}) {
-  const now = new Date();
-  const due = tasks.filter((task) => new Date(task.dueAt) <= now);
-  const next = tasks.filter((task) => new Date(task.dueAt) > now).slice(0, 5);
+}: FlowBusinessTodayProps) {
+  // Contagem real de tarefas vencidas ou previstas para hoje
+  const dueCount = useMemo(() => {
+    const now = new Date();
+    // Considera tarefas com prazo hoje ou anteriores
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    return tasks.filter((t) => new Date(t.dueAt) <= endOfToday).length;
+  }, [tasks]);
+
+  // Contagem de cadências ativas reais
+  const activeCadencesCount = useMemo(() => {
+    if (cadences.length > 0) {
+      return cadences.filter((c) => c.isActive).length;
+    }
+    return plan.used.cadences;
+  }, [cadences, plan.used.cadences]);
+
+  // Contagem de contas conectadas reais
+  const connectedAccountsCount = useMemo(() => {
+    if (accounts.length > 0) {
+      return accounts.filter((a) => a.status === "conectado").length;
+    }
+    return plan.used.accounts;
+  }, [accounts, plan.used.accounts]);
+
+  // Contagem real de respostas hoje
+  const repliesTodayCount = useMemo(() => {
+    if (automation && typeof automation.usage.daily === "number") {
+      return automation.usage.daily;
+    }
+    return cards.filter((c) => c.stage === "respondeu").length;
+  }, [automation, cards]);
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-[var(--shadow-card)]">
-        <div className="grid gap-6 p-6 sm:p-8 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-instagram-pink">
-              Instagram · Central de execução
-            </p>
-            <h2 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Hoje você trabalha oportunidades, não listas soltas.
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-              Cada ação pública é guiada e registrada. Mensagens automáticas só entram em cena
-              depois que o contato inicia uma interação com o perfil.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Button onClick={() => onNavigate("hunter")}>Encontrar oportunidades</Button>
-              <Button variant="outline" onClick={() => onNavigate("crm")}>
-                Abrir CRM <ArrowUpRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border bg-muted/35 p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">Prioridade</p>
-                <p className="mt-1 text-3xl font-semibold tabular-nums">{due.length}</p>
-              </div>
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <ListChecks className="size-5" />
-              </span>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              ações vencidas ou previstas para hoje
-            </p>
-            <Button
-              className="mt-5 w-full"
-              variant="secondary"
-              onClick={() => onNavigate("cadences")}
-            >
-              Gerenciar cadências
-            </Button>
-          </div>
-        </div>
-      </section>
+      {/* 1. Hero Principal com Copy e Composição Visual */}
+      <TodayHero dueCount={dueCount} onNavigate={onNavigate} />
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <Metric
-          icon={Users}
-          label="Contatos no CRM"
-          value={plan.used.crmContacts}
-          limit={plan.limits.crmContacts}
-          detail={planLimitDetail(plan.limits.crmContacts)}
+      {/* 2. Grid de 4 Indicadores (KPIs) */}
+      <TodayKpiGrid
+        crmContactsCount={cards.length > 0 ? cards.length : plan.used.crmContacts}
+        activeCadencesCount={activeCadencesCount}
+        connectedAccountsCount={connectedAccountsCount}
+        repliesTodayCount={repliesTodayCount}
+        plan={plan}
+        onNavigate={onNavigate}
+      />
+
+      {/* 3. Área Operacional: Fila de Hoje à esquerda e Painéis à direita */}
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[1fr_360px]">
+        {/* Lado Esquerdo: Fila de hoje */}
+        <TodayTaskQueue
+          tasks={tasks}
+          cards={cards}
+          onComplete={onComplete}
+          onNavigate={onNavigate}
         />
-        <Metric
-          icon={Clock3}
-          label="Cadências ativas"
-          value={plan.used.cadences}
-          limit={plan.limits.cadences}
-          detail={planLimitDetail(plan.limits.cadences)}
-        />
-        <Metric
-          icon={CheckCircle2}
-          label="Contas conectadas"
-          value={plan.used.accounts}
-          limit={plan.limits.accounts}
-          detail={planLimitDetail(plan.limits.accounts)}
-        />
-      </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-        <div className="rounded-3xl border border-border bg-card shadow-[var(--shadow-card)]">
-          <div className="border-b border-border p-5 sm:p-6">
-            <h3 className="text-lg font-semibold">Fila de hoje</h3>
-            <p className="text-sm text-muted-foreground">
-              Execute no Instagram e confirme aqui para avançar o CRM.
-            </p>
-          </div>
-          <div className="divide-y divide-border">
-            {due.length ? (
-              due.slice(0, 12).map((task) => (
-                <div key={task.id} className="flex flex-wrap items-center gap-4 p-4 sm:px-6">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{task.title}</p>
-                    <p className="truncate text-sm text-muted-foreground">
-                      {task.businessName}
-                      {task.username ? ` · @${task.username}` : ""}
-                    </p>
-                  </div>
-                  {task.instagramUrl ? (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={task.instagramUrl} target="_blank" rel="noreferrer">
-                        Abrir perfil <ExternalLink className="size-3.5" />
-                      </a>
-                    </Button>
-                  ) : null}
-                  <Button size="sm" onClick={() => void onComplete(task)}>
-                    <CheckCircle2 className="size-4" /> Concluir
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <div className="p-10 text-center text-sm text-muted-foreground">
-                Nenhuma ação pendente para hoje.
-              </div>
-            )}
-          </div>
+        {/* Lado Direito: Próximas ações e Insights da AISA */}
+        <div className="space-y-6">
+          <TodayUpcomingActions tasks={tasks} cards={cards} onNavigate={onNavigate} />
+          <TodayInsights cards={cards} tasks={tasks} onNavigate={onNavigate} />
         </div>
-
-        <div className="rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)] sm:p-6">
-          <h3 className="text-lg font-semibold">Próximas ações</h3>
-          <div className="mt-5 space-y-4">
-            {next.map((task) => (
-              <div key={task.id} className="rounded-xl border border-border p-3">
-                <p className="text-sm font-medium">{task.businessName}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {task.title} · {new Date(task.dueAt).toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-            ))}
-            {!next.length ? (
-              <p className="text-sm text-muted-foreground">
-                Inicie uma cadência no CRM para montar sua agenda.
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function Metric({
-  icon: Icon,
-  label,
-  value,
-  limit,
-  detail,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: number;
-  limit: number | null;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <div className="flex items-center justify-between">
-        <p className="text-2xl font-semibold tabular-nums">{value}</p>
-        <Icon className="size-4 text-muted-foreground" />
       </div>
-      <p className="mt-1 text-sm font-medium">{label}</p>
-      <Progress value={planLimitProgress(value, limit)} className="mt-4 h-1.5" />
-      <p className="mt-2 text-xs text-muted-foreground">{detail}</p>
     </div>
   );
 }
