@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, ChevronRight, Crosshair, Instagram, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ChartNoAxesColumnIncreasing, ChevronRight, Crosshair, Instagram, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -169,24 +169,32 @@ export function InstagramAppShell({
                     ? "PROSPECÇÃO"
                     : activeView === "home"
                       ? "CENTRAL"
-                      : (
-                          instagramNavigation.find((group) =>
-                            group.items.some((item) => item.id === activeView),
-                          )?.label.toUpperCase() ?? "CENTRAL"
-                        )}
+                      : activeView === "competitors"
+                        ? "INTELIGÊNCIA"
+                        : (
+                            instagramNavigation.find((group) =>
+                              group.items.some((item) => item.id === activeView),
+                            )?.label.toUpperCase() ?? "CENTRAL"
+                          )}
                 </span>
               </div>
 
               {/* Título e Subtítulo */}
               <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-[#101828]">
-                {activeView === "home" ? "Hoje" : activeItem.label}
+                {activeView === "home"
+                  ? "Hoje"
+                  : activeView === "competitors"
+                    ? "Inteligência"
+                    : activeItem.label}
               </h1>
               <p className="hidden text-xs text-[#667085] sm:block">
                 {activeView === "home"
                   ? "Prioridades e ações do dia"
                   : activeView === "hunter"
                     ? "Descubra e encontre oportunidades no Instagram"
-                    : activeItem.description}
+                    : activeView === "competitors"
+                      ? "Monitore, analise e encontre oportunidades estratégicas"
+                      : activeItem.description}
               </p>
             </div>
 
@@ -197,14 +205,27 @@ export function InstagramAppShell({
                 Operação ativa
               </div>
 
-              <Button
-                size="sm"
-                className="gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-[#1D4ED8]"
-                onClick={() => onViewChange("hunter")}
-              >
-                <Crosshair className="size-3.5" />
-                <span className="hidden sm:inline">Caçar clientes</span>
-              </Button>
+              {activeView === "competitors" ? (
+                <Button
+                  size="sm"
+                  className="gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-[#1D4ED8]"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent("instagram-open-add-competitor"));
+                  }}
+                >
+                  <ChartNoAxesColumnIncreasing className="size-3.5" />
+                  <span className="hidden sm:inline">Analisar concorrentes</span>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-[#1D4ED8]"
+                  onClick={() => onViewChange("hunter")}
+                >
+                  <Crosshair className="size-3.5" />
+                  <span className="hidden sm:inline">Caçar clientes</span>
+                </Button>
+              )}
             </div>
           </div>
 

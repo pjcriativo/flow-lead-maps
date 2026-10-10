@@ -55,7 +55,7 @@ export const instagramNavigation: NavigationGroup[] = [
       {
         id: "competitors",
         label: "Inteligência",
-        description: "Análises e insights",
+        description: "Análise e insights",
         Icon: Eye,
       },
       {
