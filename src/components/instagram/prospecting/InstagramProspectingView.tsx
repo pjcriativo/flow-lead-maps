@@ -9,6 +9,7 @@ import { ProspectingFilterSidebar } from "./components/ProspectingFilterSidebar"
 import {
   ProspectingResultsTable,
   type ProspectProfileItem,
+  getCuratedProfilePhoto,
 } from "./components/ProspectingResultsTable";
 import { ProspectingInsightsPanel } from "./components/ProspectingInsightsPanel";
 import { listarInstagramLeads, type InstagramLead } from "@/services/instagram";
@@ -46,18 +47,19 @@ export function InstagramProspectingView({ onNavigate }: InstagramProspectingVie
           const relevance: "Alta" | "Média" | "Baixa" =
             score >= 80 ? "Alta" : score >= 60 ? "Média" : "Baixa";
 
+          const name = l.full_name || l.lead.business_name || cleanUsername;
+          const category = l.business_category || l.lead.category || "Profissional";
+
           return {
             id: l.lead_id || `lead-${index}`,
-            name: l.full_name || l.lead.business_name || cleanUsername,
+            name,
             username: cleanUsername,
-            category: l.business_category || l.lead.category || "Profissional",
+            category,
             location: [l.lead.city, l.lead.state].filter(Boolean).join(", ") || "São Paulo, SP",
             followers: followersStr,
             engagement: engagementStr,
             relevance,
-            avatarUrl:
-              l.profile_pic_url ||
-              `https://images.unsplash.com/photo-${1510000000000 + (index % 10) * 1000000}?w=120&h=120&fit=crop`,
+            avatarUrl: l.profile_pic_url || getCuratedProfilePhoto(name, category),
             instagramUrl: l.lead.instagram_url || `https://www.instagram.com/${cleanUsername}`,
           };
         });

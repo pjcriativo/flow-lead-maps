@@ -29,7 +29,7 @@ export function ProspectingHero({
       <div className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full bg-gradient-to-br from-pink-50/60 via-purple-50/40 to-transparent blur-3xl" />
       <div className="pointer-events-none absolute -left-20 -bottom-20 size-80 rounded-full bg-gradient-to-tr from-amber-50/50 via-rose-50/30 to-transparent blur-3xl" />
 
-      <div className="relative grid grid-cols-1 items-center gap-8 xl:grid-cols-[1.1fr_auto_340px]">
+      <div className="relative grid grid-cols-1 items-center gap-6 xl:grid-cols-[1fr_auto_320px] 2xl:grid-cols-[1.1fr_auto_340px]">
         {/* Coluna 1: Copy principal e CTAs */}
         <div className="max-w-xl">
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#E1306C]">
@@ -69,7 +69,7 @@ export function ProspectingHero({
         </div>
 
         {/* Coluna 2: Arte central do Instagram com bolhas e chips */}
-        <div className="hidden lg:flex items-center justify-center py-2">
+        <div className="hidden lg:flex items-center justify-center py-2 shrink-0">
           <ProspectingHeroArtwork />
         </div>
 

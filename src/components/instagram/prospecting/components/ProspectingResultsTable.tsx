@@ -33,6 +33,151 @@ export interface ProspectProfileItem {
   instagramUrl?: string;
 }
 
+export function getCuratedProfilePhoto(name = "", category = ""): string {
+  const text = `${name} ${category}`.toLowerCase();
+
+  // 1. Odontologia, Dentistas, Clínicas Médicas
+  if (
+    text.includes("dent") ||
+    text.includes("odonto") ||
+    text.includes("sorriso") ||
+    text.includes("dental")
+  ) {
+    if (
+      text.includes("dra") ||
+      text.includes("angélica") ||
+      text.includes("angelica") ||
+      text.includes("luana")
+    ) {
+      return "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=160&h=160&fit=crop";
+    }
+    return "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=160&h=160&fit=crop";
+  }
+
+  if (
+    text.includes("médic") ||
+    text.includes("saúde") ||
+    text.includes("clinic") ||
+    text.includes("clínic") ||
+    text.includes("dr.") ||
+    text.includes("dr•") ||
+    text.includes("dr ")
+  ) {
+    if (text.includes("bruno") || text.includes("andre") || text.includes("andré")) {
+      return "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=160&h=160&fit=crop";
+    }
+    return "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=160&h=160&fit=crop";
+  }
+
+  // 2. Gastronomia, Restaurante, Pizzaria
+  if (
+    text.includes("pizza") ||
+    text.includes("restaurante") ||
+    text.includes("gastronom") ||
+    text.includes("burger") ||
+    text.includes("bar") ||
+    text.includes("comida")
+  ) {
+    return "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=160&h=160&fit=crop";
+  }
+
+  // 3. Beleza, Estética, Salão
+  if (
+    text.includes("beleza") ||
+    text.includes("estética") ||
+    text.includes("estetica") ||
+    text.includes("salão") ||
+    text.includes("salao") ||
+    text.includes("hair") ||
+    text.includes("sobrancelha")
+  ) {
+    return "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=160&h=160&fit=crop";
+  }
+
+  // 4. Moda, Roupas, Vestuário
+  if (
+    text.includes("moda") ||
+    text.includes("roupa") ||
+    text.includes("vestuário") ||
+    text.includes("loja") ||
+    text.includes("fashion")
+  ) {
+    return "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=160&h=160&fit=crop";
+  }
+
+  // 5. Pets, Veterinária
+  if (
+    text.includes("pet") ||
+    text.includes("vet") ||
+    text.includes("cão") ||
+    text.includes("gato")
+  ) {
+    return "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=160&h=160&fit=crop";
+  }
+
+  // 6. Fitness, Crossfit, Academia
+  if (
+    text.includes("fit") ||
+    text.includes("cross") ||
+    text.includes("treino") ||
+    text.includes("academia")
+  ) {
+    return "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=160&h=160&fit=crop";
+  }
+
+  // 7. Arquitetura, Design, Decoração
+  if (
+    text.includes("arquit") ||
+    text.includes("decor") ||
+    text.includes("design") ||
+    text.includes("interiores")
+  ) {
+    return "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=160&h=160&fit=crop";
+  }
+
+  // 8. Tecnologia
+  if (
+    text.includes("tech") ||
+    text.includes("tecnolog") ||
+    text.includes("software")
+  ) {
+    return "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=160&h=160&fit=crop";
+  }
+
+  return "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&h=160&fit=crop";
+}
+
+export function ProspectProfileAvatar({
+  name,
+  category,
+  avatarUrl,
+}: {
+  name: string;
+  category?: string;
+  avatarUrl?: string;
+}) {
+  const fallbackPhoto = getCuratedProfilePhoto(name, category);
+  const [src, setSrc] = useState<string>(avatarUrl || fallbackPhoto);
+
+  return (
+    <div className="relative size-12 shrink-0 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-slate-100/80">
+      <img
+        src={src}
+        alt={name}
+        referrerPolicy="no-referrer"
+        crossOrigin="anonymous"
+        loading="lazy"
+        onError={() => {
+          if (src !== fallbackPhoto) {
+            setSrc(fallbackPhoto);
+          }
+        }}
+        className="size-full object-cover transition-transform duration-300 hover:scale-105"
+      />
+    </div>
+  );
+}
+
 const DEFAULT_PROFILES: ProspectProfileItem[] = [
   {
     id: "1",
@@ -43,7 +188,7 @@ const DEFAULT_PROFILES: ProspectProfileItem[] = [
     followers: "12.4K",
     engagement: "4.8%",
     relevance: "Alta",
-    avatarUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=120&h=120&fit=crop",
+    avatarUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=160&h=160&fit=crop",
     instagramUrl: "https://www.instagram.com/baggiopizzaria",
   },
   {
@@ -55,7 +200,7 @@ const DEFAULT_PROFILES: ProspectProfileItem[] = [
     followers: "8.7K",
     engagement: "5.2%",
     relevance: "Alta",
-    avatarUrl: "https://images.unsplash.com/photo-1594824813572-c51f49673295?w=120&h=120&fit=crop",
+    avatarUrl: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=160&h=160&fit=crop",
     instagramUrl: "https://www.instagram.com/clinicavivamais",
   },
   {
@@ -262,13 +407,12 @@ export function ProspectingResultsTable({
 
                   {/* Informações do Perfil */}
                   <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-3 min-w-[200px]">
-                      <Avatar className="size-9 rounded-xl border border-slate-200 shrink-0">
-                        <AvatarImage src={profile.avatarUrl} alt={profile.name} />
-                        <AvatarFallback className="rounded-xl bg-gradient-to-tr from-[#F77737]/15 to-[#833AB4]/15 font-bold text-slate-700">
-                          {profile.name.slice(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                    <div className="flex items-center gap-3.5 min-w-[220px]">
+                      <ProspectProfileAvatar
+                        name={profile.name}
+                        category={profile.category}
+                        avatarUrl={profile.avatarUrl}
+                      />
 
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-900 leading-snug truncate">
