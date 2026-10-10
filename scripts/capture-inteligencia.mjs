@@ -72,7 +72,7 @@ await ctx.addInitScript(
 const page = await ctx.newPage();
 page.setDefaultTimeout(30000);
 
-const targetUrl = "http://localhost:8080/dashboard?secao=instagram&instagram_view=competitors";
+const targetUrl = "https://business.flowgenius.com.br/dashboard?secao=instagram&instagram_view=competitors";
 console.log("Navigating to:", targetUrl);
 
 await page.goto(targetUrl, { waitUntil: "networkidle" });

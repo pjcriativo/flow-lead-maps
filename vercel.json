@@ -1,4 +1,6 @@
 {
+  "framework": null,
+  "buildCommand": "vite build",
   "headers": [
     {
       "source": "/(.*)",

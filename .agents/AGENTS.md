@@ -33,4 +33,9 @@
   - 🧪 Testes & Validações Empíricas
   - 🔄 Status de Sincronização (Git & Supabase)
 
+## 6. Deploy em Produção em Tempo Real (Vercel)
+
+- **Sempre que concluir um conjunto de alterações**, além do `git push`, execute obrigatoriamente `npm run deploy` (`vite build && npx vercel deploy --prebuilt --prod --yes --scope pjcriativos-projects`).
+- **Motivo**: O projeto utiliza `@tanstack/react-start` com Nitro gerando Build Output API (`.vercel/output`). O deploy via CLI prebuilt garante que a produção (`https://business.flowgenius.com.br`) atualize imediatamente em tempo real a cada alteração.
+
 
