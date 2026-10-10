@@ -227,6 +227,7 @@ function Dashboard() {
     // deep-link de seção (ex.: /dashboard?secao=automacao — usado pelo painel /admin)
     const secao = params.get("secao");
     if (secao === "configuracoes" || secao === "perfil") selectSection("settings");
+    else if (secao === "inteligencia" || secao === "competitors") selectSection("instagram");
     else if (secao && NAV.some((n) => n.id === secao)) selectSection(secao as Section);
   }, [selectSection]);
 

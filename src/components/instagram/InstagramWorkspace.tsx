@@ -108,9 +108,39 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   const [lastRun, setLastRun] = useState<ColetaRedes | null>(null);
   const [tab, setTab] = useState<InstagramView>(() => {
     if (typeof window === "undefined") return "home";
-    const requested = new URLSearchParams(window.location.search).get("instagram_view");
-    return requested && isInstagramView(requested) ? requested : "home";
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("instagram_view");
+    if (requested && isInstagramView(requested)) return requested;
+    const secao = params.get("secao");
+    if (secao === "inteligencia" || secao === "competitors") return "competitors";
+    const stored = localStorage.getItem("flow_instagram_active_view");
+    if (stored && isInstagramView(stored)) return stored;
+    return "home";
   });
+
+  const handleViewChange = useCallback((newView: InstagramView) => {
+    setTab(newView);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("flow_instagram_active_view", newView);
+        const url = new URL(window.location.href);
+        url.searchParams.set("instagram_view", newView);
+        window.history.replaceState({}, "", url.toString());
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const requested = params.get("instagram_view");
+      if (requested && isInstagramView(requested)) {
+        setTab(requested);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
   const [profileScoreSort, setProfileScoreSort] = useState<InstagramScoreSort>("total");
   const [profileMinScore, setProfileMinScore] = useState(0);
   const [dashboardRevision, setDashboardRevision] = useState(0);
@@ -221,7 +251,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       setSelectedCampaign(id);
       setSelected(new Set());
       setCampaignOpen(false);
-      setTab("campaigns");
+      handleViewChange("campaigns");
       toast.success("Campanha de Direct assistido criada.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao criar campanha.");
@@ -311,7 +341,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   };
 
   return (
-    <InstagramAppShell activeView={tab} onViewChange={setTab} onExit={onExit}>
+    <InstagramAppShell activeView={tab} onViewChange={handleViewChange} onExit={onExit}>
       {tab === "home" && !business ? (
         <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Carregando visão geral">
           <div className="h-56 rounded-3xl bg-slate-200/70" />
@@ -340,7 +370,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
           accounts={business.accounts}
           automation={automation}
           onComplete={completeCrmTask}
-          onNavigate={setTab}
+          onNavigate={handleViewChange}
         />
       ) : null}
 
@@ -386,7 +416,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         </div>
       ) : null}
 
-      {tab === "hunter" ? <InstagramProspectingView onNavigate={setTab} /> : null}
+      {tab === "hunter" ? <InstagramProspectingView onNavigate={handleViewChange} /> : null}
 
       {tab === "discover" ? (
         <div>
@@ -406,11 +436,11 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       {tab === "radar" ? <ContentDiscoveryHunter onLeadsChanged={load} /> : null}
 
       {tab === "competitors" ? (
-        <CompetitorIntelligence onNavigate={(view) => isInstagramView(view) && setTab(view)} />
+        <CompetitorIntelligence onNavigate={(view) => isInstagramView(view) && handleViewChange(view)} />
       ) : null}
 
       {tab === "inbox" && business ? (
-        <InstagramInbox accounts={business.accounts} onOpenAccounts={() => setTab("accounts")} />
+        <InstagramInbox accounts={business.accounts} onOpenAccounts={() => handleViewChange("accounts")} />
       ) : null}
 
       {tab === "leads" ? (
