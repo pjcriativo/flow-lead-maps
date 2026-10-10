@@ -107,7 +107,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   const [message, setMessage] = useState(TEMPLATE_PADRAO);
   const [lastRun, setLastRun] = useState<ColetaRedes | null>(null);
   const [tab, setTab] = useState<InstagramView>(() => {
-    if (typeof window === "undefined") return "home";
+    if (typeof window === "undefined") return "competitors";
     const params = new URLSearchParams(window.location.search);
     const requested = params.get("instagram_view");
     if (requested && isInstagramView(requested)) return requested;
@@ -115,7 +115,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
     if (secao === "inteligencia" || secao === "competitors") return "competitors";
     const stored = localStorage.getItem("flow_instagram_active_view");
     if (stored && isInstagramView(stored)) return stored;
-    return "home";
+    return "competitors";
   });
 
   const handleViewChange = useCallback((newView: InstagramView) => {

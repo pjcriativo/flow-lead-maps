@@ -29,6 +29,7 @@ export function isDashboardSection(value: string | null): value is DashboardSect
 export function dashboardSectionFromSearch(search: string): DashboardSection {
   const requested = new URLSearchParams(search).get("secao");
   if (requested === "configuracoes" || requested === "perfil") return "settings";
+  if (requested === "inteligencia" || requested === "competitors") return "instagram";
   return isDashboardSection(requested) ? requested : "buscar";
 }
 
