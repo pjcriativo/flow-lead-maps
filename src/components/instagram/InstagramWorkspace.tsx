@@ -390,7 +390,14 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   };
 
   return (
-    <InstagramAppShell activeView={tab} onViewChange={handleViewChange} onExit={onExit}>
+    <InstagramAppShell
+      activeView={tab}
+      onViewChange={handleViewChange}
+      onExit={onExit}
+      operationActive={
+        business?.accounts.some((account) => account.status === "conectado") === true
+      }
+    >
       {tab === "home" && !business ? (
         <div
           className="space-y-6 animate-pulse"
@@ -525,7 +532,11 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       {tab === "inbox" && business ? (
         <InstagramInbox
           accounts={business.accounts}
+          workspace={business}
           onOpenAccounts={() => handleViewChange("accounts")}
+          onOpenAutomations={() => handleViewChange("cadences")}
+          onMoveCard={moveCrmCard}
+          onWorkspaceChanged={refreshBusiness}
         />
       ) : null}
 

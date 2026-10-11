@@ -7,6 +7,7 @@ import {
   Crosshair,
   Instagram,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,11 +29,13 @@ export function InstagramAppShell({
   activeView,
   onViewChange,
   onExit,
+  operationActive = false,
   children,
 }: {
   activeView: InstagramView;
   onViewChange: (view: InstagramView) => void;
   onExit: () => void;
+  operationActive?: boolean;
   children: ReactNode;
 }) {
   const activeItem =
@@ -175,13 +178,17 @@ export function InstagramAppShell({
                       ? "CENTRAL"
                       : activeView === "cadences"
                         ? "AUTOMAÇÕES"
-                        : activeView === "crm"
-                          ? "LEADS & CRM"
-                          : activeView === "competitors"
-                            ? "INTELIGÊNCIA"
-                            : (instagramNavigation
-                                .find((group) => group.items.some((item) => item.id === activeView))
-                                ?.label.toUpperCase() ?? "CENTRAL")}
+                        : activeView === "inbox"
+                          ? "CONVERSAS"
+                          : activeView === "crm"
+                            ? "LEADS & CRM"
+                            : activeView === "competitors"
+                              ? "INTELIGÊNCIA"
+                              : (instagramNavigation
+                                  .find((group) =>
+                                    group.items.some((item) => item.id === activeView),
+                                  )
+                                  ?.label.toUpperCase() ?? "CENTRAL")}
                 </span>
               </div>
 
@@ -200,20 +207,38 @@ export function InstagramAppShell({
                     ? "Descubra e encontre oportunidades no Instagram"
                     : activeView === "cadences"
                       ? "Crie cadências, automatize abordagens e acompanhe seus resultados"
-                      : activeView === "competitors"
-                        ? "Monitore, analise e encontre oportunidades estratégicas"
-                        : activeItem.description}
+                      : activeView === "inbox"
+                        ? "Atenda, responda e converta mais clientes no Instagram"
+                        : activeView === "competitors"
+                          ? "Monitore, analise e encontre oportunidades estratégicas"
+                          : activeItem.description}
               </p>
             </div>
 
             {/* Ações da Direita */}
             <div className="flex items-center gap-3">
               <div className="hidden items-center gap-2 rounded-full border border-slate-200/90 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm sm:flex">
-                <span className="size-2 rounded-full bg-[#10B981] shadow-[0_0_0_3px_rgba(16,185,129,0.18)]" />
-                Operação ativa
+                <span
+                  className={cn(
+                    "size-2 rounded-full",
+                    operationActive
+                      ? "bg-[#10B981] shadow-[0_0_0_3px_rgba(16,185,129,0.18)]"
+                      : "bg-[#F59E0B] shadow-[0_0_0_3px_rgba(245,158,11,0.16)]",
+                  )}
+                />
+                {operationActive ? "Operação ativa" : "Operação inativa"}
               </div>
 
-              {activeView === "cadences" ? (
+              {activeView === "inbox" ? (
+                <Button
+                  size="sm"
+                  className="gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-[#1D4ED8]"
+                  onClick={() => window.dispatchEvent(new CustomEvent("instagram-ai-assistant"))}
+                >
+                  <Sparkles className="size-3.5" />
+                  <span className="hidden sm:inline">Assistente de IA</span>
+                </Button>
+              ) : activeView === "cadences" ? (
                 <Button
                   size="sm"
                   className="gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-[#1D4ED8]"

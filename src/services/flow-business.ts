@@ -575,6 +575,32 @@ export async function loadFlowBusinessWorkspace(): Promise<FlowBusinessWorkspace
   };
 }
 
+export async function addFlowBusinessNote(cardId: string, detail: string): Promise<void> {
+  const note = detail.trim();
+  if (!note) throw new Error("Escreva uma nota antes de salvar.");
+
+  const { data: card, error: cardError } = await supabase
+    .from("instagram_crm_cards")
+    .select("org_id")
+    .eq("id", cardId)
+    .single();
+  raiseIfError(cardError);
+  if (!card) throw new Error("Contato do CRM não encontrado.");
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  raiseIfError(authError);
+
+  const { error } = await supabase.from("instagram_crm_activities").insert({
+    org_id: card.org_id,
+    card_id: cardId,
+    activity_type: "note",
+    title: "Nota interna adicionada",
+    detail: note,
+    actor_user_id: authData.user?.id ?? null,
+  });
+  raiseIfError(error);
+}
+
 export async function loadFlowBusinessAutomationSnapshot(): Promise<FlowBusinessAutomationSnapshot> {
   const { data, error } = await supabase.rpc("flow_business_automation_snapshot");
   raiseIfError(error);
