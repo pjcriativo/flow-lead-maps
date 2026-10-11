@@ -492,8 +492,8 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
 
       {tab === "accounts" && business ? (
         <FlowBusinessAccounts
-          accounts={business.accounts}
-          plan={business.plan}
+          workspace={business}
+          automation={automation}
           onConnected={refreshBusiness}
         />
       ) : null}
