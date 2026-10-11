@@ -126,7 +126,9 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         const url = new URL(window.location.href);
         url.searchParams.set("instagram_view", newView);
         window.history.replaceState({}, "", url.toString());
-      } catch {}
+      } catch {
+        // A navegação continua funcional quando o armazenamento do navegador está indisponível.
+      }
     }
   }, []);
 
@@ -343,7 +345,11 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   return (
     <InstagramAppShell activeView={tab} onViewChange={handleViewChange} onExit={onExit}>
       {tab === "home" && !business ? (
-        <div className="space-y-6 animate-pulse" aria-busy="true" aria-label="Carregando visão geral">
+        <div
+          className="space-y-6 animate-pulse"
+          aria-busy="true"
+          aria-label="Carregando visão geral"
+        >
           <div className="h-56 rounded-3xl bg-slate-200/70" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="h-28 rounded-2xl bg-slate-200/70" />
@@ -378,8 +384,10 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         <FlowBusinessCrm
           cards={business.cards}
           cadences={business.cadences}
+          activities={business.activities}
           onMove={moveCrmCard}
           onStartCadence={startCadence}
+          onNavigate={handleViewChange}
         />
       ) : null}
 
@@ -436,11 +444,16 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
       {tab === "radar" ? <ContentDiscoveryHunter onLeadsChanged={load} /> : null}
 
       {tab === "competitors" ? (
-        <CompetitorIntelligence onNavigate={(view) => isInstagramView(view) && handleViewChange(view)} />
+        <CompetitorIntelligence
+          onNavigate={(view) => isInstagramView(view) && handleViewChange(view)}
+        />
       ) : null}
 
       {tab === "inbox" && business ? (
-        <InstagramInbox accounts={business.accounts} onOpenAccounts={() => handleViewChange("accounts")} />
+        <InstagramInbox
+          accounts={business.accounts}
+          onOpenAccounts={() => handleViewChange("accounts")}
+        />
       ) : null}
 
       {tab === "leads" ? (

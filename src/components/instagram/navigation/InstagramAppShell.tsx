@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, ChartNoAxesColumnIncreasing, ChevronRight, Crosshair, Instagram, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  ChartNoAxesColumnIncreasing,
+  ChevronRight,
+  CirclePlus,
+  Crosshair,
+  Instagram,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -56,9 +64,7 @@ export function InstagramAppShell({
                   PRO
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-slate-400">
-                Prospecção inteligente
-              </p>
+              <p className="mt-0.5 text-xs text-slate-400">Prospecção inteligente</p>
             </div>
           </div>
         </div>
@@ -112,9 +118,7 @@ export function InstagramAppShell({
                           {item.description}
                         </span>
                       </span>
-                      {isActive ? (
-                        <ChevronRight className="size-3.5 text-[#E1306C]" />
-                      ) : null}
+                      {isActive ? <ChevronRight className="size-3.5 text-[#E1306C]" /> : null}
                     </button>
                   );
                 })}
@@ -169,13 +173,13 @@ export function InstagramAppShell({
                     ? "PROSPECÇÃO"
                     : activeView === "home"
                       ? "CENTRAL"
-                      : activeView === "competitors"
-                        ? "INTELIGÊNCIA"
-                        : (
-                            instagramNavigation.find((group) =>
-                              group.items.some((item) => item.id === activeView),
-                            )?.label.toUpperCase() ?? "CENTRAL"
-                          )}
+                      : activeView === "crm"
+                        ? "LEADS & CRM"
+                        : activeView === "competitors"
+                          ? "INTELIGÊNCIA"
+                          : (instagramNavigation
+                              .find((group) => group.items.some((item) => item.id === activeView))
+                              ?.label.toUpperCase() ?? "CENTRAL")}
                 </span>
               </div>
 
@@ -205,7 +209,16 @@ export function InstagramAppShell({
                 Operação ativa
               </div>
 
-              {activeView === "competitors" ? (
+              {activeView === "crm" ? (
+                <Button
+                  size="sm"
+                  className="gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-[#1D4ED8]"
+                  onClick={() => onViewChange("hunter")}
+                >
+                  <CirclePlus className="size-3.5" />
+                  <span className="hidden sm:inline">Adicionar lead</span>
+                </Button>
+              ) : activeView === "competitors" ? (
                 <Button
                   size="sm"
                   className="gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-[#1D4ED8]"

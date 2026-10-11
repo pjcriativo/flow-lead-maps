@@ -48,6 +48,9 @@ export type FlowBusinessCard = {
   nextActionType: FlowBusinessAction | null;
   nextActionAt: string | null;
   updatedAt: string;
+  createdAt?: string;
+  wonAt?: string | null;
+  lastContactAt?: string | null;
   businessName: string;
   category: string | null;
   city: string | null;
@@ -72,6 +75,16 @@ export type FlowBusinessTask = {
   businessName: string;
   instagramUrl: string | null;
   username: string | null;
+};
+
+export type FlowBusinessActivity = {
+  id: string;
+  cardId: string;
+  activityType: string;
+  title: string;
+  detail: string | null;
+  metadata: Json;
+  occurredAt: string;
 };
 
 export type FlowBusinessCadenceStep = {
@@ -153,6 +166,7 @@ export type FlowBusinessWorkspace = {
   cadences: FlowBusinessCadence[];
   accounts: FlowBusinessAccount[];
   flows: FlowBusinessFlow[];
+  activities?: FlowBusinessActivity[];
 };
 
 export type FlowBusinessFlowDraft = {
@@ -508,11 +522,57 @@ function raiseIfError(error: { message: string } | null) {
 }
 
 export async function loadFlowBusinessWorkspace(): Promise<FlowBusinessWorkspace> {
-  const { data, error } = await supabase.rpc("flow_business_workspace_snapshot", {
+  const workspaceResult = await supabase.rpc("flow_business_workspace_snapshot", {
     p_card_limit: 500,
   });
-  raiseIfError(error);
-  return workspaceFromJson(data);
+  raiseIfError(workspaceResult.error);
+  const workspace = workspaceFromJson(workspaceResult.data);
+  const cardTimingQuery = supabase
+    .from("instagram_crm_cards")
+    .select("id,created_at,won_at,last_contact_at");
+  const cardTimingPromise = workspace.cards.length
+    ? cardTimingQuery.in(
+        "id",
+        workspace.cards.map((card) => card.id),
+      )
+    : cardTimingQuery.limit(0);
+
+  const [activityResult, cardTimingResult] = await Promise.all([
+    supabase
+      .from("instagram_crm_activities")
+      .select("id,card_id,activity_type,title,detail,metadata,occurred_at")
+      .order("occurred_at", { ascending: false })
+      .limit(30),
+    cardTimingPromise,
+  ]);
+  raiseIfError(activityResult.error);
+  raiseIfError(cardTimingResult.error);
+
+  const timingByCard = new Map(
+    (cardTimingResult.data ?? []).map((card) => [card.id, card] as const),
+  );
+
+  return {
+    ...workspace,
+    cards: workspace.cards.map((card) => {
+      const timing = timingByCard.get(card.id);
+      return {
+        ...card,
+        createdAt: timing?.created_at ?? card.updatedAt,
+        wonAt: timing?.won_at ?? null,
+        lastContactAt: timing?.last_contact_at ?? null,
+      };
+    }),
+    activities: (activityResult.data ?? []).map((activity) => ({
+      id: activity.id,
+      cardId: activity.card_id,
+      activityType: activity.activity_type,
+      title: activity.title,
+      detail: activity.detail,
+      metadata: activity.metadata,
+      occurredAt: activity.occurred_at,
+    })),
+  };
 }
 
 export async function loadFlowBusinessAutomationSnapshot(): Promise<FlowBusinessAutomationSnapshot> {
