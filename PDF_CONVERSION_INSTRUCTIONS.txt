@@ -1,0 +1,23 @@
+HOW TO CONVERT THE TECHNICAL AUDIT REPORT TO PDF
+
+You have two options for converting the report to PDF:
+
+OPTION 1: Using the HTML file (Recommended)
+1. Open the file: TECHNICAL_AUDIT_INSTAGRAM_PRO.html in your web browser
+2. Press Ctrl+P (or Cmd+P on Mac) to open the print dialog
+3. Select "Save as PDF" as the destination
+4. Click "Save" and choose where to save the PDF file
+
+OPTION 2: Using the Markdown file
+If you prefer to work with the markdown version:
+1. Install a markdown to PDF converter like:
+   - Pandoc: https://pandoc.org/installing.html
+   - Or use an online converter like https://markdown2pdf.com/
+2. Convert the file: TECHNICAL_AUDIT_INSTAGRAM_PRO.md to PDF using your preferred tool
+
+FILES PROVIDED:
+- TECHNICAL_AUDIT_INSTAGRAM_PRO.md - The complete technical audit in markdown format
+- TECHNICAL_AUDIT_INSTAGRAM_PRO.html - The same report formatted as HTML for easy PDF conversion
+- PDF_CONVERSION_INSTRUCTIONS.txt - These instructions
+
+The HTML file is recommended for PDF conversion as it preserves formatting better than direct markdown conversion.
