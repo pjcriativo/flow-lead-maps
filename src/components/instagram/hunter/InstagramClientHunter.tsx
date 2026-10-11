@@ -6,6 +6,7 @@ import {
   Copy,
   Crosshair,
   Database,
+  ExternalLink,
   Flame,
   GitCompareArrows,
   Loader2,
@@ -43,6 +44,7 @@ import {
   type InstagramOpportunity,
   type InstagramPlanStatus,
 } from "@/services/instagram-client-hunter";
+import { addLeadToFlowBusiness } from "@/services/flow-business";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -145,6 +147,7 @@ function OpportunityCard({
   onChanged: () => Promise<void>;
 }) {
   const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(opportunity.suggested_approach ?? "");
   const profile = opportunity.profile;
   const generate = async () => {
@@ -163,8 +166,31 @@ function OpportunityCard({
     }
   };
   const changeStatus = async (status: InstagramOpportunity["status"]) => {
-    await updateOpportunityStatus(opportunity.id, status);
-    await onChanged();
+    try {
+      await updateOpportunityStatus(opportunity.id, status);
+      await onChanged();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível atualizar a oportunidade.",
+      );
+    }
+  };
+  const saveToCrm = async () => {
+    if (!opportunity.lead_id) {
+      toast.error("Esta oportunidade ainda não possui um lead persistido para enviar ao CRM.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await addLeadToFlowBusiness(opportunity.lead_id);
+      await updateOpportunityStatus(opportunity.id, "saved");
+      await onChanged();
+      toast.success("Lead salvo no CRM.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar no CRM.");
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Card className="overflow-hidden shadow-[var(--shadow-card)]">
@@ -212,6 +238,14 @@ function OpportunityCard({
             </span>
           ))}
         </div>
+        {opportunity.evidence.length ? (
+          <div className="space-y-1 rounded-xl border border-border/70 bg-muted/30 p-3 text-[11px] text-muted-foreground">
+            <p className="font-semibold text-foreground">Evidências do Score V2</p>
+            {opportunity.evidence.slice(0, 3).map((evidence, index) => (
+              <p key={`${opportunity.id}-evidence-${index}`}>{evidenceText(evidence)}</p>
+            ))}
+          </div>
+        ) : null}
         {message ? (
           <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-3 text-xs leading-relaxed">
             {message}
@@ -238,16 +272,32 @@ function OpportunityCard({
             )}{" "}
             Abordagem
           </Button>
-          <Button size="sm" variant="outline" onClick={() => void changeStatus("saved")}>
-            Salvar
+          <Button size="sm" variant="outline" onClick={() => void saveToCrm()} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Salvar no CRM
           </Button>
           <Button size="sm" onClick={() => void changeStatus("contacted")}>
             Marcar contato
           </Button>
+          {profile?.username ? (
+            <Button size="sm" variant="ghost" asChild>
+              <a
+                href={`https://instagram.com/${profile.username}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="h-4 w-4" /> Abrir perfil
+              </a>
+            </Button>
+          ) : null}
         </div>
       </CardContent>
     </Card>
   );
+}
+
+function evidenceText(evidence: Record<string, unknown>) {
+  const text = evidence.excerpt ?? evidence.sourceUrl ?? evidence.type;
+  return text ? String(text) : "Evidência registrada sem descrição textual.";
 }
 
 export function InstagramClientHunter() {

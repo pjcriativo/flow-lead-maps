@@ -64,6 +64,11 @@ import {
   reserveInstagramUsage,
   type InstagramUsageAmount,
 } from "../_shared/instagram-plan.ts";
+import { createAisaInfrastructure } from "../_shared/aisa/index.ts";
+import { createSupabaseAisaUsageTracker } from "../_shared/aisa/usage-tracker.ts";
+import { normalizeAisaProfileForDiscovery } from "../../../src/lib/instagram-prospecting.ts";
+import type { AisaCapability } from "../_shared/aisa/types.ts";
+import type { SocialProviderResult } from "../_shared/social-data-contracts.ts";
 
 const API = "https://api.apify.com/v2";
 const ACTOR_POSTS = "apify~instagram-post-scraper";
@@ -170,6 +175,7 @@ type EntradaMonitoramentoConcorrente = {
   maxPosts: number;
   commentPosts: number;
   commentsPerPost: number;
+  periodDays: number;
 };
 
 type RunResult = {
@@ -180,6 +186,119 @@ type RunResult = {
   datasetId: string | null;
   key: ChaveApify | null;
 };
+
+type AisaDiscoveryCapability = Extract<
+  AisaCapability,
+  | "instagram.getProfile"
+  | "instagram.getUserPosts"
+  | "instagram.getPostComments"
+  | "instagram.searchHashtag"
+  | "instagram.searchReels"
+>;
+
+function normalizarRegistroAisa(data: Readonly<Record<string, unknown>>): Rec {
+  const owner = data.owner && typeof data.owner === "object" ? data.owner : {};
+  const ownerUsername = Reflect.get(owner, "username");
+  const ownerFullName = Reflect.get(owner, "fullName") ?? Reflect.get(owner, "full_name");
+  const ownerProfilePicUrl =
+    Reflect.get(owner, "profilePicUrl") ?? Reflect.get(owner, "profile_pic_url");
+  return {
+    ...data,
+    owner: {
+      ...owner,
+      username: ownerUsername ?? data.owner_username ?? data.username,
+      fullName: ownerFullName,
+      profilePicUrl: ownerProfilePicUrl,
+    },
+    ownerUsername: data.ownerUsername ?? data.owner_username ?? ownerUsername,
+    shortCode: data.shortCode ?? data.shortcode,
+    url: data.url ?? data.post_url ?? data.permalink,
+    postUrl: data.postUrl ?? data.post_url ?? data.url ?? data.permalink,
+    likesCount: data.likesCount ?? data.likes_count ?? data.like_count,
+    commentsCount: data.commentsCount ?? data.comments_count ?? data.comment_count,
+    videoViewCount: data.videoViewCount ?? data.video_view_count ?? data.view_count,
+    takenAtTimestamp: data.takenAtTimestamp ?? data.taken_at_timestamp ?? data.taken_at,
+    ownerFullName: data.ownerFullName ?? data.owner_full_name,
+    ownerProfilePicUrl: data.ownerProfilePicUrl ?? data.owner_profile_pic_url,
+    ownerId: data.ownerId ?? data.owner_id,
+    repliesCount: data.repliesCount ?? data.replies_count,
+    text: data.text ?? data.comment_text,
+    commentText: data.commentText ?? data.comment_text,
+  };
+}
+
+async function executarAisaSeDisponivel(params: {
+  admin: Admin;
+  orgId: string;
+  userId: string;
+  jobId: string;
+  capability: AisaDiscoveryCapability;
+  values: string[];
+  requested: number;
+  maxCharge: number;
+}): Promise<RunResult | null> {
+  const infrastructure = await createAisaInfrastructure({
+    admin: params.admin,
+    usageTracker: createSupabaseAisaUsageTracker({
+      admin: params.admin,
+      orgId: params.orgId,
+      userId: params.userId,
+    }),
+  });
+  if (!infrastructure.status.instagram.available) return null;
+  const cacheKey = criarChaveCacheRedes(`aisa~${params.capability}`, {
+    values: params.values,
+    requested: params.requested,
+  });
+  const cache = await prepararCacheRedes<Rec>(params.admin, cacheKey, params.requested);
+  if (cache.cacheHit)
+    return {
+      items: cache.items,
+      cost: 0,
+      cacheHit: true,
+      runId: null,
+      datasetId: null,
+      key: null,
+    };
+
+  try {
+    const results = [];
+    let knownCost = 0;
+    for (const [index, value] of params.values.entries()) {
+      const queryId = `${params.jobId}:${params.capability}:${index}`;
+      let result: SocialProviderResult;
+      if (params.capability === "instagram.getProfile")
+        result = await infrastructure.instagram.getProfile({ handle: value, queryId });
+      else if (params.capability === "instagram.getUserPosts")
+        result = await infrastructure.instagram.getUserPosts({ handle: value, queryId });
+      else if (params.capability === "instagram.getPostComments")
+        result = await infrastructure.instagram.getPostComments({ url: value, queryId });
+      else if (params.capability === "instagram.searchHashtag")
+        result = await infrastructure.instagram.searchHashtag({ hashtag: value, queryId });
+      else result = await infrastructure.instagram.searchReels({ query: value, queryId });
+      results.push(result);
+      if (result.cost.costUsdExact == null) break;
+      knownCost += Number(result.cost.costUsdExact);
+      if (knownCost >= params.maxCharge) break;
+    }
+    const items = results.flatMap((result) =>
+      result.items.map((item) =>
+        params.capability === "instagram.getProfile"
+          ? { ...normalizeAisaProfileForDiscovery(item.data) }
+          : normalizarRegistroAisa(item.data),
+      ),
+    );
+    const knownCosts = results.map((result) => result.cost.costUsdExact);
+    const cost = knownCosts.every((value) => value != null)
+      ? knownCosts.reduce((sum, value) => sum + Number(value), 0)
+      : Math.max(0.01, params.maxCharge);
+    await salvarCacheRedes(params.admin, cacheKey, params.requested, items, console.warn);
+    return { items, cost, cacheHit: false, runId: null, datasetId: null, key: null };
+  } catch (error) {
+    await liberarCacheRedes(params.admin, cacheKey, console.warn);
+    throw error;
+  }
+}
 
 class ActorRunError extends Error {
   constructor(
@@ -343,6 +462,7 @@ function validarEntradaMonitoramento(body: Rec): EntradaMonitoramentoConcorrente
     maxPosts,
     commentPosts: inteiro(body.commentPosts, 1, Math.min(5, maxPosts), 3),
     commentsPerPost: inteiro(body.commentsPerPost, 10, 100, 30),
+    periodDays: inteiro(body.periodDays, 7, 90, 30),
   };
 }
 
@@ -878,20 +998,32 @@ async function processarDescobertaConteudo(params: {
     let sourceProfiles: Rec[] = [];
     let posts: Rec[] = [];
     if (input.mode === "imports") {
-      const importRun = await executarActor({
-        admin,
-        jobId: job.id,
-        orgId,
-        stepType: "enrich_profiles",
-        actorId: ACTOR_PROFILES,
-        input: { usernames: input.profileInputs, includeAboutSection: false },
-        requested: input.profileInputs.length,
-        ttlHours: 7 * 24,
-        maxCharge: Math.min(
-          Math.max(0.03, input.profileInputs.length * 0.0035),
-          availableBudget - actualCost,
-        ),
-      });
+      const importMaxCharge = Math.min(
+        Math.max(0.03, input.profileInputs.length * 0.0035),
+        availableBudget - actualCost,
+      );
+      const importRun =
+        (await executarAisaSeDisponivel({
+          admin,
+          orgId,
+          userId,
+          jobId: job.id,
+          capability: "instagram.getProfile",
+          values: input.profileInputs,
+          requested: input.profileInputs.length,
+          maxCharge: importMaxCharge,
+        })) ??
+        (await executarActor({
+          admin,
+          jobId: job.id,
+          orgId,
+          stepType: "enrich_profiles",
+          actorId: ACTOR_PROFILES,
+          input: { usernames: input.profileInputs, includeAboutSection: false },
+          requested: input.profileInputs.length,
+          ttlHours: 7 * 24,
+          maxCharge: importMaxCharge,
+        }));
       actualCost += importRun.cost;
       cacheStats.profiles = importRun.cacheHit;
       sourceProfiles = importRun.items;
@@ -918,26 +1050,43 @@ async function processarDescobertaConteudo(params: {
         ];
       });
     } else {
-      const contentRun = await executarActor({
-        admin,
-        jobId: job.id,
-        orgId,
-        stepType: "discover_content",
-        actorId: ACTOR_DISCOVERY,
-        input: {
-          directUrls: originUrls,
-          resultsType: instagramContentResultsType(input.mode),
-          resultsLimit: input.postsPerSource,
-          onlyPostsNewerThan: `${input.recentDays} days`,
-          addParentData: true,
-        },
-        requested: requestedContent,
-        ttlHours: 12,
-        maxCharge: Math.min(
-          Math.max(0.08, requestedContent * 0.0032),
-          availableBudget - actualCost,
-        ),
-      });
+      const contentMaxCharge = Math.min(
+        Math.max(0.08, requestedContent * 0.0032),
+        availableBudget - actualCost,
+      );
+      const aisaContentRun =
+        input.mode === "hashtags" || input.mode === "reels"
+          ? await executarAisaSeDisponivel({
+              admin,
+              orgId,
+              userId,
+              jobId: job.id,
+              capability:
+                input.mode === "reels" ? "instagram.searchReels" : "instagram.searchHashtag",
+              values: input.hashtags,
+              requested: requestedContent,
+              maxCharge: contentMaxCharge,
+            })
+          : null;
+      const contentRun =
+        aisaContentRun ??
+        (await executarActor({
+          admin,
+          jobId: job.id,
+          orgId,
+          stepType: "discover_content",
+          actorId: ACTOR_DISCOVERY,
+          input: {
+            directUrls: originUrls,
+            resultsType: instagramContentResultsType(input.mode),
+            resultsLimit: input.postsPerSource,
+            onlyPostsNewerThan: `${input.recentDays} days`,
+            addParentData: true,
+          },
+          requested: requestedContent,
+          ttlHours: 12,
+          maxCharge: contentMaxCharge,
+        }));
       actualCost += contentRun.cost;
       cacheStats.content = contentRun.cacheHit;
       posts = contentRun.items
@@ -981,20 +1130,35 @@ async function processarDescobertaConteudo(params: {
     const toEnrich = prequalified.slice(0, enrichLimit);
     let profiles: Rec[] = sourceProfiles;
     if (toEnrich.length && input.mode !== "imports") {
-      const profileRun = await executarActor({
-        admin,
-        jobId: job.id,
-        orgId,
-        stepType: "enrich_profiles",
-        actorId: ACTOR_PROFILES,
-        input: {
-          usernames: toEnrich.map((candidate) => candidate.username),
-          includeAboutSection: false,
-        },
-        requested: toEnrich.length,
-        ttlHours: 7 * 24,
-        maxCharge: Math.min(Math.max(0.08, toEnrich.length * 0.0035), availableBudget - actualCost),
-      });
+      const profileMaxCharge = Math.min(
+        Math.max(0.08, toEnrich.length * 0.0035),
+        availableBudget - actualCost,
+      );
+      const profileRun =
+        (await executarAisaSeDisponivel({
+          admin,
+          orgId,
+          userId,
+          jobId: job.id,
+          capability: "instagram.getProfile",
+          values: toEnrich.map((candidate) => candidate.username),
+          requested: toEnrich.length,
+          maxCharge: profileMaxCharge,
+        })) ??
+        (await executarActor({
+          admin,
+          jobId: job.id,
+          orgId,
+          stepType: "enrich_profiles",
+          actorId: ACTOR_PROFILES,
+          input: {
+            usernames: toEnrich.map((candidate) => candidate.username),
+            includeAboutSection: false,
+          },
+          requested: toEnrich.length,
+          ttlHours: 7 * 24,
+          maxCharge: profileMaxCharge,
+        }));
       actualCost += profileRun.cost;
       cacheStats.profiles = profileRun.cacheHit;
       await updateCost();
@@ -2536,43 +2700,74 @@ export async function processarMonitoramentoConcorrente(params: {
       .eq("id", job.id);
   };
   try {
-    const profileRun = await executarActor({
-      admin,
-      jobId: job.id,
-      orgId,
-      stepType: "enrich_profiles",
-      actorId: ACTOR_PROFILES,
-      input: { usernames: [competitor.username], includeAboutSection: false },
-      requested: 1,
-      ttlHours: 24,
-      maxCharge: Math.min(0.05, availableBudget - actualCost),
-    });
+    const profileMaxCharge = Math.min(0.05, availableBudget - actualCost);
+    const profileRun =
+      (await executarAisaSeDisponivel({
+        admin,
+        orgId,
+        userId,
+        jobId: job.id,
+        capability: "instagram.getProfile",
+        values: [competitor.username],
+        requested: 1,
+        maxCharge: profileMaxCharge,
+      })) ??
+      (await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "enrich_profiles",
+        actorId: ACTOR_PROFILES,
+        input: { usernames: [competitor.username], includeAboutSection: false },
+        requested: 1,
+        ttlHours: 24,
+        maxCharge: profileMaxCharge,
+      }));
     actualCost += profileRun.cost;
     await updateCost();
     const profile = profilePorUsername(profileRun.items).get(competitor.username);
     if (!profile) throw new Error("O perfil publico do concorrente nao foi encontrado.");
 
-    const postsRun = await executarActor({
-      admin,
-      jobId: job.id,
-      orgId,
-      stepType: "discover_content",
-      actorId: ACTOR_POSTS,
-      input: {
-        username: [competitor.username],
-        resultsLimit: input.maxPosts,
-        skipPinnedPosts: true,
-        dataDetailLevel: "basicData",
-      },
-      requested: input.maxPosts,
-      ttlHours: 12,
-      maxCharge: Math.min(Math.max(0.05, input.maxPosts * 0.002), availableBudget - actualCost),
-    });
+    const postsMaxCharge = Math.min(
+      Math.max(0.05, input.maxPosts * 0.002),
+      availableBudget - actualCost,
+    );
+    const postsRun =
+      (await executarAisaSeDisponivel({
+        admin,
+        orgId,
+        userId,
+        jobId: job.id,
+        capability: "instagram.getUserPosts",
+        values: [competitor.username],
+        requested: input.maxPosts,
+        maxCharge: postsMaxCharge,
+      })) ??
+      (await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "discover_content",
+        actorId: ACTOR_POSTS,
+        input: {
+          username: [competitor.username],
+          resultsLimit: input.maxPosts,
+          onlyPostsNewerThan: `${input.periodDays} days`,
+          skipPinnedPosts: true,
+          dataDetailLevel: "basicData",
+        },
+        requested: input.maxPosts,
+        ttlHours: 12,
+        maxCharge: postsMaxCharge,
+      }));
     actualCost += postsRun.cost;
     await updateCost();
+    const periodStart = Date.now() - input.periodDays * 86_400_000;
     const posts = postsRun.items
       .map((item) => normalizarPost(item, competitor.username))
-      .filter((item): item is Rec => Boolean(item));
+      .filter((item): item is Rec => Boolean(item))
+      .filter((item) => !item.posted_at || Date.parse(String(item.posted_at)) >= periodStart)
+      .slice(0, input.maxPosts);
     if (!posts.length) throw new Error("Nenhum post ou Reel publico foi encontrado.");
     const contentIds = await salvarConteudos({
       admin,
@@ -2587,25 +2782,38 @@ export async function processarMonitoramentoConcorrente(params: {
       .slice(0, input.commentPosts);
     let comments: Array<NonNullable<ReturnType<typeof normalizarComentario>>> = [];
     if (topForComments.length) {
-      const commentsRun = await executarActor({
-        admin,
-        jobId: job.id,
-        orgId,
-        stepType: "collect_comments",
-        actorId: ACTOR_COMMENTS,
-        input: {
-          directUrls: topForComments.map((post) => post.url),
-          resultsLimit: input.commentsPerPost,
-          includeNestedComments: false,
-          isNewestComments: true,
-        },
-        requested: topForComments.length * input.commentsPerPost,
-        ttlHours: 6,
-        maxCharge: Math.min(
-          Math.max(0.08, topForComments.length * input.commentsPerPost * 0.003),
-          availableBudget - actualCost,
-        ),
-      });
+      const commentsMaxCharge = Math.min(
+        Math.max(0.08, topForComments.length * input.commentsPerPost * 0.003),
+        availableBudget - actualCost,
+      );
+      const commentUrls = topForComments.map((post) => String(post.url));
+      const commentsRun =
+        (await executarAisaSeDisponivel({
+          admin,
+          orgId,
+          userId,
+          jobId: job.id,
+          capability: "instagram.getPostComments",
+          values: commentUrls,
+          requested: topForComments.length * input.commentsPerPost,
+          maxCharge: commentsMaxCharge,
+        })) ??
+        (await executarActor({
+          admin,
+          jobId: job.id,
+          orgId,
+          stepType: "collect_comments",
+          actorId: ACTOR_COMMENTS,
+          input: {
+            directUrls: commentUrls,
+            resultsLimit: input.commentsPerPost,
+            includeNestedComments: false,
+            isNewestComments: true,
+          },
+          requested: topForComments.length * input.commentsPerPost,
+          ttlHours: 6,
+          maxCharge: commentsMaxCharge,
+        }));
       actualCost += commentsRun.cost;
       await updateCost();
       comments = commentsRun.items
@@ -3213,22 +3421,34 @@ Deno.serve(async (req) => {
     let posts: Rec[] = [];
     const cacheStats = { posts: false, comments: false, profiles: false };
     if (input.sourceType === "profile") {
-      const runPosts = await executarActor({
-        admin,
-        jobId: job.id,
-        orgId,
-        stepType: "discover_content",
-        actorId: ACTOR_POSTS,
-        input: {
-          username: [input.profile],
-          resultsLimit: input.maxPosts,
-          skipPinnedPosts: true,
-          dataDetailLevel: "basicData",
-        },
-        requested: input.maxPosts,
-        ttlHours: 12,
-        maxCharge: Math.min(0.12, availableBudget - actualCost),
-      });
+      const postsMaxCharge = Math.min(0.12, availableBudget - actualCost);
+      const runPosts =
+        (await executarAisaSeDisponivel({
+          admin,
+          orgId,
+          userId,
+          jobId: job.id,
+          capability: "instagram.getUserPosts",
+          values: [input.profile],
+          requested: input.maxPosts,
+          maxCharge: postsMaxCharge,
+        })) ??
+        (await executarActor({
+          admin,
+          jobId: job.id,
+          orgId,
+          stepType: "discover_content",
+          actorId: ACTOR_POSTS,
+          input: {
+            username: [input.profile],
+            resultsLimit: input.maxPosts,
+            skipPinnedPosts: true,
+            dataDetailLevel: "basicData",
+          },
+          requested: input.maxPosts,
+          ttlHours: 12,
+          maxCharge: postsMaxCharge,
+        }));
       actualCost += runPosts.cost;
       cacheStats.posts = runPosts.cacheHit;
       await updateCost();
@@ -3261,21 +3481,36 @@ Deno.serve(async (req) => {
     });
     const postUrls = posts.map((post) => String(post.url));
     const requestedComments = postUrls.length * input.commentsPerPost;
-    const runComments = await executarActor({
-      admin,
-      jobId: job.id,
-      orgId,
-      stepType: "collect_comments",
-      actorId: ACTOR_COMMENTS,
-      input: {
-        directUrls: postUrls,
-        resultsLimit: input.commentsPerPost,
-        includeNestedComments: false,
-      },
-      requested: requestedComments,
-      ttlHours: 6,
-      maxCharge: Math.min(Math.max(0.08, requestedComments * 0.003), availableBudget - actualCost),
-    });
+    const commentsMaxCharge = Math.min(
+      Math.max(0.08, requestedComments * 0.003),
+      availableBudget - actualCost,
+    );
+    const runComments =
+      (await executarAisaSeDisponivel({
+        admin,
+        orgId,
+        userId,
+        jobId: job.id,
+        capability: "instagram.getPostComments",
+        values: postUrls,
+        requested: requestedComments,
+        maxCharge: commentsMaxCharge,
+      })) ??
+      (await executarActor({
+        admin,
+        jobId: job.id,
+        orgId,
+        stepType: "collect_comments",
+        actorId: ACTOR_COMMENTS,
+        input: {
+          directUrls: postUrls,
+          resultsLimit: input.commentsPerPost,
+          includeNestedComments: false,
+        },
+        requested: requestedComments,
+        ttlHours: 6,
+        maxCharge: commentsMaxCharge,
+      }));
     actualCost += runComments.cost;
     cacheStats.comments = runComments.cacheHit;
     await updateCost();
@@ -3322,20 +3557,35 @@ Deno.serve(async (req) => {
     const toEnrich = unique.slice(0, enrichLimit);
     let profiles: Rec[] = [];
     if (toEnrich.length) {
-      const runProfiles = await executarActor({
-        admin,
-        jobId: job.id,
-        orgId,
-        stepType: "enrich_profiles",
-        actorId: ACTOR_PROFILES,
-        input: {
-          usernames: toEnrich.map((comment) => comment.username),
-          includeAboutSection: false,
-        },
-        requested: toEnrich.length,
-        ttlHours: 7 * 24,
-        maxCharge: Math.min(Math.max(0.08, toEnrich.length * 0.0035), availableBudget - actualCost),
-      });
+      const profilesMaxCharge = Math.min(
+        Math.max(0.08, toEnrich.length * 0.0035),
+        availableBudget - actualCost,
+      );
+      const runProfiles =
+        (await executarAisaSeDisponivel({
+          admin,
+          orgId,
+          userId,
+          jobId: job.id,
+          capability: "instagram.getProfile",
+          values: toEnrich.map((comment) => comment.username),
+          requested: toEnrich.length,
+          maxCharge: profilesMaxCharge,
+        })) ??
+        (await executarActor({
+          admin,
+          jobId: job.id,
+          orgId,
+          stepType: "enrich_profiles",
+          actorId: ACTOR_PROFILES,
+          input: {
+            usernames: toEnrich.map((comment) => comment.username),
+            includeAboutSection: false,
+          },
+          requested: toEnrich.length,
+          ttlHours: 7 * 24,
+          maxCharge: profilesMaxCharge,
+        }));
       actualCost += runProfiles.cost;
       cacheStats.profiles = runProfiles.cacheHit;
       await updateCost();

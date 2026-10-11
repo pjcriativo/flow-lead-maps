@@ -33,13 +33,13 @@ export function ProspectingFilterSidebar({
   loading = false,
 }: ProspectingFilterSidebarProps) {
   const [keyword, setKeyword] = useState("");
-  const [location, setLocation] = useState("São Paulo, SP");
+  const [location, setLocation] = useState("");
   const [distance, setDistance] = useState("25");
   const [category, setCategory] = useState("all");
-  const [profileSize, setProfileSize] = useState([50]);
+  const [profileSize, setProfileSize] = useState([100]);
   const [commercialOnly, setCommercialOnly] = useState(true);
   const [hasEmail, setHasEmail] = useState(false);
-  const [hasWhatsapp, setHasWhatsapp] = useState(true);
+  const [hasWhatsapp, setHasWhatsapp] = useState(false);
   const [highEngagement, setHighEngagement] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -64,20 +64,18 @@ export function ProspectingFilterSidebar({
         <div className="flex size-9 items-center justify-center rounded-xl bg-blue-50 text-[#2563EB]">
           <Filter className="size-4" />
         </div>
-        <h3 className="text-base font-bold text-slate-900 tracking-tight">
-          Filtros de busca
-        </h3>
+        <h3 className="text-base font-bold text-slate-900 tracking-tight">Filtros de busca</h3>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Campo 1: Palavra-chave ou nicho */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-semibold text-slate-700">
-            Palavra-chave ou nicho
-          </Label>
+          <Label className="text-xs font-semibold text-slate-700">Palavra-chave ou nicho</Label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
             <Input
+              id="search-filters-input"
+              required={category === "all"}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="Ex: restaurante, clínica, loja..."
@@ -88,9 +86,7 @@ export function ProspectingFilterSidebar({
 
         {/* Campo 2: Localização */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-semibold text-slate-700">
-            Localização
-          </Label>
+          <Label className="text-xs font-semibold text-slate-700">Localização</Label>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
@@ -118,9 +114,7 @@ export function ProspectingFilterSidebar({
 
         {/* Campo 3: Categoria */}
         <div className="space-y-1.5">
-          <Label className="text-xs font-semibold text-slate-700">
-            Categoria
-          </Label>
+          <Label className="text-xs font-semibold text-slate-700">Categoria</Label>
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-slate-50/50 text-xs font-medium">
               <SelectValue placeholder="Todas as categorias" />
@@ -164,9 +158,7 @@ export function ProspectingFilterSidebar({
 
         {/* Campo 5: Filtros avançados */}
         <div className="space-y-3 pt-2 border-t border-slate-100">
-          <p className="text-xs font-bold text-slate-900 tracking-tight">
-            Filtros avançados
-          </p>
+          <p className="text-xs font-bold text-slate-900 tracking-tight">Filtros avançados</p>
 
           <div className="flex items-center justify-between text-xs">
             <span className="text-slate-600">Perfis comerciais</span>

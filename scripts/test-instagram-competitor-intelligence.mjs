@@ -10,6 +10,11 @@ import {
   summarizeCompetitorComments,
   summarizeCompetitorContent,
 } from "../src/lib/instagram-competitor-intelligence.ts";
+import {
+  buildGrowthComparison,
+  buildInstagramIntelligence,
+  validateCompetitorAnalysis,
+} from "../src/lib/instagram-intelligence.ts";
 
 const content = summarizeCompetitorContent({
   followers: 10_000,
@@ -105,6 +110,123 @@ assert.equal(
   estimateCompetitorMonitoringCost({ maxPosts: 12, commentPosts: 3, commentsPerPost: 30 }),
   0.2216,
   "frontend e Edge compartilham o mesmo teto",
+);
+
+const competitors = [
+  { id: "a", username: "alpha", label: "Alpha", status: "active" },
+  { id: "b", username: "beta", label: null, status: "active" },
+];
+const historicalSnapshots = [
+  {
+    id: "a-old",
+    competitor_id: "a",
+    captured_at: "2026-08-01T12:00:00.000Z",
+    followers_count: 100,
+    engagement_rate: 2,
+    posts_count: 10,
+    follower_growth_percent: 0,
+    profile_pic_url: null,
+    full_name: "Alpha real",
+    format_counts: { reel: 1 },
+    hashtags: [{ name: "saude", count: 1 }],
+    top_posts: [],
+    profile_snapshot: {},
+  },
+  {
+    id: "a-new",
+    competitor_id: "a",
+    captured_at: "2026-08-19T12:00:00.000Z",
+    followers_count: 125,
+    engagement_rate: 3.5,
+    posts_count: 12,
+    follower_growth_percent: 25,
+    profile_pic_url: null,
+    full_name: "Alpha real",
+    format_counts: { reel: 2, post: 1 },
+    hashtags: [{ name: "saude", count: 3 }],
+    top_posts: [{ url: "https://instagram.com/p/real", postedAt: "2026-08-18T12:00:00Z" }],
+    profile_snapshot: {},
+  },
+  {
+    id: "b-only",
+    competitor_id: "b",
+    captured_at: "2026-08-19T12:00:00.000Z",
+    followers_count: 80,
+    engagement_rate: 1.5,
+    posts_count: 6,
+    follower_growth_percent: 0,
+    profile_pic_url: null,
+    full_name: null,
+    format_counts: { post: 2 },
+    hashtags: [{ name: "local", count: 2 }],
+    top_posts: [],
+    profile_snapshot: {},
+  },
+];
+
+const followersChart = buildGrowthComparison({
+  competitors,
+  snapshots: historicalSnapshots,
+  metric: "followers",
+  periodDays: 30,
+  now: new Date("2026-08-20T12:00:00.000Z"),
+});
+assert.equal(followersChart.points.length, 2, "o grafico usa apenas datas reais observadas");
+assert.equal(followersChart.series.length, 1, "um unico snapshot nao deve produzir uma curva");
+assert.equal(followersChart.points[1].a, 125);
+
+const engagementChart = buildGrowthComparison({
+  competitors,
+  snapshots: historicalSnapshots,
+  metric: "engagement",
+  periodDays: 7,
+  now: new Date("2026-08-20T12:00:00.000Z"),
+});
+assert.equal(engagementChart.series.length, 0, "o periodo deve remover historico fora da janela");
+assert.equal(engagementChart.points[0].a, 3.5, "a metrica selecionada deve trocar os valores");
+
+const intelligence = buildInstagramIntelligence({ competitors, snapshots: historicalSnapshots });
+assert.equal(intelligence.monitored[0].followersCount, "125");
+assert.equal(intelligence.monitored[1].followersGrowth, "Não disponível");
+assert.ok(intelligence.insights.some((item) => item.kind === "growth"));
+assert.ok(
+  intelligence.trends.hashtags.every((item) => item.growthPercent === null),
+  "contagens de uma coleta nao podem ser chamadas de crescimento",
+);
+
+assert.deepEqual(
+  validateCompetitorAnalysis({
+    analysisType: "concorrentes",
+    profiles: ["@Alpha", "alpha", "beta"],
+    period: "30d",
+    metrics: ["followersGrowth", "engagementRate"],
+  }),
+  {
+    ok: true,
+    profiles: ["alpha", "beta"],
+    periodDays: 30,
+    metrics: ["followersGrowth", "engagementRate"],
+  },
+);
+assert.equal(
+  validateCompetitorAnalysis({
+    analysisType: "nicho",
+    profiles: ["alpha"],
+    period: "30d",
+    metrics: ["followersGrowth"],
+  }).ok,
+  false,
+  "tipos ainda nao suportados devem falhar antes da execucao",
+);
+assert.equal(
+  validateCompetitorAnalysis({
+    analysisType: "concorrentes",
+    profiles: ["alpha"],
+    period: "30d",
+    metrics: ["peakHours"],
+  }).ok,
+  false,
+  "metricas ainda nao suportadas devem falhar antes da execucao",
 );
 
 console.log("OK: conteudo, audiencia, tendencias, alertas e custo do concorrente validados.");

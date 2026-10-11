@@ -49,28 +49,18 @@ import {
   type InstagramCompetitorAlert,
   type InstagramCompetitorSnapshot,
 } from "@/services/instagram-competitors";
+import {
+  buildInstagramIntelligence,
+  validateCompetitorAnalysis,
+} from "@/lib/instagram-intelligence";
 
 import { IntelligenceHero } from "./components/IntelligenceHero";
-import {
-  IntelligenceNavTabs,
-  type IntelligenceTab,
-} from "./components/IntelligenceNavTabs";
+import { IntelligenceNavTabs, type IntelligenceTab } from "./components/IntelligenceNavTabs";
 import { CreateAnalysisCard } from "./components/CreateAnalysisCard";
-import {
-  DEFAULT_MONITORED_COMPETITORS,
-  MonitoredCompetitorsTable,
-  type MonitoredCompetitorItem,
-} from "./components/MonitoredCompetitorsTable";
-import {
-  DEFAULT_GROWTH_DATA,
-  GrowthComparisonChart,
-} from "./components/GrowthComparisonChart";
+import { MonitoredCompetitorsTable } from "./components/MonitoredCompetitorsTable";
+import { GrowthComparisonChart } from "./components/GrowthComparisonChart";
 import { AisaInsightsCard } from "./components/AisaInsightsCard";
-import {
-  DEFAULT_FEATURED_PROFILES,
-  FeaturedProfilesCard,
-  type FeaturedProfileItem,
-} from "./components/FeaturedProfilesCard";
+import { FeaturedProfilesCard } from "./components/FeaturedProfilesCard";
 import { CommonAudiencesCard } from "./components/CommonAudiencesCard";
 import { AddCompetitorDialog } from "./components/AddCompetitorDialog";
 import { InstagramClientHunter } from "@/components/instagram/hunter/InstagramClientHunter";
@@ -89,6 +79,8 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
   const [dialogOpen, setDialogOpen] = useState(false);
   const [runningId, setRunningId] = useState<string | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Escuta evento do botão do header "Analisar concorrentes"
   useEffect(() => {
@@ -102,6 +94,7 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
   // Carrega concorrentes do banco
   const loadData = useCallback(async (preferredId?: string) => {
     try {
+      setLoadError(null);
       const data = await listInstagramCompetitors();
       setCompetitors(data.competitors);
       setSnapshots(data.snapshots);
@@ -113,8 +106,12 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
           : (data.competitors[0]?.id ?? null);
       });
     } catch (error) {
-      // Falha silenciosa ou log suave mantendo visual de referência
-      console.warn("Concorrentes do banco indisponíveis, usando base de referência.", error);
+      setCompetitors([]);
+      setSnapshots([]);
+      setAlerts([]);
+      setLoadError(
+        error instanceof Error ? error.message : "Dados de monitoramento indisponíveis.",
+      );
     } finally {
       setLoading(false);
     }
@@ -133,7 +130,11 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
         maxPosts: 12,
         commentPosts: 3,
         commentsPerPost: 30,
+        periodDays: 30,
       });
+      if (!response.jobId || !response.snapshot) {
+        throw new Error("O monitoramento ainda não produziu um snapshot verificável.");
+      }
       await loadData(competitorId);
       toast.success(
         `${response.stats?.posts ?? 0} conteúdos e ${response.stats?.comments ?? 0} comentários analisados.`,
@@ -152,70 +153,85 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
     period: string;
     metrics: string[];
   }) => {
-    if (params.profiles.length === 0) {
-      toast.info("Informe ao menos um perfil para análise.");
+    const validated = validateCompetitorAnalysis(params);
+    if (!validated.ok) {
+      toast.error(validated.error);
       return;
     }
 
     setAnalysisLoading(true);
+    setAnalysisStatus(`Validando ${validated.profiles.length} perfil(is)...`);
     try {
-      toast.info(`Iniciando análise de ${params.profiles.length} perfis...`);
-      for (const username of params.profiles.slice(0, 5)) {
-        await saveInstagramCompetitor({
-          username,
-          label: username,
-          niche: "Geral",
-          city: "",
-          state: "",
-          monitoringIntervalHours: 168,
-        });
+      const completed: string[] = [];
+      const failed: Array<{ username: string; error: string }> = [];
+      let preferredId: string | undefined;
+      const maxPosts =
+        validated.periodDays <= 7
+          ? 7
+          : validated.periodDays <= 15
+            ? 12
+            : validated.periodDays <= 30
+              ? 20
+              : 30;
+      for (const [index, username] of validated.profiles.entries()) {
+        setAnalysisStatus(`Analisando @${username} (${index + 1}/${validated.profiles.length})...`);
+        try {
+          const competitor = await saveInstagramCompetitor({
+            username,
+            label: username,
+            niche: "Geral",
+            city: "",
+            state: "",
+            monitoringIntervalHours: 168,
+          });
+          preferredId ??= competitor.id;
+          const result = await monitorInstagramCompetitor({
+            competitorId: competitor.id,
+            maxPosts,
+            commentPosts: Math.min(5, Math.max(1, Math.ceil(maxPosts / 6))),
+            commentsPerPost: 30,
+            periodDays: validated.periodDays,
+          });
+          if (!result.jobId || !result.snapshot) {
+            throw new Error("O job terminou sem snapshot verificável.");
+          }
+          completed.push(username);
+        } catch (error) {
+          failed.push({
+            username,
+            error: error instanceof Error ? error.message : "Falha não identificada.",
+          });
+        }
       }
-      await loadData();
-      toast.success("Análise concluída com sucesso!");
+      await loadData(preferredId);
+      if (failed.length) {
+        setAnalysisStatus(`Parcial: ${completed.length} concluído(s), ${failed.length} com erro.`);
+        toast.warning(
+          `Análise parcial. ${completed.length} concluído(s); falha em ${failed.map((item) => `@${item.username}`).join(", ")}.`,
+        );
+      } else {
+        setAnalysisStatus(`Concluído: ${completed.length} snapshot(s) verificado(s).`);
+        toast.success(`Análise concluída com ${completed.length} snapshot(s) verificado(s).`);
+      }
     } catch (error) {
+      setAnalysisStatus("Erro ao processar a análise.");
       toast.error(error instanceof Error ? error.message : "Erro ao processar análise.");
     } finally {
       setAnalysisLoading(false);
     }
   };
 
-  // Mapeamento dos concorrentes para a tabela (mescla reais ou padrão)
-  const tableItems: MonitoredCompetitorItem[] = useMemo(() => {
-    if (competitors.length > 0) {
-      return competitors.map((comp, idx) => {
-        const snap = snapshots.find((s) => s.competitor_id === comp.id);
-        const followers = snap?.followers_count ?? 15000 + idx * 7500;
-        const followersStr =
-          followers >= 1000 ? `${(followers / 1000).toFixed(1)}K` : `${followers}`;
-        const growthDelta = snap?.follower_growth_percent ?? (idx % 2 === 0 ? 12 : -3);
-        const isPositive = growthDelta >= 0;
-        const colors = ["#2563EB", "#8B5CF6", "#EC4899", "#F97316", "#F43F5E"];
-
-        return {
-          id: comp.id,
-          name: comp.label || snap?.full_name || comp.username,
-          username: comp.username,
-          avatarUrl:
-            snap?.profile_pic_url ||
-            DEFAULT_MONITORED_COMPETITORS[idx % DEFAULT_MONITORED_COMPETITORS.length].avatarUrl,
-          followersCount: followersStr,
-          followersGrowth: `${isPositive ? "+" : ""}${growthDelta}%`,
-          isPositiveGrowth: isPositive,
-          engagementRate: snap?.engagement_rate ? `${snap.engagement_rate.toFixed(1)}%` : "3.5%",
-          lastPostTime: "3h atrás",
-          sparklineColor: colors[idx % colors.length],
-          sparklinePoints:
-            DEFAULT_MONITORED_COMPETITORS[idx % DEFAULT_MONITORED_COMPETITORS.length].sparklinePoints,
-          instagramUrl: `https://instagram.com/${comp.username}`,
-        };
-      });
-    }
-    return DEFAULT_MONITORED_COMPETITORS;
-  }, [competitors, snapshots]);
+  const intelligence = useMemo(
+    () => buildInstagramIntelligence({ competitors, snapshots }),
+    [competitors, snapshots],
+  );
 
   const selectedCompetitor = competitors.find((c) => c.id === selectedId) ?? null;
   const selectedSnapshots = useMemo(
-    () => snapshots.filter((item) => item.competitor_id === selectedId),
+    () =>
+      snapshots
+        .filter((item) => item.competitor_id === selectedId)
+        .sort((a, b) => Date.parse(b.captured_at) - Date.parse(a.captured_at)),
     [selectedId, snapshots],
   );
   const latestSnapshot = selectedSnapshots[0] ?? null;
@@ -244,13 +260,16 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
             <CreateAnalysisCard
               onStartAnalysis={handleStartAnalysis}
               loading={analysisLoading}
+              status={analysisStatus}
             />
           </div>
 
           {/* COLUNA CENTRAL: Concorrentes monitorados + Comparativo de crescimento */}
           <div className="space-y-5 lg:col-span-6">
             <MonitoredCompetitorsTable
-              items={tableItems}
+              items={intelligence.monitored.map((item) =>
+                item.id === runningId ? { ...item, status: "running" } : item,
+              )}
               onAddCompetitor={() => setDialogOpen(true)}
               onAnalyze={(item) => {
                 setSelectedId(item.id);
@@ -268,27 +287,38 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
               }}
             />
 
-            <GrowthComparisonChart />
+            {loading ? (
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 text-xs text-slate-500 shadow-sm">
+                Carregando dados de monitoramento...
+              </div>
+            ) : null}
+            {loadError ? (
+              <div className="rounded-2xl border border-red-200 bg-white p-5 text-xs text-red-600 shadow-sm">
+                Não foi possível carregar os dados reais: {loadError}
+              </div>
+            ) : null}
+
+            <GrowthComparisonChart competitors={competitors} snapshots={snapshots} />
           </div>
 
           {/* COLUNA DIREITA: Insights da AISA + Perfis em destaque + Audiências em comum */}
           <div className="space-y-5 lg:col-span-3">
             <AisaInsightsCard
+              insights={intelligence.insights}
               onViewAll={() => setActiveTab("perfil")}
               onSelectInsight={() => setActiveTab("audiencias")}
             />
 
             <FeaturedProfilesCard
+              profiles={intelligence.featured}
               onViewMore={() => setDialogOpen(true)}
               onAnalyze={(profile) => {
-                toast.info(`Analisando @${profile.username}...`);
+                setSelectedId(profile.id);
                 setActiveTab("perfil");
               }}
             />
 
-            <CommonAudiencesCard
-              onViewDetails={() => setActiveTab("cruzamento")}
-            />
+            <CommonAudiencesCard onViewDetails={() => setActiveTab("cruzamento")} />
           </div>
         </div>
       )}
@@ -329,7 +359,8 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
                 Selecione ou adicione um concorrente para ver a análise profunda
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                Acompanhe dados de audiência, melhores posts, engajamento real e intenções nos comentários.
+                Acompanhe dados de audiência, melhores posts, engajamento real e intenções nos
+                comentários.
               </p>
               <div className="mt-5 flex justify-center gap-3">
                 <Button
@@ -378,50 +409,49 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
           <div className="grid gap-5 lg:grid-cols-3">
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                <Hash className="size-4 text-amber-500" /> Hashtags em Alta na Região
+                <Hash className="size-4 text-amber-500" /> Hashtags observadas
               </div>
-              <p className="mt-1 text-xs text-slate-400">Menções crescentes no último ciclo</p>
+              <p className="mt-1 text-xs text-slate-400">Origem: snapshots mais recentes</p>
               <div className="mt-4 space-y-2.5">
-                {[
-                  { tag: "#pizzaartesanal", growth: "+340%", posts: "24.5K posts" },
-                  { tag: "#fornoalenha", growth: "+180%", posts: "18.2K posts" },
-                  { tag: "#deliverypizza", growth: "+145%", posts: "42.0K posts" },
-                  { tag: "#pizzanapoletana", growth: "+95%", posts: "12.8K posts" },
-                  { tag: "#massamadre", growth: "+82%", posts: "9.4K posts" },
-                ].map((item) => (
-                  <div key={item.tag} className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-800">{item.tag}</span>
+                {intelligence.trends.hashtags.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-800">#{item.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400">{item.posts}</span>
-                      <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-50">
-                        {item.growth}
-                      </Badge>
+                      <span className="text-slate-400">{item.count} ocorrência(s)</span>
+                      <Badge variant="outline">Sem histórico</Badge>
                     </div>
                   </div>
                 ))}
+                {!intelligence.trends.hashtags.length ? (
+                  <p className="text-xs text-slate-400">Nenhuma hashtag observada.</p>
+                ) : null}
               </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                <TrendingUp className="size-4 text-[#8B5CF6]" /> Formatos com Maior Entrega
+                <TrendingUp className="size-4 text-[#8B5CF6]" /> Formatos observados
               </div>
-              <p className="mt-1 text-xs text-slate-400">Eficiência de engajamento por tipo</p>
+              <p className="mt-1 text-xs text-slate-400">Volume na amostra monitorada</p>
               <div className="mt-4 space-y-3">
-                {[
-                  { format: "Reels de Bastidores", eng: "6.8%", share: 85 },
-                  { format: "Carrossel Explicativo", eng: "4.5%", share: 65 },
-                  { format: "Vídeo do Preparo", eng: "4.1%", share: 55 },
-                  { format: "Foto Estática", eng: "2.1%", share: 30 },
-                ].map((f) => (
-                  <div key={f.format} className="space-y-1">
+                {intelligence.trends.formats.map((format) => (
+                  <div key={format.name} className="space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-slate-700">{f.format}</span>
-                      <span className="font-bold text-[#2563EB]">{f.eng}</span>
+                      <span className="font-semibold capitalize text-slate-700">{format.name}</span>
+                      <span className="font-bold text-[#2563EB]">{format.count}</span>
                     </div>
-                    <Progress value={f.share} className="h-2" />
+                    <Progress
+                      value={
+                        (format.count / Math.max(1, intelligence.trends.formats[0]?.count ?? 1)) *
+                        100
+                      }
+                      className="h-2"
+                    />
                   </div>
                 ))}
+                {!intelligence.trends.formats.length ? (
+                  <p className="text-xs text-slate-400">Nenhum formato observado.</p>
+                ) : null}
               </div>
             </div>
 
@@ -431,16 +461,10 @@ export function CompetitorIntelligence({ onNavigate }: CompetitorIntelligencePro
               </div>
               <p className="mt-1 text-xs text-slate-400">Pico de atividade dos seguidores</p>
               <div className="mt-4 space-y-2.5 text-xs text-slate-600">
-                <div className="rounded-xl border border-pink-100 bg-pink-50/50 p-3">
-                  <div className="font-bold text-slate-900">Quinta a Domingo • 18:30 às 21:30</div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Maior volume de engajamento com cardápios e pedidos de delivery.
-                  </p>
-                </div>
                 <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                  <div className="font-bold text-slate-900">Sexta e Sábado • 11:30 às 13:30</div>
+                  <div className="font-bold text-slate-900">Não disponível</div>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    Pico secundário para promoções de almoço e reservas.
+                    A coleta atual não possui contrato validado de alcance por horário.
                   </p>
                 </div>
               </div>
@@ -521,7 +545,11 @@ function CompetitorDashboard({
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" asChild className="gap-2 rounded-xl text-xs">
-              <a href={`https://instagram.com/${competitor.username}`} target="_blank" rel="noreferrer">
+              <a
+                href={`https://instagram.com/${competitor.username}`}
+                target="_blank"
+                rel="noreferrer"
+              >
                 <Instagram className="size-3.5" /> Abrir no Instagram
               </a>
             </Button>
@@ -558,8 +586,9 @@ function CompetitorDashboard({
                 {compact(snapshot.followers_count)}
               </div>
               <div className="mt-1 text-xs font-semibold text-emerald-600">
-                {snapshot.follower_delta >= 0 ? "+" : ""}
-                {snapshot.follower_delta} no período
+                {snapshots.length > 1
+                  ? `${snapshot.follower_delta >= 0 ? "+" : ""}${snapshot.follower_delta} no período`
+                  : "Sem histórico comparável"}
               </div>
             </div>
 
@@ -593,7 +622,7 @@ function CompetitorDashboard({
           </div>
 
           {/* Gráfico da evolução individual */}
-          {chartData.length > 0 && (
+          {chartData.length > 1 ? (
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <h4 className="text-sm font-bold text-slate-900">Evolução dos Snapshots</h4>
               <p className="text-xs text-slate-400">{snapshots.length} capturas registradas</p>
@@ -601,7 +630,12 @@ function CompetitorDashboard({
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
                     <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={11} domain={["auto", "auto"]} />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={11}
+                      domain={["auto", "auto"]}
+                    />
                     <Tooltip />
                     <Line
                       type="monotone"
@@ -613,6 +647,10 @@ function CompetitorDashboard({
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 text-center text-xs text-slate-400 shadow-sm">
+              São necessários dois snapshots para exibir a evolução deste perfil.
             </div>
           )}
 
@@ -657,7 +695,10 @@ function CompetitorDashboard({
               <p className="text-xs text-slate-400">Sinais explícitos de interesse ou compra</p>
               <div className="mt-4 space-y-2">
                 {comments?.intentOpportunities?.slice(0, 6).map((item) => (
-                  <div key={item.username + item.text} className="rounded-xl border border-slate-100 p-3 text-xs">
+                  <div
+                    key={item.username + item.text}
+                    className="rounded-xl border border-slate-100 p-3 text-xs"
+                  >
                     <div className="flex justify-between font-bold text-slate-900">
                       <span>@{item.username}</span>
                       <Badge className="bg-blue-50 text-blue-600">{item.score}/100</Badge>
@@ -673,14 +714,21 @@ function CompetitorDashboard({
               <p className="text-xs text-slate-400">Usuários que voltam e engajam com frequência</p>
               <div className="mt-4 space-y-2">
                 {comments?.recurringCommenters?.slice(0, 6).map((item) => (
-                  <div key={item.username} className="flex items-center justify-between rounded-xl border border-slate-100 p-3 text-xs">
+                  <div
+                    key={item.username}
+                    className="flex items-center justify-between rounded-xl border border-slate-100 p-3 text-xs"
+                  >
                     <div>
                       <div className="font-bold text-slate-900">@{item.username}</div>
                       <p className="text-[10px] text-slate-400">{item.bestEvidence}</p>
                     </div>
                     <Badge variant="secondary">{item.count}x</Badge>
                   </div>
-                )) ?? <p className="text-xs text-slate-400">Sem comentaristas recorrentes detectados.</p>}
+                )) ?? (
+                  <p className="text-xs text-slate-400">
+                    Sem comentaristas recorrentes detectados.
+                  </p>
+                )}
               </div>
             </div>
           </div>

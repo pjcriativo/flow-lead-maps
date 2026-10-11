@@ -1,4 +1,4 @@
-// Edge: buscar-redes — coleta REAL de leads no Instagram/LinkedIn via Apify.
+// Edge: buscar-redes — coleta REAL de leads sociais, com AISA opcional no Instagram e Apify como fallback.
 //
 // 🔒 AUTH OBRIGATÓRIA (getUser); tudo escopado por user_id do JWT.
 // 💸 TETO DE GASTO em 2 camadas (regra do projeto: coleta paga não liga sem teto):
@@ -55,6 +55,12 @@ import {
   InstagramPlanLimitError,
   reserveInstagramUsage,
 } from "../_shared/instagram-plan.ts";
+import { createAisaInfrastructure } from "../_shared/aisa/index.ts";
+import { createSupabaseAisaUsageTracker } from "../_shared/aisa/usage-tracker.ts";
+import {
+  normalizeAisaProfileForDiscovery,
+  selectInstagramProfileProvider,
+} from "../../../src/lib/instagram-prospecting.ts";
 
 const API = "https://api.apify.com/v2";
 
@@ -240,12 +246,47 @@ async function processarResultados(params: {
       const email = it.businessEmail ?? achaEmail(bio) ?? null;
       const whatsapp = it.businessPhoneNumber ?? whatsDoLink(link) ?? achaWhats(bio) ?? null;
       const temContatoExterno = !!email || !!whatsapp || temSiteProprio;
-      const perfil = { ...it, username };
+      const seguidores = Number(it.followersCount ?? 0);
+      const posts = Array.isArray(it.latestPosts)
+        ? it.latestPosts
+        : Array.isArray(it.recentPosts)
+          ? it.recentPosts
+          : [];
+      const postMetrics = posts.slice(0, 12).map((post: Rec) => ({
+        likes: Number(post.likesCount ?? post.likes ?? 0),
+        comments: Number(post.commentsCount ?? post.comments ?? 0),
+      }));
+      const media = (campo: "likes" | "comments") =>
+        postMetrics.length
+          ? postMetrics.reduce((total: number, post: Rec) => total + Number(post[campo]), 0) /
+            postMetrics.length
+          : null;
+      const avgLikes = media("likes");
+      const avgComments = media("comments");
+      const calculatedEngagement =
+        seguidores > 0 && avgLikes != null && avgComments != null
+          ? ((avgLikes + avgComments) / seguidores) * 100
+          : null;
+      const engagementCandidate =
+        it.engagementRate == null ? calculatedEngagement : Number(it.engagementRate);
+      const engagement = Number.isFinite(engagementCandidate) ? engagementCandidate : null;
+      const perfil = {
+        ...it,
+        username,
+        businessEmail: email,
+        businessPhoneNumber: whatsapp,
+        engagementRate: engagement,
+      };
       const filtros = {
         nicho: String(campos.nicho ?? campos.categoria ?? ""),
         cidade: String(campos.cidade ?? ""),
         minSeguidores: Number(campos.minSeguidores ?? 0),
+        maxSeguidores: campos.maxSeguidores == null ? undefined : Number(campos.maxSeguidores),
         soComerciais: Boolean(campos.soComerciais),
+        exigirEmail: Boolean(campos.exigirEmail),
+        exigirWhatsapp: Boolean(campos.exigirWhatsapp),
+        minEngagementRate:
+          campos.minEngagementRate == null ? undefined : Number(campos.minEngagementRate),
         exigirLocalidade:
           campos.exigirLocalidade === undefined
             ? estrategiaId === "IG-LOCAL"
@@ -271,12 +312,6 @@ async function processarResultados(params: {
       }
       const localidadeConfirmada = perfilTemLocalidade(perfil, filtros.cidade);
       const nichoConfirmado = perfilTemNicho(perfil, filtros.nicho);
-      const seguidores = Number(it.followersCount ?? 0);
-      const posts = Array.isArray(it.latestPosts)
-        ? it.latestPosts
-        : Array.isArray(it.recentPosts)
-          ? it.recentPosts
-          : [];
       const primeiraData = posts
         .map((post: Rec) => post.timestamp ?? post.takenAtTimestamp ?? post.createdAt)
         .find(Boolean);
@@ -338,21 +373,6 @@ async function processarResultados(params: {
       lead.score = scoreV2Instagram.total;
       lead.score_breakdown = { tipo: "instagram_score_v2", ...scoreV2Instagram };
       scoreInstagram = scoreV2Instagram.total;
-      const postMetrics = posts.slice(0, 12).map((post: Rec) => ({
-        likes: Number(post.likesCount ?? post.likes ?? 0),
-        comments: Number(post.commentsCount ?? post.comments ?? 0),
-      }));
-      const media = (campo: "likes" | "comments") =>
-        postMetrics.length
-          ? postMetrics.reduce((total: number, post: Rec) => total + Number(post[campo]), 0) /
-            postMetrics.length
-          : null;
-      const avgLikes = media("likes");
-      const avgComments = media("comments");
-      const engagement =
-        seguidores > 0 && avgLikes != null && avgComments != null
-          ? ((avgLikes + avgComments) / seguidores) * 100
-          : null;
       perfilRow = {
         org_id: orgId,
         user_id: userId,
@@ -573,16 +593,6 @@ Deno.serve(async (req) => {
   // ⚠️ Guard EXPLÍCITO no pool (não em token(), que tem fallback pro secret do env): com o
   // pool CONFIGURADO, ele é a fonte da verdade — todo indisponível = PARAR com aviso, nunca
   // cair calado no secret (furo pego pela prova adversarial).
-  if (poolInicial.chaves.length === 0)
-    return json(
-      {
-        error: poolInicial.poolConfigurado
-          ? "Todas as chaves Apify do pool estão esgotadas/indisponíveis — cadastre ou reative uma em Configurações → Chaves e integrações."
-          : "APIFY_API_TOKEN não configurada",
-      },
-      503,
-    );
-
   const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -612,6 +622,11 @@ Deno.serve(async (req) => {
 
   // ---------- VERIFICAR: não roda nada, não gasta ----------
   if (acao === "verificar") {
+    if (poolInicial.chaves.length === 0)
+      return json({
+        ok: false,
+        reason: poolInicial.poolConfigurado ? "chaves_esgotadas" : "apify_nao_configurada",
+      });
     const vistos = new Map<string, unknown>();
     for (const [estr, cfg] of Object.entries(ATOR)) {
       if (!vistos.has(cfg.ator)) vistos.set(cfg.ator, await checarAtor(cfg.ator));
@@ -786,7 +801,34 @@ Deno.serve(async (req) => {
   const cfg = ATOR[estrategiaId];
   if (!cfg) return json({ ok: false, reason: "estrategia_sem_coleta", estrategia: estrategiaId });
 
+  const aisaInfrastructure =
+    estrategia.fonte === "instagram"
+      ? await createAisaInfrastructure({
+          admin,
+          usageTracker: createSupabaseAisaUsageTracker({ admin, orgId, userId }),
+        })
+      : null;
+  const provider =
+    estrategiaId === "IG-LOCAL"
+      ? selectInstagramProfileProvider({
+          aisaAvailable: aisaInfrastructure?.status.instagram.available ?? false,
+          capability: "profile_search",
+        })
+      : "apify";
+  if (provider === "apify" && poolInicial.chaves.length === 0)
+    return json(
+      {
+        ok: false,
+        reason: poolInicial.poolConfigurado ? "chaves_esgotadas" : "apify_nao_configurada",
+        motivo: poolInicial.poolConfigurado
+          ? "Todas as chaves Apify do pool estão esgotadas ou indisponíveis."
+          : "AISA está indisponível e APIFY_API_TOKEN não está configurada.",
+      },
+      503,
+    );
+
   const campos: Rec = b?.campos ?? {};
+  const cursor = typeof b?.cursor === "string" && b.cursor.trim() ? b.cursor.trim() : undefined;
   const limitePedido = Math.max(
     1,
     Math.min(estrategia.fonte === "instagram" ? 100 : 200, Number(b?.limite ?? 50)),
@@ -834,7 +876,7 @@ Deno.serve(async (req) => {
       user_id: userId,
       fonte: estrategia.fonte,
       estrategia: estrategiaId,
-      pedido: { campos, somenteNovos },
+      pedido: { campos, somenteNovos, cursor, provider },
       limite: limitePedido,
       meta_qualificados: limiteComPlano,
       candidatos_solicitados: candidatosDesejados,
@@ -860,7 +902,7 @@ Deno.serve(async (req) => {
       request_id: requestId,
       fonte: estrategia.fonte,
       estrategia: estrategiaId,
-      pedido: { campos, somenteNovos },
+      pedido: { campos, somenteNovos, cursor, provider },
       limite: limitePedido,
       meta_qualificados: limiteComPlano,
       candidatos_solicitados: plano.maxItens,
@@ -896,7 +938,10 @@ Deno.serve(async (req) => {
       ...campos,
       buscaComposta: descobertaInstagram?.buscaComposta,
     });
-    const chaveCache = criarChaveCacheRedes(cfg.ator, inputBase);
+    const chaveCache = criarChaveCacheRedes(
+      provider === "aisa" ? "aisa~instagram-search-profiles" : cfg.ator,
+      provider === "aisa" ? { query: descobertaInstagram?.buscaComposta, cursor } : inputBase,
+    );
     const cache = await prepararCacheRedes<Rec>(admin, chaveCache, plano.maxItens);
     if (!cache.cacheHit) chaveCacheReservada = chaveCache;
     await admin.from("redes_buscas").update({ cache_key: chaveCache }).eq("id", registro?.id);
@@ -942,6 +987,9 @@ Deno.serve(async (req) => {
     let chaveUsada: ChaveApify | null = null;
     let trocasDeChave = 0;
     let avisoChaves: string | null = null;
+    let nextCursor: string | null = null;
+    let providerRequestId: string | null = null;
+    let costStatus: "settled" | "unknown" = "settled";
 
     const colherDataset = async (dsId: string | null, tok: string) => {
       if (!dsId) return;
@@ -952,7 +1000,38 @@ Deno.serve(async (req) => {
       itens.push(...parcial);
     };
 
-    if (!cache.cacheHit) {
+    if (!cache.cacheHit && provider === "aisa") {
+      const query = descobertaInstagram?.buscaComposta?.trim();
+      if (!query || !aisaInfrastructure)
+        throw new Error("Consulta AISA inválida ou infraestrutura indisponível.");
+      const response = await aisaInfrastructure.instagram.searchProfiles({
+        query,
+        cursor,
+        queryId: requestId,
+      });
+      nextCursor = response.pagination.cursor ?? null;
+      providerRequestId = response.requestId;
+      costStatus = response.cost.status;
+      itens.push(
+        ...response.items.map((item) => ({
+          ...normalizeAisaProfileForDiscovery(item.data),
+          __aisaNextCursor: nextCursor,
+          __aisaRequestId: providerRequestId,
+        })),
+      );
+      if (response.cost.costUsdExact != null) custoTotal = Number(response.cost.costUsdExact);
+      await salvarCacheRedes(admin, chaveCache, plano.maxItens, itens, logCache);
+      chaveCacheReservada = null;
+    }
+
+    if (cache.cacheHit && provider === "aisa") {
+      nextCursor =
+        typeof itens[0]?.__aisaNextCursor === "string" ? itens[0].__aisaNextCursor : null;
+      providerRequestId =
+        typeof itens[0]?.__aisaRequestId === "string" ? itens[0].__aisaRequestId : null;
+    }
+
+    if (!cache.cacheHit && provider === "apify") {
       for (let rodada = 1; rodada <= MAX_RODADAS; rodada++) {
         const limitesRun = limitesRunApify(
           plano.maxItens,
@@ -1129,7 +1208,11 @@ Deno.serve(async (req) => {
       await salvarCacheRedes(admin, chaveCache, plano.maxItens, itens, logCache);
       chaveCacheReservada = null;
     }
-    const custo = custoTotal;
+    const custoContabilizado =
+      provider === "aisa" && costStatus === "unknown" && !cache.cacheHit
+        ? Math.max(0.01, instagramRunBudget)
+        : custoTotal;
+    const custo = provider === "aisa" && costStatus === "unknown" ? null : custoTotal;
 
     const processado = await processarResultados({
       admin,
@@ -1149,10 +1232,14 @@ Deno.serve(async (req) => {
 
     if (inseridos > 0) await consumir(admin, orgId, "leads", inseridos);
 
-    const estourou = estourouColeta(custo, gastoMes, TETO_RODADA, TETO_MES);
+    const estourou = estourouColeta(custoContabilizado, gastoMes, TETO_RODADA, TETO_MES);
     const resultado = {
       ok: true,
       estrategia: estrategiaId,
+      provider,
+      providerRequestId,
+      nextCursor,
+      costStatus,
       encontrados: analisados,
       inseridos,
       descartados,
@@ -1161,7 +1248,7 @@ Deno.serve(async (req) => {
       buscaId: registro?.id,
       resumo,
       custo,
-      gastoMesDepois: gastoMes + custo,
+      gastoMesDepois: gastoMes + custoContabilizado,
       teto: { rodada: TETO_RODADA, mes: TETO_MES },
       estourou,
       chaveApelido: chaveUsada?.id ? chaveUsada.apelido : null,
@@ -1171,7 +1258,7 @@ Deno.serve(async (req) => {
     };
     await finalizar({
       status: estourou ? "parada_teto" : "concluida",
-      custo_usd: custo,
+      custo_usd: custoContabilizado,
       encontrados: analisados,
       inseridos,
       motivo_parada: processado.motivoParada,
@@ -1191,7 +1278,7 @@ Deno.serve(async (req) => {
         orgId,
         requestId,
         status: "completed",
-        amount: { leads: inseridos, hunts: huntInstagram, monthlyCostUsd: custo },
+        amount: { leads: inseridos, hunts: huntInstagram, monthlyCostUsd: custoContabilizado },
       });
     }
 

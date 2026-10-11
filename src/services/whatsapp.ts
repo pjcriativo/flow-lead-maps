@@ -494,7 +494,11 @@ export type ColetaRedes = {
   encontrados?: number;
   inseridos?: number;
   descartados?: number;
-  custo?: number;
+  custo?: number | null;
+  costStatus?: "settled" | "unknown";
+  provider?: "aisa" | "apify";
+  nextCursor?: string | null;
+  providerRequestId?: string | null;
   gastoMes?: number;
   gastoMesDepois?: number;
   teto?: { rodada: number; mes: number };
@@ -526,7 +530,7 @@ export async function buscarRedes(
   estrategia: string,
   campos: Record<string, unknown>,
   limite: number,
-  opcoes?: { somenteNovos?: boolean },
+  opcoes?: { somenteNovos?: boolean; cursor?: string },
 ): Promise<ColetaRedes> {
   const requestId = crypto.randomUUID();
   const inicial = await supabase.functions.invoke("buscar-redes", {
@@ -536,6 +540,7 @@ export async function buscarRedes(
       campos,
       limite,
       somenteNovos: opcoes?.somenteNovos ?? true,
+      cursor: opcoes?.cursor,
       requestId,
     },
   });

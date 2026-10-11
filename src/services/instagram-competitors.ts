@@ -75,6 +75,7 @@ export type CompetitorMonitorInput = {
   maxPosts: number;
   commentPosts: number;
   commentsPerPost: number;
+  periodDays?: number;
 };
 
 export type CompetitorMonitorResponse = {

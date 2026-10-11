@@ -5,6 +5,11 @@ export type InstagramRejectionReason =
   | "nao_comercial"
   | "com_site_proprio"
   | "poucos_seguidores"
+  | "muitos_seguidores"
+  | "sem_email"
+  | "sem_whatsapp"
+  | "engajamento_desconhecido"
+  | "baixo_engajamento"
   | "sem_contato_externo";
 
 export type InstagramProfileSignals = {
@@ -24,6 +29,9 @@ export type InstagramProfileSignals = {
   accountType?: unknown;
   statistics?: { accountType?: unknown } | unknown;
   followersCount?: unknown;
+  engagementRate?: unknown;
+  googleTitle?: unknown;
+  googleDescription?: unknown;
   externalUrl?: unknown;
   website?: unknown;
   businessEmail?: unknown;
@@ -34,10 +42,14 @@ export type InstagramFilters = {
   nicho: string;
   cidade: string;
   minSeguidores?: number;
+  maxSeguidores?: number;
   soComerciais?: boolean;
   exigirLocalidade?: boolean;
   semSiteProprio?: boolean;
   exigirContatoExterno?: boolean;
+  exigirEmail?: boolean;
+  exigirWhatsapp?: boolean;
+  minEngagementRate?: number;
 };
 
 const STOP_WORDS = new Set([
@@ -78,6 +90,8 @@ function textoDoPerfil(perfil: InstagramProfileSignals): string {
       perfil.locationName,
       perfil.cityName,
       perfil.address,
+      perfil.googleTitle,
+      perfil.googleDescription,
       typeof perfil.businessAddress === "string"
         ? perfil.businessAddress
         : JSON.stringify(perfil.businessAddress ?? ""),
@@ -141,6 +155,21 @@ export function motivoRejeicaoInstagram(
     return "com_site_proprio";
   if (Number(perfil.followersCount ?? 0) < Number(filtros.minSeguidores ?? 0))
     return "poucos_seguidores";
+  if (
+    filtros.maxSeguidores != null &&
+    Number(perfil.followersCount ?? 0) > Number(filtros.maxSeguidores)
+  )
+    return "muitos_seguidores";
+  if (filtros.exigirEmail && !String(perfil.businessEmail ?? "").trim()) return "sem_email";
+  if (filtros.exigirWhatsapp && !String(perfil.businessPhoneNumber ?? "").trim())
+    return "sem_whatsapp";
+  if (filtros.minEngagementRate != null) {
+    if (perfil.engagementRate == null || String(perfil.engagementRate).trim() === "")
+      return "engajamento_desconhecido";
+    const engagement = Number(perfil.engagementRate);
+    if (!Number.isFinite(engagement)) return "engajamento_desconhecido";
+    if (engagement < filtros.minEngagementRate) return "baixo_engajamento";
+  }
   if (filtros.exigirContatoExterno && !temContatoExterno) return "sem_contato_externo";
   return null;
 }

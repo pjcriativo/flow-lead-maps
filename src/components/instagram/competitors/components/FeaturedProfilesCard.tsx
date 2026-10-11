@@ -12,33 +12,9 @@ export interface FeaturedProfileItem {
   id: string;
   name: string;
   username: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   followersCount: string;
 }
-
-export const DEFAULT_FEATURED_PROFILES: FeaturedProfileItem[] = [
-  {
-    id: "feat-1",
-    name: "Pizzaria Moderna",
-    username: "pizzariamoderna",
-    avatarUrl: "https://images.unsplash.com/photo-1604382355076-af4b0eb60143?w=160&h=160&fit=crop",
-    followersCount: "62.1K",
-  },
-  {
-    id: "feat-2",
-    name: "Sabor Italiano",
-    username: "saboritaliano",
-    avatarUrl: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=160&h=160&fit=crop",
-    followersCount: "41.8K",
-  },
-  {
-    id: "feat-3",
-    name: "Arte da Pizza",
-    username: "artedapizza",
-    avatarUrl: "https://images.unsplash.com/photo-1571997478779-2adcbbe9ab2f?w=160&h=160&fit=crop",
-    followersCount: "38.5K",
-  },
-];
 
 interface FeaturedProfilesCardProps {
   profiles?: FeaturedProfileItem[];
@@ -47,13 +23,12 @@ interface FeaturedProfilesCardProps {
 }
 
 export function FeaturedProfilesCard({
-  profiles = DEFAULT_FEATURED_PROFILES,
+  profiles = [],
   onViewMore,
   onAnalyze,
 }: FeaturedProfilesCardProps) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-      {/* Header do Card */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
@@ -61,7 +36,6 @@ export function FeaturedProfilesCard({
           </div>
           <h3 className="text-sm font-bold text-slate-900">Perfis em destaque</h3>
         </div>
-
         <button
           type="button"
           onClick={onViewMore}
@@ -70,15 +44,12 @@ export function FeaturedProfilesCard({
           Ver mais
         </button>
       </div>
-
-      {/* Lista de Perfis */}
       <div className="mt-4 space-y-3">
         {profiles.map((profile) => (
           <div
             key={profile.id}
             className="flex items-center justify-between gap-2.5 rounded-xl p-1 transition-colors hover:bg-slate-50"
           >
-            {/* Avatar + Nome */}
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <Avatar className="size-8.5 shrink-0 border border-slate-100 shadow-2xs">
                 <AvatarImage src={profile.avatarUrl} alt={profile.name} className="object-cover" />
@@ -86,22 +57,20 @@ export function FeaturedProfilesCard({
                   {profile.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[11.5px] font-bold text-slate-900 leading-tight">
+                <div className="truncate text-[11.5px] font-bold leading-tight text-slate-900">
                   {profile.name}
                 </div>
                 <div className="truncate text-[10px] text-slate-400">@{profile.username}</div>
               </div>
             </div>
-
-            {/* Seguidores + Botão Analisar + Menu */}
             <div className="flex shrink-0 items-center gap-1.5">
               <div className="text-right leading-tight">
-                <div className="text-[11.5px] font-bold text-slate-900">{profile.followersCount}</div>
+                <div className="text-[11.5px] font-bold text-slate-900">
+                  {profile.followersCount}
+                </div>
                 <div className="text-[9.5px] text-slate-400">seguidores</div>
               </div>
-
               <Button
                 type="button"
                 size="sm"
@@ -110,7 +79,6 @@ export function FeaturedProfilesCard({
               >
                 Analisar
               </Button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -139,6 +107,11 @@ export function FeaturedProfilesCard({
             </div>
           </div>
         ))}
+        {!profiles.length ? (
+          <p className="py-3 text-center text-xs text-slate-400">
+            Nenhum perfil com dados coletados.
+          </p>
+        ) : null}
       </div>
     </div>
   );

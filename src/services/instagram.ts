@@ -80,6 +80,33 @@ export async function listarInstagramLeads(limite = 250): Promise<InstagramLead[
   });
 }
 
+export async function listarInstagramLeadsPorIds(
+  leadIds: readonly string[],
+): Promise<InstagramLead[]> {
+  const uniqueIds = [...new Set(leadIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return [];
+  const { data: profiles, error } = await supabase
+    .from("instagram_profiles")
+    .select("*")
+    .in("lead_id", uniqueIds);
+  if (error) throw error;
+  if (!profiles?.length) return [];
+  const { data: leads, error: leadsError } = await supabase
+    .from("leads")
+    .select(
+      "id, business_name, category, city, state, email, whatsapp, instagram_url, score, status",
+    )
+    .in("id", uniqueIds);
+  if (leadsError) throw leadsError;
+  const profileByLeadId = new Map(profiles.map((profile) => [profile.lead_id, profile]));
+  const leadById = new Map((leads ?? []).map((lead) => [lead.id, lead]));
+  return uniqueIds.flatMap((leadId) => {
+    const profile = profileByLeadId.get(leadId);
+    const lead = leadById.get(leadId);
+    return profile && lead ? [{ ...profile, lead }] : [];
+  });
+}
+
 export async function listarCampanhasInstagram(): Promise<InstagramCampaign[]> {
   const { data: campaigns, error } = await supabase
     .from("campanhas")

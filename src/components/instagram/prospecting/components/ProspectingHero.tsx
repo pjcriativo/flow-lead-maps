@@ -1,27 +1,28 @@
-import { useState } from "react";
 import { ArrowUpRight, Search, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ProspectingHeroArtwork } from "./ProspectingHeroArtwork";
+import type { ProspectProfileItem } from "./ProspectingResultsTable";
 
 interface ProspectingHeroProps {
   onSearchClick: () => void;
   onViewLeadsClick: () => void;
   totalFound?: number;
+  profiles?: ProspectProfileItem[];
 }
 
 export function ProspectingHero({
   onSearchClick,
   onViewLeadsClick,
-  totalFound = 127,
+  totalFound = 0,
+  profiles = [],
 }: ProspectingHeroProps) {
-  const [period, setPeriod] = useState("24h");
+  const counts = {
+    Alta: profiles.filter((profile) => profile.relevance === "Alta").length,
+    Média: profiles.filter((profile) => profile.relevance === "Média").length,
+    Baixa: profiles.filter((profile) => profile.relevance === "Baixa").length,
+  };
+  const percentage = (value: number) =>
+    totalFound > 0 ? Math.round((value / totalFound) * 100) : 0;
 
   return (
     <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
@@ -82,36 +83,35 @@ export function ProspectingHero({
                   <Zap className="size-3.5 fill-[#833AB4]" />
                 </div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#E1306C]">
-                  RESULTADOS HOJE
+                  RESULTADOS EXIBIDOS
                 </span>
               </div>
-
-              <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger className="h-7 w-auto rounded-lg border-slate-200 bg-white text-[11px] font-medium text-slate-600 shadow-none">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value="24h">Últimas 24 horas</SelectItem>
-                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="mt-4">
               <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 tabular-nums">
                 {totalFound}
               </span>
-              <p className="mt-1 text-xs text-slate-500">
-                novos perfis encontrados
-              </p>
+              <p className="mt-1 text-xs text-slate-500">novos perfis encontrados</p>
             </div>
 
             {/* Barra de progresso segmentada (Verde 42%, Azul 38%, Cinza 20%) */}
             <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-slate-100">
-              <div className="w-[42%] bg-[#10B981]" title="Alta relevância: 42%" />
-              <div className="w-[38%] bg-[#2563EB]" title="Média relevância: 38%" />
-              <div className="w-[20%] bg-slate-300" title="Baixa relevância: 20%" />
+              <div
+                className="bg-[#10B981]"
+                style={{ width: `${percentage(counts.Alta)}%` }}
+                title={`Alta relevância: ${percentage(counts.Alta)}%`}
+              />
+              <div
+                className="bg-[#2563EB]"
+                style={{ width: `${percentage(counts.Média)}%` }}
+                title={`Média relevância: ${percentage(counts.Média)}%`}
+              />
+              <div
+                className="bg-slate-300"
+                style={{ width: `${percentage(counts.Baixa)}%` }}
+                title={`Baixa relevância: ${percentage(counts.Baixa)}%`}
+              />
             </div>
 
             {/* Lista detalhada */}
@@ -119,28 +119,28 @@ export function ProspectingHero({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-[#10B981]" />
-                  <span className="font-semibold text-slate-700">42%</span>
+                  <span className="font-semibold text-slate-700">{percentage(counts.Alta)}%</span>
                   <span className="text-slate-500">Alta relevância</span>
                 </div>
-                <span className="font-bold text-slate-800 tabular-nums">54</span>
+                <span className="font-bold text-slate-800 tabular-nums">{counts.Alta}</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-[#2563EB]" />
-                  <span className="font-semibold text-slate-700">38%</span>
+                  <span className="font-semibold text-slate-700">{percentage(counts.Média)}%</span>
                   <span className="text-slate-500">Média relevância</span>
                 </div>
-                <span className="font-bold text-slate-800 tabular-nums">48</span>
+                <span className="font-bold text-slate-800 tabular-nums">{counts.Média}</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="size-2 rounded-full bg-slate-300" />
-                  <span className="font-semibold text-slate-700">20%</span>
+                  <span className="font-semibold text-slate-700">{percentage(counts.Baixa)}%</span>
                   <span className="text-slate-500">Baixa relevância</span>
                 </div>
-                <span className="font-bold text-slate-800 tabular-nums">25</span>
+                <span className="font-bold text-slate-800 tabular-nums">{counts.Baixa}</span>
               </div>
             </div>
           </div>

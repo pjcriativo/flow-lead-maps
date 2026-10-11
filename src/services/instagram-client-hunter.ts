@@ -66,6 +66,7 @@ export type AudienceOverlapResponse = {
 
 export type InstagramOpportunity = {
   id: string;
+  lead_id: string | null;
   score: number;
   temperature: "quente" | "morno" | "frio";
   reasons: string[];

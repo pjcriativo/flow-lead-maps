@@ -19,9 +19,14 @@ interface CreateAnalysisCardProps {
     metrics: string[];
   }) => Promise<void> | void;
   loading?: boolean;
+  status?: string | null;
 }
 
-export function CreateAnalysisCard({ onStartAnalysis, loading = false }: CreateAnalysisCardProps) {
+export function CreateAnalysisCard({
+  onStartAnalysis,
+  loading = false,
+  status,
+}: CreateAnalysisCardProps) {
   const [analysisType, setAnalysisType] = useState("concorrentes");
   const [profilesInput, setProfilesInput] = useState("");
   const [period, setPeriod] = useState("30d");
@@ -152,10 +157,10 @@ export function CreateAnalysisCard({ onStartAnalysis, loading = false }: CreateA
             <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-700">
               <Checkbox
                 checked={metrics.peakHours}
-                onCheckedChange={() => toggleMetric("peakHours")}
+                disabled
                 className="size-4 rounded border-slate-300 data-[state=checked]:bg-[#2563EB] data-[state=checked]:border-[#2563EB]"
               />
-              <span>Horários de maior alcance</span>
+              <span>Horários de maior alcance (indisponível)</span>
             </label>
 
             <label className="flex cursor-pointer items-center gap-2.5 text-xs text-slate-700">
@@ -184,6 +189,7 @@ export function CreateAnalysisCard({ onStartAnalysis, loading = false }: CreateA
             )}
             Iniciar análise
           </Button>
+          {status ? <p className="mt-2 text-[10.5px] text-slate-500">{status}</p> : null}
         </div>
       </div>
     </div>

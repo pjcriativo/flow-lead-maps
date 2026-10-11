@@ -8,8 +8,8 @@ interface CommonAudiencesCardProps {
 
 export function CommonAudiencesCard({
   onViewDetails,
-  commonCount = "12.4K",
-  overlapPercent = "28%",
+  commonCount = "Não disponível",
+  overlapPercent = "Não disponível",
 }: CommonAudiencesCardProps) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
@@ -68,11 +68,12 @@ export function CommonAudiencesCard({
         {/* Textos da Audiência */}
         <div className="min-w-0">
           <div className="text-sm font-bold text-slate-900">
-            {commonCount} <span className="text-xs font-normal text-slate-500">perfis em comum</span>
+            {commonCount}{" "}
+            <span className="text-xs font-normal text-slate-500">perfis em comum</span>
           </div>
           <p className="mt-1 text-[11px] leading-tight text-slate-500">
-            <span className="font-semibold text-slate-700">{overlapPercent}</span> da audiência do
-            concorrente também segue seu perfil.
+            <span className="font-semibold text-slate-700">{overlapPercent}</span> de sobreposição
+            calculada na consulta de audiências.
           </p>
         </div>
       </div>
