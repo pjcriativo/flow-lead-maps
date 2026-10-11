@@ -38,6 +38,7 @@ import { InstagramAnalyticsDashboard } from "@/components/instagram/dashboard/In
 import { FlowBusinessToday } from "@/components/instagram/dashboard/FlowBusinessToday";
 import { FlowBusinessCrm } from "@/components/instagram/crm/FlowBusinessCrm";
 import { FlowBusinessCadences } from "@/components/instagram/cadences/FlowBusinessCadences";
+import { FlowBusinessAutomations } from "@/components/instagram/automations/FlowBusinessAutomations";
 import { FlowBusinessAccounts } from "@/components/instagram/accounts/FlowBusinessAccounts";
 import { FlowBusinessAutomationPanel } from "@/components/instagram/flows/FlowBusinessAutomationPanel";
 import {
@@ -62,6 +63,7 @@ import {
 import { buscarRedes, type ColetaRedes } from "@/services/whatsapp";
 import {
   atualizarTarefaInstagram,
+  atualizarStatusCampanhaInstagram,
   criarCampanhaInstagram,
   listarCampanhasInstagram,
   listarInstagramLeads,
@@ -101,6 +103,7 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [updatingCampaignId, setUpdatingCampaignId] = useState<string | null>(null);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [profile, setProfile] = useState<InstagramLead | null>(null);
   const [campaignName, setCampaignName] = useState("");
@@ -262,6 +265,50 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
     }
   };
 
+  const createAutomationCampaign = async (input: {
+    name: string;
+    type: "assisted" | "comment_flow" | "relationship";
+    accountId: string;
+    cadenceId: string;
+    leads: InstagramLead[];
+  }) => {
+    setCreating(true);
+    try {
+      const id = await criarCampanhaInstagram({
+        nome: input.name,
+        mensagem: TEMPLATE_PADRAO,
+        leads: input.leads,
+        accountId: input.accountId,
+        cadenceId: input.cadenceId,
+        campaignType: input.type,
+      });
+      await load();
+      setSelectedCampaign(id);
+      toast.success("Campanha criada e fila de abordagem preparada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível criar a campanha.");
+      throw error;
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const toggleCampaign = async (campaignId: string, active: boolean) => {
+    setUpdatingCampaignId(campaignId);
+    try {
+      await atualizarStatusCampanhaInstagram(campaignId, active);
+      setCampaigns(await listarCampanhasInstagram());
+      toast.success(active ? "Campanha reaberta." : "Campanha concluída.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível atualizar a campanha.",
+      );
+      throw error;
+    } finally {
+      setUpdatingCampaignId(null);
+    }
+  };
+
   const updateTask = async (task: InstagramOutreachTask, state: string) => {
     await atualizarTarefaInstagram(task.id, state);
     setTasks(await listarTarefasInstagram(task.campanha_id));
@@ -391,22 +438,48 @@ export function InstagramWorkspace({ onExit }: { onExit: () => void }) {
         />
       ) : null}
 
-      {tab === "cadences" && business ? (
-        <FlowBusinessCadences
-          cadences={business.cadences}
-          plan={business.plan}
-          onCreate={async (input) => {
-            try {
-              await createFlowBusinessCadence(input);
-              await refreshBusiness();
-              toast.success("Cadência criada.");
-            } catch (error) {
-              toast.error(
-                error instanceof Error ? error.message : "Não foi possível criar a cadência.",
-              );
-              throw error;
-            }
+      {tab === "cadences" && business && automation ? (
+        <FlowBusinessAutomations
+          campaigns={campaigns}
+          leads={leads}
+          workspace={business}
+          automation={automation}
+          creatingCampaign={creating}
+          updatingCampaignId={updatingCampaignId}
+          onCreateCampaign={createAutomationCampaign}
+          onToggleCampaign={toggleCampaign}
+          onOpenCampaign={(campaignId) => {
+            setSelectedCampaign(campaignId);
+            handleViewChange("campaigns");
           }}
+          renderCadenceManager={() => (
+            <FlowBusinessCadences
+              cadences={business.cadences}
+              plan={business.plan}
+              onCreate={async (input) => {
+                try {
+                  await createFlowBusinessCadence(input);
+                  await refreshBusiness();
+                  toast.success("Cadência criada.");
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error ? error.message : "Não foi possível criar a cadência.",
+                  );
+                  throw error;
+                }
+              }}
+            />
+          )}
+          renderFlowManager={() => (
+            <FlowBusinessAutomationPanel
+              workspace={business}
+              automation={automation}
+              togglingAccountId={togglingAccountId}
+              onToggle={toggleAutomation}
+              onSave={saveAutomationFlow}
+              onPublish={publishAutomationFlow}
+            />
+          )}
         />
       ) : null}
 

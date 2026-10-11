@@ -26,6 +26,15 @@ export type InstagramCampaign = CampaignRow & {
   total: number;
   sent: number;
   replied: number;
+  converted: number;
+  actionsToday: number;
+  repliesToday: number;
+  leadsToday: number;
+  convertedToday: number;
+  actionsLast7Days: number;
+  repliesLast7Days: number;
+  leadsLast7Days: number;
+  convertedLast7Days: number;
 };
 
 export type InstagramOutreachTask = OutreachRow & {
@@ -81,12 +90,17 @@ export async function listarCampanhasInstagram(): Promise<InstagramCampaign[]> {
   if (!campaigns?.length) return [];
   const { data: tasks, error: tasksError } = await supabase
     .from("instagram_outreach_tasks")
-    .select("campanha_id, state")
+    .select("campanha_id,state,created_at,updated_at,sent_at,replied_at")
     .in(
       "campanha_id",
       campaigns.map((campaign) => campaign.id),
     );
   if (tasksError) throw tasksError;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const lastSevenDays = new Date(startOfToday.getTime() - 6 * 86_400_000);
+  const isSince = (value: string | null, since: Date) =>
+    Boolean(value && new Date(value).getTime() >= since.getTime());
   return campaigns.map((campaign) => {
     const own = (tasks ?? []).filter((task) => task.campanha_id === campaign.id);
     return {
@@ -97,6 +111,19 @@ export async function listarCampanhasInstagram(): Promise<InstagramCampaign[]> {
       ).length,
       replied: own.filter((task) => ["replied", "interested", "converted"].includes(task.state))
         .length,
+      converted: own.filter((task) => task.state === "converted").length,
+      actionsToday: own.filter((task) => isSince(task.sent_at, startOfToday)).length,
+      repliesToday: own.filter((task) => isSince(task.replied_at, startOfToday)).length,
+      leadsToday: own.filter((task) => isSince(task.created_at, startOfToday)).length,
+      convertedToday: own.filter(
+        (task) => task.state === "converted" && isSince(task.updated_at, startOfToday),
+      ).length,
+      actionsLast7Days: own.filter((task) => isSince(task.sent_at, lastSevenDays)).length,
+      repliesLast7Days: own.filter((task) => isSince(task.replied_at, lastSevenDays)).length,
+      leadsLast7Days: own.filter((task) => isSince(task.created_at, lastSevenDays)).length,
+      convertedLast7Days: own.filter(
+        (task) => task.state === "converted" && isSince(task.updated_at, lastSevenDays),
+      ).length,
     };
   });
 }
@@ -105,6 +132,9 @@ export async function criarCampanhaInstagram(params: {
   nome: string;
   mensagem: string;
   leads: InstagramLead[];
+  accountId?: string;
+  cadenceId?: string;
+  campaignType?: string;
 }): Promise<string> {
   if (!params.leads.length) throw new Error("Selecione pelo menos um perfil.");
   const { userId, orgId } = await contextoAtual();
@@ -115,7 +145,13 @@ export async function criarCampanhaInstagram(params: {
       canal: "instagram_assisted",
       user_id: userId,
       org_id: orgId,
-      ig_config: { template: params.mensagem, mode: "assisted" },
+      ig_config: {
+        template: params.mensagem,
+        mode: "assisted",
+        ...(params.accountId ? { accountId: params.accountId } : {}),
+        ...(params.cadenceId ? { cadenceId: params.cadenceId } : {}),
+        ...(params.campaignType ? { campaignType: params.campaignType } : {}),
+      },
     })
     .select("id")
     .single();
@@ -136,6 +172,15 @@ export async function criarCampanhaInstagram(params: {
   const { error: tasksError } = await supabase.from("instagram_outreach_tasks").insert(tasks);
   if (tasksError) throw tasksError;
   return campaign.id;
+}
+
+export async function atualizarStatusCampanhaInstagram(id: string, active: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("campanhas")
+    .update({ status: active ? "ativa" : "concluida" })
+    .eq("id", id)
+    .eq("canal", "instagram_assisted");
+  if (error) throw error;
 }
 
 export async function listarTarefasInstagram(campanhaId: string): Promise<InstagramOutreachTask[]> {
