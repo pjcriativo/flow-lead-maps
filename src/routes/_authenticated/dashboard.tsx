@@ -20,6 +20,7 @@ import { InstagramWorkspace } from "@/components/instagram/InstagramWorkspace";
 import { FlowAcademyComingSoon } from "@/components/academy/FlowAcademyComingSoon";
 import { BusinessNetworkComingSoon } from "@/components/network/BusinessNetworkComingSoon";
 import { PipelineSection } from "@/components/leads/PipelineSection";
+import { PipelinePremiumView } from "@/components/pipeline-premium/PipelinePremiumView";
 import { LeadsManager } from "@/components/leads/LeadsManager";
 import { LeadsPremiumView } from "@/components/leads-premium/LeadsPremiumView";
 import { PropostasSection } from "@/components/propostas/PropostasSection";
@@ -194,7 +195,7 @@ function Dashboard() {
     <div
       className={cn(
         "flex min-h-svh w-full",
-        section === "home" || section === "leads"
+        section === "home" || section === "leads" || section === "pipeline"
           ? "bg-home-background text-home-foreground"
           : "bg-background text-foreground",
       )}
@@ -216,10 +217,12 @@ function Dashboard() {
       <main
         className={cn(
           "min-w-0 flex-1",
-          (section === "home" || section === "leads") && "bg-home-background pt-14 lg:pt-0",
+          (section === "home" || section === "leads" || section === "pipeline") &&
+            "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
             section !== "leads" &&
+            section !== "pipeline" &&
             section !== "instagram" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
@@ -248,7 +251,16 @@ function Dashboard() {
             }}
           />
         )}
-        {section === "pipeline" && <PipelineSection />}
+        {section === "pipeline" && (
+          <PipelinePremiumView
+            user={{
+              name: userProfile?.full_name || "Marcos Gonçalves",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+          />
+        )}
         {section === "leads" && (
           <LeadsPremiumView
             user={{
