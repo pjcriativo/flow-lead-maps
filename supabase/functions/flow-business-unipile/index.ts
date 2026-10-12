@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { assertCanManageInstagramAccounts } from "../_shared/instagram-account-access.ts";
 
 type AdminClient = ReturnType<typeof createClient>;
 type JsonRecord = Record<string, unknown>;
@@ -60,15 +61,23 @@ async function authenticatedContext(req: Request, admin: AdminClient) {
   if (!authHeader?.startsWith("Bearer ")) throw new Error("unauthorized");
   const { data, error } = await admin.auth.getUser(authHeader.slice(7));
   if (error || !data.user) throw new Error("unauthorized");
-  const { data: membership, error: membershipError } = await admin
-    .from("memberships")
-    .select("org_id")
-    .eq("user_id", data.user.id)
-    .order("criada_em", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: membership, error: membershipError }, { data: profile }] = await Promise.all([
+    admin
+      .from("memberships")
+      .select("org_id,papel")
+      .eq("user_id", data.user.id)
+      .order("criada_em", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    admin.from("profiles").select("is_super_admin").eq("id", data.user.id).maybeSingle(),
+  ]);
   if (membershipError || !membership) throw new Error("organization_not_found");
-  return { userId: data.user.id, orgId: membership.org_id as string };
+  return {
+    userId: data.user.id,
+    orgId: membership.org_id as string,
+    role: membership.papel,
+    isSuperAdmin: profile?.is_super_admin === true,
+  };
 }
 
 async function assertAccountCapacity(admin: AdminClient, orgId: string) {
@@ -84,7 +93,8 @@ async function assertAccountCapacity(admin: AdminClient, orgId: string) {
 }
 
 async function startConnection(req: Request, admin: AdminClient): Promise<Response> {
-  const { userId, orgId } = await authenticatedContext(req, admin);
+  const { userId, orgId, role, isSuperAdmin } = await authenticatedContext(req, admin);
+  assertCanManageInstagramAccounts({ role, isSuperAdmin });
   await assertAccountCapacity(admin, orgId);
   const apiKey = env("UNIPILE_API_KEY");
   const state = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
@@ -302,21 +312,25 @@ Deno.serve(async (req) => {
     const status =
       message === "unauthorized"
         ? 401
-        : message.startsWith("flow_business_limit")
-          ? 409
-          : message.startsWith("missing_config")
-            ? 503
-            : 500;
+        : message === "forbidden"
+          ? 403
+          : message.startsWith("flow_business_limit")
+            ? 409
+            : message.startsWith("missing_config")
+              ? 503
+              : 500;
     const publicError =
       message === "unauthorized"
         ? "unauthorized"
-        : message.startsWith("flow_business_limit")
-          ? "flow_business_limit"
-          : message.startsWith("missing_config")
-            ? "instagram_connection_unavailable"
-            : requestedAction === "send"
-              ? "instagram_message_failed"
-              : "instagram_connection_failed";
+        : message === "forbidden"
+          ? "forbidden"
+          : message.startsWith("flow_business_limit")
+            ? "flow_business_limit"
+            : message.startsWith("missing_config")
+              ? "instagram_connection_unavailable"
+              : requestedAction === "send"
+                ? "instagram_message_failed"
+                : "instagram_connection_failed";
     return json({ error: publicError }, status, req);
   }
 });

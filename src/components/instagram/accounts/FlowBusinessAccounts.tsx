@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle,
   BadgeCheck,
   Bell,
-  CheckCircle2,
   ChevronRight,
   CircleGauge,
   Database,
@@ -52,6 +50,11 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { planLimitLabel, planLimitProgress, planLimitReached } from "@/lib/flow-business-limits";
+import {
+  customerAccountLabel,
+  customerAccountType,
+  customerConnectionStatus,
+} from "@/lib/instagram-account-presentation";
 import {
   deleteInstagramSession,
   disconnectInstagramSession,
@@ -102,6 +105,7 @@ export function FlowBusinessAccounts({
   const { accounts, plan } = workspace;
   const currentAccounts = accounts.filter((account) => account.provider !== "evolution_legacy");
   const connectedAccounts = currentAccounts.filter((account) => account.status === "conectado");
+  const canManageAccounts = workspace.accountAccess.manageAccounts;
   const atLimit = planLimitReached(plan.used.accounts, plan.limits.accounts);
   const [activeTab, setActiveTab] = useState<SettingsTab>("accounts");
   const [startingConnection, setStartingConnection] = useState(false);
@@ -140,6 +144,10 @@ export function FlowBusinessAccounts({
   }, [automation?.usage.monthly, workspace.activities, workspace.cards]);
 
   const startConnection = async () => {
+    if (!canManageAccounts) {
+      toast.error("Somente administradores do workspace podem gerenciar contas do Instagram.");
+      return;
+    }
     if (atLimit) {
       toast.error("Limite de contas atingido no seu plano.");
       return;
@@ -232,6 +240,7 @@ export function FlowBusinessAccounts({
           <AccountsPanel
             accounts={currentAccounts}
             atLimit={atLimit}
+            canManageAccounts={canManageAccounts}
             startingConnection={startingConnection}
             busy={changingAccount}
             onConnect={() => void startConnection()}
@@ -408,6 +417,7 @@ function SettingsHero({
 function AccountsPanel({
   accounts,
   atLimit,
+  canManageAccounts,
   startingConnection,
   busy,
   onConnect,
@@ -417,6 +427,7 @@ function AccountsPanel({
 }: {
   accounts: FlowBusinessAccount[];
   atLimit: boolean;
+  canManageAccounts: boolean;
   startingConnection: boolean;
   busy: boolean;
   onConnect: () => void;
@@ -441,8 +452,13 @@ function AccountsPanel({
         </div>
         <Button
           className="gap-2 bg-[#1464F6] hover:bg-[#0E54D8]"
-          disabled={startingConnection || atLimit}
+          disabled={startingConnection || atLimit || !canManageAccounts}
           onClick={onConnect}
+          title={
+            canManageAccounts
+              ? undefined
+              : "Somente administradores do workspace podem conectar contas"
+          }
         >
           {startingConnection ? (
             <Loader2 className="size-4 animate-spin" />
@@ -467,6 +483,7 @@ function AccountsPanel({
               key={account.id}
               account={account}
               busy={busy}
+              canManageAccounts={canManageAccounts}
               onConfigure={() => onConfigure(account)}
               onReconnect={onConnect}
               onDisconnect={() => onDisconnect(account)}
@@ -480,6 +497,11 @@ function AccountsPanel({
           Limite de contas atingido no plano atual.
         </p>
       ) : null}
+      {!canManageAccounts ? (
+        <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+          Consulte um administrador do workspace para conectar, reconectar ou desconectar contas.
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -487,6 +509,7 @@ function AccountsPanel({
 function AccountRow({
   account,
   busy,
+  canManageAccounts,
   onConfigure,
   onReconnect,
   onDisconnect,
@@ -494,26 +517,28 @@ function AccountRow({
 }: {
   account: FlowBusinessAccount;
   busy: boolean;
+  canManageAccounts: boolean;
   onConfigure: () => void;
   onReconnect: () => void;
   onDisconnect: () => void;
   onDelete: () => void;
 }) {
   const connected = account.status === "conectado";
-  const suspended = /suspens/i.test(account.status);
-  const initials = (account.name || account.username || "IG").slice(0, 2).toUpperCase();
+  const accountLabel = customerAccountLabel(account);
+  const status = customerConnectionStatus(account.status);
+  const initials = accountLabel.replace(/^@/, "").slice(0, 2).toUpperCase();
   return (
     <article className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(230px,1.6fr)_1fr_auto] sm:items-center">
       <div className="flex min-w-0 items-center gap-3">
         <div className="rounded-full bg-gradient-to-tr from-[#FF8A3D] via-[#FF176B] to-[#A62CFF] p-[3px]">
           <Avatar className="size-12 border-2 border-white">
-            <AvatarImage src={account.profilePictureUrl ?? undefined} alt={account.name} />
+            <AvatarImage src={account.profilePictureUrl ?? undefined} alt={accountLabel} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <h4 className="truncate text-sm font-bold">{account.name}</h4>
+            <h4 className="truncate text-sm font-bold">{accountLabel}</h4>
             {account.provider === "meta_official" ? (
               <BadgeCheck className="size-4 shrink-0 fill-[#1677FF] text-white" />
             ) : null}
@@ -529,13 +554,13 @@ function AccountRow({
             "rounded-full px-2.5 py-1 text-[10px] font-semibold",
             connected
               ? "bg-emerald-50 text-emerald-600"
-              : suspended
+              : status.tone === "warning"
                 ? "bg-orange-50 text-orange-600"
                 : "bg-rose-50 text-rose-600",
           )}
         >
           <span className="mr-1">●</span>
-          {connected ? "Conectada" : suspended ? "Suspensa" : "Desconectada"}
+          {status.label}
         </span>
         <div className="hidden grid-cols-3 gap-8 text-xs lg:grid">
           <Stat value="—" label="seguidores" />
@@ -547,20 +572,20 @@ function AccountRow({
         <Switch
           checked={connected}
           disabled
-          aria-label={`Estado da conta ${account.name}`}
+          aria-label={`Estado da conta ${accountLabel}`}
           title="O estado é controlado pela conexão do provedor"
         />
         <Button
           size="sm"
           variant="outline"
           disabled={busy}
-          onClick={connected ? onConfigure : onReconnect}
+          onClick={connected || !canManageAccounts ? onConfigure : onReconnect}
         >
-          {connected ? "Configurar" : "Reconectar"}
+          {connected ? "Gerenciar" : canManageAccounts ? "Reconectar" : "Ver detalhes"}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="outline" aria-label={`Ações de ${account.name}`}>
+            <Button size="icon" variant="outline" aria-label={`Ações de ${accountLabel}`}>
               <EllipsisVertical className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -569,20 +594,24 @@ function AccountRow({
               <Settings2 className="size-4" />
               Ver detalhes
             </DropdownMenuItem>
-            {connected ? (
+            {connected && canManageAccounts ? (
               <DropdownMenuItem onClick={onDisconnect}>
                 <LogOut className="size-4" />
                 Desconectar
               </DropdownMenuItem>
             ) : null}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={onDelete}
-            >
-              <Trash2 className="size-4" />
-              Excluir conexão
-            </DropdownMenuItem>
+            {canManageAccounts ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 className="size-4" />
+                  Excluir conexão
+                </DropdownMenuItem>
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -844,8 +873,8 @@ function SecurityView({ accounts }: { accounts: FlowBusinessAccount[] }) {
         />
         <SecurityItem
           Icon={ShieldCheck}
-          title="Permissões"
-          text={`${new Set(connected.flatMap((account) => account.permissions)).size} permissão(ões) registradas.`}
+          title="Acesso protegido"
+          text="As permissões técnicas são mantidas com segurança e não ficam expostas nesta tela."
         />
       </div>
     </section>
@@ -891,15 +920,13 @@ function UnavailablePanel({
 }
 
 function AccountDetails({ account }: { account: FlowBusinessAccount }) {
+  const accountLabel = customerAccountLabel(account);
   const rows = [
-    ["Conexão", "Instagram"],
-    ["Tipo de conta", account.accountType ?? "Não informado"],
+    ["Conta", accountLabel],
+    ["Usuário", account.username ? `@${account.username}` : "Não informado"],
+    ["Tipo de conta", customerAccountType(account.accountType)],
+    ["Status", customerConnectionStatus(account.status).label],
     ["Conectada em", formatDate(account.connectedAt)],
-    ["Último webhook", formatDate(account.lastWebhookAt)],
-    [
-      "Permissões",
-      account.permissions.length ? account.permissions.join(", ") : "Nenhuma informada",
-    ],
   ];
   return (
     <div className="space-y-2">
@@ -912,17 +939,10 @@ function AccountDetails({ account }: { account: FlowBusinessAccount }) {
           <span className="break-words font-medium">{value}</span>
         </div>
       ))}
-      {account.errorMessage ? (
-        <div className="flex gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          {account.errorMessage}
-        </div>
-      ) : (
-        <div className="flex gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-          Nenhum erro registrado.
-        </div>
-      )}
+      <p className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+        A conexão é protegida. Dados técnicos e credenciais ficam disponíveis somente para o suporte
+        autorizado.
+      </p>
     </div>
   );
 }

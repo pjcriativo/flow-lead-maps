@@ -226,6 +226,7 @@ export type AdminAcao =
   | "relatorios_ler"
   | "config_ler"
   | "config_salvar"
+  | "instagram_integracoes_listar"
   | "notificacao_enviar"
   | "notificacoes_listar"
   | "assinantes_listar"

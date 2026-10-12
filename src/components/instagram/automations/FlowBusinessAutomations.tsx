@@ -510,7 +510,7 @@ function CreateCampaignCard({
             <SelectItem value="none">Selecione uma conta</SelectItem>
             {connectedAccounts.map((account) => (
               <SelectItem key={account.id} value={account.id}>
-                {account.username ? `@${account.username}` : account.name}
+                {account.username ? `@${account.username}` : (account.displayName ?? "Instagram")}
               </SelectItem>
             ))}
           </SelectContent>

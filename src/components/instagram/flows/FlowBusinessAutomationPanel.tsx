@@ -87,7 +87,9 @@ export function FlowBusinessAutomationPanel({
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">
-                    {account.username ? `@${account.username}` : account.name}
+                    {account.username
+                      ? `@${account.username}`
+                      : (account.displayName ?? "Instagram")}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {accountStatus(
@@ -98,7 +100,7 @@ export function FlowBusinessAutomationPanel({
                   </p>
                 </div>
                 <Switch
-                  aria-label={`Monitorar comentários de ${account.username ?? account.name}`}
+                  aria-label={`Monitorar comentários de ${account.username ?? account.displayName ?? "Instagram"}`}
                   checked={enabled}
                   disabled={togglingAccountId === account.id || !planAllowsAutomation}
                   onCheckedChange={(checked) => void onToggle(account.id, checked)}

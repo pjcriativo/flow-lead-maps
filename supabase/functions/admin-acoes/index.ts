@@ -650,6 +650,84 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (acao === "instagram_integracoes_listar") {
+      const [instancesResult, tokensResult, orgsResult, configResult] = await Promise.all([
+        admin
+          .from("ig_instancias")
+          .select(
+            "id,org_id,nome,username_ig,provider,status,meta_ig_user_id,external_account_id,account_type,permissions,connected_at,last_webhook_at,error_message,atualizado_em",
+          )
+          .order("atualizado_em", { ascending: false }),
+        admin.from("ig_instancia_tokens").select("instancia_id,expires_at"),
+        admin.from("orgs").select("id,nome"),
+        admin
+          .from("config_plataforma")
+          .select("instagram_oauth_ativo")
+          .eq("id", true)
+          .maybeSingle(),
+      ]);
+      const queryError = [
+        instancesResult.error,
+        tokensResult.error,
+        orgsResult.error,
+        configResult.error,
+      ].find(Boolean);
+      if (queryError) return json({ ok: false, reason: "erro_diagnostico_instagram" }, 500);
+
+      const orgNames = new Map(
+        (orgsResult.data ?? []).map((org: Rec) => [String(org.id), String(org.nome ?? "—")]),
+      );
+      const tokenExpiry = new Map(
+        (tokensResult.data ?? []).map((token: Rec) => [
+          String(token.instancia_id),
+          typeof token.expires_at === "string" ? token.expires_at : null,
+        ]),
+      );
+      const safeDiagnostic = (value: unknown) => {
+        if (typeof value !== "string" || !value.trim()) return null;
+        return /^[A-Za-z0-9_.:/-]{1,120}$/.test(value.trim())
+          ? value.trim()
+          : "diagnostic_redacted";
+      };
+      const oauth = getMetaOAuthPrerequisiteStatus((name) => Deno.env.get(name));
+      return json({
+        ok: true,
+        services: {
+          oauthEnabled: configResult.data?.instagram_oauth_ativo === true && oauth.configured,
+          oauthConfigured: oauth.configured,
+          webhookConfigured: Boolean(
+            Deno.env.get("META_INSTAGRAM_WEBHOOK_VERIFY_TOKEN")?.trim() &&
+            Deno.env.get("META_INSTAGRAM_APP_SECRET")?.trim(),
+          ),
+        },
+        accounts: (instancesResult.data ?? []).map((instance: Rec) => ({
+          id: String(instance.id),
+          workspaceId: String(instance.org_id),
+          workspaceName: orgNames.get(String(instance.org_id)) ?? "—",
+          internalName: String(instance.nome ?? "—"),
+          username: typeof instance.username_ig === "string" ? instance.username_ig : null,
+          provider: String(instance.provider ?? "unknown"),
+          status: String(instance.status ?? "unknown"),
+          metaUserId:
+            typeof instance.meta_ig_user_id === "string" ? instance.meta_ig_user_id : null,
+          externalAccountId:
+            typeof instance.external_account_id === "string" ? instance.external_account_id : null,
+          accountType: typeof instance.account_type === "string" ? instance.account_type : null,
+          permissions: Array.isArray(instance.permissions)
+            ? instance.permissions.filter(
+                (permission): permission is string => typeof permission === "string",
+              )
+            : [],
+          connectedAt: typeof instance.connected_at === "string" ? instance.connected_at : null,
+          lastWebhookAt:
+            typeof instance.last_webhook_at === "string" ? instance.last_webhook_at : null,
+          tokenExpiresAt: tokenExpiry.get(String(instance.id)) ?? null,
+          errorCode: safeDiagnostic(instance.error_message),
+          updatedAt: typeof instance.atualizado_em === "string" ? instance.atualizado_em : null,
+        })),
+      });
+    }
+
     // config_ler / config_salvar — a linha ÚNICA de config_plataforma (id=true). Cada campo
     // aqui é lido por uma edge de verdade (buscar-redes, redesign-site, send-proposal,
     // publicacao.core, WaCampanhas) como OVERRIDE do valor padrão — nunca decorativo.

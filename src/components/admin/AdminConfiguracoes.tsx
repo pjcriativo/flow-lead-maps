@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { z } from "zod";
 import { adminAcao } from "@/services/admin";
 import { atualizarPerfilUsuario, lerPerfilCompleto, uploadAvatarUsuario } from "@/services/perfil";
 
@@ -75,6 +76,36 @@ type MetaOAuthStatus = {
   prerequisitesConfigured: boolean;
   missingSecrets: string[];
 };
+
+const instagramDiagnosticsSchema = z.object({
+  services: z.object({
+    oauthEnabled: z.boolean(),
+    oauthConfigured: z.boolean(),
+    webhookConfigured: z.boolean(),
+  }),
+  accounts: z.array(
+    z.object({
+      id: z.string().uuid(),
+      workspaceId: z.string().uuid(),
+      workspaceName: z.string(),
+      internalName: z.string(),
+      username: z.string().nullable(),
+      provider: z.string(),
+      status: z.string(),
+      metaUserId: z.string().nullable(),
+      externalAccountId: z.string().nullable(),
+      accountType: z.string().nullable(),
+      permissions: z.array(z.string()),
+      connectedAt: z.string().nullable(),
+      lastWebhookAt: z.string().nullable(),
+      tokenExpiresAt: z.string().nullable(),
+      errorCode: z.string().nullable(),
+      updatedAt: z.string().nullable(),
+    }),
+  ),
+});
+
+type InstagramDiagnostics = z.infer<typeof instagramDiagnosticsSchema>;
 
 const VAZIA: Config = {
   nome_plataforma: null,
@@ -1505,6 +1536,9 @@ export function AdminConfiguracoes() {
     prerequisitesConfigured: false,
     missingSecrets: [],
   });
+  const [instagramDiagnostics, setInstagramDiagnostics] = useState<InstagramDiagnostics | null>(
+    null,
+  );
   // chaves inline do Controle básico (cofre — escrita-apenas)
   const [statusChaves, setStatusChaves] = useState<Record<string, ChaveInfo>>({});
   const [chaveOpenAi, setChaveOpenAi] = useState("");
@@ -1536,6 +1570,12 @@ export function AdminConfiguracoes() {
       })
       .catch((e) => setErro(e instanceof Error ? e.message : "erro"))
       .finally(() => setCarregando(false));
+    adminAcao("instagram_integracoes_listar")
+      .then((r) => {
+        const parsed = instagramDiagnosticsSchema.safeParse(r);
+        if (r.ok && parsed.success) setInstagramDiagnostics(parsed.data);
+      })
+      .catch(() => setInstagramDiagnostics(null));
     carregarChaves();
   }, []);
 
@@ -2075,8 +2115,105 @@ export function AdminConfiguracoes() {
               }
             />
           </div>
+          <InstagramDiagnosticsPanel diagnostics={instagramDiagnostics} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function InstagramDiagnosticsPanel({ diagnostics }: { diagnostics: InstagramDiagnostics | null }) {
+  return (
+    <section
+      className="mt-5 border-t border-border pt-4"
+      aria-label="Diagnóstico técnico do Instagram"
+    >
+      <h3 className="text-sm font-semibold text-foreground">Diagnóstico técnico do Instagram</h3>
+      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+        Visível somente para Super Admin. Credenciais e tokens nunca são retornados.
+      </p>
+      {!diagnostics ? (
+        <p className="mt-3 text-xs text-muted-foreground">Diagnóstico indisponível.</p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+            <DiagnosticStatus label="OAuth" active={diagnostics.services.oauthEnabled} />
+            <DiagnosticStatus label="Webhook" active={diagnostics.services.webhookConfigured} />
+          </div>
+          <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+            {diagnostics.accounts.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Nenhuma integração registrada.</p>
+            ) : (
+              diagnostics.accounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="rounded-lg border border-border bg-background p-3 text-[11px]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <strong className="truncate text-foreground">
+                      {account.username ? `@${account.username}` : account.internalName}
+                    </strong>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
+                      {account.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-muted-foreground">
+                    {account.workspaceName} · {account.provider}
+                  </p>
+                  <dl className="mt-2 space-y-1 break-all text-muted-foreground">
+                    <div>
+                      <dt className="inline font-medium text-foreground">Registro: </dt>
+                      <dd className="inline">{account.id}</dd>
+                    </div>
+                    {account.metaUserId ? (
+                      <div>
+                        <dt className="inline font-medium text-foreground">Meta ID: </dt>
+                        <dd className="inline">{account.metaUserId}</dd>
+                      </div>
+                    ) : null}
+                    {account.externalAccountId ? (
+                      <div>
+                        <dt className="inline font-medium text-foreground">ID externo: </dt>
+                        <dd className="inline">{account.externalAccountId}</dd>
+                      </div>
+                    ) : null}
+                    <div>
+                      <dt className="inline font-medium text-foreground">Permissões: </dt>
+                      <dd className="inline">{account.permissions.join(", ") || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline font-medium text-foreground">Último evento: </dt>
+                      <dd className="inline">
+                        {account.lastWebhookAt
+                          ? new Date(account.lastWebhookAt).toLocaleString("pt-BR")
+                          : "não registrado"}
+                      </dd>
+                    </div>
+                    {account.errorCode ? (
+                      <div className="text-destructive">
+                        <dt className="inline font-medium">Erro: </dt>
+                        <dd className="inline">{account.errorCode}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function DiagnosticStatus({ label, active }: { label: string; active: boolean }) {
+  return (
+    <div className="rounded-lg border border-border bg-background px-2 py-2">
+      <span className={active ? "text-emerald-600" : "text-amber-600"}>●</span>{" "}
+      <span className="font-medium">{label}</span>
+      <span className="block text-[10px] text-muted-foreground">
+        {active ? "operacional" : "requer atenção"}
+      </span>
     </div>
   );
 }

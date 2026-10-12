@@ -719,7 +719,7 @@ function ConversationList(props: ConversationListProps) {
           <DropdownMenuContent align="end">
             {props.accounts.map((account) => (
               <DropdownMenuItem key={account.id} onClick={() => props.onAccountChange(account.id)}>
-                {account.username ? `@${account.username}` : account.name}
+                {account.username ? `@${account.username}` : (account.displayName ?? "Instagram")}
                 {account.id === props.account?.id ? " · ativa" : ""}
               </DropdownMenuItem>
             ))}

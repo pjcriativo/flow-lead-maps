@@ -108,17 +108,13 @@ export type FlowBusinessCadence = {
 
 export type FlowBusinessAccount = {
   id: string;
-  name: string;
+  displayName: string | null;
   username: string | null;
   provider: "meta_official" | "unipile" | "session_worker" | "evolution_legacy";
   status: string;
   accountType: string | null;
   profilePictureUrl: string | null;
-  permissions: string[];
   connectedAt: string | null;
-  lastWebhookAt: string | null;
-  errorMessage: string | null;
-  pendingChallengeMode: "app_approval" | "verification_code" | "manual_verification" | null;
 };
 
 export type FlowNodeSubtype =
@@ -161,6 +157,7 @@ export type FlowBusinessFlow = {
 
 export type FlowBusinessWorkspace = {
   plan: FlowBusinessPlan;
+  accountAccess: { manageAccounts: boolean };
   cards: FlowBusinessCard[];
   tasks: FlowBusinessTask[];
   cadences: FlowBusinessCadence[];
@@ -296,6 +293,11 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
           .strict(),
       })
       .strict(),
+    accountAccess: z
+      .object({
+        manageAccounts: z.boolean(),
+      })
+      .strict(),
     cards: z.array(
       z
         .object({
@@ -367,19 +369,13 @@ const workspaceSchema: z.ZodType<FlowBusinessWorkspace> = z
       z
         .object({
           id: z.string().uuid(),
-          name: z.string(),
+          displayName: z.string().nullable(),
           username: z.string().nullable(),
           provider: z.enum(["meta_official", "unipile", "session_worker", "evolution_legacy"]),
           status: z.string(),
           accountType: z.string().nullable(),
           profilePictureUrl: z.string().nullable(),
-          permissions: z.array(z.string()),
           connectedAt: z.string().nullable(),
-          lastWebhookAt: z.string().nullable(),
-          errorMessage: z.string().nullable(),
-          pendingChallengeMode: z
-            .enum(["app_approval", "verification_code", "manual_verification"])
-            .nullable(),
         })
         .strict(),
     ),
@@ -459,6 +455,8 @@ function workspaceFromJson(value: Json | null): FlowBusinessWorkspace {
 }
 
 function friendlyError(message: string): Error {
+  if (message.includes("forbidden"))
+    return new Error("Somente administradores do workspace podem gerenciar contas do Instagram.");
   if (message.includes("unauthorized"))
     return new Error("Sua sessão expirou. Entre novamente para continuar.");
   if (message.includes("invalid_message"))

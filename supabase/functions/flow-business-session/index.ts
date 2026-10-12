@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { assertCanManageInstagramAccounts } from "../_shared/instagram-account-access.ts";
 
 type AdminClient = ReturnType<typeof createClient>;
 type JsonRecord = Record<string, unknown>;
@@ -37,15 +38,23 @@ async function authenticatedContext(req: Request, admin: AdminClient) {
   if (!authHeader?.startsWith("Bearer ")) throw new Error("unauthorized");
   const { data, error } = await admin.auth.getUser(authHeader.slice(7));
   if (error || !data.user) throw new Error("unauthorized");
-  const { data: membership, error: membershipError } = await admin
-    .from("memberships")
-    .select("org_id")
-    .eq("user_id", data.user.id)
-    .order("criada_em", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: membership, error: membershipError }, { data: profile }] = await Promise.all([
+    admin
+      .from("memberships")
+      .select("org_id,papel")
+      .eq("user_id", data.user.id)
+      .order("criada_em", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    admin.from("profiles").select("is_super_admin").eq("id", data.user.id).maybeSingle(),
+  ]);
   if (membershipError || !membership) throw new Error("organization_not_found");
-  return { userId: data.user.id, orgId: membership.org_id as string };
+  return {
+    userId: data.user.id,
+    orgId: membership.org_id as string,
+    role: membership.papel,
+    isSuperAdmin: profile?.is_super_admin === true,
+  };
 }
 
 async function assertAccountCapacity(admin: AdminClient, orgId: string) {
@@ -90,7 +99,8 @@ async function callWorker(path: string, payload: JsonRecord) {
 }
 
 async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
-  const { userId, orgId } = await authenticatedContext(req, admin);
+  const { userId, orgId, role, isSuperAdmin } = await authenticatedContext(req, admin);
+  assertCanManageInstagramAccounts({ role, isSuperAdmin });
   const username = normalizeUsername(body.username);
   if (typeof body.password !== "string" || !body.password) throw new Error("invalid_credentials");
   const verificationCode =
@@ -152,7 +162,8 @@ async function connect(req: Request, body: JsonRecord, admin: AdminClient) {
     return json({ needsTwoFactor: true, instanceId }, 200, req);
   }
   if (response.status === 409 && workerCode === "challenge_required") {
-    const challengeMode = detail?.mode === "verification_code" ? "verification_code" : "app_approval";
+    const challengeMode =
+      detail?.mode === "verification_code" ? "verification_code" : "app_approval";
     await admin
       .from("ig_instancias")
       .update({
@@ -231,7 +242,8 @@ async function changeAccountLifecycle(
   admin: AdminClient,
   action: "disconnect" | "delete",
 ) {
-  const { orgId } = await authenticatedContext(req, admin);
+  const { orgId, role, isSuperAdmin } = await authenticatedContext(req, admin);
+  assertCanManageInstagramAccounts({ role, isSuperAdmin });
   const instanceId = normalizeInstanceId(body.instanceId);
   const functionName =
     action === "disconnect"
@@ -247,7 +259,8 @@ async function changeAccountLifecycle(
 }
 
 async function manualVerification(req: Request, body: JsonRecord, admin: AdminClient) {
-  const { orgId } = await authenticatedContext(req, admin);
+  const { orgId, role, isSuperAdmin } = await authenticatedContext(req, admin);
+  assertCanManageInstagramAccounts({ role, isSuperAdmin });
   const instanceId = normalizeInstanceId(body.instanceId);
   const { data: account, error: accountError } = await admin
     .from("ig_instancias")
@@ -291,9 +304,16 @@ Deno.serve(async (req) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "instagram_connection_failed";
     const status =
-      message === "unauthorized" ? 401 : message.includes("flow_business_limit") ? 409 : 400;
+      message === "unauthorized"
+        ? 401
+        : message === "forbidden"
+          ? 403
+          : message.includes("flow_business_limit")
+            ? 409
+            : 400;
     const safe = [
       "unauthorized",
+      "forbidden",
       "invalid_username",
       "invalid_instance_id",
       "invalid_credentials",

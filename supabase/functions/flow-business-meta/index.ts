@@ -6,6 +6,7 @@ import {
   validateFlowBusinessTokenKey,
 } from "../_shared/flow-business-token.ts";
 import { messagingWindowIsOpen } from "../_shared/flow-business-policy.ts";
+import { assertCanManageInstagramAccounts } from "../_shared/instagram-account-access.ts";
 import {
   getMetaOAuthPrerequisiteStatus,
   isMetaOAuthEnabled,
@@ -52,15 +53,23 @@ async function authenticatedContext(req: Request, admin: AdminClient) {
   if (!authHeader?.startsWith("Bearer ")) throw new Error("unauthorized");
   const { data, error } = await admin.auth.getUser(authHeader.slice(7));
   if (error || !data.user) throw new Error("unauthorized");
-  const { data: membership, error: membershipError } = await admin
-    .from("memberships")
-    .select("org_id")
-    .eq("user_id", data.user.id)
-    .order("criada_em", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: membership, error: membershipError }, { data: profile }] = await Promise.all([
+    admin
+      .from("memberships")
+      .select("org_id,papel")
+      .eq("user_id", data.user.id)
+      .order("criada_em", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    admin.from("profiles").select("is_super_admin").eq("id", data.user.id).maybeSingle(),
+  ]);
   if (membershipError || !membership) throw new Error("organization_not_found");
-  return { userId: data.user.id, orgId: membership.org_id as string };
+  return {
+    userId: data.user.id,
+    orgId: membership.org_id as string,
+    role: membership.papel,
+    isSuperAdmin: profile?.is_super_admin === true,
+  };
 }
 
 async function reserveAccountConnection(
@@ -92,7 +101,8 @@ async function assertMetaOAuthEnabled(admin: AdminClient) {
 }
 
 async function startConnection(req: Request, admin: AdminClient): Promise<Response> {
-  const { userId, orgId } = await authenticatedContext(req, admin);
+  const { userId, orgId, role, isSuperAdmin } = await authenticatedContext(req, admin);
+  assertCanManageInstagramAccounts({ role, isSuperAdmin });
   await assertMetaOAuthEnabled(admin);
   const clientId = env("META_INSTAGRAM_APP_ID");
   const redirectUri = env("FLOW_BUSINESS_META_REDIRECT_URL");
@@ -331,11 +341,13 @@ Deno.serve(async (req) => {
     const status =
       message === "unauthorized"
         ? 401
-        : message.startsWith("missing_config") ||
-            message.startsWith("invalid_config") ||
-            message === "instagram_connection_disabled"
-          ? 503
-          : 500;
+        : message === "forbidden"
+          ? 403
+          : message.startsWith("missing_config") ||
+              message.startsWith("invalid_config") ||
+              message === "instagram_connection_disabled"
+            ? 503
+            : 500;
     const safeError =
       message.startsWith("missing_config") ||
       message.startsWith("invalid_config") ||
@@ -345,7 +357,9 @@ Deno.serve(async (req) => {
           ? "flow_business_limit:accounts"
           : message === "unauthorized"
             ? "unauthorized"
-            : "instagram_connection_failed";
+            : message === "forbidden"
+              ? "forbidden"
+              : "instagram_connection_failed";
     return json({ error: safeError }, status, req);
   }
 });
