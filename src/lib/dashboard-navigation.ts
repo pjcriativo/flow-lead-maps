@@ -1,4 +1,5 @@
 export const DASHBOARD_SECTION_IDS = [
+  "home",
   "buscar",
   "instagram",
   "listas",
@@ -30,7 +31,7 @@ export function dashboardSectionFromSearch(search: string): DashboardSection {
   const requested = new URLSearchParams(search).get("secao");
   if (requested === "configuracoes" || requested === "perfil") return "settings";
   if (requested === "inteligencia" || requested === "competitors") return "instagram";
-  return isDashboardSection(requested) ? requested : "buscar";
+  return isDashboardSection(requested) ? requested : "home";
 }
 
 export function dashboardUrlForSection(currentUrl: string, section: DashboardSection): string {

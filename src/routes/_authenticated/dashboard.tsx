@@ -1,35 +1,6 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
-import {
-  User,
-  Users,
-  Sheet as SheetIcon,
-  Settings as SettingsIcon,
-  Search,
-  LayoutGrid,
-  FolderOpen,
-  FileText,
-  ScrollText,
-  Wallet,
-  Wand2,
-  Rocket,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  LogOut,
-  MessageCircle,
-  Megaphone,
-  Bot,
-  ShieldCheck,
-  LifeBuoy,
-  Bell,
-  Lock,
-  Instagram,
-  GraduationCap,
-  Network,
-} from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Sheet as SheetIcon, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +33,8 @@ import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
 import { UserProfileSection } from "@/components/perfil/UserProfileSection";
+import { DashboardSidebar } from "@/components/home-premium/DashboardSidebar";
+import { HomePremiumView } from "@/components/home-premium/HomePremiumView";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -73,6 +46,7 @@ import { BRAND_NAME, BRAND_PRODUCT_DESCRIPTION, BRAND_SITE_URL } from "@/lib/bra
 import {
   dashboardSectionFromSearch,
   dashboardUrlForSection,
+  isDashboardSection,
   type DashboardSection,
 } from "@/lib/dashboard-navigation";
 
@@ -107,40 +81,16 @@ function getUserId(): string {
 
 type Section = DashboardSection;
 
-// "Google Sheets" saiu da sidebar (deprecated). No lugar entrou "Campanhas".
-const NAV: { id: Section; label: string; Icon: typeof Search; badge?: string }[] = [
-  { id: "buscar", label: "Buscar", Icon: Search },
-  { id: "instagram", label: "Instagram", Icon: Instagram },
-  { id: "listas", label: "Minhas Listas", Icon: FolderOpen },
-  { id: "pipeline", label: "Pipeline", Icon: LayoutGrid },
-  { id: "leads", label: "Meus Leads", Icon: Users },
-  { id: "propostas", label: "Propostas", Icon: FileText },
-  { id: "campanhas", label: "Campanhas", Icon: Megaphone },
-  { id: "whatsapp", label: "WhatsApp", Icon: MessageCircle },
-  { id: "automacao", label: "Automação", Icon: Bot },
-  { id: "contratos", label: "Contratos", Icon: ScrollText },
-  { id: "financeiro", label: "Financeiro", Icon: Wallet },
-  { id: "redesign", label: "Redesign", Icon: Wand2 },
-  { id: "publicar", label: "Publicar", Icon: Rocket },
-  { id: "suporte", label: "Suporte", Icon: LifeBuoy },
-  { id: "notificacoes", label: "Notificações", Icon: Bell },
-  { id: "academy", label: "Business Academy", Icon: GraduationCap, badge: "Em breve" },
-  { id: "network", label: "Business Network", Icon: Network, badge: "Em breve" },
-  { id: "settings", label: "Meu Perfil", Icon: User },
-];
-
 function Dashboard() {
-  const navigate = useNavigate();
   const planPerms = usePlanPermissions();
   const [section, setSection] = useState<Section>(() =>
-    typeof window === "undefined" ? "buscar" : dashboardSectionFromSearch(window.location.search),
+    typeof window === "undefined" ? "home" : dashboardSectionFromSearch(window.location.search),
   );
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetVerified, setSheetVerified] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [userReady, setUserReady] = useState(false);
-  const [superAdmin, setSuperAdmin] = useState(false);
   const [naoLidas, setNaoLidas] = useState(0);
   const [userProfile, setUserProfile] = useState<{
     full_name: string;
@@ -200,7 +150,6 @@ function Dashboard() {
             avatar_url: perfil.avatar_url ?? "",
             plan: perfil.plan ?? "starter",
           });
-          setSuperAdmin(perfil?.is_super_admin === true);
         }
       }
       setUserReady(true);
@@ -228,13 +177,8 @@ function Dashboard() {
     const secao = params.get("secao");
     if (secao === "configuracoes" || secao === "perfil") selectSection("settings");
     else if (secao === "inteligencia" || secao === "competitors") selectSection("instagram");
-    else if (secao && NAV.some((n) => n.id === secao)) selectSection(secao as Section);
+    else if (isDashboardSection(secao)) selectSection(secao);
   }, [selectSection]);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
-  };
 
   if (!userReady) return null;
 
@@ -246,144 +190,54 @@ function Dashboard() {
     .toUpperCase();
 
   return (
-    <div className="flex min-h-screen w-full bg-white text-foreground">
-      <aside
-        className={cn(
-          "hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
-          section === "instagram" ? "md:hidden" : "md:flex",
-        )}
-      >
-        <Link to="/" className="flex items-center px-4 py-5">
-          <FlowLeadsLogo variant="dark" className="h-12 w-auto" />
-        </Link>
-        <nav className="flex-1 space-y-1 px-3 py-2">
-          {NAV.filter((item) => item.id !== "settings").map((item) => {
-            const isLocked =
-              restrictedSections.includes(item.id) &&
-              !planPerms.canAccessPropostas &&
-              !planPerms.loading;
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleNavClick(item.id, item.label)}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                  section === item.id
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                )}
-              >
-                <item.Icon className="h-4 w-4" />
-                <span>{item.label}</span>
-                {item.badge && !isLocked && (
-                  <span className="ml-auto rounded-full border border-gold/35 bg-gold/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-gold">
-                    {item.badge}
-                  </span>
-                )}
-                {isLocked && (
-                  <span className="ml-auto flex items-center gap-1 rounded-full border border-gold/40 bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold text-gold uppercase">
-                    <Lock className="h-2.5 w-2.5" /> PRO
-                  </span>
-                )}
-                {item.id === "notificacoes" && naoLidas > 0 && !isLocked && (
-                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-semibold text-navy">
-                    {naoLidas}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Card do Usuário Logado no Rodapé da Sidebar */}
-        <div className="border-t border-sidebar-border p-3 space-y-2">
-          <button
-            type="button"
-            onClick={() => selectSection("settings")}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-all border",
-              section === "settings"
-                ? "bg-sidebar-accent border-sidebar-border text-sidebar-accent-foreground shadow-xs"
-                : "border-transparent hover:bg-sidebar-accent/50 text-sidebar-foreground",
-            )}
-            title="Ver / Editar Meu Perfil"
-          >
-            <Avatar className="h-9 w-9 border border-sidebar-border shrink-0">
-              <AvatarImage src={userProfile?.avatar_url} />
-              <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs">
-                {userIniciais}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold leading-tight text-sidebar-foreground">
-                {userProfile?.full_name || "Meu Perfil"}
-              </p>
-              <p className="truncate text-[11px] text-sidebar-foreground/60">
-                {userProfile?.email || "Configurar perfil"}
-              </p>
-            </div>
-          </button>
-
-          {superAdmin && (
-            <Link
-              to="/admin"
-              className="flex w-full items-center gap-3 rounded-md border border-gold/30 px-3 py-1.5 text-xs text-gold transition-colors hover:bg-sidebar-accent/60"
-            >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Painel Admin
-            </Link>
-          )}
-          <button
-            onClick={handleSignOut}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-xs text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Sair
-          </button>
-          <div className="border-t border-sidebar-border pt-2 text-[10px] text-sidebar-foreground/40 text-center">
-            v1.0
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile top tabs */}
-      <div
-        className={cn(
-          "fixed left-0 right-0 top-0 z-30 items-center gap-1 overflow-x-auto border-b border-border bg-sidebar px-2 py-2 md:hidden",
-          section === "instagram" ? "hidden" : "flex",
-        )}
-      >
-        {NAV.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleNavClick(item.id, item.label)}
-            className={cn(
-              "shrink-0 rounded-md px-3 py-1.5 text-xs",
-              section === item.id
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-sidebar-foreground/70",
-            )}
-          >
-            <span>{item.label}</span>
-            {item.badge ? (
-              <span className="ml-1 rounded-full bg-gold/15 px-1 py-0.5 text-[8px] font-semibold uppercase text-gold">
-                {item.badge}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
+    <div
+      className={cn(
+        "flex min-h-svh w-full",
+        section === "home"
+          ? "bg-home-background text-home-foreground"
+          : "bg-background text-foreground",
+      )}
+    >
+      {section !== "instagram" ? (
+        <DashboardSidebar
+          activeSection={section}
+          onNavigate={handleNavClick}
+          unreadNotifications={naoLidas}
+          user={{
+            name: userProfile?.full_name || "Meu Perfil",
+            email: userProfile?.email || "Configurar perfil",
+            avatarUrl: userProfile?.avatar_url || "",
+            initials: userIniciais,
+          }}
+        />
+      ) : null}
 
       <main
         className={cn(
-          "min-w-0 flex-1 bg-white",
-          section === "instagram" ? "p-0" : "px-4 pb-10 pt-16 md:px-8 md:pt-8",
+          "min-w-0 flex-1",
+          section === "home" && "bg-home-background pt-14 lg:pt-0",
+          section === "instagram" && "p-0",
+          section !== "home" &&
+            section !== "instagram" &&
+            "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
       >
+        {section === "home" && (
+          <HomePremiumView
+            user={{
+              name: userProfile?.full_name || "Marcos Gonçalves",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNewCampaign={() => handleNavClick("campanhas", "Campanhas")}
+            onOpenLeads={() => selectSection("leads")}
+          />
+        )}
         {section === "buscar" && (
           <SearchSection onOpenInstagram={() => selectSection("instagram")} />
         )}
-        {section === "instagram" && <InstagramWorkspace onExit={() => selectSection("buscar")} />}
+        {section === "instagram" && <InstagramWorkspace onExit={() => selectSection("home")} />}
         {section === "listas" && (
           <MinhasListasSection
             onOpenRedesign={(leadId) => {

@@ -13,7 +13,7 @@ test("a marca global é Flow Business e não substitui o nome do módulo Instagr
 
 test("abre e preserva o módulo Instagram pela URL do dashboard", () => {
   assert.equal(dashboardSectionFromSearch("?secao=instagram"), "instagram");
-  assert.equal(dashboardSectionFromSearch("?secao=inexistente"), "buscar");
+  assert.equal(dashboardSectionFromSearch("?secao=inexistente"), "home");
   assert.equal(
     dashboardUrlForSection("https://flowleads.com.br/dashboard?foo=bar", "instagram"),
     "/dashboard?foo=bar&secao=instagram",
