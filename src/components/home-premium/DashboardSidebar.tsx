@@ -8,7 +8,6 @@ import {
   GraduationCap,
   Headphones,
   Home,
-  LayoutDashboard,
   ListChecks,
   Menu,
   MessagesSquare,
@@ -68,7 +67,6 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
   {
     items: [
       { label: "Home", section: "home", icon: Home, homeActive: true },
-      { label: "Dashboard", section: "home", icon: LayoutDashboard },
       { label: "Leads", section: "leads", icon: Users },
       { label: "Pipeline", section: "pipeline", icon: GitBranch },
       { label: "Campanhas", section: "campanhas", icon: Megaphone },
