@@ -26,12 +26,14 @@ interface FlowMarketingPageProps {
   };
   unreadNotifications?: number;
   onNavigateToCampanhas?: () => void;
+  onNavigateToAgentes?: () => void;
 }
 
 export function FlowMarketingPage({
   user,
   unreadNotifications = 1,
   onNavigateToCampanhas,
+  onNavigateToAgentes,
 }: FlowMarketingPageProps) {
   // Dados de Produtos e Insights
   const [products, setProducts] = useState<ProductItem[]>(INITIAL_PRODUCTS);

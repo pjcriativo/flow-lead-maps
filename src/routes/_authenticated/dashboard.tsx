@@ -46,6 +46,7 @@ import {
 } from "@/components/home-premium/DashboardSidebar";
 import { HomePremiumView } from "@/components/home-premium/HomePremiumView";
 import { FlowMarketingPage } from "@/components/marketing-ai/FlowMarketingPage";
+import { AgentesEstrategiasPage } from "@/components/marketing-ai/agentes/AgentesEstrategiasPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -322,7 +323,22 @@ function Dashboard() {
             onSelectCampanhaContext={(c) => setSelectedCampanhaContext(c)}
           />
         )}
-        {section === "marketing" && (
+        {section === "marketing" && marketingSubView === "agentes" && (
+          <AgentesEstrategiasPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToProdutos={() => setMarketingSubView("produtos")}
+            onNavigateToCampanhas={() => {
+              selectSection("campanhas");
+              setCampanhasSubView("central");
+            }}
+          />
+        )}
+        {section === "marketing" && marketingSubView !== "agentes" && (
           <FlowMarketingPage
             user={{
               name: userProfile?.full_name || "Carlos Mendes",
@@ -330,6 +346,7 @@ function Dashboard() {
               initials: userIniciais,
             }}
             unreadNotifications={naoLidas}
+            onNavigateToAgentes={() => setMarketingSubView("agentes")}
             onNavigateToCampanhas={() => {
               selectSection("campanhas");
               setCampanhasSubView("central");

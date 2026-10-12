@@ -157,7 +157,7 @@ const CAMPANHAS_SUBITEMS = [
 
 export const MARKETING_SUBITEMS = [
   { id: "produtos" as const, label: "Produtos e Serviços", icon: Package, ready: true },
-  { id: "agentes" as const, label: "Agentes e Estratégias", icon: BrainCircuit, ready: false },
+  { id: "agentes" as const, label: "Agentes e Estratégias", icon: BrainCircuit, ready: true },
   { id: "campanhas_conteudo" as const, label: "Campanhas e Conteúdos", icon: Megaphone, ready: false },
   { id: "calendario" as const, label: "Calendário e Publicações", icon: CalendarDays, ready: false },
   { id: "resultados_roi" as const, label: "Resultados e ROI", icon: ChartNoAxesCombined, ready: false },
@@ -481,14 +481,14 @@ function SidebarNavigation({
                               className={cn(
                                 "group flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition-all duration-150 cursor-pointer",
                                 isSubActive
-                                  ? "bg-home-surface-strong text-white font-bold border border-home-border/80 shadow-sm"
+                                  ? "bg-home-orange text-white font-bold shadow-[0_0_15px_rgba(255,98,0,0.35)]"
                                   : "text-home-muted hover:bg-home-surface-strong hover:text-white",
                               )}
                             >
                               <SubIcon
                                 className={cn(
                                   "size-3.5 shrink-0 transition-colors",
-                                  isSubActive ? "text-home-orange" : "text-home-muted group-hover:text-white",
+                                  isSubActive ? "text-white" : "text-home-muted group-hover:text-white",
                                 )}
                               />
                               <span className="truncate flex-1">{sub.label}</span>
