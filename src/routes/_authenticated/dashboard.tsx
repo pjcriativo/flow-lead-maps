@@ -31,7 +31,11 @@ import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
 import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
-import { CampanhasPremiumView } from "@/components/campanhas-premium/CampanhasPremiumView";
+import {
+  CampanhasPremiumView,
+  type CampanhasSubView,
+} from "@/components/campanhas-premium/CampanhasPremiumView";
+import type { Campanha } from "@/types";
 import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
@@ -89,6 +93,8 @@ function Dashboard() {
   const [section, setSection] = useState<Section>(() =>
     typeof window === "undefined" ? "home" : dashboardSectionFromSearch(window.location.search),
   );
+  const [campanhasSubView, setCampanhasSubView] = useState<CampanhasSubView>("central");
+  const [selectedCampanhaContext, setSelectedCampanhaContext] = useState<Campanha | null>(null);
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetVerified, setSheetVerified] = useState(false);
@@ -204,7 +210,12 @@ function Dashboard() {
       {section !== "instagram" ? (
         <DashboardSidebar
           activeSection={section}
+          campanhasSubView={campanhasSubView}
           onNavigate={handleNavClick}
+          onNavigateCampanhasSub={(sub) => {
+            selectSection("campanhas");
+            setCampanhasSubView(sub);
+          }}
           unreadNotifications={naoLidas}
           user={{
             name: userProfile?.full_name || "Meu Perfil",
@@ -286,6 +297,10 @@ function Dashboard() {
               initials: userIniciais,
             }}
             unreadNotifications={naoLidas}
+            activeSubView={campanhasSubView}
+            onSubViewChange={(sub) => setCampanhasSubView(sub)}
+            selectedCampanhaContext={selectedCampanhaContext}
+            onSelectCampanhaContext={(c) => setSelectedCampanhaContext(c)}
           />
         )}
         {section === "whatsapp" && <WhatsAppSection />}

@@ -25,14 +25,21 @@ import { CampanhasStatsCards } from "./CampanhasStatsCards";
 import { CampanhasTable } from "./CampanhasTable";
 import { CampanhaSummaryPanel } from "./CampanhaSummaryPanel";
 import { CriarCampanhaModal } from "./CriarCampanhaModal";
+import { SelecionarCampanhaModal } from "./SelecionarCampanhaModal";
 
-interface CampanhasPremiumViewProps {
+export type CampanhasSubView = "central" | "gestao" | "resultados";
+
+export interface CampanhasPremiumViewProps {
   user?: {
     name: string;
     avatarUrl: string;
     initials: string;
   };
   unreadNotifications?: number;
+  activeSubView?: CampanhasSubView;
+  onSubViewChange?: (subView: CampanhasSubView) => void;
+  selectedCampanhaContext?: Campanha | null;
+  onSelectCampanhaContext?: (c: Campanha | null) => void;
 }
 
 export function CampanhasPremiumView({
@@ -42,7 +49,29 @@ export function CampanhasPremiumView({
     initials: "MG",
   },
   unreadNotifications = 3,
+  activeSubView,
+  onSubViewChange,
+  selectedCampanhaContext,
+  onSelectCampanhaContext,
 }: CampanhasPremiumViewProps) {
+  // Controle de subview ativa e contexto compartilhado da campanha selecionada
+  const [internalSubView, setInternalSubView] = useState<CampanhasSubView>("central");
+  const [internalCampanha, setInternalCampanha] = useState<Campanha | null>(null);
+
+  const currentSubView = activeSubView ?? internalSubView;
+  const currentCampanha =
+    selectedCampanhaContext !== undefined ? selectedCampanhaContext : internalCampanha;
+
+  const handleSubViewChange = (sub: CampanhasSubView) => {
+    setInternalSubView(sub);
+    onSubViewChange?.(sub);
+  };
+
+  const handleSetCampanha = (camp: Campanha | null) => {
+    setInternalCampanha(camp);
+    onSelectCampanhaContext?.(camp);
+  };
+
   // Lista de campanhas mesclando dados reais com o mockup aprovado
   const [campanhasList, setCampanhasList] = useState<CampanhaPremiumItem[]>(MOCK_CAMPANHAS);
   const [campanhasReais, setCampanhasReais] = useState<Campanha[]>([]);
@@ -51,8 +80,6 @@ export function CampanhasPremiumView({
 
   // Estados de modais e fluxos
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [revisaoCampanha, setRevisaoCampanha] = useState<Campanha | null>(null);
-  const [resultadosCampanha, setResultadosCampanha] = useState<Campanha | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Carrega campanhas reais do Supabase e consolida métricas reais
@@ -174,25 +201,22 @@ export function CampanhasPremiumView({
   const handleOpenCampanha = (camp: CampanhaPremiumItem) => {
     // Procura na lista de campanhas reais do Supabase
     const realCamp = campanhasReais.find((c) => c.id === camp.id);
-    if (realCamp) {
-      setRevisaoCampanha(realCamp);
-    } else {
-      // Cria objeto mock compatível para abrir a revisão
-      setRevisaoCampanha({
-        id: camp.id,
-        list_id: null,
-        nome: camp.name,
-        status: camp.status === "concluida" ? "concluida" : "ativa",
-        criada_em: new Date().toISOString(),
-        total: camp.leadsCount,
-        pendente: 0,
-        rascunho: 2,
-        aprovado: 1,
-        enviado: 1,
-        descartado: 0,
-        erro: 0,
-      });
-    }
+    const chosen: Campanha = realCamp || {
+      id: camp.id,
+      list_id: null,
+      nome: camp.name,
+      status: camp.status === "concluida" ? "concluida" : "ativa",
+      criada_em: new Date().toISOString(),
+      total: camp.leadsCount,
+      pendente: 0,
+      rascunho: 2,
+      aprovado: 1,
+      enviado: 1,
+      descartado: 0,
+      erro: 0,
+    };
+    handleSetCampanha(chosen);
+    handleSubViewChange("gestao");
   };
 
   // Renomear campanha
@@ -262,34 +286,101 @@ export function CampanhasPremiumView({
     }
   };
 
-  // Se o usuário abriu os resultados de uma campanha, renderiza a Tela 3 — Resultados e Métricas
-  if (resultadosCampanha) {
+  // Se a subview for Resultados e Métricas (Tela 3)
+  if (currentSubView === "resultados") {
+    if (currentCampanha) {
+      return (
+        <ResultadosCampanhaView
+          campanha={currentCampanha}
+          user={user}
+          unreadNotifications={unreadNotifications}
+          onBackToCentral={() => handleSubViewChange("central")}
+          onBackToProducao={() => handleSubViewChange("gestao")}
+        />
+      );
+    }
+
+    // Se nenhuma campanha estiver selecionada (Regra 5), apresenta o seletor modal com as campanhas reais
     return (
-      <ResultadosCampanhaView
-        campanha={resultadosCampanha}
-        user={user}
-        unreadNotifications={unreadNotifications}
-        onBackToCentral={() => setResultadosCampanha(null)}
-        onBackToProducao={() => {
-          setRevisaoCampanha(resultadosCampanha);
-          setResultadosCampanha(null);
-        }}
-      />
+      <div className="relative min-h-svh bg-home-background">
+        <div className="opacity-40 pointer-events-none filter blur-[1px]">
+          <DashboardHeader user={user} unreadNotifications={unreadNotifications} />
+          <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
+            <CampanhasHeader
+              onNewCampaign={() => setIsCreateModalOpen(true)}
+              onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+            />
+            <CampanhasStatsCards metrics={metrics} />
+          </main>
+        </div>
+
+        <SelecionarCampanhaModal
+          isOpen={true}
+          targetView="resultados"
+          campanhas={campanhasReais}
+          isLoading={loading}
+          onSelect={(c) => {
+            handleSetCampanha(c);
+          }}
+          onClose={() => {
+            handleSubViewChange("central");
+          }}
+          onCreateNew={() => {
+            handleSubViewChange("central");
+            setIsCreateModalOpen(true);
+          }}
+        />
+      </div>
     );
   }
 
-  // Se o usuário abriu uma campanha para revisão, renderiza a Tela 2 — Gestão e Produção de Campanhas Premium
-  if (revisaoCampanha) {
+  // Se a subview for Gestão e Produção (Tela 2)
+  if (currentSubView === "gestao") {
+    if (currentCampanha) {
+      return (
+        <GestaoProducaoView
+          campanha={currentCampanha}
+          user={user}
+          unreadNotifications={unreadNotifications}
+          onBack={() => {
+            handleSubViewChange("central");
+            carregarDadosReais();
+          }}
+        />
+      );
+    }
+
+    // Se nenhuma campanha estiver selecionada (Regra 5), apresenta o seletor modal com as campanhas reais
     return (
-      <GestaoProducaoView
-        campanha={revisaoCampanha}
-        user={user}
-        unreadNotifications={unreadNotifications}
-        onBack={() => {
-          setRevisaoCampanha(null);
-          carregarDadosReais();
-        }}
-      />
+      <div className="relative min-h-svh bg-home-background">
+        <div className="opacity-40 pointer-events-none filter blur-[1px]">
+          <DashboardHeader user={user} unreadNotifications={unreadNotifications} />
+          <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
+            <CampanhasHeader
+              onNewCampaign={() => setIsCreateModalOpen(true)}
+              onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+            />
+            <CampanhasStatsCards metrics={metrics} />
+          </main>
+        </div>
+
+        <SelecionarCampanhaModal
+          isOpen={true}
+          targetView="gestao"
+          campanhas={campanhasReais}
+          isLoading={loading}
+          onSelect={(c) => {
+            handleSetCampanha(c);
+          }}
+          onClose={() => {
+            handleSubViewChange("central");
+          }}
+          onCreateNew={() => {
+            handleSubViewChange("central");
+            setIsCreateModalOpen(true);
+          }}
+        />
+      </div>
     );
   }
 

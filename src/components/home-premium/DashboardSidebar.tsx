@@ -1,7 +1,9 @@
-import { useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { Link } from "@tanstack/react-router";
 import {
+  BarChart3,
   Bell,
+  ChevronDown,
   ChevronRight,
   FileText,
   Filter,
@@ -9,6 +11,7 @@ import {
   GraduationCap,
   Headphones,
   Home,
+  Layers,
   ListChecks,
   Menu,
   MessagesSquare,
@@ -17,6 +20,7 @@ import {
   Plug,
   ScrollText,
   Share2,
+  Sliders,
   Sparkles,
   Users,
   WalletCards,
@@ -39,9 +43,13 @@ import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
 import { cn } from "@/lib/utils";
 import type { DashboardSection } from "@/lib/dashboard-navigation";
 
+export type CampanhasSubView = "central" | "gestao" | "resultados";
+
 interface DashboardSidebarProps {
   activeSection: DashboardSection;
+  campanhasSubView?: CampanhasSubView;
   onNavigate: (section: DashboardSection, label: string) => void;
+  onNavigateCampanhasSub?: (subView: CampanhasSubView) => void;
   unreadNotifications: number;
   user: {
     name: string;
@@ -126,20 +134,45 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
   },
 ];
 
+const CAMPANHAS_SUBITEMS = [
+  { id: "central" as const, label: "Central de Campanhas", icon: Layers },
+  { id: "gestao" as const, label: "Gestão e Produção", icon: Sliders },
+  { id: "resultados" as const, label: "Resultados e Métricas", icon: BarChart3 },
+];
+
 function SidebarNavigation({
   activeSection,
+  campanhasSubView = "central",
   onNavigate,
+  onNavigateCampanhasSub,
   unreadNotifications,
   onClose,
-}: Pick<DashboardSidebarProps, "activeSection" | "onNavigate" | "unreadNotifications"> & {
+}: Pick<
+  DashboardSidebarProps,
+  "activeSection" | "campanhasSubView" | "onNavigate" | "onNavigateCampanhasSub" | "unreadNotifications"
+> & {
   onClose?: () => void;
 }) {
+  const [isCampanhasExpanded, setIsCampanhasExpanded] = useState<boolean>(
+    activeSection === "campanhas",
+  );
+
+  // Mantém o grupo Campanhas expandido enquanto uma de suas páginas estiver ativa (Regra 8)
+  useEffect(() => {
+    if (activeSection === "campanhas") {
+      setIsCampanhasExpanded(true);
+    }
+  }, [activeSection]);
   const openItem = (item: NavigationItem) => {
     if (!item.section) {
       toast.info(`${item.label} estará disponível em breve.`);
       return;
     }
     onNavigate(item.section, item.label);
+    if (item.section === "campanhas") {
+      setIsCampanhasExpanded(true);
+      onNavigateCampanhasSub?.("central");
+    }
     onClose?.();
   };
 
@@ -155,6 +188,8 @@ function SidebarNavigation({
           <div className="space-y-0.5">
             {group.items.map((item) => {
               const Icon = item.icon;
+              const isCampanhas = item.section === "campanhas";
+              const isCampanhasGroupActive = activeSection === "campanhas";
               const active = item.homeActive
                 ? activeSection === "home"
                 : item.section !== "home" && activeSection === item.section;
@@ -164,6 +199,87 @@ function SidebarNavigation({
                   : item.section === "notificacoes"
                     ? 3
                     : null;
+
+              // Renderização Especial com Submenu Expansível para o Módulo Campanhas
+              if (isCampanhas) {
+                return (
+                  <div key={item.label} className="space-y-0.5">
+                    <button
+                      type="button"
+                      aria-current={isCampanhasGroupActive ? "page" : undefined}
+                      onClick={() => {
+                        if (!isCampanhasGroupActive) {
+                          onNavigate("campanhas", "Campanhas");
+                          onNavigateCampanhasSub?.("central");
+                          setIsCampanhasExpanded(true);
+                        } else {
+                          setIsCampanhasExpanded((prev) => !prev);
+                        }
+                      }}
+                      className={cn(
+                        "group flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium transition-colors cursor-pointer",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isCampanhasGroupActive
+                          ? "bg-home-surface-strong/90 text-white font-semibold border border-home-border/80"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <Megaphone
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4 shrink-0 transition-colors",
+                          isCampanhasGroupActive ? "text-home-orange" : item.iconClassName,
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <ChevronDown
+                        className={cn(
+                          "size-3.5 text-home-muted transition-transform duration-200",
+                          !isCampanhasExpanded && "-rotate-90",
+                        )}
+                      />
+                    </button>
+
+                    {/* Submenu de Campanhas (Central, Gestão e Produção, Resultados e Métricas) */}
+                    {isCampanhasExpanded && (
+                      <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-home-border/60 pl-2 py-0.5">
+                        {CAMPANHAS_SUBITEMS.map((sub) => {
+                          const isSubActive =
+                            isCampanhasGroupActive && (campanhasSubView || "central") === sub.id;
+                          const SubIcon = sub.icon;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigate("campanhas", sub.label);
+                                onNavigateCampanhasSub?.(sub.id);
+                                onClose?.();
+                              }}
+                              className={cn(
+                                "group flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition-all duration-150 cursor-pointer",
+                                isSubActive
+                                  ? "bg-home-orange text-white font-bold shadow-[0_0_15px_rgba(255,98,0,0.35)]"
+                                  : "text-home-muted hover:bg-home-surface-strong hover:text-white",
+                              )}
+                            >
+                              <SubIcon
+                                className={cn(
+                                  "size-3.5 shrink-0 transition-colors",
+                                  isSubActive ? "text-white" : "text-home-muted group-hover:text-white",
+                                )}
+                              />
+                              <span className="truncate">{sub.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
               return (
                 <button
@@ -258,7 +374,9 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
         </Link>
         <SidebarNavigation
           activeSection={props.activeSection}
+          campanhasSubView={props.campanhasSubView}
           onNavigate={props.onNavigate}
+          onNavigateCampanhasSub={props.onNavigateCampanhasSub}
           unreadNotifications={props.unreadNotifications}
         />
         <UserFooter user={props.user} onNavigate={props.onNavigate} />
@@ -298,7 +416,9 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
             </div>
             <SidebarNavigation
               activeSection={props.activeSection}
+              campanhasSubView={props.campanhasSubView}
               onNavigate={props.onNavigate}
+              onNavigateCampanhasSub={props.onNavigateCampanhasSub}
               unreadNotifications={props.unreadNotifications}
               onClose={() => setMobileOpen(false)}
             />

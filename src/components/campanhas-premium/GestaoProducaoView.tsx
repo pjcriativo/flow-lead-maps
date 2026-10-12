@@ -71,23 +71,25 @@ export function GestaoProducaoView({
         // Mapeia CampanhaLeadView para GestaoLeadItem
         const mapped: GestaoLeadItem[] = views.map((v) => {
           let st: GestaoLeadStatus = "pendente";
-          if (v.estado === "aprovado") st = "aprovado";
+          if (v.proposta?.status === "enviada") st = "enviado";
+          else if (v.estado === "aprovado") st = "aprovado";
           else if (v.estado === "rascunho") st = "rascunho";
           else if (v.estado === "gerando") st = "em_geracao";
           else if (v.estado === "sem_motivo") st = "sem_motivo";
-          else if (v.estado === "enviado") st = "enviado";
           else if (v.estado === "descartado") st = "descartado";
           else if (v.estado === "erro") st = "erro";
+
+          const anyV = v as Record<string, any>;
 
           return {
             id: v.id,
             leadId: v.lead_id,
             name: v.lead_nome,
-            niche: v.lead_categoria || "Restaurante",
-            city: v.lead_cidade?.split("-")[0]?.trim() || "São Paulo",
-            uf: v.lead_cidade?.split("-")[1]?.trim() || "SP",
+            niche: anyV.lead_categoria || "Restaurante",
+            city: typeof anyV.lead_cidade === "string" ? anyV.lead_cidade.split("-")[0]?.trim() : "São Paulo",
+            uf: typeof anyV.lead_cidade === "string" ? anyV.lead_cidade.split("-")[1]?.trim() : "SP",
             status: st,
-            hasWebsite: !!v.tem_site_proprio,
+            hasWebsite: !!v.tem_website,
             hasSite: !!v.redesign_id,
             hasProposal: !!v.proposta_id,
             redesignId: v.redesign_id || undefined,
@@ -248,6 +250,8 @@ export function GestaoProducaoView({
         await salvarProposta({
           id: selectedLead.propostaId,
           lead_id: selectedLead.leadId,
+          lead_nome: selectedLead.name,
+          lead_email: null,
           assunto,
           corpo,
           valor: null,

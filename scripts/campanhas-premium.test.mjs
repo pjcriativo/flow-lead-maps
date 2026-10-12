@@ -11,7 +11,7 @@ test("a rota dashboard renderiza CampanhasPremiumView quando a seção ativa é 
     "utf8",
   );
   assert.ok(
-    file.includes('import { CampanhasPremiumView } from "@/components/campanhas-premium/CampanhasPremiumView";'),
+    file.includes("CampanhasPremiumView") && file.includes("@/components/campanhas-premium/CampanhasPremiumView"),
     "Deveria importar CampanhasPremiumView",
   );
   assert.ok(
@@ -196,6 +196,45 @@ test("Tela 3: os 6 cards superiores de KPIs e dados do funil e canais correspond
   assert.ok(file.includes("Leads interessados"), "Deveria ter Leads interessados");
   assert.ok(file.includes("FUNNEL_STAGES"), "Deveria ter FUNNEL_STAGES com 6 etapas");
   assert.ok(file.includes("CHANNELS_DATA"), "Deveria ter CHANNELS_DATA com distribuição multicanal");
+});
+
+test("Submenu Campanhas: DashboardSidebar implementa submenu expansível com os 3 itens obrigatórios", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("CAMPANHAS_SUBITEMS"), "Deveria definir CAMPANHAS_SUBITEMS");
+  assert.ok(file.includes("Central de Campanhas"), "Deveria ter o subitem Central de Campanhas");
+  assert.ok(file.includes("Gestão e Produção"), "Deveria ter o subitem Gestão e Produção");
+  assert.ok(file.includes("Resultados e Métricas"), "Deveria ter o subitem Resultados e Métricas");
+  assert.ok(file.includes("isCampanhasExpanded"), "Deveria controlar o estado expandido/recolhido do submenu");
+  assert.ok(file.includes("bg-home-orange text-white font-bold"), "Deveria destacar visualmente o subitem ativo com laranja premium");
+  assert.ok(file.includes("onNavigateCampanhasSub"), "Deveria suportar callback de navegação entre as subviews de campanhas");
+});
+
+test("SelecionarCampanhaModal: apresenta lista de campanhas reais, busca, loading e estado vazio", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/SelecionarCampanhaModal.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("Selecionar Campanha"), "Deveria ter o título Selecionar Campanha");
+  assert.ok(file.includes("targetView"), "Deveria aceitar targetView gestao ou resultados");
+  assert.ok(file.includes("Carregando campanhas do seu workspace"), "Deveria ter estado de loading");
+  assert.ok(file.includes("Nenhuma campanha encontrada"), "Deveria ter estado vazio");
+  assert.ok(file.includes("Criar nova campanha"), "Deveria ter botão de criar campanha no estado vazio");
+  assert.ok(file.includes("onSelect"), "Deveria fornecer callback de seleção da campanha");
+});
+
+test("CampanhasPremiumView: coordena subviews (central, gestao, resultados) e preserva contexto da campanha selecionada", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/CampanhasPremiumView.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("SelecionarCampanhaModal"), "Deveria importar e usar SelecionarCampanhaModal");
+  assert.ok(file.includes('currentSubView === "resultados"'), "Deveria rotear para Resultados");
+  assert.ok(file.includes('currentSubView === "gestao"'), "Deveria rotear para Gestao");
+  assert.ok(file.includes("onBackToCentral"), "Deveria permitir voltar para a Central de Campanhas");
+  assert.ok(file.includes("onBackToProducao"), "Deveria permitir transição preservada entre Resultados e Gestão");
 });
 
 
