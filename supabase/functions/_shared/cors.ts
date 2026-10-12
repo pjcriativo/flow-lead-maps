@@ -2,6 +2,7 @@
 // 🔒 HARDENING: origin restrito aos domínios do Flow Business (antes era "*").
 
 const ALLOWED_ORIGINS = [
+  "https://business.flowgenius.com.br",
   "https://flow-leads-dusky.vercel.app",
   "https://flowleads.com.br",
   "https://www.flowleads.com.br",
