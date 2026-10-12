@@ -4,6 +4,7 @@ import {
   Bell,
   ChevronRight,
   FileText,
+  Filter,
   GitBranch,
   GraduationCap,
   Headphones,
@@ -15,6 +16,7 @@ import {
   Network,
   Plug,
   ScrollText,
+  Share2,
   Users,
   WalletCards,
   Workflow,
@@ -67,8 +69,8 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
   {
     items: [
       { label: "Home", section: "home", icon: Home, homeActive: true },
-      { label: "Leads", section: "leads", icon: Users },
-      { label: "Pipeline", section: "pipeline", icon: GitBranch },
+      { label: "Leads", section: "leads", icon: Share2 },
+      { label: "Pipeline", section: "pipeline", icon: Filter },
       { label: "Campanhas", section: "campanhas", icon: Megaphone },
       { label: "Conversas", section: "whatsapp", icon: MessagesSquare },
       { label: "Automações", section: "automacao", icon: Workflow },
