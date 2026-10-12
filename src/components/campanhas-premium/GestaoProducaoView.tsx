@@ -21,6 +21,7 @@ import { GestaoLeadsTable } from "./GestaoLeadsTable";
 import { GestaoProcessSteps } from "./GestaoProcessSteps";
 import { GestaoProposalEditor } from "./GestaoProposalEditor";
 import { GestaoSitePreview } from "./GestaoSitePreview";
+import { ResultadosCampanhaView } from "./ResultadosCampanhaView";
 import {
   MOCK_GESTAO_LEADS,
   type GestaoLeadItem,
@@ -58,6 +59,7 @@ export function GestaoProducaoView({
   const [isConfigDrawerOpen, setIsConfigDrawerOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingRedesign, setEditingRedesign] = useState<Redesign | null>(null);
+  const [mostrarResultados, setMostrarResultados] = useState(false);
 
   // Carrega leads reais vinculados a esta campanha no banco de dados
   const carregarLeadsReais = useCallback(async () => {
@@ -401,6 +403,19 @@ export function GestaoProducaoView({
     toast.success("Exportação de leads concluída.");
   };
 
+  // Se o usuário navegou para os resultados da campanha (Tela 3)
+  if (mostrarResultados) {
+    return (
+      <ResultadosCampanhaView
+        campanha={campanha}
+        user={user}
+        unreadNotifications={unreadNotifications}
+        onBackToCentral={onBack}
+        onBackToProducao={() => setMostrarResultados(false)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-svh bg-home-background text-home-foreground">
       {/* Topbar Global */}
@@ -427,7 +442,7 @@ export function GestaoProducaoView({
           activeStep={1}
           onSelectStep={(step) => {
             if (step === 5) {
-              toast.info("A Tela 3 — Resultados e Métricas será implementada na próxima etapa.");
+              setMostrarResultados(true);
             }
           }}
         />

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DashboardHeader } from "@/components/home-premium/DashboardHeader";
 import { GestaoProducaoView } from "./GestaoProducaoView";
+import { ResultadosCampanhaView } from "./ResultadosCampanhaView";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +52,7 @@ export function CampanhasPremiumView({
   // Estados de modais e fluxos
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [revisaoCampanha, setRevisaoCampanha] = useState<Campanha | null>(null);
+  const [resultadosCampanha, setResultadosCampanha] = useState<Campanha | null>(null);
   const [loading, setLoading] = useState(false);
 
   // Carrega campanhas reais do Supabase e consolida métricas reais
@@ -259,6 +261,22 @@ export function CampanhasPremiumView({
       toast.error(e instanceof Error ? e.message : "Falha ao alterar status da campanha");
     }
   };
+
+  // Se o usuário abriu os resultados de uma campanha, renderiza a Tela 3 — Resultados e Métricas
+  if (resultadosCampanha) {
+    return (
+      <ResultadosCampanhaView
+        campanha={resultadosCampanha}
+        user={user}
+        unreadNotifications={unreadNotifications}
+        onBackToCentral={() => setResultadosCampanha(null)}
+        onBackToProducao={() => {
+          setRevisaoCampanha(resultadosCampanha);
+          setResultadosCampanha(null);
+        }}
+      />
+    );
+  }
 
   // Se o usuário abriu uma campanha para revisão, renderiza a Tela 2 — Gestão e Produção de Campanhas Premium
   if (revisaoCampanha) {

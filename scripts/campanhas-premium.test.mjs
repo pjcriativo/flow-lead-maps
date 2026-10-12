@@ -169,3 +169,33 @@ test("Tela 2: GestaoSitePreview possui abas (Site gerado, Proposta, Análise, Hi
   assert.ok(file.includes("Editar site"), "Deveria ter botão Editar site");
 });
 
+test("Tela 3: Resultados e Métricas reúne todos os componentes da composição aprovada", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/ResultadosCampanhaView.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("<ResultadosHeader"), "Deveria incluir ResultadosHeader");
+  assert.ok(file.includes("<ResultadosKpiCards"), "Deveria incluir ResultadosKpiCards");
+  assert.ok(file.includes("<ResultadosEvolutionChart"), "Deveria incluir ResultadosEvolutionChart");
+  assert.ok(file.includes("<ResultadosFunnelCard"), "Deveria incluir ResultadosFunnelCard");
+  assert.ok(file.includes("<ResultadosPerformanceTable"), "Deveria incluir ResultadosPerformanceTable");
+  assert.ok(file.includes("<ResultadosChannelsCard"), "Deveria incluir ResultadosChannelsCard");
+  assert.ok(file.includes("<ResultadosActivityTimeline"), "Deveria incluir ResultadosActivityTimeline");
+});
+
+test("Tela 3: os 6 cards superiores de KPIs e dados do funil e canais correspondem ao layout", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/resultados-campanha-data.ts"),
+    "utf8",
+  );
+  assert.ok(file.includes("Leads da campanha"), "Deveria ter Leads da campanha");
+  assert.ok(file.includes("Sites gerados"), "Deveria ter Sites gerados");
+  assert.ok(file.includes("Propostas enviadas"), "Deveria ter Propostas enviadas");
+  assert.ok(file.includes("Taxa de abertura"), "Deveria ter Taxa de abertura");
+  assert.ok(file.includes("Cliques no site"), "Deveria ter Cliques no site");
+  assert.ok(file.includes("Leads interessados"), "Deveria ter Leads interessados");
+  assert.ok(file.includes("FUNNEL_STAGES"), "Deveria ter FUNNEL_STAGES com 6 etapas");
+  assert.ok(file.includes("CHANNELS_DATA"), "Deveria ter CHANNELS_DATA com distribuição multicanal");
+});
+
+
