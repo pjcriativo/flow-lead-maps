@@ -40,8 +40,12 @@ import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
 import { UserProfileSection } from "@/components/perfil/UserProfileSection";
-import { DashboardSidebar } from "@/components/home-premium/DashboardSidebar";
+import {
+  DashboardSidebar,
+  type MarketingSubView,
+} from "@/components/home-premium/DashboardSidebar";
 import { HomePremiumView } from "@/components/home-premium/HomePremiumView";
+import { FlowMarketingPage } from "@/components/marketing-ai/FlowMarketingPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -94,6 +98,7 @@ function Dashboard() {
     typeof window === "undefined" ? "home" : dashboardSectionFromSearch(window.location.search),
   );
   const [campanhasSubView, setCampanhasSubView] = useState<CampanhasSubView>("central");
+  const [marketingSubView, setMarketingSubView] = useState<MarketingSubView>("produtos");
   const [selectedCampanhaContext, setSelectedCampanhaContext] = useState<Campanha | null>(null);
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
@@ -202,7 +207,11 @@ function Dashboard() {
     <div
       className={cn(
         "flex min-h-svh w-full",
-        section === "home" || section === "leads" || section === "pipeline" || section === "campanhas"
+        section === "home" ||
+          section === "leads" ||
+          section === "pipeline" ||
+          section === "campanhas" ||
+          section === "marketing"
           ? "bg-home-background text-home-foreground"
           : "bg-background text-foreground",
       )}
@@ -211,10 +220,15 @@ function Dashboard() {
         <DashboardSidebar
           activeSection={section}
           campanhasSubView={campanhasSubView}
+          marketingSubView={marketingSubView}
           onNavigate={handleNavClick}
           onNavigateCampanhasSub={(sub) => {
             selectSection("campanhas");
             setCampanhasSubView(sub);
+          }}
+          onNavigateMarketingSub={(sub) => {
+            selectSection("marketing");
+            setMarketingSubView(sub);
           }}
           unreadNotifications={naoLidas}
           user={{
@@ -229,13 +243,18 @@ function Dashboard() {
       <main
         className={cn(
           "min-w-0 flex-1",
-          (section === "home" || section === "leads" || section === "pipeline" || section === "campanhas") &&
+          (section === "home" ||
+            section === "leads" ||
+            section === "pipeline" ||
+            section === "campanhas" ||
+            section === "marketing") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
             section !== "leads" &&
             section !== "pipeline" &&
             section !== "campanhas" &&
+            section !== "marketing" &&
             section !== "instagram" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
@@ -301,6 +320,20 @@ function Dashboard() {
             onSubViewChange={(sub) => setCampanhasSubView(sub)}
             selectedCampanhaContext={selectedCampanhaContext}
             onSelectCampanhaContext={(c) => setSelectedCampanhaContext(c)}
+          />
+        )}
+        {section === "marketing" && (
+          <FlowMarketingPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToCampanhas={() => {
+              selectSection("campanhas");
+              setCampanhasSubView("central");
+            }}
           />
         )}
         {section === "whatsapp" && <WhatsAppSection />}

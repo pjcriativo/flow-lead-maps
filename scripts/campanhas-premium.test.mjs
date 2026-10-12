@@ -42,8 +42,8 @@ test("a sidebar inclui Flow Marketing AI abaixo de Campanhas com ícone Sparkles
     "Deveria usar o ícone Sparkles",
   );
   assert.ok(
-    file.includes('badge: "EM BREVE"'),
-    "Deveria ter o badge EM BREVE",
+    file.includes('badge: "EM BREVE"') || file.includes('badge: "Em breve"'),
+    "Deveria ter o badge EM BREVE ou Em breve",
   );
 
   // Verifica ordem: Campanhas vem antes de Flow Marketing AI, e Flow Marketing AI vem antes de Conversas

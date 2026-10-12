@@ -3,6 +3,9 @@ import { Link } from "@tanstack/react-router";
 import {
   BarChart3,
   Bell,
+  BrainCircuit,
+  CalendarDays,
+  ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -17,6 +20,7 @@ import {
   MessagesSquare,
   Megaphone,
   Network,
+  Package,
   PanelLeftClose,
   PanelLeftOpen,
   Plug,
@@ -47,11 +51,20 @@ import type { DashboardSection } from "@/lib/dashboard-navigation";
 
 export type CampanhasSubView = "central" | "gestao" | "resultados";
 
+export type MarketingSubView =
+  | "produtos"
+  | "agentes"
+  | "campanhas_conteudo"
+  | "calendario"
+  | "resultados_roi";
+
 interface DashboardSidebarProps {
   activeSection: DashboardSection;
   campanhasSubView?: CampanhasSubView;
+  marketingSubView?: MarketingSubView;
   onNavigate: (section: DashboardSection, label: string) => void;
   onNavigateCampanhasSub?: (subView: CampanhasSubView) => void;
+  onNavigateMarketingSub?: (subView: MarketingSubView) => void;
   unreadNotifications: number;
   user: {
     name: string;
@@ -83,7 +96,7 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
       { label: "Leads", section: "leads", icon: Share2 },
       { label: "Pipeline", section: "pipeline", icon: Filter },
       { label: "Campanhas", section: "campanhas", icon: Megaphone },
-      { label: "Flow Marketing AI", icon: Sparkles, badge: "EM BREVE" },
+      { label: "Flow Marketing AI", section: "marketing", icon: Sparkles, badge: "Em breve" },
       { label: "Conversas", section: "whatsapp", icon: MessagesSquare },
       { label: "Automações", section: "automacao", icon: Workflow },
     ],
@@ -142,17 +155,33 @@ const CAMPANHAS_SUBITEMS = [
   { id: "resultados" as const, label: "Resultados e Métricas", icon: BarChart3 },
 ];
 
+export const MARKETING_SUBITEMS = [
+  { id: "produtos" as const, label: "Produtos e Serviços", icon: Package, ready: true },
+  { id: "agentes" as const, label: "Agentes e Estratégias", icon: BrainCircuit, ready: false },
+  { id: "campanhas_conteudo" as const, label: "Campanhas e Conteúdos", icon: Megaphone, ready: false },
+  { id: "calendario" as const, label: "Calendário e Publicações", icon: CalendarDays, ready: false },
+  { id: "resultados_roi" as const, label: "Resultados e ROI", icon: ChartNoAxesCombined, ready: false },
+];
+
 function SidebarNavigation({
   activeSection,
   campanhasSubView = "central",
+  marketingSubView = "produtos",
   onNavigate,
   onNavigateCampanhasSub,
+  onNavigateMarketingSub,
   unreadNotifications,
   isCollapsed = false,
   onClose,
 }: Pick<
   DashboardSidebarProps,
-  "activeSection" | "campanhasSubView" | "onNavigate" | "onNavigateCampanhasSub" | "unreadNotifications"
+  | "activeSection"
+  | "campanhasSubView"
+  | "marketingSubView"
+  | "onNavigate"
+  | "onNavigateCampanhasSub"
+  | "onNavigateMarketingSub"
+  | "unreadNotifications"
 > & {
   isCollapsed?: boolean;
   onClose?: () => void;
@@ -160,11 +189,21 @@ function SidebarNavigation({
   const [isCampanhasExpanded, setIsCampanhasExpanded] = useState<boolean>(
     activeSection === "campanhas",
   );
+  const [isMarketingExpanded, setIsMarketingExpanded] = useState<boolean>(
+    activeSection === "marketing",
+  );
 
-  // Mantém o grupo Campanhas expandido enquanto uma de suas páginas estiver ativa (Regra 8)
+  // Mantém o grupo Campanhas expandido enquanto ativo
   useEffect(() => {
     if (activeSection === "campanhas") {
       setIsCampanhasExpanded(true);
+    }
+  }, [activeSection]);
+
+  // Mantém o grupo Flow Marketing AI expandido enquanto ativo (Regra Etapa 2)
+  useEffect(() => {
+    if (activeSection === "marketing") {
+      setIsMarketingExpanded(true);
     }
   }, [activeSection]);
 
@@ -177,6 +216,10 @@ function SidebarNavigation({
     if (item.section === "campanhas") {
       setIsCampanhasExpanded(true);
       onNavigateCampanhasSub?.("central");
+    }
+    if (item.section === "marketing") {
+      setIsMarketingExpanded(true);
+      onNavigateMarketingSub?.("produtos");
     }
     onClose?.();
   };
@@ -205,6 +248,8 @@ function SidebarNavigation({
               const Icon = item.icon;
               const isCampanhas = item.section === "campanhas";
               const isCampanhasGroupActive = activeSection === "campanhas";
+              const isMarketing = item.section === "marketing";
+              const isMarketingGroupActive = activeSection === "marketing";
               const active = item.homeActive
                 ? activeSection === "home"
                 : item.section !== "home" && activeSection === item.section;
@@ -318,6 +363,140 @@ function SidebarNavigation({
                                 )}
                               />
                               <span className="truncate">{sub.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              // Renderização Especial com Submenu Expansível para o Módulo Flow Marketing AI
+              if (isMarketing) {
+                if (isCollapsed) {
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      aria-current={isMarketingGroupActive ? "page" : undefined}
+                      title="Flow Marketing AI"
+                      onClick={() => {
+                        onNavigate("marketing", "Flow Marketing AI");
+                        onNavigateMarketingSub?.("produtos");
+                        onClose?.();
+                      }}
+                      className={cn(
+                        "group relative flex h-9 w-full items-center justify-center rounded-lg text-left transition-colors cursor-pointer",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isMarketingGroupActive
+                          ? "bg-home-orange text-white shadow-[0_0_20px_rgba(255,98,0,0.3)]"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <Sparkles
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4.5 shrink-0 transition-colors",
+                          isMarketingGroupActive ? "text-white" : item.iconClassName,
+                        )}
+                      />
+                    </button>
+                  );
+                }
+
+                return (
+                  <div key={item.label} className="space-y-0.5">
+                    <button
+                      type="button"
+                      aria-current={isMarketingGroupActive ? "page" : undefined}
+                      onClick={() => {
+                        if (!isMarketingGroupActive) {
+                          onNavigate("marketing", "Flow Marketing AI");
+                          onNavigateMarketingSub?.("produtos");
+                          setIsMarketingExpanded(true);
+                        } else {
+                          setIsMarketingExpanded((prev) => !prev);
+                        }
+                      }}
+                      className={cn(
+                        "group flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium transition-colors cursor-pointer",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isMarketingGroupActive
+                          ? "bg-home-orange text-white font-semibold shadow-[0_0_20px_rgba(255,98,0,0.3)]"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <Sparkles
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4 shrink-0 transition-colors",
+                          isMarketingGroupActive ? "text-white" : item.iconClassName,
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                          isMarketingGroupActive
+                            ? "bg-black/30 text-white/95 border border-white/20"
+                            : "bg-home-orange/15 text-home-orange border border-home-orange/30",
+                        )}
+                      >
+                        Em breve
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-3.5 transition-transform duration-200 ml-0.5",
+                          isMarketingGroupActive ? "text-white/80" : "text-home-muted",
+                          !isMarketingExpanded && "-rotate-90",
+                        )}
+                      />
+                    </button>
+
+                    {/* Submenu de Flow Marketing AI (Produtos, Agentes, Campanhas, Calendário, Resultados) */}
+                    {isMarketingExpanded && (
+                      <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-home-border/60 pl-2 py-0.5">
+                        {MARKETING_SUBITEMS.map((sub) => {
+                          const isSubActive =
+                            isMarketingGroupActive && (marketingSubView || "produtos") === sub.id;
+                          const SubIcon = sub.icon;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (sub.ready) {
+                                  onNavigate("marketing", sub.label);
+                                  onNavigateMarketingSub?.(sub.id);
+                                  onClose?.();
+                                } else {
+                                  toast.info(
+                                    `${sub.label} estará disponível em breve nas próximas etapas do Flow Marketing AI.`,
+                                  );
+                                }
+                              }}
+                              className={cn(
+                                "group flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition-all duration-150 cursor-pointer",
+                                isSubActive
+                                  ? "bg-home-surface-strong text-white font-bold border border-home-border/80 shadow-sm"
+                                  : "text-home-muted hover:bg-home-surface-strong hover:text-white",
+                              )}
+                            >
+                              <SubIcon
+                                className={cn(
+                                  "size-3.5 shrink-0 transition-colors",
+                                  isSubActive ? "text-home-orange" : "text-home-muted group-hover:text-white",
+                                )}
+                              />
+                              <span className="truncate flex-1">{sub.label}</span>
+                              {!sub.ready && (
+                                <span className="text-[9px] font-medium text-home-muted/70 group-hover:text-home-muted">
+                                  Em breve
+                                </span>
+                              )}
                             </button>
                           );
                         })}
@@ -528,8 +707,10 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
         <SidebarNavigation
           activeSection={props.activeSection}
           campanhasSubView={props.campanhasSubView}
+          marketingSubView={props.marketingSubView}
           onNavigate={props.onNavigate}
           onNavigateCampanhasSub={props.onNavigateCampanhasSub}
+          onNavigateMarketingSub={props.onNavigateMarketingSub}
           unreadNotifications={props.unreadNotifications}
           isCollapsed={isCollapsed}
         />
@@ -571,8 +752,10 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
             <SidebarNavigation
               activeSection={props.activeSection}
               campanhasSubView={props.campanhasSubView}
+              marketingSubView={props.marketingSubView}
               onNavigate={props.onNavigate}
               onNavigateCampanhasSub={props.onNavigateCampanhasSub}
+              onNavigateMarketingSub={props.onNavigateMarketingSub}
               unreadNotifications={props.unreadNotifications}
               onClose={() => setMobileOpen(false)}
             />
