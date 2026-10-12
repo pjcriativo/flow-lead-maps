@@ -237,4 +237,16 @@ test("CampanhasPremiumView: coordena subviews (central, gestao, resultados) e pr
   assert.ok(file.includes("onBackToProducao"), "Deveria permitir transição preservada entre Resultados e Gestão");
 });
 
+test("Sidebar Premium: implementa recolhimento/expansão e oculta barra nativa de rolagem", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("isCollapsed"), "Deveria ter estado isCollapsed");
+  assert.ok(file.includes("PanelLeftClose") && file.includes("PanelLeftOpen"), "Deveria ter ícones de recolher e expandir");
+  assert.ok(file.includes("w-[272px]"), "Deveria expandir com 272px para evitar nomes cortados");
+  assert.ok(file.includes("w-[72px]"), "Deveria recolher para 72px em modo ícones");
+  assert.ok(file.includes("scrollbar-none"), "Deveria ocultar a barra nativa de rolagem com scrollbar-none");
+});
+
 

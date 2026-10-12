@@ -17,6 +17,8 @@ import {
   MessagesSquare,
   Megaphone,
   Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plug,
   ScrollText,
   Share2,
@@ -146,11 +148,13 @@ function SidebarNavigation({
   onNavigate,
   onNavigateCampanhasSub,
   unreadNotifications,
+  isCollapsed = false,
   onClose,
 }: Pick<
   DashboardSidebarProps,
   "activeSection" | "campanhasSubView" | "onNavigate" | "onNavigateCampanhasSub" | "unreadNotifications"
 > & {
+  isCollapsed?: boolean;
   onClose?: () => void;
 }) {
   const [isCampanhasExpanded, setIsCampanhasExpanded] = useState<boolean>(
@@ -163,6 +167,7 @@ function SidebarNavigation({
       setIsCampanhasExpanded(true);
     }
   }, [activeSection]);
+
   const openItem = (item: NavigationItem) => {
     if (!item.section) {
       toast.info(`${item.label} estará disponível em breve.`);
@@ -177,13 +182,23 @@ function SidebarNavigation({
   };
 
   return (
-    <nav aria-label="Navegação principal" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+    <nav
+      aria-label="Navegação principal"
+      className={cn(
+        "min-h-0 flex-1 overflow-y-auto scrollbar-none pb-4",
+        isCollapsed ? "px-2" : "px-3",
+      )}
+    >
       {NAVIGATION_GROUPS.map((group, groupIndex) => (
-        <div key={group.label ?? "principal"} className={cn(groupIndex > 0 && "mt-5")}>
+        <div key={group.label ?? "principal"} className={cn(groupIndex > 0 && (isCollapsed ? "mt-3" : "mt-5"))}>
           {group.label ? (
-            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-home-muted/80">
-              {group.label}
-            </p>
+            isCollapsed ? (
+              <div className="my-2.5 mx-1 border-t border-home-border/40" />
+            ) : (
+              <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-home-muted/80">
+                {group.label}
+              </p>
+            )
           ) : null}
           <div className="space-y-0.5">
             {group.items.map((item) => {
@@ -202,6 +217,37 @@ function SidebarNavigation({
 
               // Renderização Especial com Submenu Expansível para o Módulo Campanhas
               if (isCampanhas) {
+                if (isCollapsed) {
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      aria-current={isCampanhasGroupActive ? "page" : undefined}
+                      title="Campanhas"
+                      onClick={() => {
+                        onNavigate("campanhas", "Campanhas");
+                        onNavigateCampanhasSub?.("central");
+                        onClose?.();
+                      }}
+                      className={cn(
+                        "group relative flex h-9 w-full items-center justify-center rounded-lg text-left transition-colors cursor-pointer",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isCampanhasGroupActive
+                          ? "bg-home-orange text-white shadow-[0_0_20px_rgba(255,98,0,0.3)]"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <Megaphone
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4.5 shrink-0 transition-colors",
+                          isCampanhasGroupActive ? "text-white" : item.iconClassName,
+                        )}
+                      />
+                    </button>
+                  );
+                }
+
                 return (
                   <div key={item.label} className="space-y-0.5">
                     <button
@@ -281,6 +327,41 @@ function SidebarNavigation({
                 );
               }
 
+              if (isCollapsed) {
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    aria-current={active ? "page" : undefined}
+                    title={item.label}
+                    onClick={() => openItem(item)}
+                    className={cn(
+                      "group relative flex h-9 w-full items-center justify-center rounded-lg text-left transition-colors cursor-pointer",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                      active
+                        ? "bg-home-orange text-white shadow-[0_0_20px_rgba(255,98,0,0.3)]"
+                        : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                    )}
+                  >
+                    {item.brandMark ? (
+                      <span className="flex size-4.5 items-center justify-center rounded-sm bg-home-orange/20 text-[9px] font-black text-home-orange">
+                        {item.brandMark}
+                      </span>
+                    ) : Icon ? (
+                      <Icon
+                        aria-hidden="true"
+                        className={cn("size-4.5 shrink-0", active ? "text-white" : item.iconClassName)}
+                      />
+                    ) : null}
+                    {notificationCount ? (
+                      <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-home-orange ring-2 ring-home-background" />
+                    ) : item.badge ? (
+                      <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-home-amber ring-2 ring-home-background" />
+                    ) : null}
+                  </button>
+                );
+              }
+
               return (
                 <button
                   key={item.label}
@@ -288,7 +369,7 @@ function SidebarNavigation({
                   aria-current={active ? "page" : undefined}
                   onClick={() => openItem(item)}
                   className={cn(
-                    "group flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium transition-colors",
+                    "group flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium transition-colors cursor-pointer",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
                     active
                       ? "bg-home-orange text-white shadow-[0_0_20px_rgba(255,98,0,0.3)]"
@@ -296,7 +377,7 @@ function SidebarNavigation({
                   )}
                 >
                   {item.brandMark ? (
-                    <span className="flex size-4.5 items-center justify-center rounded-sm bg-home-orange/20 text-[9px] font-black text-home-orange">
+                    <span className="flex size-4.5 items-center justify-center rounded-sm bg-home-orange/20 text-[9px] font-black text-home-orange shrink-0">
                       {item.brandMark}
                     </span>
                   ) : Icon ? (
@@ -307,13 +388,13 @@ function SidebarNavigation({
                   ) : null}
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
                   {notificationCount ? (
-                    <span className="flex size-5 items-center justify-center rounded-full bg-home-orange text-[10px] font-bold text-white shadow-[0_0_10px_rgba(255,98,0,0.4)]">
+                    <span className="shrink-0 flex size-5 items-center justify-center rounded-full bg-home-orange text-[10px] font-bold text-white shadow-[0_0_10px_rgba(255,98,0,0.4)]">
                       {notificationCount}
                     </span>
                   ) : item.badge ? (
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider",
+                        "shrink-0 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider",
                         item.badge === "Novo"
                           ? "bg-home-orange text-white"
                           : "border border-home-amber/40 bg-home-amber/10 text-home-amber",
@@ -332,7 +413,11 @@ function SidebarNavigation({
   );
 }
 
-function UserFooter({ user, onNavigate }: Pick<DashboardSidebarProps, "user" | "onNavigate">) {
+function UserFooter({
+  user,
+  onNavigate,
+  isCollapsed = false,
+}: Pick<DashboardSidebarProps, "user" | "onNavigate"> & { isCollapsed?: boolean }) {
   const displayName = user.name && user.name !== "Meu Perfil" ? user.name : "Marcos Gonçalves";
   const displayEmail =
     user.email && user.email !== "Configurar perfil" ? user.email : "marcosgflow@gmail.com";
@@ -340,16 +425,37 @@ function UserFooter({ user, onNavigate }: Pick<DashboardSidebarProps, "user" | "
     user.avatarUrl ||
     "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80";
 
+  if (isCollapsed) {
+    return (
+      <button
+        type="button"
+        onClick={() => onNavigate("settings", "Meu perfil")}
+        title={`${displayName} (${displayEmail})`}
+        className={cn(
+          "flex w-full items-center justify-center border-t border-home-border/60 py-3 text-center",
+          "transition-colors hover:bg-home-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange cursor-pointer",
+        )}
+      >
+        <Avatar className="size-8.5 border border-home-border shrink-0">
+          <AvatarImage src={avatarSrc} alt={displayName} />
+          <AvatarFallback className="bg-home-surface-strong text-xs font-semibold text-home-foreground">
+            MG
+          </AvatarFallback>
+        </Avatar>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={() => onNavigate("settings", "Meu perfil")}
       className={cn(
-        "flex w-full items-center gap-3 border-t border-home-border px-4 py-4 text-left",
-        "transition-colors hover:bg-home-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+        "flex w-full items-center gap-3 border-t border-home-border/60 px-4 py-3.5 text-left",
+        "transition-colors hover:bg-home-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange cursor-pointer",
       )}
     >
-      <Avatar className="size-9 border border-home-border">
+      <Avatar className="size-9 border border-home-border shrink-0">
         <AvatarImage src={avatarSrc} alt={displayName} />
         <AvatarFallback className="bg-home-surface-strong text-xs font-semibold text-home-foreground">
           MG
@@ -365,21 +471,69 @@ function UserFooter({ user, onNavigate }: Pick<DashboardSidebarProps, "user" | "
 
 export function DashboardSidebar(props: DashboardSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("flow_sidebar_collapsed") === "true";
+  });
+
+  const toggleCollapsed = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("flow_sidebar_collapsed", String(next));
+      return next;
+    });
+  };
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 flex-col border-r border-home-border bg-home-background lg:flex">
-        <Link to="/" className="flex h-18 shrink-0 items-center px-5" aria-label="Flow Business">
-          <FlowLeadsLogo variant="dark" className="h-9 max-w-47" />
-        </Link>
+      <aside
+        className={cn(
+          "sticky top-0 hidden h-svh shrink-0 flex-col border-r border-home-border bg-home-background transition-[width] duration-200 ease-in-out lg:flex",
+          isCollapsed ? "w-[72px]" : "w-[272px]",
+        )}
+      >
+        <div
+          className={cn(
+            "flex h-16 shrink-0 items-center px-4",
+            isCollapsed ? "justify-center px-2" : "justify-between",
+          )}
+        >
+          {isCollapsed ? (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="group flex size-9 items-center justify-center rounded-xl border border-home-border/60 bg-home-surface/60 text-home-foreground transition-all hover:border-home-orange/40 hover:bg-home-surface-strong hover:text-white cursor-pointer"
+              title="Expandir menu lateral"
+              aria-label="Expandir menu lateral"
+            >
+              <PanelLeftOpen className="size-5 text-home-muted group-hover:text-home-orange transition-colors" />
+            </button>
+          ) : (
+            <>
+              <Link to="/" className="flex items-center min-w-0" aria-label="Flow Business">
+                <FlowLeadsLogo variant="dark" className="h-8 max-w-45" />
+              </Link>
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                className="flex size-8 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface-strong hover:text-white cursor-pointer"
+                title="Recolher menu lateral"
+                aria-label="Recolher menu lateral"
+              >
+                <PanelLeftClose className="size-4.5" />
+              </button>
+            </>
+          )}
+        </div>
         <SidebarNavigation
           activeSection={props.activeSection}
           campanhasSubView={props.campanhasSubView}
           onNavigate={props.onNavigate}
           onNavigateCampanhasSub={props.onNavigateCampanhasSub}
           unreadNotifications={props.unreadNotifications}
+          isCollapsed={isCollapsed}
         />
-        <UserFooter user={props.user} onNavigate={props.onNavigate} />
+        <UserFooter user={props.user} onNavigate={props.onNavigate} isCollapsed={isCollapsed} />
       </aside>
 
       <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-home-border bg-home-background px-4 lg:hidden">

@@ -308,3 +308,11 @@
 @utility animate-row-in {
   animation: row-in 480ms ease-out both;
 }
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

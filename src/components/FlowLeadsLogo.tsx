@@ -6,11 +6,12 @@ import { BRAND_NAME } from "@/lib/brand";
 interface FlowLeadsLogoProps {
   className?: string;
   variant?: "light" | "dark";
+  iconOnly?: boolean;
 }
 
 // ⚙️ Configurações (admin → Logotipo e Favicon): logo_url substitui o SVG por uma imagem;
 // nome_plataforma troca o texto da marca (só quando não há logo_url). Vazio = usa o padrão.
-export function FlowLeadsLogo({ className, variant = "light" }: FlowLeadsLogoProps) {
+export function FlowLeadsLogo({ className, variant = "light", iconOnly = false }: FlowLeadsLogoProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [nome, setNome] = useState<string | null>(null);
   useEffect(() => {
@@ -61,7 +62,9 @@ export function FlowLeadsLogo({ className, variant = "light" }: FlowLeadsLogoPro
             </linearGradient>
           </defs>
         </svg>
-        <span className="font-sans text-[18px] font-bold tracking-tight text-white">{texto}</span>
+        {!iconOnly && (
+          <span className="font-sans text-[18px] font-bold tracking-tight text-white">{texto}</span>
+        )}
       </div>
     );
   }
