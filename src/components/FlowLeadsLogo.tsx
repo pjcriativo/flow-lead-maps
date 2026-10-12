@@ -20,15 +20,13 @@ export function FlowLeadsLogo({ className, variant = "light" }: FlowLeadsLogoPro
     });
   }, []);
 
+  const texto = nome || BRAND_NAME;
+
   if (logoUrl) {
-    return (
-      <img
-        src={logoUrl}
-        alt={nome || BRAND_NAME}
-        className={cn("h-9 w-auto object-contain", className)}
-      />
-    );
+    return <img src={logoUrl} alt={texto} className={cn("h-9 w-auto object-contain", className)} />;
   }
+
+  const isDark = variant === "dark";
 
   if (isDark) {
     return (
@@ -72,7 +70,6 @@ export function FlowLeadsLogo({ className, variant = "light" }: FlowLeadsLogoPro
   const tileFg = "#ffffff";
   const wordmark = "#1a1a2e";
   const accent = "#4f8ef7";
-  const texto = nome || BRAND_NAME;
 
   return (
     <svg
