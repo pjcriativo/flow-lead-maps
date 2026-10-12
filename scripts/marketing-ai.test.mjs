@@ -217,3 +217,106 @@ test("o painel lateral da Tela 2 possui o assistente com 6 ações e o card de i
   assert.ok(panelContent.includes("Criar campanha agora"));
 });
 
+test("todos os componentes da Tela 3 — Campanhas e Conteúdos existem e estão presentes", () => {
+  const requiredFiles = [
+    "src/components/marketing-ai/conteudos/conteudos-data.ts",
+    "src/components/marketing-ai/conteudos/MarketingConteudoHeader.tsx",
+    "src/components/marketing-ai/conteudos/MarketingConteudoKpis.tsx",
+    "src/components/marketing-ai/conteudos/MarketingConteudoSubnav.tsx",
+    "src/components/marketing-ai/conteudos/MarketingConteudoFiltersBar.tsx",
+    "src/components/marketing-ai/conteudos/PlatformIcon.tsx",
+    "src/components/marketing-ai/conteudos/EditorialContentCard.tsx",
+    "src/components/marketing-ai/conteudos/EditorialCalendarGrid.tsx",
+    "src/components/marketing-ai/conteudos/EditorialListView.tsx",
+    "src/components/marketing-ai/conteudos/EditorialKanbanView.tsx",
+    "src/components/marketing-ai/conteudos/TiposConteudoSection.tsx",
+    "src/components/marketing-ai/conteudos/ConteudoAssistantPanel.tsx",
+    "src/components/marketing-ai/conteudos/NovoConteudoModal.tsx",
+    "src/components/marketing-ai/conteudos/ConteudoDetalhesDrawer.tsx",
+    "src/components/marketing-ai/conteudos/MarketingConteudoPage.tsx",
+  ];
+
+  for (const file of requiredFiles) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo obrigatório ausente: ${file}`);
+  }
+});
+
+test("a rota dashboard renderiza MarketingConteudoPage quando marketingSubView é campanhas_conteudo", () => {
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    dashContent.includes("MarketingConteudoPage"),
+    "Deve importar MarketingConteudoPage",
+  );
+  assert.ok(
+    dashContent.includes('marketingSubView === "campanhas_conteudo"'),
+    "Deve renderizar condicionalmente MarketingConteudoPage",
+  );
+});
+
+test("a Tela 3 possui os 6 KPIs, 7 dias de calendário, 21 conteúdos agendados e 8 tipos de formatos da referência", () => {
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/marketing-ai/conteudos/conteudos-data.ts"),
+    "utf8",
+  );
+
+  // 6 KPIs superiores
+  assert.ok(dataContent.includes("Conteúdos gerados") && dataContent.includes('"148"'));
+  assert.ok(dataContent.includes("Publicações realizadas") && dataContent.includes('"386"'));
+  assert.ok(dataContent.includes("Alcance total") && dataContent.includes('"125.4K"'));
+  assert.ok(dataContent.includes("Engajamento") && dataContent.includes('"8.7K"'));
+  assert.ok(dataContent.includes("Cliques no link") && dataContent.includes('"2.4K"'));
+  assert.ok(dataContent.includes("Leads gerados") && dataContent.includes('"486"'));
+
+  // 7 Dias de calendário
+  assert.ok(dataContent.includes('"Dom"') && dataContent.includes("11"));
+  assert.ok(dataContent.includes('"Qua"') && dataContent.includes("14"));
+  assert.ok(dataContent.includes('"Sáb"') && dataContent.includes("17"));
+
+  // Conteúdos da referência
+  assert.ok(dataContent.includes("Devocional da Manhã"));
+  assert.ok(dataContent.includes("A Promessa de Deus"));
+  assert.ok(dataContent.includes("História Bíblica"));
+  assert.ok(dataContent.includes("Nos Dias de Isaías"));
+  assert.ok(dataContent.includes("Versículo do Dia"));
+  assert.ok(dataContent.includes("Ensino Bíblico"));
+  assert.ok(dataContent.includes("Israel Antigo"));
+
+  // 8 Tipos de conteúdo
+  assert.ok(dataContent.includes("Post simples"));
+  assert.ok(dataContent.includes("Carrossel"));
+  assert.ok(dataContent.includes("Reels / Shorts"));
+  assert.ok(dataContent.includes("Vídeo completo"));
+  assert.ok(dataContent.includes("Story"));
+  assert.ok(dataContent.includes("Artigo / Blog"));
+  assert.ok(dataContent.includes("E-mail"));
+  assert.ok(dataContent.includes("Anúncio"));
+});
+
+test("o painel lateral da Tela 3 possui o assistente com 6 ações e as 4 sugestões da IA", () => {
+  const panelContent = fs.readFileSync(
+    path.join(root, "src/components/marketing-ai/conteudos/ConteudoAssistantPanel.tsx"),
+    "utf8",
+  );
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/marketing-ai/conteudos/conteudos-data.ts"),
+    "utf8",
+  );
+
+  assert.ok(panelContent.includes("Assistente de Conteúdo com IA"));
+  assert.ok(dataContent.includes("Gerar posts para redes sociais"));
+  assert.ok(dataContent.includes("Criar carrossel completo"));
+  assert.ok(dataContent.includes("Gerar roteiro de vídeo"));
+  assert.ok(dataContent.includes("Criar imagens com IA"));
+  assert.ok(dataContent.includes("Adaptar conteúdo para cada canal"));
+  assert.ok(dataContent.includes("Reescrever e melhorar copy"));
+  assert.ok(panelContent.includes("Sugestões da IA"));
+  assert.ok(panelContent.includes("Transforme ideias em conteúdos virais"));
+  assert.ok(panelContent.includes("Criar agora"));
+});
+
+

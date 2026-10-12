@@ -47,6 +47,7 @@ import {
 import { HomePremiumView } from "@/components/home-premium/HomePremiumView";
 import { FlowMarketingPage } from "@/components/marketing-ai/FlowMarketingPage";
 import { AgentesEstrategiasPage } from "@/components/marketing-ai/agentes/AgentesEstrategiasPage";
+import { MarketingConteudoPage } from "@/components/marketing-ai/conteudos/MarketingConteudoPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -323,6 +324,22 @@ function Dashboard() {
             onSelectCampanhaContext={(c) => setSelectedCampanhaContext(c)}
           />
         )}
+        {section === "marketing" && marketingSubView === "campanhas_conteudo" && (
+          <MarketingConteudoPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToProdutos={() => setMarketingSubView("produtos")}
+            onNavigateToAgentes={() => setMarketingSubView("agentes")}
+            onNavigateToCampanhas={() => {
+              selectSection("campanhas");
+              setCampanhasSubView("central");
+            }}
+          />
+        )}
         {section === "marketing" && marketingSubView === "agentes" && (
           <AgentesEstrategiasPage
             user={{
@@ -338,7 +355,7 @@ function Dashboard() {
             }}
           />
         )}
-        {section === "marketing" && marketingSubView !== "agentes" && (
+        {section === "marketing" && marketingSubView !== "agentes" && marketingSubView !== "campanhas_conteudo" && (
           <FlowMarketingPage
             user={{
               name: userProfile?.full_name || "Carlos Mendes",
