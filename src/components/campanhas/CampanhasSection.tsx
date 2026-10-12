@@ -416,7 +416,7 @@ type Progresso = {
   semMotivo: number;
 };
 
-function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: () => void }) {
+export function RevisaoEmLote({ campanha, onVoltar }: { campanha: Campanha; onVoltar: () => void }) {
   const [view, setView] = useState<CampanhaLeadView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

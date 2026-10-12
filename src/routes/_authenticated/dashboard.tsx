@@ -31,6 +31,7 @@ import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
 import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
+import { CampanhasPremiumView } from "@/components/campanhas-premium/CampanhasPremiumView";
 import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
@@ -195,7 +196,7 @@ function Dashboard() {
     <div
       className={cn(
         "flex min-h-svh w-full",
-        section === "home" || section === "leads" || section === "pipeline"
+        section === "home" || section === "leads" || section === "pipeline" || section === "campanhas"
           ? "bg-home-background text-home-foreground"
           : "bg-background text-foreground",
       )}
@@ -217,12 +218,13 @@ function Dashboard() {
       <main
         className={cn(
           "min-w-0 flex-1",
-          (section === "home" || section === "leads" || section === "pipeline") &&
+          (section === "home" || section === "leads" || section === "pipeline" || section === "campanhas") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
             section !== "leads" &&
             section !== "pipeline" &&
+            section !== "campanhas" &&
             section !== "instagram" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
@@ -276,7 +278,16 @@ function Dashboard() {
           />
         )}
         {section === "propostas" && <PropostasSection />}
-        {section === "campanhas" && <CampanhasSection />}
+        {section === "campanhas" && (
+          <CampanhasPremiumView
+            user={{
+              name: userProfile?.full_name || "Marcos Gonçalves",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+          />
+        )}
         {section === "whatsapp" && <WhatsAppSection />}
         {section === "automacao" && (
           <AutomacaoSection onRevisar={() => selectSection("campanhas")} />
