@@ -85,8 +85,8 @@ test("a tela Campanhas Premium reúne todos os componentes da composição aprov
     "Deveria conter CriarCampanhaModal",
   );
   assert.ok(
-    file.includes("<RevisaoEmLote"),
-    "Deveria preservar a capacidade de abrir RevisaoEmLote",
+    file.includes("<GestaoProducaoView"),
+    "Deveria abrir a Tela 2 GestaoProducaoView ao selecionar uma campanha",
   );
 });
 
@@ -126,3 +126,46 @@ test("o gráfico de desempenho utiliza Recharts com linhas multicanal", () => {
   assert.ok(file.includes("clinicaVida"), "Deveria ter a série da Clínica Vida");
   assert.ok(file.includes("Desempenho por campanha"), "Deveria ter o título Desempenho por campanha");
 });
+
+test("Tela 2: Gestão e Produção de Campanhas integra todos os componentes da composição aprovada", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/GestaoProducaoView.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("<GestaoHeader"), "Deveria incluir GestaoHeader com título e badges");
+  assert.ok(file.includes("<GestaoProcessSteps"), "Deveria incluir GestaoProcessSteps com as 5 etapas");
+  assert.ok(file.includes("<GestaoLeadsTable"), "Deveria incluir GestaoLeadsTable com lista de leads e filtros");
+  assert.ok(file.includes("<GestaoSitePreview"), "Deveria incluir GestaoSitePreview com visualização do site");
+  assert.ok(file.includes("<GestaoProposalEditor"), "Deveria incluir GestaoProposalEditor para copy e envio");
+  assert.ok(file.includes("<GestaoConfigDrawer"), "Deveria incluir GestaoConfigDrawer para governança e rampa");
+  assert.ok(file.includes("prepararCampanhaLead"), "Deveria integrar serviço real prepararCampanhaLead");
+  assert.ok(file.includes("aprovarTodosDaCampanha"), "Deveria integrar serviço real aprovarTodosDaCampanha");
+  assert.ok(file.includes("enviarProposta"), "Deveria integrar serviço real enviarProposta");
+});
+
+test("Tela 2: GestaoProcessSteps implementa as 5 fases horizontais do processo comercial", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/GestaoProcessSteps.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("Selecionar leads"), "Etapa 1: Selecionar leads");
+  assert.ok(file.includes("Gerar sites e propostas"), "Etapa 2: Gerar sites e propostas");
+  assert.ok(file.includes("Revisar e aprovar"), "Etapa 3: Revisar e aprovar");
+  assert.ok(file.includes("Enviar propostas"), "Etapa 4: Enviar propostas");
+  assert.ok(file.includes("Acompanhar resultados"), "Etapa 5: Acompanhar resultados");
+});
+
+test("Tela 2: GestaoSitePreview possui abas (Site gerado, Proposta, Análise, Histórico) e alternância Desktop/Tablet/Mobile", () => {
+  const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/GestaoSitePreview.tsx"),
+    "utf8",
+  );
+  assert.ok(file.includes("Site gerado"), "Deveria ter aba Site gerado");
+  assert.ok(file.includes("Proposta comercial"), "Deveria ter aba Proposta comercial");
+  assert.ok(file.includes("Análise da IA"), "Deveria ter aba Análise da IA");
+  assert.ok(file.includes("Histórico"), "Deveria ter aba Histórico");
+  assert.ok(file.includes("Abrir site"), "Deveria ter botão Abrir site");
+  assert.ok(file.includes("Desktop") && file.includes("Tablet") && file.includes("Mobile"), "Deveria ter controles de viewport");
+  assert.ok(file.includes("Editar site"), "Deveria ter botão Editar site");
+});
+

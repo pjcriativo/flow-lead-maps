@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DashboardHeader } from "@/components/home-premium/DashboardHeader";
-import { RevisaoEmLote } from "@/components/campanhas/CampanhasSection";
+import { GestaoProducaoView } from "./GestaoProducaoView";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -260,21 +260,18 @@ export function CampanhasPremiumView({
     }
   };
 
-  // Se o usuário abriu uma campanha para revisão, renderiza a tela de revisão preservando o fluxo
+  // Se o usuário abriu uma campanha para revisão, renderiza a Tela 2 — Gestão e Produção de Campanhas Premium
   if (revisaoCampanha) {
     return (
-      <div className="min-h-svh bg-home-background text-home-foreground">
-        <DashboardHeader user={user} unreadNotifications={unreadNotifications} />
-        <main className="mx-auto max-w-[1720px] px-4 py-6 sm:px-6 lg:px-7">
-          <RevisaoEmLote
-            campanha={revisaoCampanha}
-            onVoltar={() => {
-              setRevisaoCampanha(null);
-              carregarDadosReais();
-            }}
-          />
-        </main>
-      </div>
+      <GestaoProducaoView
+        campanha={revisaoCampanha}
+        user={user}
+        unreadNotifications={unreadNotifications}
+        onBack={() => {
+          setRevisaoCampanha(null);
+          carregarDadosReais();
+        }}
+      />
     );
   }
 
