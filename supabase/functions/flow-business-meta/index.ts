@@ -6,6 +6,10 @@ import {
   validateFlowBusinessTokenKey,
 } from "../_shared/flow-business-token.ts";
 import { messagingWindowIsOpen } from "../_shared/flow-business-policy.ts";
+import {
+  getMetaOAuthPrerequisiteStatus,
+  isMetaOAuthEnabled,
+} from "../_shared/meta-oauth-config.ts";
 
 const SCOPES = [
   "instagram_business_basic",
@@ -72,8 +76,24 @@ async function reserveAccountConnection(
   if (error) throw error;
 }
 
+async function assertMetaOAuthEnabled(admin: AdminClient) {
+  const { data, error } = await admin
+    .from("config_plataforma")
+    .select("instagram_oauth_ativo")
+    .eq("id", true)
+    .maybeSingle();
+  if (error) throw error;
+  if (!isMetaOAuthEnabled(data)) throw new Error("instagram_connection_disabled");
+
+  const prerequisites = getMetaOAuthPrerequisiteStatus((name) => Deno.env.get(name));
+  if (!prerequisites.configured) {
+    throw new Error(`missing_config:${prerequisites.missing[0]}`);
+  }
+}
+
 async function startConnection(req: Request, admin: AdminClient): Promise<Response> {
   const { userId, orgId } = await authenticatedContext(req, admin);
+  await assertMetaOAuthEnabled(admin);
   const clientId = env("META_INSTAGRAM_APP_ID");
   const redirectUri = env("FLOW_BUSINESS_META_REDIRECT_URL");
   env("META_INSTAGRAM_APP_SECRET");
@@ -142,6 +162,7 @@ async function consumeState(admin: AdminClient, state: string) {
 }
 
 async function callback(req: Request, admin: AdminClient): Promise<Response> {
+  await assertMetaOAuthEnabled(admin);
   const url = new URL(req.url);
   const code = url.searchParams.get("code")?.replace(/#_$/, "");
   const state = url.searchParams.get("state");
@@ -303,16 +324,22 @@ Deno.serve(async (req) => {
     if (req.method === "GET")
       return redirectWithResult(
         "error",
-        message.startsWith("missing_config") ? "not_configured" : "connection_failed",
+        message.startsWith("missing_config") || message === "instagram_connection_disabled"
+          ? "not_configured"
+          : "connection_failed",
       );
     const status =
       message === "unauthorized"
         ? 401
-        : message.startsWith("missing_config") || message.startsWith("invalid_config")
+        : message.startsWith("missing_config") ||
+            message.startsWith("invalid_config") ||
+            message === "instagram_connection_disabled"
           ? 503
           : 500;
     const safeError =
-      message.startsWith("missing_config") || message.startsWith("invalid_config")
+      message.startsWith("missing_config") ||
+      message.startsWith("invalid_config") ||
+      message === "instagram_connection_disabled"
         ? "instagram_connection_unavailable"
         : message === "flow_business_limit:accounts"
           ? "flow_business_limit:accounts"

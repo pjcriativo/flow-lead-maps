@@ -68,6 +68,12 @@ type Config = {
   cadastro_usuario_ativo: boolean;
   termos_condicoes_ativo: boolean;
   modo_manutencao_ativo: boolean;
+  instagram_oauth_ativo: boolean;
+};
+
+type MetaOAuthStatus = {
+  prerequisitesConfigured: boolean;
+  missingSecrets: string[];
 };
 
 const VAZIA: Config = {
@@ -99,6 +105,7 @@ const VAZIA: Config = {
   cadastro_usuario_ativo: true,
   termos_condicoes_ativo: false,
   modo_manutencao_ativo: false,
+  instagram_oauth_ativo: false,
 };
 
 type Secao =
@@ -1494,6 +1501,10 @@ export function AdminConfiguracoes() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [metaOAuthStatus, setMetaOAuthStatus] = useState<MetaOAuthStatus>({
+    prerequisitesConfigured: false,
+    missingSecrets: [],
+  });
   // chaves inline do Controle básico (cofre — escrita-apenas)
   const [statusChaves, setStatusChaves] = useState<Record<string, ChaveInfo>>({});
   const [chaveOpenAi, setChaveOpenAi] = useState("");
@@ -1512,8 +1523,16 @@ export function AdminConfiguracoes() {
   useEffect(() => {
     adminAcao("config_ler")
       .then((r) => {
-        if (r.ok) setCfg({ ...VAZIA, ...(r.config as Partial<Config>) });
-        else setErro(String(r.reason ?? "falha ao carregar"));
+        if (r.ok) {
+          setCfg({ ...VAZIA, ...(r.config as Partial<Config>) });
+          const status = r.metaOAuth as Partial<MetaOAuthStatus> | undefined;
+          setMetaOAuthStatus({
+            prerequisitesConfigured: status?.prerequisitesConfigured === true,
+            missingSecrets: Array.isArray(status?.missingSecrets)
+              ? status.missingSecrets.filter((name): name is string => typeof name === "string")
+              : [],
+          });
+        } else setErro(String(r.reason ?? "falha ao carregar"));
       })
       .catch((e) => setErro(e instanceof Error ? e.message : "erro"))
       .finally(() => setCarregando(false));
@@ -1532,7 +1551,11 @@ export function AdminConfiguracoes() {
       const r = await adminAcao("config_salvar", cfg as unknown as Record<string, unknown>);
       if (!r.ok) {
         setErro(String(r.detalhe ?? r.reason ?? "falha ao salvar"));
-        toast.error("Falha ao salvar as configurações.");
+        toast.error(
+          r.reason === "instagram_oauth_prerequisites_missing"
+            ? "Configure todos os secrets do OAuth Meta antes de ativar a integração."
+            : "Falha ao salvar as configurações.",
+        );
         return;
       }
       // chaves digitadas inline (cofre) — salvas junto no mesmo clique
@@ -2039,6 +2062,17 @@ export function AdminConfiguracoes() {
               checked={cfg.modo_manutencao_ativo}
               onChange={setBool("modo_manutencao_ativo")}
               motivo="Bloqueia quem não é super_admin nas rotas autenticadas"
+            />
+            <Toggle
+              rotulo="Conexão oficial do Instagram"
+              checked={cfg.instagram_oauth_ativo}
+              onChange={setBool("instagram_oauth_ativo")}
+              disabled={!metaOAuthStatus.prerequisitesConfigured && !cfg.instagram_oauth_ativo}
+              motivo={
+                metaOAuthStatus.prerequisitesConfigured
+                  ? "Libera novas conexões via Instagram Login para workspaces com vaga no plano"
+                  : `Bloqueada: faltam ${metaOAuthStatus.missingSecrets.join(", ") || "secrets OAuth"}`
+              }
             />
           </div>
         </div>

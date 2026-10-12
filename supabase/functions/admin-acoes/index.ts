@@ -23,6 +23,7 @@ import { buildApiUsagePeriodSummary } from "../_shared/api-usage-summary.ts";
 import { planApifyRunLedgerSync, type RemoteApifyRun } from "../_shared/apify-run-ledger.ts";
 import { collectUniqueOffsetPages } from "../_shared/offset-pagination.ts";
 import { validarEmailAutentico } from "../_shared/email-validation.ts";
+import { getMetaOAuthPrerequisiteStatus } from "../_shared/meta-oauth-config.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
 type Rec = Record<string, unknown>;
@@ -658,7 +659,15 @@ Deno.serve(async (req) => {
         .select("*")
         .eq("id", true)
         .maybeSingle();
-      return json({ ok: true, config: config ?? {} });
+      const metaOAuth = getMetaOAuthPrerequisiteStatus((name) => Deno.env.get(name));
+      return json({
+        ok: true,
+        config: config ?? {},
+        metaOAuth: {
+          prerequisitesConfigured: metaOAuth.configured,
+          missingSecrets: metaOAuth.missing,
+        },
+      });
     }
 
     if (acao === "config_salvar") {
@@ -695,6 +704,7 @@ Deno.serve(async (req) => {
         "cadastro_usuario_ativo",
         "termos_condicoes_ativo",
         "modo_manutencao_ativo",
+        "instagram_oauth_ativo",
       ] as const;
       const patch: Rec = {};
       for (const campo of NUMERICOS) {
@@ -711,6 +721,16 @@ Deno.serve(async (req) => {
       }
       for (const campo of BOOLEANOS) {
         if (campo in b) patch[campo] = b[campo] === true;
+      }
+      if (patch.instagram_oauth_ativo === true) {
+        const metaOAuth = getMetaOAuthPrerequisiteStatus((name) => Deno.env.get(name));
+        if (!metaOAuth.configured) {
+          return json({
+            ok: false,
+            reason: "instagram_oauth_prerequisites_missing",
+            missingSecrets: metaOAuth.missing,
+          });
+        }
       }
       if (Object.keys(patch).length === 0) return json({ ok: false, reason: "nada_para_salvar" });
       patch.atualizado_em = new Date().toISOString();

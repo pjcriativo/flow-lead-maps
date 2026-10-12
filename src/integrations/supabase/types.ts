@@ -597,6 +597,7 @@ export type Database = {
           id: boolean;
           intervalo_disparo_max_seg: number | null;
           intervalo_disparo_min_seg: number | null;
+          instagram_oauth_ativo: boolean;
           logo_url: string | null;
           max_leads_busca: number | null;
           modelo_ia: string | null;
@@ -629,6 +630,7 @@ export type Database = {
           id?: boolean;
           intervalo_disparo_max_seg?: number | null;
           intervalo_disparo_min_seg?: number | null;
+          instagram_oauth_ativo?: boolean;
           logo_url?: string | null;
           max_leads_busca?: number | null;
           modelo_ia?: string | null;
@@ -661,6 +663,7 @@ export type Database = {
           id?: boolean;
           intervalo_disparo_max_seg?: number | null;
           intervalo_disparo_min_seg?: number | null;
+          instagram_oauth_ativo?: boolean;
           logo_url?: string | null;
           max_leads_busca?: number | null;
           modelo_ia?: string | null;
