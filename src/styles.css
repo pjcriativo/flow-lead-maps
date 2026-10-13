@@ -316,3 +316,9 @@
     display: none;
   }
 }
+
+/* Leaflet Dark Theme Tiles sem marca d'água */
+.leaflet-dark-tiles .leaflet-tile {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(90%);
+}
+

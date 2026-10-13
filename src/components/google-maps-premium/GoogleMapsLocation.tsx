@@ -84,7 +84,7 @@ export function GoogleMapsLocation({
   }, [municipios, termoBuscaCidade]);
 
   return (
-    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-12 items-center bg-home-surface/90 border border-home-border rounded-2xl p-2.5">
+    <div className="relative z-30 grid grid-cols-1 gap-2.5 sm:grid-cols-12 items-center bg-home-surface/90 border border-home-border rounded-2xl p-2.5">
       {/* 1. ESTADO (UF) — Obrigatório aparecer ANTES de Cidade */}
       <div className="sm:col-span-3 space-y-1">
         <label className="text-[10px] font-bold uppercase tracking-wider text-home-muted select-none">
@@ -114,7 +114,7 @@ export function GoogleMapsLocation({
       </div>
 
       {/* 2. CIDADES — Municípios oficiais do IBGE com busca interna */}
-      <div ref={cidadeDropdownRef} className="relative sm:col-span-4 space-y-1">
+      <div ref={cidadeDropdownRef} className="relative z-40 sm:col-span-4 space-y-1">
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-bold uppercase tracking-wider text-home-muted select-none">
             Cidade
@@ -149,7 +149,7 @@ export function GoogleMapsLocation({
 
         {/* Dropdown com busca de municípios */}
         {cidadeComboAberto && uf && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-hidden rounded-xl border border-home-border bg-[#101720] p-1.5 shadow-2xl backdrop-blur-xl">
+          <div className="absolute left-0 right-0 top-full z-[1000] mt-1.5 max-h-60 overflow-hidden rounded-xl border border-home-border bg-[#101720] p-1.5 shadow-2xl backdrop-blur-xl">
             {/* Campo de pesquisa interna de cidades */}
             <div className="relative mb-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3 text-home-muted -translate-y-1/2" />

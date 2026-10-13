@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Crosshair, Layers, MapPin, Minus, Plus, Radar, Search } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 import "leaflet/dist/leaflet.css";
 
 type LatLng = { lat: number; lng: number };
@@ -58,11 +59,8 @@ export function GoogleMapsMapPanel({
         attributionControl: false,
       }).setView(pin ? [pin.lat, pin.lng] : CENTRO_PADRAO, 12);
 
-      // CartoDB Dark Matter tiles (estilo premium escuro idêntico à referência)
-      const tileUrl =
-        mapStyle === "dark"
-          ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+      // Camada base OpenStreetMap com tema escuro via CSS (elimina marca d'água de cartocdn.com/dark_all)
+      const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
       const tileLayer = L.tileLayer(tileUrl, {
         maxZoom: 19,
@@ -95,10 +93,8 @@ export function GoogleMapsMapPanel({
     if (!L || !map || !tileLayer) return;
 
     map.removeLayer(tileLayer);
-    const tileUrl =
-      mapStyle === "dark"
-        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    // Camada base OpenStreetMap com tema escuro via CSS (elimina marca d'água de cartocdn.com/dark_all)
+    const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
     refs.current.tileLayer = L.tileLayer(tileUrl, {
       maxZoom: 19,
@@ -176,7 +172,10 @@ export function GoogleMapsMapPanel({
       {/* Box do Mapa com Overlays */}
       <div className="relative h-88 sm:h-96 w-full overflow-hidden rounded-2xl border border-home-border bg-[#0b1016]">
         {/* Container do Leaflet */}
-        <div ref={divRef} className="h-full w-full" />
+        <div
+          ref={divRef}
+          className={cn("h-full w-full", mapStyle === "dark" && "leaflet-dark-tiles")}
+        />
 
         {/* Barra de Pesquisa de Endereço Overlay no Topo */}
         <form

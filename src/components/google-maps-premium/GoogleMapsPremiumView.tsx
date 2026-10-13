@@ -375,39 +375,43 @@ export function GoogleMapsPremiumView({
           </section>
 
           {/* Coluna 2: Centro (5 cols) — Localização (UF antes de Cidade), Mapa e Raio */}
-          <section className="lg:col-span-5 space-y-3">
+          <section className="lg:col-span-5 space-y-3 relative">
             {/* Barra de Localização: UF → Cidade (IBGE) → Apify → E-mails */}
-            <GoogleMapsLocation
-              uf={uf}
-              cidade={cidade}
-              onSelectUf={(novaUf) => {
-                setUf(novaUf);
-                setCidade("");
-                setPin(null);
-                setPinManual(false);
-              }}
-              onSelectCidade={(novaCidade) => {
-                setCidade(novaCidade);
-                void geocodar(novaCidade, uf);
-              }}
-              buscarEmails={buscarEmails}
-              onToggleBuscarEmails={setBuscarEmails}
-              disabled={running}
-            />
+            <div className="relative z-30">
+              <GoogleMapsLocation
+                uf={uf}
+                cidade={cidade}
+                onSelectUf={(novaUf) => {
+                  setUf(novaUf);
+                  setCidade("");
+                  setPin(null);
+                  setPinManual(false);
+                }}
+                onSelectCidade={(novaCidade) => {
+                  setCidade(novaCidade);
+                  void geocodar(novaCidade, uf);
+                }}
+                buscarEmails={buscarEmails}
+                onToggleBuscarEmails={setBuscarEmails}
+                disabled={running}
+              />
+            </div>
 
             {/* Mapa Interativo Leaflet Dark com Raio e Marcador */}
-            <GoogleMapsMapPanel
-              pin={pin}
-              raioKm={raioKm}
-              cidade={cidade}
-              uf={uf}
-              onChangeRaio={setRaioKm}
-              onPickPin={(p) => {
-                setPin(p);
-                setPinManual(true);
-              }}
-              onSearchEndereco={handleSearchEndereco}
-            />
+            <div className="relative z-10">
+              <GoogleMapsMapPanel
+                pin={pin}
+                raioKm={raioKm}
+                cidade={cidade}
+                uf={uf}
+                onChangeRaio={setRaioKm}
+                onPickPin={(p) => {
+                  setPin(p);
+                  setPinManual(true);
+                }}
+                onSearchEndereco={handleSearchEndereco}
+              />
+            </div>
           </section>
 
           {/* Coluna 3: Direita (3 cols) — Resumo da Prospecção e Ações */}
