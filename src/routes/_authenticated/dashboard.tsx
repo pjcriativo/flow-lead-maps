@@ -56,6 +56,7 @@ import { InfluencersLibraryPage } from "@/components/influencers-studio/bibliote
 import { AvatarCreatorPage } from "@/components/influencers-studio/criador/AvatarCreatorPage";
 import { UgcVideoStudioPage } from "@/components/influencers-studio/ugc-studio/UgcVideoStudioPage";
 import { ProjetosBibliotecaPage } from "@/components/influencers-studio/projetos/ProjetosBibliotecaPage";
+import { MeusInfluencersLicencasPage } from "@/components/influencers-studio/licencas/MeusInfluencersLicencasPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -461,11 +462,28 @@ function Dashboard() {
             onNavigateToVisaoGeral={() => setInfluencersSubView("visao_geral")}
           />
         )}
+        {section === "influencers" && influencersSubView === "licencas" && (
+          <MeusInfluencersLicencasPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToUgcStudio={() => {
+              setInfluencersSubView("ugc_studio");
+            }}
+            onNavigateToCriador={() => setInfluencersSubView("criador")}
+            onNavigateToBiblioteca={() => setInfluencersSubView("biblioteca")}
+            onNavigateToVisaoGeral={() => setInfluencersSubView("visao_geral")}
+          />
+        )}
         {section === "influencers" &&
           influencersSubView !== "biblioteca" &&
           influencersSubView !== "criador" &&
           influencersSubView !== "ugc_studio" &&
-          influencersSubView !== "projetos" && (
+          influencersSubView !== "projetos" &&
+          influencersSubView !== "licencas" && (
             <AIInfluencersStudioPage
               user={{
                 name: userProfile?.full_name || "Carlos Mendes",

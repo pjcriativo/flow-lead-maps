@@ -522,6 +522,87 @@ test("todos os componentes e dados da Tela 5 Projetos e Biblioteca existem e est
   assert.ok(dataContent.includes("Interno - Estúdio"));
 });
 
+test("DashboardSidebar ativa Meus Influencers e Licenças como pronto (ready: true)", () => {
+  const sidebarContent = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    sidebarContent.includes('{ id: "licencas" as const, label: "Meus Influencers e Licenças", icon: Award, ready: true }'),
+    "Meus Influencers e Licenças deve estar pronto (ready: true) no submenu",
+  );
+});
+
+test("a rota dashboard renderiza MeusInfluencersLicencasPage quando influencersSubView for licencas", () => {
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    dashContent.includes("MeusInfluencersLicencasPage"),
+    "Deve importar MeusInfluencersLicencasPage",
+  );
+  assert.ok(
+    dashContent.includes('section === "influencers" && influencersSubView === "licencas"'),
+    "Deve renderizar condicionalmente MeusInfluencersLicencasPage quando influencersSubView for licencas",
+  );
+});
+
+test("todos os componentes e dados da Tela 6 Meus Influencers e Licenças existem e estão íntegros", () => {
+  const requiredTela6Files = [
+    "src/components/influencers-studio/licencas/licencas-data.ts",
+    "src/components/influencers-studio/licencas/LicencasHeader.tsx",
+    "src/components/influencers-studio/licencas/LicencasMetricsBlock.tsx",
+    "src/components/influencers-studio/licencas/LicencasFilterBar.tsx",
+    "src/components/influencers-studio/licencas/LicencasLibraryGrid.tsx",
+    "src/components/influencers-studio/licencas/LicencaDetailsSidebar.tsx",
+    "src/components/influencers-studio/licencas/MeusInfluencersLicencasPage.tsx",
+  ];
+
+  for (const file of requiredTela6Files) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo da Tela 6 ausente: ${file}`);
+  }
+
+  // Validação dos dados em licencas-data.ts
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/influencers-studio/licencas/licencas-data.ts"),
+    "utf8",
+  );
+
+  // 5 KPIs
+  assert.ok(dataContent.includes("Meus Avatares") && dataContent.includes('"12"'));
+  assert.ok(dataContent.includes("Influencers Licenciados") && dataContent.includes('"8"'));
+  assert.ok(dataContent.includes("Licenças Ativas") && dataContent.includes('"17"'));
+  assert.ok(dataContent.includes("Renovação em breve") && dataContent.includes('"3"'));
+  assert.ok(dataContent.includes("Uso Comercial") && dataContent.includes('"100%"'));
+
+  // 5 Abas
+  assert.ok(dataContent.includes("Meus Avatares") && dataContent.includes("12"));
+  assert.ok(dataContent.includes("Licenças e Contratos") && dataContent.includes("17"));
+  assert.ok(dataContent.includes("Influencers Favoritos") && dataContent.includes("8"));
+  assert.ok(dataContent.includes("Histórico de Uso"));
+  assert.ok(dataContent.includes("Renovações") && dataContent.includes("3"));
+
+  // 8 Influencers Mockados
+  assert.ok(dataContent.includes("Isabella"));
+  assert.ok(dataContent.includes("Lucas"));
+  assert.ok(dataContent.includes("Mariana"));
+  assert.ok(dataContent.includes("Rafael"));
+  assert.ok(dataContent.includes("Fernanda"));
+  assert.ok(dataContent.includes("Mateus"));
+  assert.ok(dataContent.includes("Juliana"));
+  assert.ok(dataContent.includes("Thiago"));
+
+  // Isabella selecionada com detalhes de licença
+  assert.ok(dataContent.includes("Bella Vita Cosméticos"));
+  assert.ok(dataContent.includes("Uso comercial exclusivo"));
+  assert.ok(dataContent.includes("320"));
+  assert.ok(dataContent.includes("Global"));
+});
+
 test("a logomarca oficial FlowLeadsLogo está 100% preservada", () => {
   const logoContent = fs.readFileSync(
     path.join(root, "src/components/FlowLeadsLogo.tsx"),
@@ -531,7 +612,4 @@ test("a logomarca oficial FlowLeadsLogo está 100% preservada", () => {
   assert.ok(logoContent.includes("BRAND_NAME"), "Logo deve utilizar BRAND_NAME oficial");
   assert.ok(logoContent.includes("fill="), "Logo deve conter os vetores originais");
 });
-
-
-
 
