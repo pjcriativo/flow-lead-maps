@@ -102,6 +102,9 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode; dica: string }[
   },
 ];
 const SCORE_QUALIFICADO = 70;
+const DISPARO_EM_MASSA_BLOQUEADO =
+  "Disparo em massa temporariamente bloqueado até existir reserva atômica e autorização específica por canal no servidor.";
+const envioEmMassaPossuiReservaAtomica = (): boolean => false;
 
 function passaTab(l: WaLeadCompose, tab: TabKey): boolean {
   switch (tab) {
@@ -409,6 +412,10 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
 
   // PORTÃO passo 3 — DISPARAR: só age sobre APROVADOS (link pronto). Explica se não há nenhum.
   const disparar = async () => {
+    if (!envioEmMassaPossuiReservaAtomica()) {
+      toast.error(DISPARO_EM_MASSA_BLOQUEADO, { duration: 8000 });
+      return;
+    }
     if (!temChipDisparo) {
       toast.error("Conecte um chip de disparo na aba WhatsApp.");
       return;
@@ -1040,14 +1047,23 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           {!disparando && (semChip || aprovadosProntos.length === 0) && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-50/70 p-3 text-xs leading-relaxed text-amber-900 shadow-xs">
               {semChip ? (
-                <span>⚠️ <b>Chip de Disparo Ausente:</b> Conecte um chip com o papel 'Disparo' na aba WhatsApp para habilitar o envio.</span>
+                <span>
+                  ⚠️ <b>Chip de Disparo Ausente:</b> Conecte um chip com o papel 'Disparo' na aba
+                  WhatsApp para habilitar o envio.
+                </span>
               ) : (
                 <div>
                   💡 <b>Como ativar este botão para disparar:</b>
                   <ol className="mt-1.5 list-decimal space-y-1 pl-4">
                     <li>Selecione os leads desejados na lista à esquerda.</li>
-                    <li>Clique no botão <b>'Preparar'</b> (na caixa abaixo da lista) para gerar as prévias.</li>
-                    <li>Clique no botão <b>'Aprovar'</b> para publicar as landing pages e liberar o envio.</li>
+                    <li>
+                      Clique no botão <b>'Preparar'</b> (na caixa abaixo da lista) para gerar as
+                      prévias.
+                    </li>
+                    <li>
+                      Clique no botão <b>'Aprovar'</b> para publicar as landing pages e liberar o
+                      envio.
+                    </li>
                   </ol>
                 </div>
               )}

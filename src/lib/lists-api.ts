@@ -42,6 +42,11 @@ export async function criarListaComLeads(params: {
   radius: number;
   leadIds: string[];
 }): Promise<LeadList> {
+  if (params.leadIds.length === 0) {
+    throw new Error("Não é possível criar uma lista vazia.");
+  }
+  const uniqueLeadIds = [...new Set(params.leadIds)].filter(Boolean);
+  if (uniqueLeadIds.length === 0) throw new Error("A lista não contém IDs de leads válidos.");
   const user_id = await getUserId();
   const { data: lista, error } = await supabase
     .from("lead_lists")
@@ -53,19 +58,33 @@ export async function criarListaComLeads(params: {
       uf: params.uf || null,
       fonte: params.fonte || null,
       radius: params.radius,
-      total_leads: params.leadIds.length,
+      total_leads: uniqueLeadIds.length,
     })
     .select()
     .single();
   if (error || !lista) throw new Error(error?.message ?? "Falha ao criar a lista");
 
-  if (params.leadIds.length) {
-    const { error: upErr } = await supabase
-      .from("leads")
-      .update({ list_id: lista.id })
-      .in("id", params.leadIds);
-    if (upErr) throw new Error("Lista criada, mas falhou ao vincular os leads: " + upErr.message);
+  const { error: upErr } = await supabase
+    .from("leads")
+    .update({ list_id: lista.id })
+    .in("id", uniqueLeadIds);
+  if (upErr) {
+    throw new Error(`Lista ${lista.id} criada, mas falhou ao vincular os leads: ${upErr.message}`);
   }
+
+  // Uma atualização filtrada pelo RLS pode afetar menos linhas sem retornar erro. Só há
+  // sucesso depois de reler o estado persistido e confirmar todos os IDs desta execução.
+  const { data: vinculados, error: verifyErr } = await supabase
+    .from("leads")
+    .select("id")
+    .eq("list_id", lista.id)
+    .in("id", uniqueLeadIds);
+  if (verifyErr || vinculados?.length !== uniqueLeadIds.length) {
+    throw new Error(
+      `Lista ${lista.id} criada, mas a associação ficou incompleta: ${vinculados?.length ?? 0}/${uniqueLeadIds.length} leads vinculados.`,
+    );
+  }
+
   return lista;
 }
 
@@ -155,8 +174,46 @@ export async function criarListaDeLeads(name: string, leads: Lead[]): Promise<Le
   return lista;
 }
 
-/** Exclui a lista. Os leads vinculados são apagados junto (FK on delete cascade). */
+/**
+ * Exclui somente listas comprovadamente vazias e somente por papel administrativo.
+ * A checagem reduz o risco na aplicação; ON DELETE RESTRICT no banco ainda é necessário
+ * para eliminar a janela de corrida entre a contagem e o DELETE.
+ */
 export async function excluirLista(id: string): Promise<void> {
+  await getUserId();
+  const { data: lista, error: listaErr } = await supabase
+    .from("lead_lists")
+    .select("id, org_id")
+    .eq("id", id)
+    .single();
+  if (listaErr || !lista) throw new Error("Lista não encontrada ou acesso negado.");
+  if (!lista.org_id) {
+    throw new Error("Não foi possível validar a organização desta lista. Exclusão bloqueada.");
+  }
+
+  const [{ data: isSuperAdmin, error: superErr }, { data: papel, error: papelErr }] =
+    await Promise.all([
+      supabase.rpc("eh_super_admin"),
+      supabase.rpc("papel_do_usuario", { p_org: lista.org_id }),
+    ]);
+  if (superErr || papelErr) {
+    throw new Error("Não foi possível validar sua permissão. Exclusão bloqueada.");
+  }
+  if (!isSuperAdmin && !["admin", "gerente"].includes(papel ?? "")) {
+    throw new Error("Somente administradores ou gerentes podem excluir listas.");
+  }
+
+  const { count, error: countErr } = await supabase
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .eq("list_id", id);
+  if (countErr) throw new Error("Não foi possível verificar os leads. Exclusão bloqueada.");
+  if ((count ?? 0) > 0) {
+    throw new Error(
+      `Lista não pode ser excluída: ${count} leads vinculados seriam apagados. Remova o risco no banco antes de tentar novamente.`,
+    );
+  }
+
   const { error } = await supabase.from("lead_lists").delete().eq("id", id);
   if (error) throw error;
 }

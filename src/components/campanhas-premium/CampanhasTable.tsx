@@ -19,6 +19,7 @@ import {
   Clock,
   Sparkles,
   Layers,
+  Mail,
 } from "lucide-react";
 import {
   SiGooglemaps,
@@ -59,41 +60,36 @@ interface CampanhasTableProps {
   onSendProposal?: (campanha: CampanhaPremiumItem) => void;
 }
 
-const ETAPA_BADGES: Record<
-  EtapaType,
-  { label: string; icon: typeof FileText; className: string }
-> = {
-  proposta: {
-    label: "Proposta",
-    icon: FileText,
-    className: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-  },
-  site_gerado: {
-    label: "Site gerado",
-    icon: Globe,
-    className: "border-purple-500/30 bg-purple-500/10 text-purple-400",
-  },
-  preparacao: {
-    label: "Preparação",
-    icon: Wrench,
-    className: "border-blue-500/30 bg-blue-500/10 text-blue-400",
-  },
-  aprovacao: {
-    label: "Aprovação",
-    icon: CheckCircle2,
-    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
-  },
-  envio: {
-    label: "Envio",
-    icon: Send,
-    className: "border-cyan-500/30 bg-cyan-500/10 text-cyan-400",
-  },
-};
+const ETAPA_BADGES: Record<EtapaType, { label: string; icon: typeof FileText; className: string }> =
+  {
+    proposta: {
+      label: "Proposta",
+      icon: FileText,
+      className: "border-amber-500/30 bg-amber-500/10 text-amber-400",
+    },
+    site_gerado: {
+      label: "Site gerado",
+      icon: Globe,
+      className: "border-purple-500/30 bg-purple-500/10 text-purple-400",
+    },
+    preparacao: {
+      label: "Preparação",
+      icon: Wrench,
+      className: "border-blue-500/30 bg-blue-500/10 text-blue-400",
+    },
+    aprovacao: {
+      label: "Aprovação",
+      icon: CheckCircle2,
+      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+    },
+    envio: {
+      label: "Envio",
+      icon: Send,
+      className: "border-cyan-500/30 bg-cyan-500/10 text-cyan-400",
+    },
+  };
 
-const STATUS_BADGES: Record<
-  StatusType,
-  { label: string; className: string }
-> = {
+const STATUS_BADGES: Record<StatusType, { label: string; className: string }> = {
   em_producao: {
     label: "Em produção",
     className: "bg-blue-500/15 text-blue-400 border-blue-500/30",
@@ -159,10 +155,7 @@ export function CampanhasTable({
         return false;
       }
 
-      if (
-        responsibleFilter !== "all" &&
-        c.responsible.name !== responsibleFilter
-      ) {
+      if (responsibleFilter !== "all" && c.responsible.name !== responsibleFilter) {
         return false;
       }
 
@@ -198,6 +191,8 @@ export function CampanhasTable({
 
   const renderChannelIcon = (channel: ChannelType) => {
     switch (channel) {
+      case "email":
+        return <Mail className="size-4 text-blue-400" aria-label="E-mail" />;
       case "google_maps":
         return <SiGooglemaps className="size-4 text-emerald-400" title="Google Maps" />;
       case "instagram":
@@ -357,10 +352,7 @@ export function CampanhasTable({
             <tr className="border-b border-home-border/60 text-[10px] font-semibold uppercase tracking-wider text-home-muted">
               <th className="w-10 pb-2.5 pl-2">
                 <Checkbox
-                  checked={
-                    selectedIds.size > 0 &&
-                    selectedIds.size === filteredCampanhas.length
-                  }
+                  checked={selectedIds.size > 0 && selectedIds.size === filteredCampanhas.length}
                   onCheckedChange={toggleSelectAll}
                   aria-label="Selecionar todas"
                 />
@@ -395,10 +387,7 @@ export function CampanhasTable({
                   )}
                 >
                   {/* Checkbox */}
-                  <td
-                    className="py-3 pl-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <td className="py-3 pl-2" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={isChecked}
                       onCheckedChange={() => toggleSelect(campanha.id)}
@@ -414,9 +403,7 @@ export function CampanhasTable({
                         <div className="font-semibold text-white transition-colors group-hover:text-home-orange">
                           {campanha.name}
                         </div>
-                        <div className="text-[11px] text-home-muted truncate">
-                          {campanha.niche}
-                        </div>
+                        <div className="text-[11px] text-home-muted truncate">{campanha.niche}</div>
                       </div>
                     </div>
                   </td>
@@ -482,10 +469,7 @@ export function CampanhasTable({
                   </td>
 
                   {/* Ações */}
-                  <td
-                    className="py-3 pr-2 text-right"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <td className="py-3 pr-2 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <button
                         type="button"

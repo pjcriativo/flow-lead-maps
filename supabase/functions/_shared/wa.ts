@@ -785,7 +785,7 @@ export async function registrarEnvio(
     mensagem: string;
   },
 ): Promise<void> {
-  await admin.from("wa_envios").insert({
+  const { error } = await admin.from("wa_envios").insert({
     user_id: userId,
     lead_id: e.leadId,
     instancia_id: e.instanciaId,
@@ -793,4 +793,5 @@ export async function registrarEnvio(
     variacao_id: e.variacaoId,
     mensagem: e.mensagem,
   });
+  if (error) throw new Error(`Falha ao registrar envio de WhatsApp: ${error.message}`);
 }

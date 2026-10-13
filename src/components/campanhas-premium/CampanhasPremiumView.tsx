@@ -13,12 +13,7 @@ import {
   renomearCampanha,
 } from "@/services/campanhas";
 import type { Campanha } from "@/types";
-import {
-  MOCK_CAMPANHAS,
-  TOP_METRICS,
-  type CampanhaPremiumItem,
-  type MetricCardItem,
-} from "./campanhas-premium-data";
+import { type CampanhaPremiumItem, type MetricCardItem } from "./campanhas-premium-data";
 import { CampanhasHeader } from "./CampanhasHeader";
 import { CampanhasPerformanceChart } from "./CampanhasPerformanceChart";
 import { CampanhasStatsCards } from "./CampanhasStatsCards";
@@ -44,11 +39,11 @@ export interface CampanhasPremiumViewProps {
 
 export function CampanhasPremiumView({
   user = {
-    name: "Marcos Gonçalves",
+    name: "Usuário",
     avatarUrl: "",
-    initials: "MG",
+    initials: "U",
   },
-  unreadNotifications = 3,
+  unreadNotifications = 0,
   activeSubView,
   onSubViewChange,
   selectedCampanhaContext,
@@ -72,122 +67,123 @@ export function CampanhasPremiumView({
     onSelectCampanhaContext?.(camp);
   };
 
-  // Lista de campanhas mesclando dados reais com o mockup aprovado
-  const [campanhasList, setCampanhasList] = useState<CampanhaPremiumItem[]>(MOCK_CAMPANHAS);
+  // A central só apresenta registros confirmados pelo backend.
+  const [campanhasList, setCampanhasList] = useState<CampanhaPremiumItem[]>([]);
   const [campanhasReais, setCampanhasReais] = useState<Campanha[]>([]);
-  const [selectedCampanha, setSelectedCampanha] = useState<CampanhaPremiumItem>(MOCK_CAMPANHAS[0]);
-  const [metrics, setMetrics] = useState<MetricCardItem[]>(TOP_METRICS);
+  const [selectedCampanha, setSelectedCampanha] = useState<CampanhaPremiumItem | null>(null);
+  const [metrics, setMetrics] = useState<MetricCardItem[]>([]);
 
   // Estados de modais e fluxos
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Carrega campanhas reais do Supabase e consolida métricas reais
   const carregarDadosReais = useCallback(async () => {
     try {
       setLoading(true);
-      const [camps, { count: countRedesigns }, { count: countPropostasEnviadas }] = await Promise.all([
+      setLoadError(null);
+      const [camps, redesignsResult, propostasResult] = await Promise.all([
         listarCampanhas(),
         supabase.from("redesigns").select("id", { count: "exact", head: true }),
-        supabase.from("propostas").select("id", { count: "exact", head: true }).eq("status", "enviada"),
+        supabase
+          .from("propostas")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "enviada"),
       ]);
+      if (redesignsResult.error) throw redesignsResult.error;
+      if (propostasResult.error) throw propostasResult.error;
+      const countRedesigns = redesignsResult.count ?? 0;
+      const countPropostasEnviadas = propostasResult.count ?? 0;
 
       setCampanhasReais(camps);
+      const mapped: CampanhaPremiumItem[] = camps.map((c) => ({
+        id: c.id,
+        name: c.nome,
+        niche: "Não informado",
+        channel: "email",
+        channelLabel: "E-mail",
+        leadsCount: c.total,
+        etapa:
+          c.enviado > 0
+            ? "envio"
+            : c.aprovado > 0
+              ? "aprovacao"
+              : c.rascunho > 0
+                ? "site_gerado"
+                : "preparacao",
+        status: c.status === "concluida" ? "concluida" : "em_producao",
+        stepperStep: c.enviado > 0 ? 5 : c.aprovado > 0 ? 4 : c.rascunho > 0 ? 2 : 1,
+        responsible: {
+          name: user.name || "Usuário",
+          initials: user.initials || "U",
+          avatarUrl: user.avatarUrl,
+        },
+        lastAction: new Date(c.criada_em).toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      }));
+      setCampanhasList(mapped);
+      setSelectedCampanha(
+        (current) => mapped.find((c) => c.id === current?.id) ?? mapped[0] ?? null,
+      );
 
-      if (camps && camps.length > 0) {
-        // Mapeia campanhas reais para o formato premium da UI
-        const mapped: CampanhaPremiumItem[] = camps.map((c, index) => {
-          const mockRef = MOCK_CAMPANHAS[index % MOCK_CAMPANHAS.length];
-          return {
-            id: c.id,
-            name: c.nome,
-            niche: mockRef.niche,
-            channel: (c as any).canal === "whatsapp" ? "whatsapp" : "google_maps",
-            channelLabel: (c as any).canal === "whatsapp" ? "WhatsApp" : "Google Maps",
-            leadsCount: c.total,
-            etapa: c.enviado > 0 ? "envio" : c.aprovado > 0 ? "aprovacao" : c.rascunho > 0 ? "site_gerado" : "preparacao",
-            status: c.status === "concluida" ? "concluida" : "em_producao",
-            priority: mockRef.priority,
-            category: mockRef.category,
-            stepperStep: c.enviado > 0 ? 5 : c.aprovado > 0 ? 4 : c.rascunho > 0 ? 2 : 1,
-            responsible: {
-              name: user.name || "Marcos Gonçalves",
-              initials: user.initials || "MG",
-              avatarUrl: user.avatarUrl,
-            },
-            lastAction: new Date(c.criada_em).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            metrics: {
-              leads: c.total,
-              leadsGrowth: "12%",
-              responses: Math.round(c.enviado * 0.15),
-              responsesGrowth: "25%",
-              meetings: Math.round(c.enviado * 0.05),
-              meetingsGrowth: "50%",
-              acceptedProposals: Math.round(c.enviado * 0.03),
-              acceptedGrowth: "100%",
-            },
-          };
-        });
+      const totalAtivas = camps.filter((c) => c.status === "ativa").length;
+      const totalLeads = camps.reduce((acc, c) => acc + c.total, 0);
+      const totalFalhas = camps.reduce((acc, c) => acc + c.erro, 0);
 
-        // Atualiza a listagem com as campanhas reais no topo
-        setCampanhasList(mapped);
-        setSelectedCampanha(mapped[0]);
-
-        // Atualiza os cards superiores com os números reais
-        const totalAtivas = camps.filter((c) => c.status === "ativa").length;
-        const totalLeads = camps.reduce((acc, c) => acc + c.total, 0);
-
-        setMetrics([
-          {
-            id: "ativas",
-            label: "Campanhas ativas",
-            value: totalAtivas > 0 ? String(totalAtivas) : "24",
-            change: "26%",
-            accent: "orange",
-            bars: [30, 45, 60, 50, 70, 85, 95, 100],
-          },
-          {
-            id: "leads",
-            label: "Leads em campanha",
-            value: totalLeads > 0 ? totalLeads.toLocaleString("pt-BR") : "1.248",
-            change: "18%",
-            accent: "purple",
-            bars: [40, 55, 65, 50, 80, 75, 90, 100],
-          },
-          {
-            id: "sites",
-            label: "Sites gerados",
-            value: countRedesigns ? countRedesigns.toLocaleString("pt-BR") : "312",
-            change: "24%",
-            accent: "green",
-            bars: [20, 35, 50, 65, 75, 80, 90, 100],
-          },
-          {
-            id: "propostas",
-            label: "Propostas enviadas",
-            value: countPropostasEnviadas ? countPropostasEnviadas.toLocaleString("pt-BR") : "148",
-            change: "16%",
-            accent: "blue",
-            bars: [30, 40, 50, 60, 70, 80, 85, 95],
-          },
-          {
-            id: "receita",
-            label: "Receita gerada",
-            value: "R$ 28.430",
-            change: "28%",
-            accent: "amber",
-            bars: [45, 55, 60, 75, 80, 85, 90, 100],
-          },
-        ]);
-      }
-    } catch {
-      // Se falhar a consulta (ou offline), mantém o dataset mockup aprovado
+      setMetrics([
+        {
+          id: "ativas",
+          label: "Campanhas ativas",
+          value: String(totalAtivas),
+          change: "",
+          accent: "orange",
+          bars: [],
+        },
+        {
+          id: "leads",
+          label: "Leads em campanha",
+          value: totalLeads.toLocaleString("pt-BR"),
+          change: "",
+          accent: "purple",
+          bars: [],
+        },
+        {
+          id: "sites",
+          label: "Sites gerados",
+          value: countRedesigns.toLocaleString("pt-BR"),
+          change: "",
+          accent: "green",
+          bars: [],
+        },
+        {
+          id: "propostas",
+          label: "Propostas enviadas",
+          value: countPropostasEnviadas.toLocaleString("pt-BR"),
+          change: "",
+          accent: "blue",
+          bars: [],
+        },
+        {
+          id: "falhas",
+          label: "Falhas registradas",
+          value: totalFalhas.toLocaleString("pt-BR"),
+          change: "",
+          accent: "amber",
+          bars: [],
+        },
+      ]);
+    } catch (error) {
+      setCampanhasReais([]);
+      setCampanhasList([]);
+      setSelectedCampanha(null);
+      setMetrics([]);
+      setLoadError(error instanceof Error ? error.message : "Falha ao carregar campanhas");
     } finally {
       setLoading(false);
     }
@@ -201,21 +197,11 @@ export function CampanhasPremiumView({
   const handleOpenCampanha = (camp: CampanhaPremiumItem) => {
     // Procura na lista de campanhas reais do Supabase
     const realCamp = campanhasReais.find((c) => c.id === camp.id);
-    const chosen: Campanha = realCamp || {
-      id: camp.id,
-      list_id: null,
-      nome: camp.name,
-      status: camp.status === "concluida" ? "concluida" : "ativa",
-      criada_em: new Date().toISOString(),
-      total: camp.leadsCount,
-      pendente: 0,
-      rascunho: 2,
-      aprovado: 1,
-      enviado: 1,
-      descartado: 0,
-      erro: 0,
-    };
-    handleSetCampanha(chosen);
+    if (!realCamp) {
+      toast.error("Campanha não encontrada. Atualize a listagem.");
+      return;
+    }
+    handleSetCampanha(realCamp);
     handleSubViewChange("gestao");
   };
 
@@ -231,8 +217,8 @@ export function CampanhasPremiumView({
       setCampanhasList((prev) =>
         prev.map((c) => (c.id === camp.id ? { ...c, name: novoNome.trim() } : c)),
       );
-      if (selectedCampanha.id === camp.id) {
-        setSelectedCampanha((prev) => ({ ...prev, name: novoNome.trim() }));
+      if (selectedCampanha?.id === camp.id) {
+        setSelectedCampanha((prev) => (prev ? { ...prev, name: novoNome.trim() } : null));
       }
       toast.success("Campanha renomeada com sucesso.");
     } catch (e) {
@@ -242,7 +228,11 @@ export function CampanhasPremiumView({
 
   // Excluir campanha
   const handleDeleteCampanha = async (camp: CampanhaPremiumItem) => {
-    if (!confirm(`Deseja realmente excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`)) {
+    if (
+      !confirm(
+        `Deseja realmente excluir a campanha "${camp.name}"? Esta ação não pode ser desfeita.`,
+      )
+    ) {
       return;
     }
 
@@ -251,8 +241,8 @@ export function CampanhasPremiumView({
         await excluirCampanha(camp.id);
       }
       setCampanhasList((prev) => prev.filter((c) => c.id !== camp.id));
-      if (selectedCampanha.id === camp.id) {
-        const next = campanhasList.find((c) => c.id !== camp.id) || MOCK_CAMPANHAS[0];
+      if (selectedCampanha?.id === camp.id) {
+        const next = campanhasList.find((c) => c.id !== camp.id) ?? null;
         setSelectedCampanha(next);
       }
       toast.success("Campanha excluída com sucesso.");
@@ -277,8 +267,8 @@ export function CampanhasPremiumView({
       setCampanhasList((prev) =>
         prev.map((c) => (c.id === camp.id ? { ...c, status: nextStatus } : c)),
       );
-      if (selectedCampanha.id === camp.id) {
-        setSelectedCampanha((prev) => ({ ...prev, status: nextStatus }));
+      if (selectedCampanha?.id === camp.id) {
+        setSelectedCampanha((prev) => (prev ? { ...prev, status: nextStatus } : null));
       }
       toast.success(isConcluida ? "Campanha reaberta." : "Campanha marcada como concluída.");
     } catch (e) {
@@ -411,7 +401,7 @@ export function CampanhasPremiumView({
           <div className="min-w-0 space-y-4">
             <CampanhasTable
               campanhas={campanhasList}
-              selectedCampanhaId={selectedCampanha.id}
+              selectedCampanhaId={selectedCampanha?.id ?? null}
               onSelectCampanha={setSelectedCampanha}
               onOpenCampanha={handleOpenCampanha}
               onRenameCampanha={handleRenameCampanha}
@@ -422,12 +412,22 @@ export function CampanhasPremiumView({
               onSendProposal={(c) => toast.info(`Disparo de propostas para ${c.name}`)}
             />
 
-            <CampanhasPerformanceChart />
+            <CampanhasPerformanceChart data={[]} />
           </div>
 
           {/* Coluna Direita: Painel Lateral com os 4 Cards */}
           <div className="min-w-0">
-            <CampanhaSummaryPanel campanha={selectedCampanha} />
+            {selectedCampanha ? (
+              <CampanhaSummaryPanel campanha={selectedCampanha} />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-home-border bg-home-surface/80 p-8 text-center text-sm text-home-muted">
+                {loadError
+                  ? `Não foi possível carregar as campanhas: ${loadError}`
+                  : loading
+                    ? "Carregando campanhas..."
+                    : "Nenhuma campanha real disponível."}
+              </div>
+            )}
           </div>
         </section>
       </main>

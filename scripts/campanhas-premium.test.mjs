@@ -64,8 +64,12 @@ test("a tela Campanhas Premium reúne todos os componentes da composição aprov
   );
 });
 
-test("os 5 cards superiores de métricas possuem os indicadores aprovados", () => {
+test("os cards superiores exibem somente indicadores operacionais comprováveis", () => {
   const file = fs.readFileSync(
+    path.join(root, "src/components/campanhas-premium/CampanhasPremiumView.tsx"),
+    "utf8",
+  );
+  const data = fs.readFileSync(
     path.join(root, "src/components/campanhas-premium/campanhas-premium-data.ts"),
     "utf8",
   );
@@ -73,10 +77,12 @@ test("os 5 cards superiores de métricas possuem os indicadores aprovados", () =
   assert.ok(file.includes('label: "Leads em campanha"'), "Deveria ter Leads em campanha");
   assert.ok(file.includes('label: "Sites gerados"'), "Deveria ter Sites gerados");
   assert.ok(file.includes('label: "Propostas enviadas"'), "Deveria ter Propostas enviadas");
-  assert.ok(
-    file.includes('label: "Receita gerada"'),
-    "Deveria ter Receita gerada / Desempenho comercial",
-  );
+  assert.ok(file.includes('label: "Falhas registradas"'), "Deveria ter Falhas registradas");
+  assert.ok(!file.includes("Receita gerada"), "Não deveria inventar receita");
+  assert.ok(!file.includes("MOCK_CAMPANHAS"), "Não deveria usar campanhas simuladas");
+  assert.ok(!file.includes("TOP_METRICS"), "Não deveria usar métricas simuladas");
+  assert.ok(!data.includes("MOCK_CAMPANHAS"), "Não deveria manter catálogo operacional mock");
+  assert.ok(!data.includes("TOP_METRICS"), "Não deveria manter métricas operacionais mock");
 });
 
 test("o painel lateral direito possui o resumo com stepper, próximas ações e saúde operacional", () => {
@@ -92,18 +98,18 @@ test("o painel lateral direito possui o resumo com stepper, próximas ações e 
   assert.ok(file.includes("Próximas ações"), "Deveria ter Próximas ações");
   assert.ok(file.includes("Saúde operacional"), "Deveria ter Saúde operacional");
   assert.ok(file.includes("Distribuição por etapa"), "Deveria ter Distribuição por etapa");
-  assert.ok(file.includes("1.248"), "Deveria ter a contagem total de leads");
+  assert.ok(!file.includes("1.248"), "Não deveria exibir contagem simulada de leads");
 });
 
-test("o gráfico de desempenho utiliza Recharts com linhas multicanal", () => {
+test("o gráfico de desempenho preserva o layout e usa estado neutro sem série real", () => {
   const file = fs.readFileSync(
     path.join(root, "src/components/campanhas-premium/CampanhasPerformanceChart.tsx"),
     "utf8",
   );
   assert.ok(file.includes("<LineChart"), "Deveria usar LineChart do Recharts");
   assert.ok(file.includes("<ResponsiveContainer"), "Deveria ser responsivo");
-  assert.ok(file.includes("odontoPrime"), "Deveria ter a série da Odonto Prime");
-  assert.ok(file.includes("clinicaVida"), "Deveria ter a série da Clínica Vida");
+  assert.ok(file.includes("Nenhum histórico confiável disponível"), "Deveria ter estado neutro");
+  assert.ok(!file.includes("CHART_SERIES"), "Não deveria carregar série simulada por padrão");
   assert.ok(
     file.includes("Desempenho por campanha"),
     "Deveria ter o título Desempenho por campanha",
@@ -274,6 +280,35 @@ test("CampanhasPremiumView: coordena subviews (central, gestao, resultados) e pr
   assert.ok(
     file.includes("onBackToProducao"),
     "Deveria permitir transição preservada entre Resultados e Gestão",
+  );
+});
+
+test("disparos em massa permanecem bloqueados sem reserva atômica no servidor", () => {
+  const service = fs.readFileSync(path.join(root, "src/services/campanhas.ts"), "utf8");
+  const whatsapp = fs.readFileSync(
+    path.join(root, "src/components/whatsapp/WaCampanhas.tsx"),
+    "utf8",
+  );
+
+  assert.ok(service.includes("BULK_SEND_BLOCKED_MESSAGE"), "E-mail em massa deve ser bloqueado");
+  assert.ok(
+    whatsapp.includes("DISPARO_EM_MASSA_BLOQUEADO"),
+    "WhatsApp em massa deve ser bloqueado",
+  );
+});
+
+test("edge de WhatsApp trata falha de persistência e não confunde opt-out de e-mail com autorização do canal", () => {
+  const edge = fs.readFileSync(
+    path.join(root, "supabase/functions/send-proposal-wa/index.ts"),
+    "utf8",
+  );
+  const shared = fs.readFileSync(path.join(root, "supabase/functions/_shared/wa.ts"), "utf8");
+
+  assert.ok(edge.includes("registro_falhou"), "Falha de registro deve ser explícita");
+  assert.ok(shared.includes("throw new Error"), "O insert de wa_envios não pode ignorar erro");
+  assert.ok(
+    edge.includes("email_opt_out") && edge.includes("autorização específica de WhatsApp"),
+    "O contrato atual deve documentar que email_opt_out não prova autorização de WhatsApp",
   );
 });
 

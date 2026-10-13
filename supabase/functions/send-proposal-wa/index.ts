@@ -102,7 +102,9 @@ Deno.serve(async (req) => {
     .maybeSingle();
   if (!lead) return json({ ok: false, reason: "lead_nao_encontrado" });
 
-  // Opt-out GLOBAL existente (e-mail) é respeitado também no WhatsApp (LGPD, não incomodar).
+  // O bloqueio de e-mail continua sendo respeitado por cautela, mas NÃO representa
+  // autorização específica de WhatsApp. O disparo em massa fica bloqueado no cliente até
+  // existir preferência por canal e reserva atômica no servidor.
   if (lead.email_opt_out) return json({ ok: false, reason: "opt_out" });
 
   // Lead sem WhatsApp → avisa, não finge (não inventa número).
@@ -190,13 +192,23 @@ Deno.serve(async (req) => {
     return json({ ok: false, reason: "envio_falhou", error: env.error, chip: chip.numero });
 
   // 10) registra (base de graduação, histórico e revezamento) + move o lead (best-effort).
-  await registrarEnvio(admin, userId, {
-    leadId: lead.id,
-    instanciaId: chip.id,
-    campanhaId: cl.campanha_id,
-    variacaoId: variacao.id,
-    mensagem: texto,
-  });
+  try {
+    await registrarEnvio(admin, userId, {
+      leadId: lead.id,
+      instanciaId: chip.id,
+      campanhaId: cl.campanha_id,
+      variacaoId: variacao.id,
+      mensagem: texto,
+    });
+  } catch (error) {
+    console.error("send-proposal-wa: mensagem entregue, mas o registro falhou", error);
+    return json({
+      ok: false,
+      reason: "registro_falhou",
+      estado: "entrega_incerta",
+      error: error instanceof Error ? error.message : "Falha ao persistir o envio",
+    });
+  }
   await admin
     .from("leads")
     .update({ status: "proposta_enviada", last_contacted_at: new Date().toISOString() })

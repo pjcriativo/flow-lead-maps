@@ -96,12 +96,13 @@ export function MinhasListasSection({
   };
 
   const handleExcluir = async (l: LeadListComStats) => {
-    if (
-      !confirm(
-        `Excluir a lista "${l.name}"? Os ${l.leads_atuais} leads dela também serão removidos. Esta ação não pode ser desfeita.`,
-      )
-    )
+    if (l.leads_atuais > 0) {
+      toast.error(
+        `Exclusão bloqueada: "${l.name}" possui ${l.leads_atuais} lead(s). Nenhum dado foi removido.`,
+      );
       return;
+    }
+    if (!confirm(`Excluir a lista vazia "${l.name}"? Esta ação não pode ser desfeita.`)) return;
     const prev = listas;
     setListas((p) => p.filter((x) => x.id !== l.id));
     try {

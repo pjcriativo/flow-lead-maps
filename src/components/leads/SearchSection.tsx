@@ -199,6 +199,7 @@ export function SearchSection({
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let streamHadError = false;
 
     try {
       // FONTE ÚNICA da área: pino manual manda; senão geocodifica a cidade AGORA
@@ -250,12 +251,11 @@ export function SearchSection({
               setStatus(`Qualificando... ${ev.found}/${ev.target} leads encontrados`);
               break;
             case "done":
-              setStatus(`Concluído — ${ev.inserted} leads encontrados`);
-              pushLog(`✔ Concluído. ${ev.inserted} leads encontrados no banco.`);
-              posthog.capture("search_leads_done", { inserted: ev.inserted });
-              onFinished?.();
+              setStatus(ev.inserted > 0 ? "Finalizando lista..." : "Concluído — nenhum lead novo");
+              pushLog(`Coleta finalizada. ${ev.inserted} leads encontrados no banco.`);
               break;
             case "error":
+              streamHadError = true;
               setStatus(`Erro: ${ev.message}`);
               pushLog(`✖ ${ev.message}`);
               break;
@@ -282,6 +282,13 @@ export function SearchSection({
           pushLog(
             `🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`,
           );
+          setStatus(
+            streamHadError
+              ? `Parcial — ${ids.length} leads vinculados à lista`
+              : `Concluído — ${ids.length} leads vinculados à lista`,
+          );
+          posthog.capture("search_leads_done", { inserted: ids.length, partial: streamHadError });
+          onFinished?.();
           posthog.capture("lead_list_created", {
             list_id: lista.id,
             total: ids.length,
@@ -292,12 +299,22 @@ export function SearchSection({
           });
         } catch (le) {
           const msg = le instanceof Error ? le.message : "erro";
-          pushLog(`⚠️ Leads salvos, mas falhou ao criar a lista: ${msg}`);
+          setStatus(`Parcial — ${ids.length} leads coletados sem lista confirmada`);
+          pushLog(`⚠️ Leads coletados sem lista confirmada (${ids.length}): ${msg}`);
         }
+      } else if (!streamHadError) {
+        posthog.capture("search_leads_done", { inserted: 0, partial: false });
+        onFinished?.();
       }
     } catch (e) {
       // cancelar a busca dispara AbortError — isso não é erro pra mostrar ao dono.
-      if (!(e instanceof Error) || e.name !== "AbortError") {
+      const partialCount = new Set(insertedIdsRef.current).size;
+      if (partialCount > 0) {
+        setStatus(`Parcial — ${partialCount} leads coletados sem lista`);
+        pushLog(
+          `⚠️ Leads coletados sem lista (${partialCount}). A execução foi interrompida antes da vinculação.`,
+        );
+      } else if (!(e instanceof Error) || e.name !== "AbortError") {
         const msg = e instanceof Error ? e.message : String(e);
         setStatus(`Erro: ${msg}`);
         pushLog(`ERRO: ${msg}`);

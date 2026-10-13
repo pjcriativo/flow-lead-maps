@@ -10,7 +10,6 @@ import { classificarMotivo } from "@/lib/copy-proposta";
 import { configPadraoWa, type WaCampanhaConfig } from "@/lib/wa-copy";
 import {
   injetarLinkPrevia,
-  enviarProposta,
   salvarProposta,
   listarPropostasPorCampanha,
   gerarPropostaRascunhoSemSite,
@@ -648,50 +647,14 @@ export type EnviarLoteResult = {
   sem_reply_to: number;
 };
 
+export const BULK_SEND_BLOCKED_MESSAGE =
+  "Envio em massa temporariamente bloqueado: a reserva atômica e a chave idempotente ainda precisam ser instaladas no servidor.";
+
 /** REVISÃO EM LOTE — envia todas as propostas APROVADAS da campanha, respeitando o
  * portão (só aprovada) e a rampa por org (para no teto do dia). */
 export async function enviarAprovadasDaCampanha(campanhaId: string): Promise<EnviarLoteResult> {
-  const { data: aprovadas, error } = await supabase
-    .from("propostas")
-    .select("id")
-    .eq("campanha_id", campanhaId)
-    .eq("status", "aprovada")
-    .order("criada_em", { ascending: true });
-  if (error) throw error;
-
-  const r: EnviarLoteResult = {
-    enviadas: 0,
-    sem_email: 0,
-    opt_out: 0,
-    teto_dia: 0,
-    erro: 0,
-    sem_reply_to: 0,
-  };
-  for (const p of (aprovadas ?? []) as Array<{ id: string }>) {
-    try {
-      const res = await enviarProposta(p.id);
-      if (res.ok) {
-        r.enviadas += 1;
-      } else if (res.reason === "teto_dia") {
-        r.teto_dia += 1;
-        break; // teto do dia da org — o resto sai amanhã
-      } else if (res.reason === "sem_reply_to" || res.reason === "sem_remetente") {
-        // Config da ORG, não do lead: sem Reply-To NENHUMA proposta sai. Insistir lead a
-        // lead só produziria N erros iguais — para na hora.
-        r.sem_reply_to += 1;
-        break;
-      } else if (res.reason === "sem_email") {
-        r.sem_email += 1;
-      } else if (res.reason === "opt_out") {
-        r.opt_out += 1;
-      } else {
-        r.erro += 1;
-      }
-    } catch {
-      r.erro += 1;
-    }
-  }
-  return r;
+  void campanhaId;
+  throw new Error(BULK_SEND_BLOCKED_MESSAGE);
 }
 
 export type { Campanha, CampanhaLeadView, Proposta };

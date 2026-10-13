@@ -1,14 +1,6 @@
-import {
-  DollarSign,
-  FileText,
-  Globe,
-  Megaphone,
-  Monitor,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { DollarSign, FileText, Globe, Megaphone, Monitor, TrendingUp, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TOP_METRICS, type MetricCardItem } from "./campanhas-premium-data";
+import type { MetricCardItem } from "./campanhas-premium-data";
 
 const ACCENT_STYLES = {
   orange: {
@@ -51,10 +43,7 @@ interface CampanhasStatsCardsProps {
   className?: string;
 }
 
-export function CampanhasStatsCards({
-  metrics = TOP_METRICS,
-  className,
-}: CampanhasStatsCardsProps) {
+export function CampanhasStatsCards({ metrics = [], className }: CampanhasStatsCardsProps) {
   return (
     <div
       className={cn(
@@ -63,8 +52,7 @@ export function CampanhasStatsCards({
       )}
     >
       {metrics.map((metric) => {
-        const IconComponent =
-          ICONS[metric.id as keyof typeof ICONS] || Megaphone;
+        const IconComponent = ICONS[metric.id as keyof typeof ICONS] || Megaphone;
         const style = ACCENT_STYLES[metric.accent];
 
         return (
@@ -96,17 +84,16 @@ export function CampanhasStatsCards({
                 </span>
                 <div className="mt-0.5 flex items-center gap-1.5">
                   <span className="text-xs text-home-muted">{metric.label}</span>
-                  <span className="inline-flex items-center text-[11px] font-semibold text-emerald-400">
-                    ↑ {metric.change}
-                  </span>
+                  {metric.change && (
+                    <span className="inline-flex items-center text-[11px] font-semibold text-emerald-400">
+                      {metric.change}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Mini vertical bar chart */}
-              <div
-                aria-hidden="true"
-                className="flex items-end gap-1 pb-1"
-              >
+              <div aria-hidden="true" className="flex items-end gap-1 pb-1">
                 {metric.bars.map((height, i) => (
                   <div
                     key={i}
