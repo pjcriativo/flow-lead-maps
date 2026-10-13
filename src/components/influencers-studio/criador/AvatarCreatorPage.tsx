@@ -206,20 +206,22 @@ export const AvatarCreatorPage: React.FC<AvatarCreatorPageProps> = ({
       )}
 
       {/* Video Player Modal for "Ver em movimento" */}
-      <VideoPlayerModal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        video={{
-          id: "video-sofia-demo",
-          title: `Apresentação em Movimento • ${avatarName}`,
-          date: "Hoje",
-          duration: "00:32",
-          status: "concluido",
-          thumbnailUrl: selectedModel.imageUrl,
-          avatarName: avatarName,
-          views: "24.5K",
-        }}
-      />
+      {isVideoModalOpen && (
+        <VideoPlayerModal
+          isOpen={isVideoModalOpen}
+          onClose={() => setIsVideoModalOpen(false)}
+          video={{
+            id: "video-sofia-demo",
+            title: `Apresentação em Movimento • ${avatarName}`,
+            date: "Hoje",
+            duration: "00:32",
+            status: "concluido",
+            thumbnailUrl: selectedModel.imageUrl,
+            avatarName: avatarName,
+            views: "24.5K",
+          }}
+        />
+      )}
 
       {/* Examples Modal for "Ver exemplos" */}
       {isExamplesModalOpen && (

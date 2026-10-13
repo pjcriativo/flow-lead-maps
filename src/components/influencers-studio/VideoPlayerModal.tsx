@@ -4,25 +4,34 @@ import type { RecentVideoItem } from "./influencers-data";
 
 interface VideoPlayerModalProps {
   video: RecentVideoItem | null;
+  isOpen?: boolean;
   onClose: () => void;
 }
 
 export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   video,
+  isOpen,
   onClose,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
+  if (isOpen !== undefined && !isOpen) return null;
   if (!video) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#0F1626] border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative text-left">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#0F1626] border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative text-left"
+      >
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 text-white/80 hover:text-white p-1 rounded-lg bg-black/50 backdrop-blur-sm transition-colors"
+          className="absolute top-4 right-4 z-20 text-white/80 hover:text-white p-1.5 rounded-lg bg-black/60 hover:bg-black/90 backdrop-blur-sm transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>

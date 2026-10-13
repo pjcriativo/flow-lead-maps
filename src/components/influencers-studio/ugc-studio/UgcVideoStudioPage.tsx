@@ -207,20 +207,22 @@ export const UgcVideoStudioPage: React.FC<UgcVideoStudioPageProps> = ({
       )}
 
       {/* Video Player Modal */}
-      <VideoPlayerModal
-        isOpen={isVideoModalOpen}
-        onClose={() => setIsVideoModalOpen(false)}
-        video={{
-          id: "video-ugc-demo",
-          title: `Vídeo UGC de Anúncio • ${selectedProduct.name}`,
-          date: "Hoje",
-          duration: "00:30",
-          status: "concluido",
-          thumbnailUrl: selectedAvatar.imageUrl,
-          avatarName: selectedAvatar.name,
-          views: "38.2K",
-        }}
-      />
+      {isVideoModalOpen && (
+        <VideoPlayerModal
+          isOpen={isVideoModalOpen}
+          onClose={() => setIsVideoModalOpen(false)}
+          video={{
+            id: "video-ugc-demo",
+            title: `Vídeo UGC de Anúncio • ${selectedProduct.name}`,
+            date: "Hoje",
+            duration: "00:30",
+            status: "concluido",
+            thumbnailUrl: selectedAvatar.imageUrl,
+            avatarName: selectedAvatar.name,
+            views: "38.2K",
+          }}
+        />
+      )}
 
       {/* Tutorials Modal */}
       {isTutorialsModalOpen && (
