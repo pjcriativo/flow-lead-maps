@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, Layers, MapPin, Minus, Plus, Radar, Search } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { MAP_CONFIG, MAP_LAYERS } from "@/lib/map-config";
 import "leaflet/dist/leaflet.css";
 
 type LatLng = { lat: number; lng: number };
@@ -59,12 +60,11 @@ export function GoogleMapsMapPanel({
         attributionControl: false,
       }).setView(pin ? [pin.lat, pin.lng] : CENTRO_PADRAO, 12);
 
-      // Camada base OpenStreetMap com tema escuro via CSS (elimina marca d'água de cartocdn.com/dark_all)
-      const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-      const tileLayer = L.tileLayer(tileUrl, {
-        maxZoom: 19,
-        subdomains: "abcd",
+      // Configuração centralizada OpenStreetMap com tema escuro via CSS (elimina marca d'água de cartocdn.com/dark_all)
+      const currentLayer = MAP_LAYERS[mapStyle] || MAP_LAYERS.dark;
+      const tileLayer = L.tileLayer(currentLayer.url, {
+        maxZoom: currentLayer.maxZoom,
+        subdomains: currentLayer.subdomains,
       }).addTo(map);
 
       refs.current.tileLayer = tileLayer;
@@ -93,12 +93,11 @@ export function GoogleMapsMapPanel({
     if (!L || !map || !tileLayer) return;
 
     map.removeLayer(tileLayer);
-    // Camada base OpenStreetMap com tema escuro via CSS (elimina marca d'água de cartocdn.com/dark_all)
-    const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-    refs.current.tileLayer = L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      subdomains: "abcd",
+    // Configuração centralizada OpenStreetMap com tema escuro via CSS (elimina marca d'água de cartocdn.com/dark_all)
+    const currentLayer = MAP_LAYERS[mapStyle] || MAP_LAYERS.dark;
+    refs.current.tileLayer = L.tileLayer(currentLayer.url, {
+      maxZoom: currentLayer.maxZoom,
+      subdomains: currentLayer.subdomains,
     }).addTo(map);
   }, [mapStyle]);
 

@@ -16,6 +16,7 @@ import { GoogleMapsLocation } from "./GoogleMapsLocation";
 import { GoogleMapsMapPanel } from "./GoogleMapsMapPanel";
 import { GoogleMapsSearchSummary } from "./GoogleMapsSearchSummary";
 import { GoogleMapsResultsPanel } from "./GoogleMapsResultsPanel";
+import { GoogleMapsRunningView } from "./GoogleMapsRunningView";
 import { useGoogleMapsStats } from "./useGoogleMapsStats";
 import { Radar } from "lucide-react";
 
@@ -76,6 +77,24 @@ export function GoogleMapsPremiumView({
   const abortRef = useRef<AbortController | null>(null);
   const insertedIdsRef = useRef<string[]>([]);
   const geoAbort = useRef<AbortController | null>(null);
+
+  // Estados de visualização: "config" (Tela 01) vs "running" (Tela 02 - Prospecção em Andamento)
+  const [activeView, setActiveView] = useState<"config" | "running">("config");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [duplicatasCount, setDuplicatasCount] = useState(0);
+
+  // Timer em tempo real durante a execução ativa
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (running) {
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [running]);
 
   // Nome resolvido da lista
   const nomeListaResolvido = resolveListName(nomeListaCustom, nicho, cidade, uf);
@@ -185,6 +204,9 @@ export function GoogleMapsPremiumView({
     }
 
     setRunning(true);
+    setActiveView("running");
+    setElapsedSeconds(0);
+    setDuplicatasCount(0);
     setLeads([]);
     setLogs([]);
     setProgress({ found: 0, target: limite });
@@ -194,6 +216,7 @@ export function GoogleMapsPremiumView({
     const controller = new AbortController();
     abortRef.current = controller;
     let streamHadError = false;
+    let doneRecebido = false;
 
     try {
       let centro = pin;
@@ -244,6 +267,18 @@ export function GoogleMapsPremiumView({
           switch (ev.type) {
             case "log":
               pushLog(ev.message);
+              if (
+                ev.message.toLowerCase().includes("já pertenci") ||
+                ev.message.toLowerCase().includes("já existe") ||
+                ev.message.toLowerCase().includes("duplicat")
+              ) {
+                const matchDupl = ev.message.match(/(\d+)\s+estabelecimento/i);
+                if (matchDupl) {
+                  setDuplicatasCount((prev) => prev + Number(matchDupl[1]));
+                } else {
+                  setDuplicatasCount((prev) => prev + 1);
+                }
+              }
               break;
             case "lead":
               setLeads((prev) => [...prev, ev.lead]);
@@ -254,6 +289,7 @@ export function GoogleMapsPremiumView({
               setStatus(`Qualificando... ${ev.found}/${ev.target} leads encontrados`);
               break;
             case "done":
+              doneRecebido = true;
               setStatus(ev.inserted > 0 ? "Finalizando lista..." : "Concluído — nenhum lead novo");
               pushLog(`Coleta finalizada. ${ev.inserted} leads encontrados no banco.`);
               break;
@@ -314,6 +350,10 @@ export function GoogleMapsPremiumView({
           toast.error(msg);
         }
       }
+      if (!doneRecebido && !streamHadError) {
+        setStatus("Parcial — conexão encerrada");
+        pushLog("⚠️ Conexão encerrada antes da confirmação terminal.");
+      }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {
         const msg = (err as Error).message ?? "Erro inesperado na busca";
@@ -325,6 +365,46 @@ export function GoogleMapsPremiumView({
       setRunning(false);
     }
   };
+
+  // Interrupção honesta da busca pelo usuário
+  const handleCancelarBusca = () => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    setRunning(false);
+    setStatus("Interrompido pelo usuário");
+    pushLog("⏹️ Prospecção interrompida pelo usuário no navegador.");
+    toast.info("Busca interrompida. Os leads já capturados foram preservados.");
+  };
+
+  // Renderização da Tela 02: Prospecção em Andamento
+  if (activeView === "running") {
+    return (
+      <GoogleMapsRunningView
+        user={user}
+        unreadNotifications={unreadNotifications}
+        nicho={nicho}
+        categoria={categoriaAtiva}
+        cidade={cidade}
+        uf={uf}
+        raioKm={raioKm}
+        limite={limite}
+        nomeLista={nomeListaResolvido}
+        buscarEmails={buscarEmails}
+        filtrosCaptura={filtrosCaptura}
+        pin={pin}
+        running={running}
+        leads={leads}
+        logs={logs}
+        status={status}
+        progress={progress}
+        elapsedSeconds={elapsedSeconds}
+        duplicatasCount={duplicatasCount}
+        onCancelarBusca={handleCancelarBusca}
+        onVoltarConfiguracao={() => setActiveView("config")}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
