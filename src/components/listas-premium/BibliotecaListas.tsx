@@ -90,9 +90,7 @@ export function BibliotecaListas({
           <input
             type="search"
             value={filters.search}
-            onChange={(e) =>
-              onFilterChange((prev) => ({ ...prev, search: e.target.value }))
-            }
+            onChange={(e) => onFilterChange((prev) => ({ ...prev, search: e.target.value }))}
             placeholder="Buscar listas por nome, nicho ou região..."
             className="h-9.5 w-full rounded-xl border border-home-border bg-home-surface-strong pl-9.5 pr-4 text-xs text-white placeholder:text-home-muted outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/40 transition-colors"
           />
@@ -103,9 +101,7 @@ export function BibliotecaListas({
           {/* Fonte */}
           <select
             value={filters.fonte}
-            onChange={(e) =>
-              onFilterChange((prev) => ({ ...prev, fonte: e.target.value }))
-            }
+            onChange={(e) => onFilterChange((prev) => ({ ...prev, fonte: e.target.value }))}
             className="h-8 rounded-lg border border-home-border bg-home-surface-strong px-2 text-[11px] font-medium text-home-foreground outline-none focus:border-amber-500/80 cursor-pointer"
           >
             <option value="todas">Fonte: Todas</option>
@@ -119,9 +115,7 @@ export function BibliotecaListas({
           {/* Nicho */}
           <select
             value={filters.nicho}
-            onChange={(e) =>
-              onFilterChange((prev) => ({ ...prev, nicho: e.target.value }))
-            }
+            onChange={(e) => onFilterChange((prev) => ({ ...prev, nicho: e.target.value }))}
             className="h-8 rounded-lg border border-home-border bg-home-surface-strong px-2 text-[11px] font-medium text-home-foreground outline-none focus:border-amber-500/80 cursor-pointer"
           >
             <option value="todos">Nicho: Todos</option>
@@ -135,9 +129,7 @@ export function BibliotecaListas({
           {/* Cidade */}
           <select
             value={filters.cidade}
-            onChange={(e) =>
-              onFilterChange((prev) => ({ ...prev, cidade: e.target.value }))
-            }
+            onChange={(e) => onFilterChange((prev) => ({ ...prev, cidade: e.target.value }))}
             className="h-8 rounded-lg border border-home-border bg-home-surface-strong px-2 text-[11px] font-medium text-home-foreground outline-none focus:border-amber-500/80 cursor-pointer"
           >
             <option value="todas">Cidade: Todas</option>
@@ -151,14 +143,11 @@ export function BibliotecaListas({
           {/* Status */}
           <select
             value={filters.status}
-            onChange={(e) =>
-              onFilterChange((prev) => ({ ...prev, status: e.target.value }))
-            }
+            onChange={(e) => onFilterChange((prev) => ({ ...prev, status: e.target.value }))}
             className="h-8 rounded-lg border border-home-border bg-home-surface-strong px-2 text-[11px] font-medium text-home-foreground outline-none focus:border-amber-500/80 cursor-pointer"
           >
             <option value="todos">Status: Todos</option>
             <option value="ativa">Ativa</option>
-            <option value="em_estrategia">Em estratégia</option>
             <option value="pausada">Pausada</option>
             <option value="rascunho">Rascunho</option>
           </select>

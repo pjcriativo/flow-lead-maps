@@ -67,7 +67,12 @@ export function ListaDetailsPanel({
 
   const renderFonteBadge = () => {
     const f = (lista.fonte || "google").toLowerCase();
-    if (f.includes("maps") || f.includes("google") || f.includes("apify") || f.includes("geoapify")) {
+    if (
+      f.includes("maps") ||
+      f.includes("google") ||
+      f.includes("apify") ||
+      f.includes("geoapify")
+    ) {
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-semibold text-blue-400 border border-blue-500/20">
           <SiGooglemaps className="size-3 text-blue-400" />
@@ -189,7 +194,7 @@ export function ListaDetailsPanel({
                     {lista.com_contato_count.toLocaleString("pt-BR")}
                   </span>
                   <p className="text-[10px] text-home-muted uppercase tracking-wider">
-                    Com contato
+                    Contato disponível
                   </p>
                 </div>
 
@@ -200,7 +205,7 @@ export function ListaDetailsPanel({
                     {lista.taxa_contato}%
                   </span>
                   <p className="text-[10px] text-home-muted uppercase tracking-wider">
-                    Taxa de contato
+                    Cobertura de contato
                   </p>
                 </div>
               </div>
@@ -282,6 +287,7 @@ export function ListaDetailsPanel({
       <div className="pt-1">
         {activeTab === "estrategia" && (
           <ListaEstrategiaTab
+            key={lista.id}
             lista={lista}
             leads={leads}
             linkedCampaigns={linkedCampaigns}
@@ -299,7 +305,7 @@ export function ListaDetailsPanel({
           />
         )}
 
-        {activeTab === "oferta" && <ListaOfertaTab lista={lista} />}
+        {activeTab === "oferta" && <ListaOfertaTab key={lista.id} lista={lista} />}
 
         {activeTab === "campanhas" && (
           <ListaCampanhasTab

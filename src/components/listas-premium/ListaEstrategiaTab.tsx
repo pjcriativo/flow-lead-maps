@@ -12,15 +12,15 @@ import {
   Check,
   Plus,
   ArrowRight,
-  TrendingUp,
   Table as TableIcon,
   MoreVertical,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Lead } from "@/lib/leads-api";
 import {
-  deriveDefaultStrategy,
+  deriveIllustrativeStrategy,
   type CampanhaComCanal,
   type LeadListWithFullStats,
 } from "./listas-premium-data";
@@ -40,8 +40,10 @@ export function ListaEstrategiaTab({
   onCreateCampaign,
   onViewAllLeads,
 }: ListaEstrategiaTabProps) {
-  const strategy = deriveDefaultStrategy(lista.niche, lista.city, lista.uf);
-  const [selectedChannel, setSelectedChannel] = useState<"whatsapp" | "email" | "instagram">("whatsapp");
+  const strategy = deriveIllustrativeStrategy(lista.niche, lista.city, lista.uf);
+  const [selectedChannel, setSelectedChannel] = useState<"whatsapp" | "email" | "instagram">(
+    "whatsapp",
+  );
   const [copied, setCopied] = useState(false);
 
   // Canais ativos
@@ -76,13 +78,21 @@ export function ListaEstrategiaTab({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-start gap-3 rounded-2xl border border-blue-500/25 bg-blue-500/10 p-4 text-xs text-blue-100">
+        <Info className="mt-0.5 size-4 shrink-0 text-blue-300" />
+        <p>
+          <strong>Modelo ilustrativo não persistido.</strong> Oferta, público, abordagem, canais,
+          sequência e mensagens abaixo são um rascunho local de referência. Alterações nesta aba não
+          são salvas e nenhuma IA paga é acionada.
+        </p>
+      </div>
       {/* 🟢 LINHA 1: Três Cards Principais de Estratégia */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {/* Card 1: Oferta principal */}
         <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-500">
             <Tag className="size-3.5 stroke-[2.5]" />
-            <span>Oferta principal</span>
+            <span>Exemplo ilustrativo — Oferta principal</span>
           </div>
           <h4 className="mt-2 text-sm font-bold text-white line-clamp-1">
             {strategy.oferta_principal.titulo}
@@ -96,7 +106,7 @@ export function ListaEstrategiaTab({
         <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-500">
             <Users className="size-3.5 stroke-[2.5]" />
-            <span>Público e contexto</span>
+            <span>Exemplo ilustrativo — Público e contexto</span>
           </div>
           <h4 className="mt-2 text-sm font-bold text-white line-clamp-1">
             {strategy.publico_contexto.titulo}
@@ -110,7 +120,7 @@ export function ListaEstrategiaTab({
         <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
           <div className="flex items-center gap-2 text-xs font-semibold text-amber-500">
             <Target className="size-3.5 stroke-[2.5]" />
-            <span>Abordagem</span>
+            <span>Abordagem ilustrativa</span>
           </div>
           <ul className="mt-2 space-y-1 text-xs text-home-muted">
             {strategy.abordagem.map((item, idx) => (
@@ -130,7 +140,7 @@ export function ListaEstrategiaTab({
           {/* Bloco Canais Sugeridos */}
           <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
             <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <span className="text-amber-500">⚡</span> Canais sugeridos
+              <span className="text-amber-500">⚡</span> Canais sugeridos (rascunho local)
             </h4>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {/* E-mail */}
@@ -226,7 +236,7 @@ export function ListaEstrategiaTab({
           {/* Bloco Sequência de Abordagem */}
           <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
             <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <span className="text-amber-500">🧭</span> Sequência de abordagem
+              <span className="text-amber-500">🧭</span> Sequência de abordagem (ilustrativa)
             </h4>
             <div className="mt-3 space-y-3">
               {strategy.sequencia.map((step) => (
@@ -235,12 +245,8 @@ export function ListaEstrategiaTab({
                     {step.ordem}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-white">
-                      {step.etapa}
-                    </p>
-                    <p className="text-[11px] text-home-muted leading-tight">
-                      {step.objetivo}
-                    </p>
+                    <p className="text-xs font-bold text-white">{step.etapa}</p>
+                    <p className="text-[11px] text-home-muted leading-tight">{step.objetivo}</p>
                   </div>
                 </div>
               ))}
@@ -255,7 +261,7 @@ export function ListaEstrategiaTab({
               {/* Header com Tabs de Canal */}
               <div className="flex items-center justify-between border-b border-home-border/80 pb-2.5">
                 <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <span className="text-amber-500">📝</span> Rascunho de mensagem
+                  <span className="text-amber-500">📝</span> Rascunho de mensagem (local)
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -306,7 +312,11 @@ export function ListaEstrategiaTab({
                   title="Copiar mensagem"
                   className="absolute top-3 right-3 flex size-7 items-center justify-center rounded-lg bg-home-surface text-home-muted hover:text-white transition-colors"
                 >
-                  {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                  {copied ? (
+                    <Check className="size-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="size-3.5" />
+                  )}
                 </button>
 
                 <p className="whitespace-pre-wrap text-xs text-home-foreground leading-relaxed font-sans pr-6">
@@ -318,20 +328,26 @@ export function ListaEstrategiaTab({
             {/* Variáveis dinâmicas sugeridas */}
             <div className="mt-3 flex flex-wrap items-center gap-1.5 pt-2 border-t border-home-border/60 text-[10px] text-home-muted">
               <span>Variáveis:</span>
-              <span className="rounded bg-home-surface px-1.5 py-0.5 text-amber-400 font-mono">{"{{nome}}"}</span>
-              <span className="rounded bg-home-surface px-1.5 py-0.5 text-amber-400 font-mono">{"{{empresa}}"}</span>
-              <span className="rounded bg-home-surface px-1.5 py-0.5 text-amber-400 font-mono">{"{{cidade}}"}</span>
+              <span className="rounded bg-home-surface px-1.5 py-0.5 text-amber-400 font-mono">
+                {"{{nome}}"}
+              </span>
+              <span className="rounded bg-home-surface px-1.5 py-0.5 text-amber-400 font-mono">
+                {"{{empresa}}"}
+              </span>
+              <span className="rounded bg-home-surface px-1.5 py-0.5 text-amber-400 font-mono">
+                {"{{cidade}}"}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Coluna 3 (Campanhas vinculadas + Resultados rápidos) — 4 cols */}
+        {/* Coluna 3 (dados persistidos + disponibilidade de resultados) — 4 cols */}
         <div className="space-y-4 lg:col-span-4 flex flex-col justify-between">
           {/* Bloco Campanhas Vinculadas */}
           <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <span className="text-amber-500">📢</span> Campanhas vinculadas
+                <span className="text-amber-500">📢</span> Campanhas vinculadas (persistidas)
               </h4>
               <button
                 type="button"
@@ -357,43 +373,14 @@ export function ListaEstrategiaTab({
                       </p>
                     </div>
                     <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/25">
-                      ● Ativa
+                      {camp.status}
                     </span>
                   </div>
                 ))
               ) : (
-                <>
-                  {/* Card Exemplo 1 */}
-                  <div className="flex items-center justify-between rounded-xl border border-home-border/70 bg-home-surface-strong/80 p-2.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white truncate">Prospecção SP — Clínicas</p>
-                      <p className="text-[11px] text-home-muted">892 leads • Iniciada em 12/03</p>
-                    </div>
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/25">
-                      ● Ativa
-                    </span>
-                  </div>
-                  {/* Card Exemplo 2 */}
-                  <div className="flex items-center justify-between rounded-xl border border-home-border/70 bg-home-surface-strong/80 p-2.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white truncate">Follow-up WhatsApp</p>
-                      <p className="text-[11px] text-home-muted">648 leads • Iniciada em 18/03</p>
-                    </div>
-                    <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-semibold text-blue-400 border border-blue-500/25">
-                      ● Em andamento
-                    </span>
-                  </div>
-                  {/* Card Exemplo 3 */}
-                  <div className="flex items-center justify-between rounded-xl border border-home-border/70 bg-home-surface-strong/80 p-2.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold text-white truncate">Remarketing Instagram</p>
-                      <p className="text-[11px] text-home-muted">320 leads • Iniciada em 05/03</p>
-                    </div>
-                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400 border border-amber-500/25">
-                      ● Pausada
-                    </span>
-                  </div>
-                </>
+                <p className="rounded-xl border border-dashed border-home-border bg-home-surface-strong/60 p-3 text-xs text-home-muted">
+                  Nenhuma campanha persistida está vinculada a esta lista.
+                </p>
               )}
             </div>
           </div>
@@ -404,44 +391,11 @@ export function ListaEstrategiaTab({
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <span className="text-amber-500">📊</span> Resultados rápidos
               </h4>
-              <span className="rounded-md border border-home-border bg-home-surface px-2 py-0.5 text-[10px] font-medium text-home-muted">
-                Últimos 30 dias
-              </span>
             </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-home-border/70 bg-home-surface-strong/80 p-2.5">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-white tabular-nums">312</span>
-                  <span className="text-[10px] font-semibold text-emerald-400">↑ 18%</span>
-                </div>
-                <p className="mt-0.5 text-[10px] text-home-muted">Leads contatados</p>
-              </div>
-
-              <div className="rounded-xl border border-home-border/70 bg-home-surface-strong/80 p-2.5">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-white tabular-nums">87</span>
-                  <span className="text-[10px] font-semibold text-emerald-400">↑ 24%</span>
-                </div>
-                <p className="mt-0.5 text-[10px] text-home-muted">Respostas</p>
-              </div>
-
-              <div className="rounded-xl border border-home-border/70 bg-home-surface-strong/80 p-2.5">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-white tabular-nums">36</span>
-                  <span className="text-[10px] font-semibold text-emerald-400">↑ 33%</span>
-                </div>
-                <p className="mt-0.5 text-[10px] text-home-muted">Reuniões agendadas</p>
-              </div>
-
-              <div className="rounded-xl border border-home-border/70 bg-home-surface-strong/80 p-2.5">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-white tabular-nums">12</span>
-                  <span className="text-[10px] font-semibold text-emerald-400">↑ 20%</span>
-                </div>
-                <p className="mt-0.5 text-[10px] text-home-muted">Clientes fechados</p>
-              </div>
-            </div>
+            <p className="mt-3 rounded-xl border border-dashed border-home-border bg-home-surface-strong/60 p-3 text-xs leading-relaxed text-home-muted">
+              Sem métricas de execução consolidadas por lista. Consulte a aba Resultados para ver os
+              dados disponíveis e os indicadores ainda não rastreados.
+            </p>
           </div>
         </div>
       </div>
@@ -494,10 +448,10 @@ export function ListaEstrategiaTab({
                       {lead.email || lead.phone || lead.whatsapp || "Sem contato"}
                     </td>
                     <td className="py-2.5 text-home-muted">
-                      {lead.origem_fonte || "Google Maps"}
+                      {lead.origem_fonte || "Não informada"}
                     </td>
                     <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums">
-                      {lead.score ?? 70}
+                      {lead.score ?? "—"}
                     </td>
                     <td className="py-2.5">
                       <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
@@ -516,54 +470,11 @@ export function ListaEstrategiaTab({
                   </tr>
                 ))
               ) : (
-                /* Exemplo visual idêntico à imagem se a lista ainda não tiver carregado */
-                <>
-                  <tr className="hover:bg-home-surface-strong/50 transition-colors">
-                    <td className="py-2.5 font-semibold text-white">Odonto Prime</td>
-                    <td className="py-2.5 text-home-muted">São Paulo - SP</td>
-                    <td className="py-2.5 text-home-muted font-mono text-[11px]">contato@odontoprime.com.br</td>
-                    <td className="py-2.5 text-home-muted">Google Maps</td>
-                    <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums">92</td>
-                    <td className="py-2.5">
-                      <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400 border border-amber-500/20">
-                        Novo
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <MoreVertical className="size-3.5 text-home-muted inline" />
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-home-surface-strong/50 transition-colors">
-                    <td className="py-2.5 font-semibold text-white">Sorriso & Vida</td>
-                    <td className="py-2.5 text-home-muted">São Paulo - SP</td>
-                    <td className="py-2.5 text-home-muted font-mono text-[11px]">(11) 98765-4321</td>
-                    <td className="py-2.5 text-home-muted">Google Maps</td>
-                    <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums">88</td>
-                    <td className="py-2.5">
-                      <span className="inline-flex rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold text-blue-400 border border-blue-500/20">
-                        Em contato
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <MoreVertical className="size-3.5 text-home-muted inline" />
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-home-surface-strong/50 transition-colors">
-                    <td className="py-2.5 font-semibold text-white">Clínica OralTech</td>
-                    <td className="py-2.5 text-home-muted">São Paulo - SP</td>
-                    <td className="py-2.5 text-home-muted font-mono text-[11px]">contato@oraltech.com.br</td>
-                    <td className="py-2.5 text-home-muted">Google Maps</td>
-                    <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums">76</td>
-                    <td className="py-2.5">
-                      <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
-                        Qualificado
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <MoreVertical className="size-3.5 text-home-muted inline" />
-                    </td>
-                  </tr>
-                </>
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-xs text-home-muted">
+                    Nenhum lead persistido disponível para pré-visualização.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

@@ -52,6 +52,7 @@ import {
 } from "@/lib/fontes-prospeccao";
 import { geocodeCidade } from "@/lib/geo";
 import { criarListaComLeads, nomeAutoLista } from "@/lib/lists-api";
+import { resolveListName } from "@/lib/list-naming";
 import {
   ScoreBadge,
   ScoreLegend,
@@ -270,7 +271,7 @@ export function SearchSection({
       const ids = insertedIdsRef.current;
       if (ids.length > 0) {
         try {
-          const nome = nomeListaCustom.trim() || nomeAutoLista(nicho, cidade, uf);
+          const nome = resolveListName(nomeListaCustom, nicho, cidade, uf);
           const lista = await criarListaComLeads({
             name: nome,
             niche: nicho,

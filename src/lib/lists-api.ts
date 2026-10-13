@@ -5,6 +5,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { Lead } from "@/lib/leads-api";
+import { nomeAutoLista } from "@/lib/list-naming";
+
+export { nomeAutoLista } from "@/lib/list-naming";
 
 export type LeadList = Database["public"]["Tables"]["lead_lists"]["Row"];
 
@@ -21,12 +24,6 @@ async function getUserId(): Promise<string> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw new Error("Você precisa estar logado.");
   return data.user.id;
-}
-
-/** Nome automático da lista a partir dos parâmetros da busca (editável depois). */
-export function nomeAutoLista(niche: string, city: string, uf: string): string {
-  const local = [city.trim(), uf.trim()].filter(Boolean).join("/");
-  return [niche.trim() || "Busca", local].filter(Boolean).join(" — ");
 }
 
 /**

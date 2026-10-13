@@ -35,11 +35,10 @@ export function ListaCampanhasTab({
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
         <div>
-          <h3 className="text-sm font-bold text-white">
-            Campanhas Conectadas a esta Lista
-          </h3>
+          <h3 className="text-sm font-bold text-white">Campanhas Conectadas a esta Lista</h3>
           <p className="text-xs text-home-muted">
-            {campaigns.length} {campaigns.length === 1 ? "campanha associada" : "campanhas associadas"} a {lista.name}
+            {campaigns.length}{" "}
+            {campaigns.length === 1 ? "campanha associada" : "campanhas associadas"} a {lista.name}
           </p>
         </div>
 
@@ -99,13 +98,13 @@ export function ListaCampanhasTab({
                       {camp.nome}
                     </h4>
                     <span className="text-[11px] text-home-muted capitalize">
-                      Canal: {camp.canal || "E-mail"}
+                      Canal: {camp.canal || "não informado"}
                     </span>
                   </div>
                 </div>
 
                 <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/25">
-                  {camp.status || "Ativa"}
+                  {camp.status}
                 </span>
               </div>
 

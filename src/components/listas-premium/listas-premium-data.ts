@@ -3,7 +3,8 @@ import type { LeadListComStats } from "@/lib/lists-api";
 import type { Lead } from "@/lib/leads-api";
 import type { Campanha } from "@/types";
 
-export type CampanhaComCanal = Campanha & {
+export type CampanhaComCanal = Omit<Campanha, "status"> & {
+  status: string;
   canal?: string;
 };
 
@@ -16,7 +17,6 @@ export interface LeadListWithFullStats extends LeadListComStats {
   taxa_contato: number;
   status: ListStatus;
   thumbnail_url: string;
-  has_strategy: boolean;
   campanhas_count: number;
   last_activity_text: string;
 }
@@ -64,17 +64,6 @@ export interface OfferConfig {
   objetivo: string;
 }
 
-export interface QuickResultsMetrics {
-  leads_contatados: number;
-  taxa_contatados_delta: string;
-  respostas: number;
-  taxa_respostas_delta: string;
-  reunioes_agendadas: number;
-  taxa_reunioes_delta: string;
-  clientes_fechados: number;
-  taxa_clientes_delta: string;
-}
-
 /**
  * Mapeamento temático inteligente de miniaturas por nicho/categoria com imagens profissionais em alta definição.
  * Mantém coerência com as categorias da referência aprovada.
@@ -82,28 +71,72 @@ export interface QuickResultsMetrics {
 export function getNicheThumbnail(niche: string = "", name: string = ""): string {
   const text = `${niche} ${name}`.toLowerCase();
 
-  if (text.includes("odonto") || text.includes("dent") || text.includes("saúde") || text.includes("médic") || text.includes("clínica")) {
+  if (
+    text.includes("odonto") ||
+    text.includes("dent") ||
+    text.includes("saúde") ||
+    text.includes("médic") ||
+    text.includes("clínica")
+  ) {
     return "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&auto=format&fit=crop&q=80"; // Consultório odontológico / clínico moderno
   }
-  if (text.includes("restauran") || text.includes("comida") || text.includes("gastronom") || text.includes("aliment") || text.includes("bar") || text.includes("café")) {
+  if (
+    text.includes("restauran") ||
+    text.includes("comida") ||
+    text.includes("gastronom") ||
+    text.includes("aliment") ||
+    text.includes("bar") ||
+    text.includes("café")
+  ) {
     return "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&auto=format&fit=crop&q=80"; // Restaurante moderno e elegante
   }
-  if (text.includes("imob") || text.includes("corretor") || text.includes("imóve") || text.includes("construt")) {
+  if (
+    text.includes("imob") ||
+    text.includes("corretor") ||
+    text.includes("imóve") ||
+    text.includes("construt")
+  ) {
     return "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&auto=format&fit=crop&q=80"; // Edifício corporativo imobiliário moderno
   }
-  if (text.includes("academ") || text.includes("fitness") || text.includes("treino") || text.includes("esport")) {
+  if (
+    text.includes("academ") ||
+    text.includes("fitness") ||
+    text.includes("treino") ||
+    text.includes("esport")
+  ) {
     return "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&auto=format&fit=crop&q=80"; // Academia equipada
   }
-  if (text.includes("estétic") || text.includes("belez") || text.includes("salão") || text.includes("barbear")) {
+  if (
+    text.includes("estétic") ||
+    text.includes("belez") ||
+    text.includes("salão") ||
+    text.includes("barbear")
+  ) {
     return "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&auto=format&fit=crop&q=80"; // Clínica de estética e bem-estar
   }
-  if (text.includes("contab") || text.includes("advoc") || text.includes("jurídic") || text.includes("b2b") || text.includes("escritór")) {
+  if (
+    text.includes("contab") ||
+    text.includes("advoc") ||
+    text.includes("jurídic") ||
+    text.includes("b2b") ||
+    text.includes("escritór")
+  ) {
     return "https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&auto=format&fit=crop&q=80"; // Escritório corporativo / contábil
   }
-  if (text.includes("agro") || text.includes("fazenda") || text.includes("rural") || text.includes("pecuár")) {
+  if (
+    text.includes("agro") ||
+    text.includes("fazenda") ||
+    text.includes("rural") ||
+    text.includes("pecuár")
+  ) {
     return "https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=400&auto=format&fit=crop&q=80"; // Agropecuária moderna
   }
-  if (text.includes("mecan") || text.includes("oficina") || text.includes("auto") || text.includes("carro")) {
+  if (
+    text.includes("mecan") ||
+    text.includes("oficina") ||
+    text.includes("auto") ||
+    text.includes("carro")
+  ) {
     return "https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=400&auto=format&fit=crop&q=80"; // Oficina automotiva
   }
   if (text.includes("farmác") || text.includes("manipula")) {
@@ -117,16 +150,7 @@ export function getNicheThumbnail(niche: string = "", name: string = ""): string
 /**
  * Derivação do status real da lista com base nas regras operacionais do sistema.
  */
-export function deriveListStatus(
-  list: LeadListComStats,
-  campanhasCount: number,
-): ListStatus {
-  if (campanhasCount > 0) {
-    return "ativa";
-  }
-  if (list.follow_up_ativo || list.gold_count > 0) {
-    return "em_estrategia";
-  }
+export function deriveListStatus(list: LeadListComStats): ListStatus {
   if (list.leads_atuais === 0) {
     return "rascunho";
   }
@@ -158,7 +182,7 @@ export function formatTimeAgo(dateStr: string): string {
  * Deriva uma proposta de estratégia comercial de abordagem baseada no nicho e região reais da lista.
  * Utilizado para preencher o rascunho de trabalho no painel de detalhes.
  */
-export function deriveDefaultStrategy(
+export function deriveIllustrativeStrategy(
   niche: string,
   city: string,
   uf?: string | null,
@@ -221,17 +245,16 @@ export function deriveDefaultStrategy(
 /**
  * Deriva estrutura de oferta planejada
  */
-export function deriveDefaultOffer(niche: string, city: string): OfferConfig {
-  const nichoFormatado = niche.trim() || "Serviços Especializados";
+export function createEmptyOffer(): OfferConfig {
   return {
-    produto_servico: `Soluções Comerciais para ${nichoFormatado}`,
-    nome_oferta: `Programa de Aquisição de Clientes — ${city || "Regional"}`,
-    descricao: `Estruturação de funil comercial, qualificação de leads e automação de abordagem para empresas de ${nichoFormatado}.`,
-    publico_alvo: `Diretores, sócios e gestores comerciais de ${nichoFormatado}.`,
-    beneficios: `Mais reuniões qualificadas, redução no ciclo de vendas e prospecção consistente.`,
-    proposta_valor: `Geração previsível de novas oportunidades sem depender apenas de indicações.`,
-    preco: "Sob consulta",
-    objetivo: "Acelerar conversão em vendas e abertura de novas contas.",
+    produto_servico: "",
+    nome_oferta: "",
+    descricao: "",
+    publico_alvo: "",
+    beneficios: "",
+    proposta_valor: "",
+    preco: "",
+    objetivo: "",
   };
 }
 

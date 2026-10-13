@@ -1,118 +1,131 @@
-// Aba Resultados da Lista Selecionada
-import { BarChart3, TrendingUp, Users, Phone, CheckCircle, Award } from "lucide-react";
+import {
+  BarChart3,
+  CheckCircle,
+  MessageCircleReply,
+  PhoneCall,
+  Trophy,
+  Users,
+  UserRoundCheck,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { LeadListWithFullStats } from "./listas-premium-data";
+import { calculateListResultMetrics } from "./listas-premium-metrics";
 
 interface ListaResultadosTabProps {
   lista: LeadListWithFullStats;
 }
 
+interface MetricCardProps {
+  label: string;
+  value: number | null;
+  description: string;
+  icon: LucideIcon;
+}
+
+function MetricCard({ label, value, description, icon: Icon }: MetricCardProps) {
+  return (
+    <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-home-muted">{label}</span>
+        <Icon className="size-4 text-amber-400" />
+      </div>
+      <p className="mt-2 text-2xl font-bold text-white tabular-nums">
+        {value === null ? "—" : value.toLocaleString("pt-BR")}
+      </p>
+      <p className="mt-1 text-[11px] text-home-muted">{description}</p>
+    </div>
+  );
+}
+
 export function ListaResultadosTab({ lista }: ListaResultadosTabProps) {
-  const total = lista.leads_atuais;
-  const comContato = lista.com_contato_count;
-  const taxaContato = lista.taxa_contato;
-  const campanhas = lista.campanhas_count;
+  const metrics = calculateListResultMetrics(lista);
+  const contactRate =
+    metrics.totalLeads > 0
+      ? Math.round((metrics.leadsComContatoDisponivel / metrics.totalLeads) * 100)
+      : 0;
 
   return (
     <div className="space-y-4">
-      {/* 4 Cards Principais de Resultados */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1 */}
-        <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-home-muted">Total de Leads</span>
-            <Users className="size-4 text-blue-400" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-white tabular-nums">
-            {total.toLocaleString("pt-BR")}
-          </p>
-          <p className="mt-1 text-[11px] text-home-muted">Capturados e qualificados</p>
-        </div>
-
-        {/* Card 2 */}
-        <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-home-muted">Com Contato Válido</span>
-            <Phone className="size-4 text-emerald-400" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-white tabular-nums">
-            {comContato.toLocaleString("pt-BR")}
-          </p>
-          <p className="mt-1 text-[11px] text-emerald-400 font-semibold">
-            {taxaContato}% de aproveitamento
-          </p>
-        </div>
-
-        {/* Card 3 */}
-        <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-home-muted">Campanhas Conectadas</span>
-            <BarChart3 className="size-4 text-amber-500" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-white tabular-nums">
-            {campanhas}
-          </p>
-          <p className="mt-1 text-[11px] text-home-muted">Disparos em andamento</p>
-        </div>
-
-        {/* Card 4 */}
-        <div className="rounded-2xl border border-home-border bg-home-surface/90 p-4 backdrop-blur-md">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-home-muted">Cliente Ouro / Qualificados</span>
-            <Award className="size-4 text-amber-400" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-amber-400 tabular-nums">
-            {lista.gold_count.toLocaleString("pt-BR")}
-          </p>
-          <p className="mt-1 text-[11px] text-home-muted">Maior probabilidade de conversão</p>
-        </div>
+      <div className="rounded-2xl border border-blue-500/25 bg-blue-500/10 p-4 text-xs text-blue-100">
+        Contato disponível indica apenas que o lead possui algum canal cadastrado. Não significa que
+        uma abordagem foi enviada. Contatos realizados, respostas, conversões e clientes ganhos
+        permanecem neutros até existir rastreamento consolidado por lista.
       </div>
 
-      {/* Funil Visual da Lista */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label="Total de leads"
+          value={metrics.totalLeads}
+          description="Leads atualmente vinculados à lista"
+          icon={Users}
+        />
+        <MetricCard
+          label="Contato disponível"
+          value={metrics.leadsComContatoDisponivel}
+          description={`${contactRate}% possuem ao menos um canal cadastrado`}
+          icon={PhoneCall}
+        />
+        <MetricCard
+          label="Campanhas vinculadas"
+          value={metrics.campanhasVinculadas}
+          description="Campanhas criadas; não implica execução"
+          icon={BarChart3}
+        />
+        <MetricCard
+          label="Contatos realizados"
+          value={metrics.contatosRealizados}
+          description="Sem rastreamento consolidado por lista"
+          icon={CheckCircle}
+        />
+        <MetricCard
+          label="Respostas"
+          value={metrics.respostas}
+          description="Sem rastreamento consolidado por lista"
+          icon={MessageCircleReply}
+        />
+        <MetricCard
+          label="Conversões"
+          value={metrics.conversoes}
+          description="Sem definição persistida por lista"
+          icon={UserRoundCheck}
+        />
+        <MetricCard
+          label="Clientes ganhos"
+          value={metrics.clientesGanhos}
+          description="Sem atribuição persistida por lista"
+          icon={Trophy}
+        />
+      </div>
+
       <div className="rounded-2xl border border-home-border bg-home-surface/90 p-5 backdrop-blur-md">
-        <h4 className="text-xs sm:text-sm font-bold text-white mb-3">
-          Funil Comercial de Conversão da Lista
+        <h4 className="mb-3 text-xs font-bold text-white sm:text-sm">
+          Cobertura de dados disponível
         </h4>
-
         <div className="space-y-3">
-          {/* Etapa 1 */}
           <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-home-muted font-medium">1. Leads Coletados no Banco</span>
-              <span className="text-white font-bold tabular-nums">{total} (100%)</span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-home-surface-strong overflow-hidden">
-              <div className="h-full rounded-full bg-blue-500" style={{ width: "100%" }} />
-            </div>
-          </div>
-
-          {/* Etapa 2 */}
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-home-muted font-medium">2. Contatos Validados (Telefone/Email/Whats)</span>
-              <span className="text-white font-bold tabular-nums">
-                {comContato} ({taxaContato}%)
+            <div className="mb-1 flex justify-between text-xs">
+              <span className="font-medium text-home-muted">Leads vinculados</span>
+              <span className="font-bold text-white tabular-nums">
+                {metrics.totalLeads.toLocaleString("pt-BR")}
               </span>
             </div>
-            <div className="h-2 w-full rounded-full bg-home-surface-strong overflow-hidden">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                style={{ width: `${Math.min(100, Math.max(5, taxaContato))}%` }}
-              />
+            <div className="h-2 w-full overflow-hidden rounded-full bg-home-surface-strong">
+              <div className="h-full w-full rounded-full bg-blue-500" />
             </div>
           </div>
-
-          {/* Etapa 3 */}
           <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-home-muted font-medium">3. Ativação em Campanhas</span>
-              <span className="text-white font-bold tabular-nums">
-                {campanhas > 0 ? "Campanhas ativas" : "Aguardando ativação"}
+            <div className="mb-1 flex justify-between text-xs">
+              <span className="font-medium text-home-muted">
+                Leads com canal de contato disponível
+              </span>
+              <span className="font-bold text-white tabular-nums">
+                {metrics.leadsComContatoDisponivel.toLocaleString("pt-BR")} ({contactRate}%)
               </span>
             </div>
-            <div className="h-2 w-full rounded-full bg-home-surface-strong overflow-hidden">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-home-surface-strong">
               <div
-                className="h-full rounded-full bg-amber-500 transition-all duration-500"
-                style={{ width: campanhas > 0 ? "75%" : "0%" }}
+                className="h-full rounded-full bg-emerald-500"
+                style={{ width: `${contactRate}%` }}
               />
             </div>
           </div>

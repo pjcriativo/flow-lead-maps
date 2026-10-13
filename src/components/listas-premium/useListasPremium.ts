@@ -17,6 +17,7 @@ import {
   type CampanhaComCanal,
   type LeadListWithFullStats,
 } from "./listas-premium-data";
+import { calculateListKpis } from "./listas-premium-metrics";
 
 export interface ListasFilterState {
   search: string;
@@ -70,10 +71,7 @@ export function useListasPremium() {
           lead.phone || lead.email || lead.whatsapp || lead.website || lead.instagram_url,
         );
         if (temContato) {
-          contatosPorLista.set(
-            lead.list_id,
-            (contatosPorLista.get(lead.list_id) ?? 0) + 1,
-          );
+          contatosPorLista.set(lead.list_id, (contatosPorLista.get(lead.list_id) ?? 0) + 1);
         }
       }
 
@@ -81,27 +79,20 @@ export function useListasPremium() {
       const campanhasPorLista = new Map<string, number>();
       for (const camp of campanhasRes.data ?? []) {
         if (!camp.list_id) continue;
-        campanhasPorLista.set(
-          camp.list_id,
-          (campanhasPorLista.get(camp.list_id) ?? 0) + 1,
-        );
+        campanhasPorLista.set(camp.list_id, (campanhasPorLista.get(camp.list_id) ?? 0) + 1);
       }
 
       const formatadas: LeadListWithFullStats[] = listasBase.map((item) => {
         const campanhasCount = campanhasPorLista.get(item.id) ?? 0;
         const comContato = contatosPorLista.get(item.id) ?? 0;
-        const taxa =
-          item.leads_atuais > 0
-            ? Math.round((comContato / item.leads_atuais) * 100)
-            : 0;
+        const taxa = item.leads_atuais > 0 ? Math.round((comContato / item.leads_atuais) * 100) : 0;
 
         return {
           ...item,
           com_contato_count: comContato,
           taxa_contato: taxa,
-          status: deriveListStatus(item, campanhasCount),
+          status: deriveListStatus(item),
           thumbnail_url: getNicheThumbnail(item.niche, item.name),
-          has_strategy: item.follow_up_ativo || campanhasCount > 0,
           campanhas_count: campanhasCount,
           last_activity_text: formatTimeAgo(item.created_at),
         };
@@ -153,32 +144,69 @@ export function useListasPremium() {
         .eq("list_id", selectedListId)
         .order("criada_em", { ascending: false }),
     ])
-      .then(([leadsData, campanhasData]) => {
+      .then(async ([leadsData, campanhasData]) => {
+        if (!ativo) return;
+        if (campanhasData.error) throw campanhasData.error;
+
+        const campaignIds = (campanhasData.data ?? []).map((campaign) => campaign.id);
+        const campaignLeadCounts = new Map<
+          string,
+          Pick<
+            CampanhaComCanal,
+            "total" | "pendente" | "rascunho" | "aprovado" | "enviado" | "descartado" | "erro"
+          >
+        >();
+
+        if (campaignIds.length > 0) {
+          const { data: campaignLeads, error: campaignLeadsError } = await supabase
+            .from("campanha_leads")
+            .select("campanha_id, estado")
+            .in("campanha_id", campaignIds);
+          if (campaignLeadsError) throw campaignLeadsError;
+
+          for (const campaignLead of campaignLeads ?? []) {
+            const current = campaignLeadCounts.get(campaignLead.campanha_id) ?? {
+              total: 0,
+              pendente: 0,
+              rascunho: 0,
+              aprovado: 0,
+              enviado: 0,
+              descartado: 0,
+              erro: 0,
+            };
+            current.total += 1;
+            const state = campaignLead.estado === "gerando" ? "pendente" : campaignLead.estado;
+            if (state in current) {
+              current[state as keyof typeof current] += 1;
+            }
+            campaignLeadCounts.set(campaignLead.campanha_id, current);
+          }
+        }
+
         if (!ativo) return;
         setSelectedLeads(leadsData);
-        // Tipagem compatível de campanha
         const camps = (campanhasData.data ?? []).map((c) => ({
           id: c.id,
           list_id: c.list_id,
           nome: c.nome,
-          status: (c.status ?? "ativa") as CampanhaComCanal["status"],
-          canal: c.canal ?? "email",
+          status: c.status,
+          canal: c.canal,
           criada_em: c.criada_em,
-          total: leadsData.length,
-          pendente: 0,
-          rascunho: 0,
-          aprovado: 0,
-          enviado: 0,
-          descartado: 0,
-          erro: 0,
+          ...(campaignLeadCounts.get(c.id) ?? {
+            total: 0,
+            pendente: 0,
+            rascunho: 0,
+            aprovado: 0,
+            enviado: 0,
+            descartado: 0,
+            erro: 0,
+          }),
         }));
         setLinkedCampaigns(camps);
       })
       .catch((e) => {
         if (!ativo) return;
-        toast.error(
-          e instanceof Error ? e.message : "Erro ao carregar detalhes da lista.",
-        );
+        toast.error(e instanceof Error ? e.message : "Erro ao carregar detalhes da lista.");
       })
       .finally(() => {
         if (ativo) setLeadsLoading(false);
@@ -191,31 +219,13 @@ export function useListasPremium() {
 
   // Indicadores Superiores Reais
   const kpis = useMemo(() => {
-    const totalListas = listas.length;
-    const totalLeads = listas.reduce((acc, l) => acc + l.leads_atuais, 0);
-    const listasComEstrategia = listas.filter((l) => l.has_strategy).length;
-    const campanhasVinculadas = listas.reduce((acc, l) => acc + l.campanhas_count, 0);
-    const aguardandoAcao = listas.filter(
-      (l) => l.campanhas_count === 0 && !l.follow_up_ativo,
-    ).length;
-
-    return {
-      totalListas,
-      totalLeads,
-      listasComEstrategia,
-      campanhasVinculadas,
-      aguardandoAcao,
-    };
+    return calculateListKpis(listas);
   }, [listas]);
 
   // Opções para filtros dinâmicos
   const filterOptions = useMemo(() => {
-    const fontes = Array.from(
-      new Set(listas.map((l) => l.fonte).filter(Boolean)),
-    ) as string[];
-    const nichos = Array.from(
-      new Set(listas.map((l) => l.niche).filter(Boolean)),
-    ) as string[];
+    const fontes = Array.from(new Set(listas.map((l) => l.fonte).filter(Boolean))) as string[];
+    const nichos = Array.from(new Set(listas.map((l) => l.niche).filter(Boolean))) as string[];
     const cidades = Array.from(
       new Set(listas.map((l) => l.city).filter((c) => c && c !== "—")),
     ) as string[];
@@ -242,23 +252,17 @@ export function useListasPremium() {
 
     // Filtro por Fonte
     if (filters.fonte !== "todas") {
-      result = result.filter(
-        (l) => (l.fonte || "").toLowerCase() === filters.fonte.toLowerCase(),
-      );
+      result = result.filter((l) => (l.fonte || "").toLowerCase() === filters.fonte.toLowerCase());
     }
 
     // Filtro por Nicho
     if (filters.nicho !== "todos") {
-      result = result.filter(
-        (l) => (l.niche || "").toLowerCase() === filters.nicho.toLowerCase(),
-      );
+      result = result.filter((l) => (l.niche || "").toLowerCase() === filters.nicho.toLowerCase());
     }
 
     // Filtro por Cidade
     if (filters.cidade !== "todas") {
-      result = result.filter(
-        (l) => (l.city || "").toLowerCase() === filters.cidade.toLowerCase(),
-      );
+      result = result.filter((l) => (l.city || "").toLowerCase() === filters.cidade.toLowerCase());
     }
 
     // Filtro por Status
@@ -268,9 +272,7 @@ export function useListasPremium() {
 
     // Ordenação
     if (filters.ordenarPor === "recentes") {
-      result.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
+      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     } else if (filters.ordenarPor === "maior_leads") {
       result.sort((a, b) => b.leads_atuais - a.leads_atuais);
     } else if (filters.ordenarPor === "alfabetico") {

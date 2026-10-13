@@ -1,15 +1,10 @@
 // Cinco Indicadores Superiores da Central de Listas Premium
 import { List, Users, Target, Megaphone, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { ListasPremiumKpis } from "./listas-premium-metrics";
 
 interface ListasStatsCardsProps {
-  kpis: {
-    totalListas: number;
-    totalLeads: number;
-    listasComEstrategia: number;
-    campanhasVinculadas: number;
-    aguardandoAcao: number;
-  };
+  kpis: ListasPremiumKpis;
   className?: string;
 }
 
@@ -19,8 +14,6 @@ export function ListasStatsCards({ kpis, className }: ListasStatsCardsProps) {
       id: "total_listas",
       titulo: "Total de listas",
       valor: kpis.totalListas.toLocaleString("pt-BR"),
-      badge: "↑ 12%",
-      badgeTrend: "up" as const,
       subtitulo: "Listas criadas na sua conta",
       icon: List,
       iconBg: "bg-amber-500/15 text-amber-500",
@@ -29,8 +22,6 @@ export function ListasStatsCards({ kpis, className }: ListasStatsCardsProps) {
       id: "leads_listas",
       titulo: "Leads nas listas",
       valor: kpis.totalLeads.toLocaleString("pt-BR"),
-      badge: "↑ 18%",
-      badgeTrend: "up" as const,
       subtitulo: "Leads totais em todas as listas",
       icon: Users,
       iconBg: "bg-blue-500/15 text-blue-400",
@@ -38,10 +29,8 @@ export function ListasStatsCards({ kpis, className }: ListasStatsCardsProps) {
     {
       id: "listas_estrategia",
       titulo: "Listas com estratégia",
-      valor: kpis.listasComEstrategia.toLocaleString("pt-BR"),
-      badge: "↑ 29%",
-      badgeTrend: "up" as const,
-      subtitulo: "Com estratégia definida",
+      valor: kpis.listasComEstrategia?.toLocaleString("pt-BR") ?? "—",
+      subtitulo: "Sem estratégia persistida por lista",
       icon: Target,
       iconBg: "bg-amber-600/15 text-amber-500",
     },
@@ -49,9 +38,7 @@ export function ListasStatsCards({ kpis, className }: ListasStatsCardsProps) {
       id: "campanhas_vinculadas",
       titulo: "Campanhas vinculadas",
       valor: kpis.campanhasVinculadas.toLocaleString("pt-BR"),
-      badge: "↑ 27%",
-      badgeTrend: "up" as const,
-      subtitulo: "Campanhas ativas nas listas",
+      subtitulo: "Campanhas associadas às listas",
       icon: Megaphone,
       iconBg: "bg-orange-500/15 text-orange-500",
     },
@@ -59,9 +46,7 @@ export function ListasStatsCards({ kpis, className }: ListasStatsCardsProps) {
       id: "aguardando_acao",
       titulo: "Aguardando ação",
       valor: kpis.aguardandoAcao.toLocaleString("pt-BR"),
-      badge: "↓ 14%",
-      badgeTrend: "down" as const,
-      subtitulo: "Listas que precisam de atenção",
+      subtitulo: "Com leads e sem campanha vinculada",
       icon: Clock,
       iconBg: "bg-amber-500/15 text-amber-400",
     },
@@ -96,27 +81,15 @@ export function ListasStatsCards({ kpis, className }: ListasStatsCardsProps) {
               </span>
             </div>
 
-            {/* Middle row: Value + Trend Badge */}
+            {/* Valor persistido ou estado neutro quando a métrica não existe */}
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-bold tracking-tight text-white tabular-nums">
                 {card.valor}
               </span>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums",
-                  card.badgeTrend === "up"
-                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25"
-                    : "bg-rose-500/15 text-rose-400 border border-rose-500/25",
-                )}
-              >
-                {card.badge}
-              </span>
             </div>
 
             {/* Bottom subtitle */}
-            <p className="mt-1 text-[11px] text-home-muted/80 line-clamp-1">
-              {card.subtitulo}
-            </p>
+            <p className="mt-1 text-[11px] text-home-muted/80 line-clamp-1">{card.subtitulo}</p>
           </div>
         );
       })}

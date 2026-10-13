@@ -46,7 +46,12 @@ export function ListaCard({
   // Ícone e estilo da fonte de captura
   const renderFonteBadge = () => {
     const f = (lista.fonte || "google").toLowerCase();
-    if (f.includes("maps") || f.includes("google") || f.includes("apify") || f.includes("geoapify")) {
+    if (
+      f.includes("maps") ||
+      f.includes("google") ||
+      f.includes("apify") ||
+      f.includes("geoapify")
+    ) {
       return (
         <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-400 border border-blue-500/20">
           <SiGooglemaps className="size-3 text-blue-400" />
@@ -253,7 +258,10 @@ export function ListaCard({
           </span>
           <span className="inline-flex items-center gap-1 font-medium text-home-muted">
             <Phone className="size-3.5 text-home-muted" />
-            <span className="tabular-nums">{lista.com_contato_count.toLocaleString("pt-BR")}</span> com contato
+            <span className="tabular-nums">
+              {lista.com_contato_count.toLocaleString("pt-BR")}
+            </span>{" "}
+            com canal disponível
           </span>
           <span className="inline-flex items-center gap-1 text-home-muted/80">
             <Clock className="size-3 text-home-muted/60" />
