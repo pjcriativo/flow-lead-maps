@@ -53,7 +53,7 @@ export const InfluencerDetailsSidebar: React.FC<InfluencerDetailsSidebarProps> =
           <img
             src={influencer.imageUrl}
             alt={influencer.name}
-            className="w-full h-full object-cover object-top"
+            className="w-full h-full object-cover object-[center_20%]"
           />
 
           {/* Top-Left Badge */}
@@ -184,7 +184,7 @@ export const InfluencerDetailsSidebar: React.FC<InfluencerDetailsSidebarProps> =
                   <img
                     src={sample.thumbnailUrl}
                     alt={sample.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    className="w-full h-full object-cover object-[center_20%] group-hover:scale-105 transition-transform"
                   />
                   {/* Duration badge */}
                   <span className="absolute bottom-1 right-1 px-1 py-0.5 rounded text-[9px] font-mono font-bold bg-black/80 text-white">

@@ -57,37 +57,37 @@ export const NICHE_CATEGORIES: NicheCategoryItem[] = [
     id: "beleza",
     label: "Beleza e Moda",
     count: "18 influencers",
-    imageUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&auto=format&fit=crop&q=80",
   },
   {
     id: "tecnologia",
     label: "Tecnologia",
     count: "12 influencers",
-    imageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80",
   },
   {
     id: "educacao",
     label: "Educação",
     count: "10 influencers",
-    imageUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=500&auto=format&fit=crop&q=80",
   },
   {
     id: "gastronomia",
     label: "Gastronomia",
     count: "10 influencers",
-    imageUrl: "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=200&auto=format&fit=crop&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=500&auto=format&fit=crop&q=80",
   },
   {
     id: "viagens",
     label: "Viagens",
     count: "8 influencers",
-    imageUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&auto=format&fit=crop&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&auto=format&fit=crop&q=80",
   },
   {
     id: "esportes",
     label: "Esportes",
     count: "6 influencers",
-    imageUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&auto=format&fit=crop&q=80",
   },
 ];
 
@@ -96,7 +96,7 @@ export const INFLUENCERS_CATALOG: InfluencerCatalogItem[] = [
     id: "isabella",
     name: "Isabella",
     role: "Lifestyle e Beleza",
-    imageUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&auto=format&fit=crop&q=80",
+    imageUrl: "/images/hero_influencer_banner.jpg",
     badge: {
       text: "Mais usado",
       variant: "pink",
@@ -111,17 +111,17 @@ export const INFLUENCERS_CATALOG: InfluencerCatalogItem[] = [
       {
         title: "Review de Produto",
         duration: "00:32",
-        thumbnailUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80",
+        thumbnailUrl: "/images/hero_influencer_banner.jpg",
       },
       {
         title: "Rotina de Beleza",
         duration: "00:28",
-        thumbnailUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80",
+        thumbnailUrl: "/images/hero_influencer_banner.jpg",
       },
       {
         title: "Dicas de Skincare",
         duration: "00:45",
-        thumbnailUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=80",
+        thumbnailUrl: "/images/hero_influencer_banner.jpg",
       },
     ],
   },
@@ -129,7 +129,7 @@ export const INFLUENCERS_CATALOG: InfluencerCatalogItem[] = [
     id: "lucas",
     name: "Lucas",
     role: "Tecnologia e Negócios",
-    imageUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80",
+    imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop&q=80",
     badge: {
       text: "Novo",
       variant: "emerald",

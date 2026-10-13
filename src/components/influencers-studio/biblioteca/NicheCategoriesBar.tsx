@@ -1,6 +1,6 @@
 import React from "react";
 import { Users2 } from "lucide-react";
-import { NICHE_CATEGORIES, type NicheCategoryItem } from "./biblioteca-data";
+import { NICHE_CATEGORIES } from "./biblioteca-data";
 
 interface NicheCategoriesBarProps {
   selectedCategory: string;
@@ -21,23 +21,23 @@ export const NicheCategoriesBar: React.FC<NicheCategoriesBarProps> = ({
             key={cat.id}
             type="button"
             onClick={() => onSelectCategory(cat.id)}
-            className={`flex flex-col items-center justify-center min-w-[105px] sm:min-w-[110px] p-2.5 rounded-xl border transition-all duration-200 cursor-pointer text-center shrink-0 ${
+            className={`flex flex-col items-center justify-between min-w-[108px] sm:min-w-[114px] p-2 rounded-xl border transition-all duration-200 cursor-pointer text-center shrink-0 ${
               isSelected
                 ? "border-orange-500 bg-[#16121D] shadow-[0_0_15px_rgba(249,115,22,0.25)] ring-1 ring-orange-500/50"
                 : "border-slate-800/80 bg-[#0E1524]/80 hover:border-slate-700 hover:bg-slate-800/50"
             }`}
           >
-            {/* Visual Icon / Thumbnail */}
+            {/* Wide Visual Thumbnail Banner */}
             {cat.isAll ? (
-              <div className="w-10 h-10 rounded-lg bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 mb-1.5 shadow-inner">
+              <div className="w-full h-12 rounded-lg bg-orange-500/10 border border-orange-500/25 flex items-center justify-center text-orange-400 mb-1.5 shadow-inner">
                 <Users2 className="w-5 h-5" />
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-700/60 mb-1.5 shrink-0 bg-slate-900">
+              <div className="w-full h-12 rounded-lg overflow-hidden border border-slate-700/60 mb-1.5 shrink-0 bg-slate-900">
                 <img
                   src={cat.imageUrl}
                   alt={cat.label}
-                  className="w-full h-full object-cover object-top"
+                  className="w-full h-full object-cover object-center"
                 />
               </div>
             )}
@@ -45,7 +45,7 @@ export const NicheCategoriesBar: React.FC<NicheCategoriesBarProps> = ({
             {/* Label */}
             <span
               className={`text-xs font-bold leading-tight truncate w-full ${
-                isSelected ? "text-white" : "text-slate-300"
+                isSelected ? "text-white" : "text-slate-200"
               }`}
             >
               {cat.label}

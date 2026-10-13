@@ -65,7 +65,7 @@ export const InfluencerCard: React.FC<InfluencerCardProps> = ({
         <img
           src={influencer.imageUrl}
           alt={influencer.name}
-          className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-cover object-[center_20%] group-hover:scale-105 transition-transform duration-300"
         />
 
         {/* Top-Left Badge (if present) */}
