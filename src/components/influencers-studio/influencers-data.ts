@@ -138,7 +138,7 @@ export const FEATURED_AVATARS: FeaturedAvatarItem[] = [
     role: "Apresentadora",
     categoryBadge: "Mais usado",
     badgeType: "featured",
-    imageUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&auto=format&fit=crop&q=80",
+    imageUrl: "/images/hero_influencer_banner.jpg",
     isSelected: true,
     language: "Português (BR), Inglês, Espanhol",
     voiceStyle: "Entusiasmada, Comercial e Empática",

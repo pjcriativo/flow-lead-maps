@@ -36,18 +36,51 @@ export const InfluencersHeroBanner: React.FC<InfluencersHeroBannerProps> = ({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#121929] via-[#0E1524] to-[#151D2C] border border-slate-800/80 p-5 sm:p-7 shadow-2xl">
-      {/* Background subtle radial glow */}
-      <div className="absolute top-0 right-1/3 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="relative overflow-hidden rounded-2xl bg-[#090D18] border border-slate-800/80 shadow-2xl min-h-[300px]">
+      {/* 1. Seamless Background Banner across the ENTIRE card */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {/* Full-width, full-height avatar influencer background */}
+        <img
+          src="/images/hero_influencer_banner.jpg"
+          alt="Avatar Influencer Principal"
+          className="w-full h-full object-cover object-[center_35%] scale-105"
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center relative z-10">
-        {/* Left column: Copy & CTAs */}
+        {/* Left Dark Gradient Overlay: smooth fade allowing crisp readability of text */}
+        <div className="absolute inset-y-0 left-0 w-full sm:w-[65%] lg:w-[50%] bg-gradient-to-r from-[#070B14] via-[#070B14]/95 via-55% to-transparent z-10" />
+
+        {/* Right Dark Gradient Overlay: smooth glass backdrop for features */}
+        <div className="absolute inset-y-0 right-0 w-full sm:w-[50%] lg:w-[42%] bg-gradient-to-l from-[#070B14]/90 via-[#070B14]/65 to-transparent z-10" />
+
+        {/* Top and Bottom soft vignettes */}
+        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#070B14]/75 to-transparent z-10" />
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#070B14]/85 to-transparent z-10" />
+
+        {/* Subtle warm amber ambient glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+      </div>
+
+      {/* 2. Center Floating Play Button (directly on the influencer) */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+        <button
+          type="button"
+          onClick={onPlayDemo}
+          aria-label="Ver demonstração do avatar"
+          className="pointer-events-auto group w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-black/60 backdrop-blur-md border border-orange-500/80 shadow-[0_0_25px_rgba(249,115,22,0.45)] flex items-center justify-center hover:scale-110 hover:border-orange-400 hover:shadow-[0_0_35px_rgba(249,115,22,0.7)] transition-all duration-300 cursor-pointer pl-0.5"
+        >
+          <Play className="w-6 h-6 fill-orange-500 text-orange-500 group-hover:scale-105 transition-transform" />
+        </button>
+      </div>
+
+      {/* 3. Foreground Content Layout */}
+      <div className="relative z-20 p-6 sm:p-8 lg:p-9 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        {/* Left Column: Copy & Actions */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="inline-block text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-md border border-orange-500/20">
+          <div className="inline-block text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest text-orange-400 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/25">
             Transforme ideias em vídeos incríveis
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+          <h2 className="text-2xl sm:text-3xl lg:text-[32px] font-extrabold tracking-tight text-white leading-tight">
             Crie vídeos com avatares de IA{" "}
             <span className="text-orange-500">em poucos minutos</span>
           </h2>
@@ -78,37 +111,17 @@ export const InfluencersHeroBanner: React.FC<InfluencersHeroBannerProps> = ({
           </div>
         </div>
 
-        {/* Center column: High quality avatar photo with play overlay */}
-        <div className="lg:col-span-4 flex items-center justify-center">
-          <div
-            onClick={onPlayDemo}
-            className="relative group cursor-pointer rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl max-w-[280px] w-full aspect-[4/5] bg-slate-900"
-          >
-            <img
-              src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&auto=format&fit=crop&q=80"
-              alt="Avatar principal do studio"
-              className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
-            />
-            {/* Dark gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+        {/* Center Spacer Column: keeps the center open for the background avatar and play button */}
+        <div className="hidden lg:block lg:col-span-3 h-48 pointer-events-none" />
 
-            {/* Glowing play button in center */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-12 h-12 rounded-full bg-orange-500/90 text-white flex items-center justify-center shadow-[0_0_25px_rgba(249,115,22,0.7)] group-hover:scale-110 transition-all duration-300 pl-0.5">
-                <Play className="w-5 h-5 fill-white text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right column: 4 Features list */}
-        <div className="lg:col-span-3 space-y-3.5">
+        {/* Right Column: 4 Features list floating over the banner */}
+        <div className="lg:col-span-4 space-y-3">
           {HERO_FEATURES.map((feat) => (
             <div
               key={feat.id}
-              className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-900/50 border border-slate-800/80 hover:border-slate-700/80 transition-colors"
+              className="flex items-center gap-3 p-2.5 sm:p-3 rounded-xl bg-[#09101E]/75 backdrop-blur-md border border-slate-800/80 hover:border-slate-700/80 transition-all shadow-md"
             >
-              <div className="w-8 h-8 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-8 h-8 rounded-lg bg-slate-900/90 border border-slate-700/60 flex items-center justify-center shrink-0">
                 {getFeatureIcon(feat.iconName)}
               </div>
               <div>

@@ -95,8 +95,7 @@ export const AIInfluencersStudioPage: React.FC<AIInfluencersStudioPageProps> = (
                 date: "Hoje",
                 duration: "01:15",
                 status: "concluido",
-                thumbnailUrl:
-                  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&auto=format&fit=crop&q=80",
+                thumbnailUrl: "/images/hero_influencer_banner.jpg",
                 avatarName: "Isabella",
               });
             }}
@@ -107,8 +106,7 @@ export const AIInfluencersStudioPage: React.FC<AIInfluencersStudioPageProps> = (
                 date: "Hoje",
                 duration: "00:45",
                 status: "concluido",
-                thumbnailUrl:
-                  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&auto=format&fit=crop&q=80",
+                thumbnailUrl: "/images/hero_influencer_banner.jpg",
                 avatarName: "Isabella",
               });
             }}
