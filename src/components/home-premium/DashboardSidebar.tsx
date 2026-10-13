@@ -185,7 +185,7 @@ export const INFLUENCERS_SUBITEMS = [
   { id: "biblioteca" as const, label: "Biblioteca de Influencers", icon: Users, ready: true },
   { id: "criador" as const, label: "Criador de Avatares", icon: UserPlus, ready: true },
   { id: "ugc_studio" as const, label: "AI UGC Video Studio", icon: Video, ready: true },
-  { id: "projetos" as const, label: "Projetos e Biblioteca", icon: FolderGit2, ready: false },
+  { id: "projetos" as const, label: "Projetos e Biblioteca", icon: FolderGit2, ready: true },
   { id: "licencas" as const, label: "Meus Influencers e Licenças", icon: Award, ready: false },
 ];
 

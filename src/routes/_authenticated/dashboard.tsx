@@ -55,6 +55,7 @@ import { AIInfluencersStudioPage } from "@/components/influencers-studio/AIInflu
 import { InfluencersLibraryPage } from "@/components/influencers-studio/biblioteca/InfluencersLibraryPage";
 import { AvatarCreatorPage } from "@/components/influencers-studio/criador/AvatarCreatorPage";
 import { UgcVideoStudioPage } from "@/components/influencers-studio/ugc-studio/UgcVideoStudioPage";
+import { ProjetosBibliotecaPage } from "@/components/influencers-studio/projetos/ProjetosBibliotecaPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -446,10 +447,25 @@ function Dashboard() {
             }}
           />
         )}
+        {section === "influencers" && influencersSubView === "projetos" && (
+          <ProjetosBibliotecaPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToUgcStudio={() => setInfluencersSubView("ugc_studio")}
+            onNavigateToCriador={() => setInfluencersSubView("criador")}
+            onNavigateToBiblioteca={() => setInfluencersSubView("biblioteca")}
+            onNavigateToVisaoGeral={() => setInfluencersSubView("visao_geral")}
+          />
+        )}
         {section === "influencers" &&
           influencersSubView !== "biblioteca" &&
           influencersSubView !== "criador" &&
-          influencersSubView !== "ugc_studio" && (
+          influencersSubView !== "ugc_studio" &&
+          influencersSubView !== "projetos" && (
             <AIInfluencersStudioPage
               user={{
                 name: userProfile?.full_name || "Carlos Mendes",

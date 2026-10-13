@@ -434,5 +434,104 @@ test("a rota dashboard renderiza UgcVideoStudioPage quando influencersSubView fo
   );
 });
 
+test("DashboardSidebar ativa Projetos e Biblioteca como pronto (ready: true)", () => {
+  const sidebarContent = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    sidebarContent.includes('{ id: "projetos" as const, label: "Projetos e Biblioteca", icon: FolderGit2, ready: true }'),
+    "Projetos e Biblioteca deve estar pronto (ready: true) no submenu",
+  );
+});
+
+test("a rota dashboard renderiza ProjetosBibliotecaPage quando influencersSubView for projetos", () => {
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    dashContent.includes("ProjetosBibliotecaPage"),
+    "Deve importar ProjetosBibliotecaPage",
+  );
+  assert.ok(
+    dashContent.includes('section === "influencers" && influencersSubView === "projetos"'),
+    "Deve renderizar condicionalmente ProjetosBibliotecaPage quando influencersSubView for projetos",
+  );
+});
+
+test("todos os componentes e dados da Tela 5 Projetos e Biblioteca existem e estão íntegros", () => {
+  const requiredTela5Files = [
+    "src/components/influencers-studio/projetos/projetos-data.ts",
+    "src/components/influencers-studio/projetos/ProjetosHeader.tsx",
+    "src/components/influencers-studio/projetos/ProjetosMetricsBlock.tsx",
+    "src/components/influencers-studio/projetos/ProjetosFilterBar.tsx",
+    "src/components/influencers-studio/projetos/ProjetosLibraryGrid.tsx",
+    "src/components/influencers-studio/projetos/ProjetoDetailsSidebar.tsx",
+    "src/components/influencers-studio/projetos/ProjetosBibliotecaPage.tsx",
+  ];
+
+  for (const file of requiredTela5Files) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo da Tela 5 ausente: ${file}`);
+  }
+
+  // Validação dos dados em projetos-data.ts
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/influencers-studio/projetos/projetos-data.ts"),
+    "utf8",
+  );
+
+  // 6 KPIs
+  assert.ok(dataContent.includes("Total de projetos") && dataContent.includes('"48"'));
+  assert.ok(dataContent.includes("Vídeos gerados") && dataContent.includes('"186"'));
+  assert.ok(dataContent.includes("Em processamento") && dataContent.includes('"12"'));
+  assert.ok(dataContent.includes("Concluídos") && dataContent.includes('"162"'));
+  assert.ok(dataContent.includes("Falhas") && dataContent.includes('"8"'));
+  assert.ok(dataContent.includes("Espaço utilizado") && dataContent.includes('"12.4 GB"'));
+
+  // Abas de categorias
+  assert.ok(dataContent.includes("Todos") && dataContent.includes("48"));
+  assert.ok(dataContent.includes("Vídeos") && dataContent.includes("186"));
+  assert.ok(dataContent.includes("Imagens") && dataContent.includes("42"));
+  assert.ok(dataContent.includes("Roteiros") && dataContent.includes("28"));
+  assert.ok(dataContent.includes("Avatares") && dataContent.includes("12"));
+  assert.ok(dataContent.includes("Templates") && dataContent.includes("18"));
+
+  // 12 Cards Mockados
+  assert.ok(dataContent.includes("Anúncio Shampoo Natural"));
+  assert.ok(dataContent.includes("Review Curso Online"));
+  assert.ok(dataContent.includes("Depoimento Cliente"));
+  assert.ok(dataContent.includes("Lançamento de Produto"));
+  assert.ok(dataContent.includes("Dicas de Saúde"));
+  assert.ok(dataContent.includes("Tutorial Ferramenta"));
+  assert.ok(dataContent.includes("Viagem e Lifestyle"));
+  assert.ok(dataContent.includes("Anúncio Produto Beleza"));
+  assert.ok(dataContent.includes("Apresentação Institucional"));
+  assert.ok(dataContent.includes("Podcast e Entrevista"));
+  assert.ok(dataContent.includes("Black Friday Oferta"));
+  assert.ok(dataContent.includes("Campanha de Vendas"));
+
+  // Card 1 Selecionado por padrão
+  assert.ok(dataContent.includes("Isabella"));
+  assert.ok(dataContent.includes("Shampoo Natural"));
+  assert.ok(dataContent.includes("Vertical (9:16)"));
+  assert.ok(dataContent.includes("Adriana (Natural)"));
+  assert.ok(dataContent.includes("Interno - Estúdio"));
+});
+
+test("a logomarca oficial FlowLeadsLogo está 100% preservada", () => {
+  const logoContent = fs.readFileSync(
+    path.join(root, "src/components/FlowLeadsLogo.tsx"),
+    "utf8",
+  );
+  assert.ok(logoContent.includes("FlowLeadsLogo"), "Componente FlowLeadsLogo deve existir");
+  assert.ok(logoContent.includes("BRAND_NAME"), "Logo deve utilizar BRAND_NAME oficial");
+  assert.ok(logoContent.includes("fill="), "Logo deve conter os vetores originais");
+});
+
+
 
 
