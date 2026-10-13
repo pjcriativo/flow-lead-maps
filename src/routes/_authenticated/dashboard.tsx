@@ -113,6 +113,7 @@ function Dashboard() {
   const [influencersSubView, setInfluencersSubView] = useState<InfluencersSubView>("visao_geral");
   const [selectedCampanhaContext, setSelectedCampanhaContext] = useState<Campanha | null>(null);
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
+  const [focusedLeadId, setFocusedLeadId] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetVerified, setSheetVerified] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
@@ -311,7 +312,10 @@ function Dashboard() {
               initials: userIniciais,
             }}
             unreadNotifications={naoLidas}
-            onOpenLead={() => selectSection("leads")}
+            onOpenLead={(leadId) => {
+              setFocusedLeadId(leadId);
+              selectSection("leads");
+            }}
           />
         )}
         {section === "leads" && (
@@ -322,6 +326,8 @@ function Dashboard() {
               initials: userIniciais,
             }}
             unreadNotifications={naoLidas}
+            focusLeadId={focusedLeadId}
+            onFocusHandled={() => setFocusedLeadId(null)}
             onOpenRedesign={(leadId) => {
               setFocusRedesignLead(leadId);
               selectSection("redesign");

@@ -28,6 +28,7 @@ const pipelineBoard = read("src/components/pipeline-premium/PipelineBoard.tsx");
 const pipelineColumn = read("src/components/pipeline-premium/PipelineColumn.tsx");
 const opportunityCard = read("src/components/pipeline-premium/OpportunityCard.tsx");
 const opportunityDetails = read("src/components/pipeline-premium/OpportunityDetailsPanel.tsx");
+const leadsView = read("src/components/leads-premium/LeadsPremiumView.tsx");
 const leadsApi = read("src/lib/leads-api.ts");
 const rlsFunctions = read("supabase/migrations/042_orgs_memberships_estrutura.sql");
 const rlsPolicies = read("supabase/migrations/043_rls_org_papel.sql");
@@ -302,7 +303,19 @@ test("seleção, drawer, edição e integração com a Central usam o mesmo lead
   assert.match(pipelineView, /<LeadFormDialog/);
   assert.match(pipelineView, /return updateLead\(editing\.id/);
   assert.match(pipelineView, /onOpenLead=\{onOpenLead\}/);
-  assert.match(dashboardRoute, /onOpenLead=\{\(\) => selectSection\("leads"\)\}/);
+  assert.match(
+    dashboardRoute,
+    /onOpenLead=\{\(leadId\) => \{[\s\S]*setFocusedLeadId\(leadId\)[\s\S]*selectSection\("leads"\)/,
+  );
+  assert.match(dashboardRoute, /focusLeadId=\{focusedLeadId\}/);
+  assert.match(leadsView, /fetchLeadById\(focusLeadId\)/);
+  assert.match(leadsView, /setSelectedLead\(toLeadItem\(record\)\)/);
+});
+
+test("lead removido ou bloqueado por RLS encerra o foco com feedback sem fallback por nome", () => {
+  assert.match(leadsView, /Não foi possível abrir este lead/);
+  assert.match(leadsView, /onFocusHandled\?\.\(\)/);
+  assert.doesNotMatch(leadsView, /focusLead(?:Name|Company)|business_name.*focusLead/);
 });
 
 test("Kanban e detalhes preservam navegação responsiva", () => {

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   createLead,
   deleteLead,
   fetchAllLeadsForExport,
+  fetchLeadById,
   fetchLeadsByIds,
   updateLead,
   type CreateLeadInput,
@@ -37,6 +38,8 @@ interface LeadsPremiumViewProps {
     initials: string;
   };
   unreadNotifications?: number;
+  focusLeadId?: string | null;
+  onFocusHandled?: () => void;
   onOpenRedesign?: (leadId: string) => void;
 }
 
@@ -45,10 +48,13 @@ type BulkDialog = "assign" | "list" | null;
 export function LeadsPremiumView({
   user = { name: "Usuário", avatarUrl: "", initials: "US" },
   unreadNotifications = 0,
+  focusLeadId = null,
+  onFocusHandled,
   onOpenRedesign,
 }: LeadsPremiumViewProps) {
   const leadsState = useLeadsPremium();
   const [selectedLead, setSelectedLead] = useState<LeadItem | null>(null);
+  const handledFocusRef = useRef<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [formOpen, setFormOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
@@ -56,6 +62,39 @@ export function LeadsPremiumView({
   const [bulkDialog, setBulkDialog] = useState<BulkDialog>(null);
   const [bulkTarget, setBulkTarget] = useState("");
   const [exporting, setExporting] = useState(false);
+
+  const focusedLeadQuery = useQuery({
+    queryKey: ["premium-leads", "detail", focusLeadId] as const,
+    queryFn: () => {
+      if (!focusLeadId) throw new Error("ID do lead não informado.");
+      return fetchLeadById(focusLeadId);
+    },
+    enabled: Boolean(focusLeadId),
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (!focusLeadId) {
+      handledFocusRef.current = null;
+      return;
+    }
+    if (handledFocusRef.current === focusLeadId) return;
+    if (focusedLeadQuery.data) {
+      const record = focusedLeadQuery.data;
+      handledFocusRef.current = focusLeadId;
+      setSelectedLead(toLeadItem(record));
+      onFocusHandled?.();
+      return;
+    }
+    if (focusedLeadQuery.isError) {
+      handledFocusRef.current = focusLeadId;
+      toast.error(
+        "Não foi possível abrir este lead. Ele pode ter sido removido ou você não tem acesso.",
+      );
+      onFocusHandled?.();
+    }
+  }, [focusLeadId, focusedLeadQuery.data, focusedLeadQuery.isError, onFocusHandled]);
 
   useEffect(() => {
     if (!selectedLead) return;
