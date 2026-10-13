@@ -319,4 +319,96 @@ test("o painel lateral da Tela 3 possui o assistente com 6 ações e as 4 sugest
   assert.ok(panelContent.includes("Criar agora"));
 });
 
+test("todos os componentes da Tela 4 — Calendário e Publicações existem e estão presentes", () => {
+  const requiredFiles = [
+    "src/components/marketing-ai/calendario/calendario-data.ts",
+    "src/components/marketing-ai/calendario/CalendarioPublicacoesHeader.tsx",
+    "src/components/marketing-ai/calendario/CalendarioPublicacoesKpis.tsx",
+    "src/components/marketing-ai/calendario/CalendarioPublicacoesSubnav.tsx",
+    "src/components/marketing-ai/calendario/CalendarioFiltersBar.tsx",
+    "src/components/marketing-ai/calendario/TimelineCalendarGrid.tsx",
+    "src/components/marketing-ai/calendario/PublicacaoCard.tsx",
+    "src/components/marketing-ai/calendario/FilaPublicacaoSection.tsx",
+    "src/components/marketing-ai/calendario/CalendarioSidebarPanel.tsx",
+    "src/components/marketing-ai/calendario/AgendarPublicacaoModal.tsx",
+    "src/components/marketing-ai/calendario/ConectarCanaisModal.tsx",
+    "src/components/marketing-ai/calendario/PublicacaoDetalhesDrawer.tsx",
+    "src/components/marketing-ai/calendario/CalendarioPublicacoesPage.tsx",
+  ];
+
+  for (const file of requiredFiles) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo obrigatório ausente: ${file}`);
+  }
+});
+
+test("a rota dashboard renderiza CalendarioPublicacoesPage quando marketingSubView é calendario", () => {
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    dashContent.includes("CalendarioPublicacoesPage"),
+    "Deve importar CalendarioPublicacoesPage",
+  );
+  assert.ok(
+    dashContent.includes('marketingSubView === "calendario"'),
+    "Deve renderizar condicionalmente CalendarioPublicacoesPage",
+  );
+});
+
+test("a Tela 4 possui os 6 KPIs, timeline slots, 6 canais conectados e fila de 5 publicações", () => {
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/marketing-ai/calendario/calendario-data.ts"),
+    "utf8",
+  );
+
+  // 6 KPIs superiores
+  assert.ok(dataContent.includes("Publicações agendadas") && dataContent.includes('"42"'));
+  assert.ok(dataContent.includes("Publicações hoje") && dataContent.includes('"12"'));
+  assert.ok(dataContent.includes("Publicações realizadas") && dataContent.includes('"386"'));
+  assert.ok(dataContent.includes("Taxa de sucesso") && dataContent.includes('"98,5%"'));
+  assert.ok(dataContent.includes("Canais conectados") && dataContent.includes('"6"'));
+  assert.ok(dataContent.includes("Alcance total") && dataContent.includes('"125.4K"'));
+
+  // 6 Canais conectados
+  assert.ok(dataContent.includes('"instagram"'));
+  assert.ok(dataContent.includes('"facebook"'));
+  assert.ok(dataContent.includes('"linkedin"'));
+  assert.ok(dataContent.includes('"youtube"'));
+  assert.ok(dataContent.includes('"tiktok"'));
+  assert.ok(dataContent.includes('"whatsapp"'));
+
+  // 5 Publicações da Fila
+  assert.ok(dataContent.includes("Reels Motivacional"));
+  assert.ok(dataContent.includes("Artigo Teológico"));
+  assert.ok(dataContent.includes("Shorts Reflexão"));
+  assert.ok(dataContent.includes("Reels de Oração"));
+  assert.ok(dataContent.includes("Deus é Fiel"));
+});
+
+test("o painel lateral da Tela 4 possui o assistente com 6 ações e o card de automação com foguete", () => {
+  const panelContent = fs.readFileSync(
+    path.join(root, "src/components/marketing-ai/calendario/CalendarioSidebarPanel.tsx"),
+    "utf8",
+  );
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/marketing-ai/calendario/calendario-data.ts"),
+    "utf8",
+  );
+
+  assert.ok(panelContent.includes("Assistente de Publicação com IA"));
+  assert.ok(dataContent.includes("Sugerir melhor horário"));
+  assert.ok(dataContent.includes("Agendar em múltiplos canais"));
+  assert.ok(dataContent.includes("Ajustar conteúdos existentes"));
+  assert.ok(dataContent.includes("Reaproveitar conteúdos mais performantes"));
+  assert.ok(dataContent.includes("Corrigir e otimizar copy"));
+  assert.ok(dataContent.includes("Analisar desempenho das publicações"));
+  assert.ok(panelContent.includes("Status dos canais"));
+  assert.ok(panelContent.includes("Publique com IA, sem esforço"));
+  assert.ok(panelContent.includes("Ativar publicação automática"));
+});
+
+
 

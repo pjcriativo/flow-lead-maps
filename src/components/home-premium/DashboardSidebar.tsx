@@ -159,7 +159,7 @@ export const MARKETING_SUBITEMS = [
   { id: "produtos" as const, label: "Produtos e Serviços", icon: Package, ready: true },
   { id: "agentes" as const, label: "Agentes e Estratégias", icon: BrainCircuit, ready: true },
   { id: "campanhas_conteudo" as const, label: "Campanhas e Conteúdos", icon: Megaphone, ready: true },
-  { id: "calendario" as const, label: "Calendário e Publicações", icon: CalendarDays, ready: false },
+  { id: "calendario" as const, label: "Calendário e Publicações", icon: CalendarDays, ready: true },
   { id: "resultados_roi" as const, label: "Resultados e ROI", icon: ChartNoAxesCombined, ready: false },
 ];
 

@@ -48,6 +48,7 @@ import { HomePremiumView } from "@/components/home-premium/HomePremiumView";
 import { FlowMarketingPage } from "@/components/marketing-ai/FlowMarketingPage";
 import { AgentesEstrategiasPage } from "@/components/marketing-ai/agentes/AgentesEstrategiasPage";
 import { MarketingConteudoPage } from "@/components/marketing-ai/conteudos/MarketingConteudoPage";
+import { CalendarioPublicacoesPage } from "@/components/marketing-ai/calendario/CalendarioPublicacoesPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -324,6 +325,19 @@ function Dashboard() {
             onSelectCampanhaContext={(c) => setSelectedCampanhaContext(c)}
           />
         )}
+        {section === "marketing" && marketingSubView === "calendario" && (
+          <CalendarioPublicacoesPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToProdutos={() => setMarketingSubView("produtos")}
+            onNavigateToAgentes={() => setMarketingSubView("agentes")}
+            onNavigateToConteudos={() => setMarketingSubView("campanhas_conteudo")}
+          />
+        )}
         {section === "marketing" && marketingSubView === "campanhas_conteudo" && (
           <MarketingConteudoPage
             user={{
@@ -355,21 +369,24 @@ function Dashboard() {
             }}
           />
         )}
-        {section === "marketing" && marketingSubView !== "agentes" && marketingSubView !== "campanhas_conteudo" && (
-          <FlowMarketingPage
-            user={{
-              name: userProfile?.full_name || "Carlos Mendes",
-              avatarUrl: userProfile?.avatar_url || "",
-              initials: userIniciais,
-            }}
-            unreadNotifications={naoLidas}
-            onNavigateToAgentes={() => setMarketingSubView("agentes")}
-            onNavigateToCampanhas={() => {
-              selectSection("campanhas");
-              setCampanhasSubView("central");
-            }}
-          />
-        )}
+        {section === "marketing" &&
+          marketingSubView !== "agentes" &&
+          marketingSubView !== "campanhas_conteudo" &&
+          marketingSubView !== "calendario" && (
+            <FlowMarketingPage
+              user={{
+                name: userProfile?.full_name || "Carlos Mendes",
+                avatarUrl: userProfile?.avatar_url || "",
+                initials: userIniciais,
+              }}
+              unreadNotifications={naoLidas}
+              onNavigateToAgentes={() => setMarketingSubView("agentes")}
+              onNavigateToCampanhas={() => {
+                selectSection("campanhas");
+                setCampanhasSubView("central");
+              }}
+            />
+          )}
         {section === "whatsapp" && <WhatsAppSection />}
         {section === "automacao" && (
           <AutomacaoSection onRevisar={() => selectSection("campanhas")} />
