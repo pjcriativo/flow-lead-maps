@@ -27,7 +27,7 @@ test("todos os componentes de AI Influencers Studio existem e estão presentes",
   }
 });
 
-test("DashboardSidebar possui AI Influencers Studio posicionado entre Flow Marketing AI e Conversas com submenu aprovado", () => {
+test("DashboardSidebar possui AI Influencers Studio após Flow Marketing AI e antes de Canais de Aquisição com submenu aprovado", () => {
   const sidebarContent = fs.readFileSync(
     path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
     "utf8",
@@ -37,45 +37,53 @@ test("DashboardSidebar possui AI Influencers Studio posicionado entre Flow Marke
     sidebarContent.includes('label: "AI Influencers Studio"'),
     "Deve conter o item AI Influencers Studio",
   );
-  assert.ok(
-    sidebarContent.includes("Clapperboard"),
-    "Deve usar o ícone Clapperboard",
-  );
+  assert.ok(sidebarContent.includes("Clapperboard"), "Deve usar o ícone Clapperboard");
 
   // Ordem de navegação
   const mktIdx = sidebarContent.indexOf('label: "Flow Marketing AI"');
   const infIdx = sidebarContent.indexOf('label: "AI Influencers Studio"');
-  const convIdx = sidebarContent.indexOf('label: "Conversas"');
+  const acquisitionIdx = sidebarContent.indexOf('label: "CANAIS DE AQUISIÇÃO"');
 
   assert.ok(mktIdx < infIdx, "Flow Marketing AI deve preceder AI Influencers Studio");
-  assert.ok(infIdx < convIdx, "AI Influencers Studio deve preceder Conversas");
+  assert.ok(infIdx < acquisitionIdx, "AI Influencers Studio deve preceder Canais de Aquisição");
 
   // Estrutura das 6 entradas do submenu
   assert.ok(sidebarContent.includes("INFLUENCERS_SUBITEMS"), "Deve declarar INFLUENCERS_SUBITEMS");
   assert.ok(sidebarContent.includes('label: "Visão Geral"'), "Submenu deve ter Visão Geral");
-  assert.ok(sidebarContent.includes('label: "Biblioteca de Influencers"'), "Submenu deve ter Biblioteca de Influencers");
-  assert.ok(sidebarContent.includes('label: "Criador de Avatares"'), "Submenu deve ter Criador de Avatares");
-  assert.ok(sidebarContent.includes('label: "AI UGC Video Studio"'), "Submenu deve ter AI UGC Video Studio");
-  assert.ok(sidebarContent.includes('label: "Projetos e Biblioteca"'), "Submenu deve ter Projetos e Biblioteca");
-  assert.ok(sidebarContent.includes('label: "Meus Influencers e Licenças"'), "Submenu deve ter Meus Influencers e Licenças");
+  assert.ok(
+    sidebarContent.includes('label: "Biblioteca de Influencers"'),
+    "Submenu deve ter Biblioteca de Influencers",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "Criador de Avatares"'),
+    "Submenu deve ter Criador de Avatares",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "AI UGC Video Studio"'),
+    "Submenu deve ter AI UGC Video Studio",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "Projetos e Biblioteca"'),
+    "Submenu deve ter Projetos e Biblioteca",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "Meus Influencers e Licenças"'),
+    "Submenu deve ter Meus Influencers e Licenças",
+  );
 
   // Visão Geral deve ter ready: true
   assert.ok(
-    sidebarContent.includes('{ id: "visao_geral" as const, label: "Visão Geral", icon: LayoutDashboard, ready: true }'),
+    sidebarContent.includes(
+      '{ id: "visao_geral" as const, label: "Visão Geral", icon: LayoutDashboard, ready: true }',
+    ),
     "Visão Geral deve estar pronta e ativa (ready: true)",
   );
 });
 
 test("dashboardNavigation inclui influencers e mapeia alias de busca", () => {
-  const navContent = fs.readFileSync(
-    path.join(root, "src/lib/dashboard-navigation.ts"),
-    "utf8",
-  );
+  const navContent = fs.readFileSync(path.join(root, "src/lib/dashboard-navigation.ts"), "utf8");
 
-  assert.ok(
-    navContent.includes('"influencers"'),
-    "DASHBOARD_SECTION_IDS deve conter influencers",
-  );
+  assert.ok(navContent.includes('"influencers"'), "DASHBOARD_SECTION_IDS deve conter influencers");
   assert.ok(
     navContent.includes('requested === "influencers_studio"'),
     "dashboardSectionFromSearch deve reconhecer influencers_studio",
@@ -207,7 +215,9 @@ test("DashboardSidebar ativa Biblioteca de Influencers como pronta (ready: true)
   );
 
   assert.ok(
-    sidebarContent.includes('{ id: "biblioteca" as const, label: "Biblioteca de Influencers", icon: Users, ready: true }'),
+    sidebarContent.includes(
+      '{ id: "biblioteca" as const, label: "Biblioteca de Influencers", icon: Users, ready: true }',
+    ),
     "Biblioteca de Influencers deve estar pronta (ready: true) no submenu",
   );
 });
@@ -218,10 +228,7 @@ test("a rota dashboard renderiza InfluencersLibraryPage quando influencersSubVie
     "utf8",
   );
 
-  assert.ok(
-    dashContent.includes("InfluencersLibraryPage"),
-    "Deve importar InfluencersLibraryPage",
-  );
+  assert.ok(dashContent.includes("InfluencersLibraryPage"), "Deve importar InfluencersLibraryPage");
   assert.ok(
     dashContent.includes('section === "influencers" && influencersSubView === "biblioteca"'),
     "Deve renderizar condicionalmente InfluencersLibraryPage quando influencersSubView for biblioteca",
@@ -299,7 +306,9 @@ test("DashboardSidebar ativa Criador de Avatares como pronto (ready: true)", () 
   );
 
   assert.ok(
-    sidebarContent.includes('{ id: "criador" as const, label: "Criador de Avatares", icon: UserPlus, ready: true }'),
+    sidebarContent.includes(
+      '{ id: "criador" as const, label: "Criador de Avatares", icon: UserPlus, ready: true }',
+    ),
     "Criador de Avatares deve estar pronto (ready: true) no submenu",
   );
 });
@@ -310,10 +319,7 @@ test("a rota dashboard renderiza AvatarCreatorPage quando influencersSubView for
     "utf8",
   );
 
-  assert.ok(
-    dashContent.includes("AvatarCreatorPage"),
-    "Deve importar AvatarCreatorPage",
-  );
+  assert.ok(dashContent.includes("AvatarCreatorPage"), "Deve importar AvatarCreatorPage");
   assert.ok(
     dashContent.includes('section === "influencers" && influencersSubView === "criador"'),
     "Deve renderizar condicionalmente AvatarCreatorPage quando influencersSubView for criador",
@@ -321,10 +327,7 @@ test("a rota dashboard renderiza AvatarCreatorPage quando influencersSubView for
 });
 
 test("a logomarca oficial do Flow Business foi preservada sem alterações", () => {
-  const logoContent = fs.readFileSync(
-    path.join(root, "src/components/FlowLeadsLogo.tsx"),
-    "utf8",
-  );
+  const logoContent = fs.readFileSync(path.join(root, "src/components/FlowLeadsLogo.tsx"), "utf8");
   assert.ok(logoContent.includes("FlowLeadsLogo"), "Componente FlowLeadsLogo deve existir");
   assert.ok(logoContent.includes("Flow"), "Deve conter a marca Flow");
 });
@@ -357,7 +360,9 @@ test("dados do AI UGC Video Studio contemplam 5 produtos, 6 objetivos, 4 duraç�
 
   // 5 Produtos
   assert.ok(dataContent.includes("UGC_PRODUCTS"));
-  assert.ok(dataContent.includes("Curso de Marketing Digital") && dataContent.includes("Curso online"));
+  assert.ok(
+    dataContent.includes("Curso de Marketing Digital") && dataContent.includes("Curso online"),
+  );
   assert.ok(dataContent.includes("Consultoria Empresarial") && dataContent.includes("Serviço"));
   assert.ok(dataContent.includes("E-book Produtividade") && dataContent.includes("E-book"));
   assert.ok(dataContent.includes("Mentoria Individual") && dataContent.includes("Serviço"));
@@ -413,7 +418,9 @@ test("DashboardSidebar ativa AI UGC Video Studio como pronto (ready: true)", () 
   );
 
   assert.ok(
-    sidebarContent.includes('{ id: "ugc_studio" as const, label: "AI UGC Video Studio", icon: Video, ready: true }'),
+    sidebarContent.includes(
+      '{ id: "ugc_studio" as const, label: "AI UGC Video Studio", icon: Video, ready: true }',
+    ),
     "AI UGC Video Studio deve estar pronto (ready: true) no submenu",
   );
 });
@@ -424,10 +431,7 @@ test("a rota dashboard renderiza UgcVideoStudioPage quando influencersSubView fo
     "utf8",
   );
 
-  assert.ok(
-    dashContent.includes("UgcVideoStudioPage"),
-    "Deve importar UgcVideoStudioPage",
-  );
+  assert.ok(dashContent.includes("UgcVideoStudioPage"), "Deve importar UgcVideoStudioPage");
   assert.ok(
     dashContent.includes('section === "influencers" && influencersSubView === "ugc_studio"'),
     "Deve renderizar condicionalmente UgcVideoStudioPage quando influencersSubView for ugc_studio",
@@ -441,7 +445,9 @@ test("DashboardSidebar ativa Projetos e Biblioteca como pronto (ready: true)", (
   );
 
   assert.ok(
-    sidebarContent.includes('{ id: "projetos" as const, label: "Projetos e Biblioteca", icon: FolderGit2, ready: true }'),
+    sidebarContent.includes(
+      '{ id: "projetos" as const, label: "Projetos e Biblioteca", icon: FolderGit2, ready: true }',
+    ),
     "Projetos e Biblioteca deve estar pronto (ready: true) no submenu",
   );
 });
@@ -452,10 +458,7 @@ test("a rota dashboard renderiza ProjetosBibliotecaPage quando influencersSubVie
     "utf8",
   );
 
-  assert.ok(
-    dashContent.includes("ProjetosBibliotecaPage"),
-    "Deve importar ProjetosBibliotecaPage",
-  );
+  assert.ok(dashContent.includes("ProjetosBibliotecaPage"), "Deve importar ProjetosBibliotecaPage");
   assert.ok(
     dashContent.includes('section === "influencers" && influencersSubView === "projetos"'),
     "Deve renderizar condicionalmente ProjetosBibliotecaPage quando influencersSubView for projetos",
@@ -529,7 +532,9 @@ test("DashboardSidebar ativa Meus Influencers e Licenças como pronto (ready: tr
   );
 
   assert.ok(
-    sidebarContent.includes('{ id: "licencas" as const, label: "Meus Influencers e Licenças", icon: Award, ready: true }'),
+    sidebarContent.includes(
+      '{ id: "licencas" as const, label: "Meus Influencers e Licenças", icon: Award, ready: true }',
+    ),
     "Meus Influencers e Licenças deve estar pronto (ready: true) no submenu",
   );
 });
@@ -604,12 +609,8 @@ test("todos os componentes e dados da Tela 6 Meus Influencers e Licenças existe
 });
 
 test("a logomarca oficial FlowLeadsLogo está 100% preservada", () => {
-  const logoContent = fs.readFileSync(
-    path.join(root, "src/components/FlowLeadsLogo.tsx"),
-    "utf8",
-  );
+  const logoContent = fs.readFileSync(path.join(root, "src/components/FlowLeadsLogo.tsx"), "utf8");
   assert.ok(logoContent.includes("FlowLeadsLogo"), "Componente FlowLeadsLogo deve existir");
   assert.ok(logoContent.includes("BRAND_NAME"), "Logo deve utilizar BRAND_NAME oficial");
   assert.ok(logoContent.includes("fill="), "Logo deve conter os vetores originais");
 });
-

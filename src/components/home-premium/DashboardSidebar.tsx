@@ -58,19 +58,10 @@ import type { DashboardSection } from "@/lib/dashboard-navigation";
 export type CampanhasSubView = "central" | "gestao" | "resultados";
 
 export type MarketingSubView =
-  | "produtos"
-  | "agentes"
-  | "campanhas_conteudo"
-  | "calendario"
-  | "resultados_roi";
+  "produtos" | "agentes" | "campanhas_conteudo" | "calendario" | "resultados_roi";
 
 export type InfluencersSubView =
-  | "visao_geral"
-  | "biblioteca"
-  | "criador"
-  | "ugc_studio"
-  | "projetos"
-  | "licencas";
+  "visao_geral" | "biblioteca" | "criador" | "ugc_studio" | "projetos" | "licencas";
 
 interface DashboardSidebarProps {
   activeSection: DashboardSection;
@@ -98,6 +89,7 @@ interface NavigationItem {
   badge?: string;
   homeActive?: boolean;
   brandMark?: string;
+  managementGroup?: boolean;
 }
 
 interface NavigationGroup {
@@ -109,13 +101,15 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
   {
     items: [
       { label: "Home", section: "home", icon: Home, homeActive: true },
-      { label: "Leads", section: "leads", icon: Share2 },
-      { label: "Pipeline", section: "pipeline", icon: Filter },
+      { label: "Gestão", icon: LayoutDashboard, managementGroup: true },
       { label: "Campanhas", section: "campanhas", icon: Megaphone },
       { label: "Flow Marketing AI", section: "marketing", icon: Sparkles, badge: "Em breve" },
-      { label: "AI Influencers Studio", section: "influencers", icon: Clapperboard, badge: "Em breve" },
-      { label: "Conversas", section: "whatsapp", icon: MessagesSquare },
-      { label: "Automações", section: "automacao", icon: Workflow },
+      {
+        label: "AI Influencers Studio",
+        section: "influencers",
+        icon: Clapperboard,
+        badge: "Em breve",
+      },
     ],
   },
   {
@@ -146,15 +140,6 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
     ],
   },
   {
-    label: "GESTÃO",
-    items: [
-      { label: "Minhas Listas", section: "listas", icon: ListChecks },
-      { label: "Propostas", section: "propostas", icon: FileText },
-      { label: "Contratos", section: "contratos", icon: ScrollText },
-      { label: "Financeiro", section: "financeiro", icon: WalletCards },
-    ],
-  },
-  {
     label: "SISTEMA",
     items: [
       { label: "Integrações", section: "settings", icon: Plug },
@@ -166,6 +151,25 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
   },
 ];
 
+const MANAGEMENT_SUBITEMS = [
+  { label: "Leads", section: "leads", icon: Share2 },
+  { label: "Minhas Listas", section: "listas", icon: ListChecks },
+  { label: "Pipeline", section: "pipeline", icon: Filter },
+  { label: "Conversas e WhatsApp", section: "whatsapp", icon: MessagesSquare },
+  { label: "Automações", section: "automacao", icon: Workflow },
+  { label: "Propostas", section: "propostas", icon: FileText },
+  { label: "Contratos", section: "contratos", icon: ScrollText },
+  { label: "Financeiro", section: "financeiro", icon: WalletCards },
+] as const satisfies ReadonlyArray<{
+  label: string;
+  section: DashboardSection;
+  icon: LucideIcon;
+}>;
+
+const MANAGEMENT_SECTION_IDS = new Set<DashboardSection>(
+  MANAGEMENT_SUBITEMS.map((item) => item.section),
+);
+
 const CAMPANHAS_SUBITEMS = [
   { id: "central" as const, label: "Central de Campanhas", icon: Layers },
   { id: "gestao" as const, label: "Gestão e Produção", icon: Sliders },
@@ -175,9 +179,19 @@ const CAMPANHAS_SUBITEMS = [
 export const MARKETING_SUBITEMS = [
   { id: "produtos" as const, label: "Produtos e Serviços", icon: Package, ready: true },
   { id: "agentes" as const, label: "Agentes e Estratégias", icon: BrainCircuit, ready: true },
-  { id: "campanhas_conteudo" as const, label: "Campanhas e Conteúdos", icon: Megaphone, ready: true },
+  {
+    id: "campanhas_conteudo" as const,
+    label: "Campanhas e Conteúdos",
+    icon: Megaphone,
+    ready: true,
+  },
   { id: "calendario" as const, label: "Calendário e Publicações", icon: CalendarDays, ready: true },
-  { id: "resultados_roi" as const, label: "Resultados e ROI", icon: ChartNoAxesCombined, ready: true },
+  {
+    id: "resultados_roi" as const,
+    label: "Resultados e ROI",
+    icon: ChartNoAxesCombined,
+    ready: true,
+  },
 ];
 
 export const INFLUENCERS_SUBITEMS = [
@@ -216,6 +230,9 @@ function SidebarNavigation({
   isCollapsed?: boolean;
   onClose?: () => void;
 }) {
+  const [isManagementExpanded, setIsManagementExpanded] = useState<boolean>(
+    MANAGEMENT_SECTION_IDS.has(activeSection),
+  );
   const [isCampanhasExpanded, setIsCampanhasExpanded] = useState<boolean>(
     activeSection === "campanhas",
   );
@@ -225,6 +242,13 @@ function SidebarNavigation({
   const [isInfluencersExpanded, setIsInfluencersExpanded] = useState<boolean>(
     activeSection === "influencers",
   );
+
+  // Mantém o grupo Gestão expandido enquanto uma de suas páginas estiver ativa
+  useEffect(() => {
+    if (MANAGEMENT_SECTION_IDS.has(activeSection)) {
+      setIsManagementExpanded(true);
+    }
+  }, [activeSection]);
 
   // Mantém o grupo Campanhas expandido enquanto ativo
   useEffect(() => {
@@ -272,12 +296,15 @@ function SidebarNavigation({
     <nav
       aria-label="Navegação principal"
       className={cn(
-        "min-h-0 flex-1 overflow-y-auto scrollbar-none pb-4",
+        "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-4 [scrollbar-gutter:stable]",
         isCollapsed ? "px-2" : "px-3",
       )}
     >
       {NAVIGATION_GROUPS.map((group, groupIndex) => (
-        <div key={group.label ?? "principal"} className={cn(groupIndex > 0 && (isCollapsed ? "mt-3" : "mt-5"))}>
+        <div
+          key={group.label ?? "principal"}
+          className={cn(groupIndex > 0 && (isCollapsed ? "mt-3" : "mt-5"))}
+        >
           {group.label ? (
             isCollapsed ? (
               <div className="my-2.5 mx-1 border-t border-home-border/40" />
@@ -290,6 +317,8 @@ function SidebarNavigation({
           <div className="space-y-0.5">
             {group.items.map((item) => {
               const Icon = item.icon;
+              const isManagement = item.managementGroup === true;
+              const isManagementGroupActive = MANAGEMENT_SECTION_IDS.has(activeSection);
               const isCampanhas = item.section === "campanhas";
               const isCampanhasGroupActive = activeSection === "campanhas";
               const isMarketing = item.section === "marketing";
@@ -305,6 +334,111 @@ function SidebarNavigation({
                   : item.section === "notificacoes"
                     ? 3
                     : null;
+
+              // Grupo expansível da Gestão Comercial
+              if (isManagement) {
+                if (isCollapsed) {
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      aria-current={isManagementGroupActive ? "page" : undefined}
+                      title="Gestão"
+                      onClick={() => {
+                        onNavigate("leads", "Leads");
+                        onClose?.();
+                      }}
+                      className={cn(
+                        "group relative flex h-9 w-full cursor-pointer items-center justify-center rounded-lg text-left transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isManagementGroupActive
+                          ? "bg-home-orange text-white shadow-[0_0_20px_rgba(255,98,0,0.3)]"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <LayoutDashboard
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4.5 shrink-0 transition-colors",
+                          isManagementGroupActive ? "text-white" : item.iconClassName,
+                        )}
+                      />
+                    </button>
+                  );
+                }
+
+                return (
+                  <div key={item.label} className="space-y-0.5">
+                    <button
+                      type="button"
+                      aria-expanded={isManagementExpanded}
+                      aria-current={isManagementGroupActive ? "page" : undefined}
+                      onClick={() => setIsManagementExpanded((previous) => !previous)}
+                      className={cn(
+                        "group flex h-9 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isManagementGroupActive
+                          ? "border border-home-border/80 bg-home-surface-strong/90 font-semibold text-white"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <LayoutDashboard
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4 shrink-0 transition-colors",
+                          isManagementGroupActive ? "text-home-orange" : item.iconClassName,
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <ChevronDown
+                        aria-hidden="true"
+                        className={cn(
+                          "size-3.5 text-home-muted transition-transform duration-200",
+                          !isManagementExpanded && "-rotate-90",
+                        )}
+                      />
+                    </button>
+
+                    {isManagementExpanded && (
+                      <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-home-border/60 py-0.5 pl-2">
+                        {MANAGEMENT_SUBITEMS.map((subitem) => {
+                          const SubIcon = subitem.icon;
+                          const isSubitemActive = activeSection === subitem.section;
+
+                          return (
+                            <button
+                              key={subitem.section}
+                              type="button"
+                              aria-current={isSubitemActive ? "page" : undefined}
+                              onClick={() => {
+                                onNavigate(subitem.section, subitem.label);
+                                onClose?.();
+                              }}
+                              className={cn(
+                                "group flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-all duration-150",
+                                isSubitemActive
+                                  ? "bg-home-orange font-bold text-white shadow-[0_0_15px_rgba(255,98,0,0.35)]"
+                                  : "text-home-muted hover:bg-home-surface-strong hover:text-white",
+                              )}
+                            >
+                              <SubIcon
+                                aria-hidden="true"
+                                className={cn(
+                                  "size-3.5 shrink-0 transition-colors",
+                                  isSubitemActive
+                                    ? "text-white"
+                                    : "text-home-muted group-hover:text-white",
+                                )}
+                              />
+                              <span className="min-w-0 flex-1 leading-4">{subitem.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
 
               // Renderização Especial com Submenu Expansível para o Módulo Campanhas
               if (isCampanhas) {
@@ -405,7 +539,9 @@ function SidebarNavigation({
                               <SubIcon
                                 className={cn(
                                   "size-3.5 shrink-0 transition-colors",
-                                  isSubActive ? "text-white" : "text-home-muted group-hover:text-white",
+                                  isSubActive
+                                    ? "text-white"
+                                    : "text-home-muted group-hover:text-white",
                                 )}
                               />
                               <span className="truncate">{sub.label}</span>
@@ -534,7 +670,9 @@ function SidebarNavigation({
                               <SubIcon
                                 className={cn(
                                   "size-3.5 shrink-0 transition-colors",
-                                  isSubActive ? "text-white" : "text-home-muted group-hover:text-white",
+                                  isSubActive
+                                    ? "text-white"
+                                    : "text-home-muted group-hover:text-white",
                                 )}
                               />
                               <span className="truncate flex-1">{sub.label}</span>
@@ -639,7 +777,8 @@ function SidebarNavigation({
                       <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-home-border/60 pl-2 py-0.5">
                         {INFLUENCERS_SUBITEMS.map((sub) => {
                           const isSubActive =
-                            isInfluencersGroupActive && (influencersSubView || "visao_geral") === sub.id;
+                            isInfluencersGroupActive &&
+                            (influencersSubView || "visao_geral") === sub.id;
                           const SubIcon = sub.icon;
 
                           return (
@@ -668,7 +807,9 @@ function SidebarNavigation({
                               <SubIcon
                                 className={cn(
                                   "size-3.5 shrink-0 transition-colors",
-                                  isSubActive ? "text-white" : "text-home-muted group-hover:text-white",
+                                  isSubActive
+                                    ? "text-white"
+                                    : "text-home-muted group-hover:text-white",
                                 )}
                               />
                               <span className="truncate flex-1">{sub.label}</span>
@@ -709,7 +850,10 @@ function SidebarNavigation({
                     ) : Icon ? (
                       <Icon
                         aria-hidden="true"
-                        className={cn("size-4.5 shrink-0", active ? "text-white" : item.iconClassName)}
+                        className={cn(
+                          "size-4.5 shrink-0",
+                          active ? "text-white" : item.iconClassName,
+                        )}
                       />
                     ) : null}
                     {notificationCount ? (

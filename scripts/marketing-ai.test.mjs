@@ -28,7 +28,7 @@ test("todos os componentes de Flow Marketing AI existem e estão presentes", () 
   }
 });
 
-test("DashboardSidebar possui Flow Marketing AI posicionado entre Campanhas e Conversas com ícones aprovados", () => {
+test("DashboardSidebar possui Flow Marketing AI posicionado entre Campanhas e AI Influencers Studio com ícones aprovados", () => {
   const sidebarContent = fs.readFileSync(
     path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
     "utf8",
@@ -38,32 +38,56 @@ test("DashboardSidebar possui Flow Marketing AI posicionado entre Campanhas e Co
     sidebarContent.includes('label: "Flow Marketing AI"'),
     "Deve conter o item Flow Marketing AI",
   );
-  assert.ok(
-    sidebarContent.includes("Sparkles"),
-    "Deve usar o ícone Sparkles",
-  );
+  assert.ok(sidebarContent.includes("Sparkles"), "Deve usar o ícone Sparkles");
 
   // Ordem de navegação
   const campanhasIdx = sidebarContent.indexOf('label: "Campanhas"');
   const aiIdx = sidebarContent.indexOf('label: "Flow Marketing AI"');
-  const conversasIdx = sidebarContent.indexOf('label: "Conversas"');
+  const influencersIdx = sidebarContent.indexOf('label: "AI Influencers Studio"');
 
   assert.ok(campanhasIdx < aiIdx, "Campanhas deve preceder Flow Marketing AI");
-  assert.ok(aiIdx < conversasIdx, "Flow Marketing AI deve preceder Conversas");
+  assert.ok(aiIdx < influencersIdx, "Flow Marketing AI deve preceder AI Influencers Studio");
 
   // Estrutura definitiva do submenu e seus ícones
   assert.ok(sidebarContent.includes("MARKETING_SUBITEMS"), "Deve declarar MARKETING_SUBITEMS");
-  assert.ok(sidebarContent.includes('label: "Produtos e Serviços"'), "Submenu deve ter Produtos e Serviços");
-  assert.ok(sidebarContent.includes('label: "Agentes e Estratégias"'), "Submenu deve ter Agentes e Estratégias");
-  assert.ok(sidebarContent.includes('label: "Campanhas e Conteúdos"'), "Submenu deve ter Campanhas e Conteúdos");
-  assert.ok(sidebarContent.includes('label: "Calendário e Publicações"'), "Submenu deve ter Calendário e Publicações");
-  assert.ok(sidebarContent.includes('label: "Resultados e ROI"'), "Submenu deve ter Resultados e ROI");
+  assert.ok(
+    sidebarContent.includes('label: "Produtos e Serviços"'),
+    "Submenu deve ter Produtos e Serviços",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "Agentes e Estratégias"'),
+    "Submenu deve ter Agentes e Estratégias",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "Campanhas e Conteúdos"'),
+    "Submenu deve ter Campanhas e Conteúdos",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "Calendário e Publicações"'),
+    "Submenu deve ter Calendário e Publicações",
+  );
+  assert.ok(
+    sidebarContent.includes('label: "Resultados e ROI"'),
+    "Submenu deve ter Resultados e ROI",
+  );
 
   assert.ok(sidebarContent.includes("Package"), "Deve usar ícone Package para Produtos e Serviços");
-  assert.ok(sidebarContent.includes("BrainCircuit"), "Deve usar ícone BrainCircuit para Agentes e Estratégias");
-  assert.ok(sidebarContent.includes("Megaphone"), "Deve usar ícone Megaphone para Campanhas e Conteúdos");
-  assert.ok(sidebarContent.includes("CalendarDays"), "Deve usar ícone CalendarDays para Calendário e Publicações");
-  assert.ok(sidebarContent.includes("ChartNoAxesCombined"), "Deve usar ícone ChartNoAxesCombined para Resultados e ROI");
+  assert.ok(
+    sidebarContent.includes("BrainCircuit"),
+    "Deve usar ícone BrainCircuit para Agentes e Estratégias",
+  );
+  assert.ok(
+    sidebarContent.includes("Megaphone"),
+    "Deve usar ícone Megaphone para Campanhas e Conteúdos",
+  );
+  assert.ok(
+    sidebarContent.includes("CalendarDays"),
+    "Deve usar ícone CalendarDays para Calendário e Publicações",
+  );
+  assert.ok(
+    sidebarContent.includes("ChartNoAxesCombined"),
+    "Deve usar ícone ChartNoAxesCombined para Resultados e ROI",
+  );
 });
 
 test("a rota dashboard renderiza FlowMarketingPage com isolamento e visual dark premium", () => {
@@ -72,10 +96,7 @@ test("a rota dashboard renderiza FlowMarketingPage com isolamento e visual dark 
     "utf8",
   );
 
-  assert.ok(
-    dashContent.includes("FlowMarketingPage"),
-    "Deve importar FlowMarketingPage",
-  );
+  assert.ok(dashContent.includes("FlowMarketingPage"), "Deve importar FlowMarketingPage");
   assert.ok(
     dashContent.includes('section === "marketing"'),
     "Deve renderizar condicionalmente section === 'marketing'",
@@ -157,10 +178,7 @@ test("a rota dashboard renderiza AgentesEstrategiasPage quando marketingSubView 
     "utf8",
   );
 
-  assert.ok(
-    dashContent.includes("AgentesEstrategiasPage"),
-    "Deve importar AgentesEstrategiasPage",
-  );
+  assert.ok(dashContent.includes("AgentesEstrategiasPage"), "Deve importar AgentesEstrategiasPage");
   assert.ok(
     dashContent.includes('section === "marketing" && marketingSubView === "agentes"'),
     "Deve renderizar condicionalmente a Tela 2 para o submenu agentes",
@@ -248,10 +266,7 @@ test("a rota dashboard renderiza MarketingConteudoPage quando marketingSubView �
     "utf8",
   );
 
-  assert.ok(
-    dashContent.includes("MarketingConteudoPage"),
-    "Deve importar MarketingConteudoPage",
-  );
+  assert.ok(dashContent.includes("MarketingConteudoPage"), "Deve importar MarketingConteudoPage");
   assert.ok(
     dashContent.includes('marketingSubView === "campanhas_conteudo"'),
     "Deve renderizar condicionalmente MarketingConteudoPage",
@@ -480,8 +495,9 @@ test("o dashboard e sidebar conectam a Tela 5 (Resultados e ROI) com ready true"
     "utf8",
   );
 
-  assert.ok(
-    sidebarContent.includes('{ id: "resultados_roi" as const, label: "Resultados e ROI", icon: ChartNoAxesCombined, ready: true }'),
+  assert.match(
+    sidebarContent,
+    /id: "resultados_roi" as const,\s*label: "Resultados e ROI",\s*icon: ChartNoAxesCombined,\s*ready: true/,
     "Resultados e ROI deve estar ativo com ready: true na sidebar",
   );
 
@@ -494,7 +510,3 @@ test("o dashboard e sidebar conectam a Tela 5 (Resultados e ROI) com ready true"
     "Dashboard deve renderizar MarketingResultsPage para marketingSubView === 'resultados_roi'",
   );
 });
-
-
-
-
