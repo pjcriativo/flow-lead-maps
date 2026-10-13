@@ -40,6 +40,7 @@ export interface GoogleMapsRunningViewProps {
   // Callbacks de controle
   onCancelarBusca: () => void;
   onVoltarConfiguracao: () => void;
+  onVerResultados?: () => void;
 }
 
 export function GoogleMapsRunningView({
@@ -64,6 +65,7 @@ export function GoogleMapsRunningView({
   duplicatasCount,
   onCancelarBusca,
   onVoltarConfiguracao,
+  onVerResultados,
 }: GoogleMapsRunningViewProps) {
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [modalCancelarAberto, setModalCancelarAberto] = useState(false);
@@ -148,7 +150,7 @@ export function GoogleMapsRunningView({
               <span>Ver detalhes da busca</span>
             </button>
 
-            {running && (
+            {running ? (
               <button
                 type="button"
                 onClick={() => setModalCancelarAberto(true)}
@@ -157,7 +159,16 @@ export function GoogleMapsRunningView({
                 <XCircle className="size-3.5 text-red-400" />
                 <span>Cancelar busca</span>
               </button>
-            )}
+            ) : onVerResultados ? (
+              <button
+                type="button"
+                onClick={onVerResultados}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-home-orange px-4 text-xs font-bold text-white shadow-md shadow-home-orange/20 hover:bg-home-orange-hover transition-colors cursor-pointer"
+              >
+                <span>Ver resultados da busca</span>
+                <span className="text-white/80">→</span>
+              </button>
+            ) : null}
           </div>
         </div>
 

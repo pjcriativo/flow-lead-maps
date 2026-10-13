@@ -17,6 +17,7 @@ import { GoogleMapsMapPanel } from "./GoogleMapsMapPanel";
 import { GoogleMapsSearchSummary } from "./GoogleMapsSearchSummary";
 import { GoogleMapsResultsPanel } from "./GoogleMapsResultsPanel";
 import { GoogleMapsRunningView } from "./GoogleMapsRunningView";
+import { GoogleMapsSearchResultsView } from "./GoogleMapsSearchResultsView";
 import { useGoogleMapsStats } from "./useGoogleMapsStats";
 import { Radar } from "lucide-react";
 
@@ -30,6 +31,8 @@ export interface GoogleMapsPremiumViewProps {
   };
   unreadNotifications?: number;
   onOpenMinhasListas?: () => void;
+  onOpenLeads?: (leadId?: string) => void;
+  onOpenCampanhas?: () => void;
   onFinished?: () => void;
 }
 
@@ -43,6 +46,8 @@ export function GoogleMapsPremiumView({
   },
   unreadNotifications = 3,
   onOpenMinhasListas,
+  onOpenLeads,
+  onOpenCampanhas,
   onFinished,
 }: GoogleMapsPremiumViewProps) {
   // Hook de métricas reais da organização
@@ -78,10 +83,12 @@ export function GoogleMapsPremiumView({
   const insertedIdsRef = useRef<string[]>([]);
   const geoAbort = useRef<AbortController | null>(null);
 
-  // Estados de visualização: "config" (Tela 01) vs "running" (Tela 02 - Prospecção em Andamento)
-  const [activeView, setActiveView] = useState<"config" | "running">("config");
+  // Estados de visualização: "config" (Tela 01), "running" (Tela 02) ou "results" (Tela 03)
+  const [activeView, setActiveView] = useState<"config" | "running" | "results">("config");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [duplicatasCount, setDuplicatasCount] = useState(0);
+  const [isParcial, setIsParcial] = useState(false);
+  const [dataUltimaBusca, setDataUltimaBusca] = useState<string>("");
 
   // Timer em tempo real durante a execução ativa
   useEffect(() => {
@@ -205,6 +212,12 @@ export function GoogleMapsPremiumView({
 
     setRunning(true);
     setActiveView("running");
+    setIsParcial(false);
+    setDataUltimaBusca(
+      new Date().toLocaleDateString("pt-BR") +
+        " às " +
+        new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    );
     setElapsedSeconds(0);
     setDuplicatasCount(0);
     setLeads([]);
@@ -351,10 +364,12 @@ export function GoogleMapsPremiumView({
         }
       }
       if (!doneRecebido && !streamHadError) {
+        setIsParcial(true);
         setStatus("Parcial — conexão encerrada");
         pushLog("⚠️ Conexão encerrada antes da confirmação terminal.");
       }
     } catch (err) {
+      setIsParcial(true);
       if ((err as Error).name !== "AbortError") {
         const msg = (err as Error).message ?? "Erro inesperado na busca";
         setStatus(`Erro: ${msg}`);
@@ -372,6 +387,7 @@ export function GoogleMapsPremiumView({
       abortRef.current.abort();
     }
     setRunning(false);
+    setIsParcial(true);
     setStatus("Interrompido pelo usuário");
     pushLog("⏹️ Prospecção interrompida pelo usuário no navegador.");
     toast.info("Busca interrompida. Os leads já capturados foram preservados.");
@@ -402,6 +418,34 @@ export function GoogleMapsPremiumView({
         duplicatasCount={duplicatasCount}
         onCancelarBusca={handleCancelarBusca}
         onVoltarConfiguracao={() => setActiveView("config")}
+        onVerResultados={() => setActiveView("results")}
+      />
+    );
+  }
+
+  // Renderização da Tela 03: Resultados da Busca
+  if (activeView === "results") {
+    return (
+      <GoogleMapsSearchResultsView
+        user={user}
+        unreadNotifications={unreadNotifications}
+        nicho={nicho}
+        categoria={categoriaAtiva}
+        cidade={cidade}
+        uf={uf}
+        raioKm={raioKm}
+        limite={limite}
+        nomeLista={nomeListaResolvido}
+        dataBusca={dataUltimaBusca}
+        leads={leads}
+        duplicatasCount={duplicatasCount}
+        isParcial={isParcial}
+        listaCriadaId={listaCriadaId}
+        onNovaBusca={() => setActiveView("config")}
+        onEditarPesquisa={() => setActiveView("config")}
+        onVerMinhasListas={onOpenMinhasListas}
+        onOpenLeads={onOpenLeads}
+        onOpenCampanhas={onOpenCampanhas}
       />
     );
   }

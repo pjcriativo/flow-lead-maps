@@ -310,6 +310,11 @@ function Dashboard() {
             }}
             unreadNotifications={naoLidas}
             onOpenMinhasListas={() => selectSection("listas")}
+            onOpenLeads={(leadId) => {
+              if (leadId) setFocusedLeadId(leadId);
+              selectSection("leads");
+            }}
+            onOpenCampanhas={() => selectSection("campanhas")}
           />
         )}
         {section === "instagram" && <InstagramWorkspace onExit={() => selectSection("home")} />}
