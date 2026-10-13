@@ -53,6 +53,7 @@ import { CalendarioPublicacoesPage } from "@/components/marketing-ai/calendario/
 import { MarketingResultsPage } from "@/components/marketing-ai/resultados/MarketingResultsPage";
 import { AIInfluencersStudioPage } from "@/components/influencers-studio/AIInfluencersStudioPage";
 import { InfluencersLibraryPage } from "@/components/influencers-studio/biblioteca/InfluencersLibraryPage";
+import { AvatarCreatorPage } from "@/components/influencers-studio/criador/AvatarCreatorPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -416,22 +417,36 @@ function Dashboard() {
             onNavigateToUgcStudio={() => setInfluencersSubView("ugc_studio")}
           />
         )}
-        {section === "influencers" && influencersSubView !== "biblioteca" && (
-          <AIInfluencersStudioPage
+        {section === "influencers" && influencersSubView === "criador" && (
+          <AvatarCreatorPage
             user={{
               name: userProfile?.full_name || "Carlos Mendes",
               avatarUrl: userProfile?.avatar_url || "",
               initials: userIniciais,
             }}
             unreadNotifications={naoLidas}
-            onNavigateToPlanos={() => {
-              selectSection("settings");
-            }}
-            onNavigateToBiblioteca={() => {
-              setInfluencersSubView("biblioteca");
-            }}
+            onNavigateToBiblioteca={() => setInfluencersSubView("biblioteca")}
+            onNavigateToUgcStudio={() => setInfluencersSubView("ugc_studio")}
           />
         )}
+        {section === "influencers" &&
+          influencersSubView !== "biblioteca" &&
+          influencersSubView !== "criador" && (
+            <AIInfluencersStudioPage
+              user={{
+                name: userProfile?.full_name || "Carlos Mendes",
+                avatarUrl: userProfile?.avatar_url || "",
+                initials: userIniciais,
+              }}
+              unreadNotifications={naoLidas}
+              onNavigateToPlanos={() => {
+                selectSection("settings");
+              }}
+              onNavigateToBiblioteca={() => {
+                setInfluencersSubView("biblioteca");
+              }}
+            />
+          )}
         {section === "whatsapp" && <WhatsAppSection />}
         {section === "automacao" && (
           <AutomacaoSection onRevisar={() => selectSection("campanhas")} />

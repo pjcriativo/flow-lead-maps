@@ -228,3 +228,105 @@ test("a rota dashboard renderiza InfluencersLibraryPage quando influencersSubVie
   );
 });
 
+test("todos os componentes de Tela 3 (Criador de Avatares) existem e estão presentes", () => {
+  const requiredFiles = [
+    "src/components/influencers-studio/criador/criador-data.ts",
+    "src/components/influencers-studio/criador/AvatarCreatorHeader.tsx",
+    "src/components/influencers-studio/criador/AvatarCreationStepper.tsx",
+    "src/components/influencers-studio/criador/AvatarAppearanceLibrary.tsx",
+    "src/components/influencers-studio/criador/AvatarCustomizationPanel.tsx",
+    "src/components/influencers-studio/criador/AvatarPreviewPanel.tsx",
+    "src/components/influencers-studio/criador/AvatarAdditionalSteps.tsx",
+    "src/components/influencers-studio/criador/AvatarCreatorPage.tsx",
+  ];
+
+  for (const file of requiredFiles) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo do Criador de Avatares ausente: ${file}`);
+  }
+});
+
+test("dados do Criador de Avatares contemplam 12 modelos da plataforma, 6 tons de pele, 5 cabelos, 5 olhos, 6 expressões e 5 etapas", () => {
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/influencers-studio/criador/criador-data.ts"),
+    "utf8",
+  );
+
+  // 12 Modelos
+  assert.ok(dataContent.includes("PLATFORM_MODELS"));
+  assert.ok(dataContent.includes('"Sofia"') && dataContent.includes('"Lifestyle"'));
+  assert.ok(dataContent.includes('"Lucas"') && dataContent.includes('"Negócios"'));
+  assert.ok(dataContent.includes('"Mariana"') && dataContent.includes('"Moda"'));
+  assert.ok(dataContent.includes('"Rafael"') && dataContent.includes('"Tecnologia"'));
+  assert.ok(dataContent.includes('"Camila"') && dataContent.includes('"Beleza"'));
+  assert.ok(dataContent.includes('"Bruno"') && dataContent.includes('"Saúde"'));
+  assert.ok(dataContent.includes('"Juliana"') && dataContent.includes('"Viagens"'));
+  assert.ok(dataContent.includes('"Mateus"') && dataContent.includes('"Corporativo"'));
+  assert.ok(dataContent.includes('"Isabella"') && dataContent.includes('"UGC"'));
+  assert.ok(dataContent.includes('"Caio"') && dataContent.includes('"Esportes"'));
+  assert.ok(dataContent.includes('"Fernanda"') && dataContent.includes('"Educação"'));
+  assert.ok(dataContent.includes('"Thiago"') && dataContent.includes('"Gastronomia"'));
+
+  // 6 Tons de pele
+  assert.ok(dataContent.includes("SKIN_TONES"));
+  assert.ok(dataContent.includes('"#F7D1BA"'));
+  assert.ok(dataContent.includes('"#543322"'));
+
+  // 5 Cabelos, 5 Olhos, 6 Expressões
+  assert.ok(dataContent.includes("HAIR_OPTIONS"));
+  assert.ok(dataContent.includes("EYE_OPTIONS"));
+  assert.ok(dataContent.includes("FACIAL_EXPRESSIONS"));
+  assert.ok(dataContent.includes('"Normal"'));
+  assert.ok(dataContent.includes('"Sorriso"'));
+  assert.ok(dataContent.includes('"Séria"'));
+  assert.ok(dataContent.includes('"Animada"'));
+  assert.ok(dataContent.includes('"Surpresa"'));
+  assert.ok(dataContent.includes('"Pensativa"'));
+
+  // 5 Etapas do Stepper
+  assert.ok(dataContent.includes("CREATOR_STEPS"));
+  assert.ok(dataContent.includes('"Aparência"'));
+  assert.ok(dataContent.includes('"Voz e Idioma"'));
+  assert.ok(dataContent.includes('"Personalidade"'));
+  assert.ok(dataContent.includes('"Estilo e Cenários"'));
+  assert.ok(dataContent.includes('"Revisão e Criação"'));
+});
+
+test("DashboardSidebar ativa Criador de Avatares como pronto (ready: true)", () => {
+  const sidebarContent = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    sidebarContent.includes('{ id: "criador" as const, label: "Criador de Avatares", icon: UserPlus, ready: true }'),
+    "Criador de Avatares deve estar pronto (ready: true) no submenu",
+  );
+});
+
+test("a rota dashboard renderiza AvatarCreatorPage quando influencersSubView for criador", () => {
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    dashContent.includes("AvatarCreatorPage"),
+    "Deve importar AvatarCreatorPage",
+  );
+  assert.ok(
+    dashContent.includes('section === "influencers" && influencersSubView === "criador"'),
+    "Deve renderizar condicionalmente AvatarCreatorPage quando influencersSubView for criador",
+  );
+});
+
+test("a logomarca oficial do Flow Business foi preservada sem alterações", () => {
+  const logoContent = fs.readFileSync(
+    path.join(root, "src/components/FlowLeadsLogo.tsx"),
+    "utf8",
+  );
+  assert.ok(logoContent.includes("FlowLeadsLogo"), "Componente FlowLeadsLogo deve existir");
+  assert.ok(logoContent.includes("Flow"), "Deve conter a marca Flow");
+});
+
+
