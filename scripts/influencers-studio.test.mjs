@@ -329,4 +329,110 @@ test("a logomarca oficial do Flow Business foi preservada sem alterações", () 
   assert.ok(logoContent.includes("Flow"), "Deve conter a marca Flow");
 });
 
+test("todos os componentes de Tela 4 (AI UGC Video Studio) existem e estão presentes", () => {
+  const requiredFiles = [
+    "src/components/influencers-studio/ugc-studio/ugc-data.ts",
+    "src/components/influencers-studio/ugc-studio/UgcStudioHeader.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcProductionStepper.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcProductObjectivePanel.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcScriptTextPanel.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcAvatarVoicePanel.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcStyleFormatPanel.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcPreviewStoryboardPanel.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcProjectSummaryCard.tsx",
+    "src/components/influencers-studio/ugc-studio/UgcVideoStudioPage.tsx",
+  ];
+
+  for (const file of requiredFiles) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo do UGC Video Studio ausente: ${file}`);
+  }
+});
+
+test("dados do AI UGC Video Studio contemplam 5 produtos, 6 objetivos, 4 durações, 4 estilos, 4 cenários e 5 cenas de storyboard", () => {
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/influencers-studio/ugc-studio/ugc-data.ts"),
+    "utf8",
+  );
+
+  // 5 Produtos
+  assert.ok(dataContent.includes("UGC_PRODUCTS"));
+  assert.ok(dataContent.includes("Curso de Marketing Digital") && dataContent.includes("Curso online"));
+  assert.ok(dataContent.includes("Consultoria Empresarial") && dataContent.includes("Serviço"));
+  assert.ok(dataContent.includes("E-book Produtividade") && dataContent.includes("E-book"));
+  assert.ok(dataContent.includes("Mentoria Individual") && dataContent.includes("Serviço"));
+  assert.ok(dataContent.includes("Pack de Templates") && dataContent.includes("Template"));
+
+  // 6 Objetivos
+  assert.ok(dataContent.includes("UGC_OBJECTIVES"));
+  assert.ok(dataContent.includes('"Anúncio"'));
+  assert.ok(dataContent.includes('"Review"'));
+  assert.ok(dataContent.includes('"Tutorial"'));
+  assert.ok(dataContent.includes('"Depoimento"'));
+  assert.ok(dataContent.includes('"Institucional"'));
+  assert.ok(dataContent.includes('"Outro"'));
+
+  // 4 Durações
+  assert.ok(dataContent.includes("UGC_DURATIONS"));
+  assert.ok(dataContent.includes('"15 segundos"'));
+  assert.ok(dataContent.includes('"30 segundos"'));
+  assert.ok(dataContent.includes('"60 segundos"'));
+
+  // 4 Estilos e 4 Cenários
+  assert.ok(dataContent.includes("UGC_VISUAL_STYLES"));
+  assert.ok(dataContent.includes('"Natural"'));
+  assert.ok(dataContent.includes('"Profissional"'));
+  assert.ok(dataContent.includes('"Casual"'));
+  assert.ok(dataContent.includes('"Criativo"'));
+  assert.ok(dataContent.includes("UGC_SCENARIOS"));
+  assert.ok(dataContent.includes('"Interno"'));
+  assert.ok(dataContent.includes('"Externo"'));
+  assert.ok(dataContent.includes('"Estúdio"'));
+
+  // 5 Cenas
+  assert.ok(dataContent.includes("UGC_SCENES"));
+  assert.ok(dataContent.includes("Apresentação") && dataContent.includes("0:00 - 0:05"));
+  assert.ok(dataContent.includes("Problema") && dataContent.includes("0:05 - 0:10"));
+  assert.ok(dataContent.includes("Solução") && dataContent.includes("0:10 - 0:20"));
+  assert.ok(dataContent.includes("Benefícios") && dataContent.includes("0:20 - 0:25"));
+  assert.ok(dataContent.includes("CTA") && dataContent.includes("0:25 - 0:30"));
+
+  // 5 Etapas
+  assert.ok(dataContent.includes("UGC_STEPS"));
+  assert.ok(dataContent.includes("Produto e Objetivo"));
+  assert.ok(dataContent.includes("Roteiro e Texto"));
+  assert.ok(dataContent.includes("Avatar e Voz"));
+  assert.ok(dataContent.includes("Estilo e Formato"));
+  assert.ok(dataContent.includes("Revisão e Geração"));
+});
+
+test("DashboardSidebar ativa AI UGC Video Studio como pronto (ready: true)", () => {
+  const sidebarContent = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    sidebarContent.includes('{ id: "ugc_studio" as const, label: "AI UGC Video Studio", icon: Video, ready: true }'),
+    "AI UGC Video Studio deve estar pronto (ready: true) no submenu",
+  );
+});
+
+test("a rota dashboard renderiza UgcVideoStudioPage quando influencersSubView for ugc_studio", () => {
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    dashContent.includes("UgcVideoStudioPage"),
+    "Deve importar UgcVideoStudioPage",
+  );
+  assert.ok(
+    dashContent.includes('section === "influencers" && influencersSubView === "ugc_studio"'),
+    "Deve renderizar condicionalmente UgcVideoStudioPage quando influencersSubView for ugc_studio",
+  );
+});
+
+
 

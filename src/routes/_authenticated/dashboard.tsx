@@ -54,6 +54,7 @@ import { MarketingResultsPage } from "@/components/marketing-ai/resultados/Marke
 import { AIInfluencersStudioPage } from "@/components/influencers-studio/AIInfluencersStudioPage";
 import { InfluencersLibraryPage } from "@/components/influencers-studio/biblioteca/InfluencersLibraryPage";
 import { AvatarCreatorPage } from "@/components/influencers-studio/criador/AvatarCreatorPage";
+import { UgcVideoStudioPage } from "@/components/influencers-studio/ugc-studio/UgcVideoStudioPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -429,9 +430,26 @@ function Dashboard() {
             onNavigateToUgcStudio={() => setInfluencersSubView("ugc_studio")}
           />
         )}
+        {section === "influencers" && influencersSubView === "ugc_studio" && (
+          <UgcVideoStudioPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToBiblioteca={() => setInfluencersSubView("biblioteca")}
+            onNavigateToCriador={() => setInfluencersSubView("criador")}
+            onNavigateToMarketing={() => {
+              selectSection("marketing");
+              setMarketingSubView("produtos");
+            }}
+          />
+        )}
         {section === "influencers" &&
           influencersSubView !== "biblioteca" &&
-          influencersSubView !== "criador" && (
+          influencersSubView !== "criador" &&
+          influencersSubView !== "ugc_studio" && (
             <AIInfluencersStudioPage
               user={{
                 name: userProfile?.full_name || "Carlos Mendes",
