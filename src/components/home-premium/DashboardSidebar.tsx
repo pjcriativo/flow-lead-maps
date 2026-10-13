@@ -8,13 +8,16 @@ import {
   ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
+  Clapperboard,
   FileText,
   Filter,
+  FolderGit2,
   GitBranch,
   GraduationCap,
   Headphones,
   Home,
   Layers,
+  LayoutDashboard,
   ListChecks,
   Menu,
   MessagesSquare,
@@ -29,9 +32,12 @@ import {
   Sliders,
   Sparkles,
   Users,
+  UserPlus,
+  Video,
   WalletCards,
   Workflow,
   X,
+  Award,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -58,13 +64,23 @@ export type MarketingSubView =
   | "calendario"
   | "resultados_roi";
 
+export type InfluencersSubView =
+  | "visao_geral"
+  | "biblioteca"
+  | "criador"
+  | "ugc_studio"
+  | "projetos"
+  | "licencas";
+
 interface DashboardSidebarProps {
   activeSection: DashboardSection;
   campanhasSubView?: CampanhasSubView;
   marketingSubView?: MarketingSubView;
+  influencersSubView?: InfluencersSubView;
   onNavigate: (section: DashboardSection, label: string) => void;
   onNavigateCampanhasSub?: (subView: CampanhasSubView) => void;
   onNavigateMarketingSub?: (subView: MarketingSubView) => void;
+  onNavigateInfluencersSub?: (subView: InfluencersSubView) => void;
   unreadNotifications: number;
   user: {
     name: string;
@@ -97,6 +113,7 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
       { label: "Pipeline", section: "pipeline", icon: Filter },
       { label: "Campanhas", section: "campanhas", icon: Megaphone },
       { label: "Flow Marketing AI", section: "marketing", icon: Sparkles, badge: "Em breve" },
+      { label: "AI Influencers Studio", section: "influencers", icon: Clapperboard, badge: "Em breve" },
       { label: "Conversas", section: "whatsapp", icon: MessagesSquare },
       { label: "Automações", section: "automacao", icon: Workflow },
     ],
@@ -163,13 +180,24 @@ export const MARKETING_SUBITEMS = [
   { id: "resultados_roi" as const, label: "Resultados e ROI", icon: ChartNoAxesCombined, ready: true },
 ];
 
+export const INFLUENCERS_SUBITEMS = [
+  { id: "visao_geral" as const, label: "Visão Geral", icon: LayoutDashboard, ready: true },
+  { id: "biblioteca" as const, label: "Biblioteca de Influencers", icon: Users, ready: false },
+  { id: "criador" as const, label: "Criador de Avatares", icon: UserPlus, ready: false },
+  { id: "ugc_studio" as const, label: "AI UGC Video Studio", icon: Video, ready: false },
+  { id: "projetos" as const, label: "Projetos e Biblioteca", icon: FolderGit2, ready: false },
+  { id: "licencas" as const, label: "Meus Influencers e Licenças", icon: Award, ready: false },
+];
+
 function SidebarNavigation({
   activeSection,
   campanhasSubView = "central",
   marketingSubView = "produtos",
+  influencersSubView = "visao_geral",
   onNavigate,
   onNavigateCampanhasSub,
   onNavigateMarketingSub,
+  onNavigateInfluencersSub,
   unreadNotifications,
   isCollapsed = false,
   onClose,
@@ -178,9 +206,11 @@ function SidebarNavigation({
   | "activeSection"
   | "campanhasSubView"
   | "marketingSubView"
+  | "influencersSubView"
   | "onNavigate"
   | "onNavigateCampanhasSub"
   | "onNavigateMarketingSub"
+  | "onNavigateInfluencersSub"
   | "unreadNotifications"
 > & {
   isCollapsed?: boolean;
@@ -192,6 +222,9 @@ function SidebarNavigation({
   const [isMarketingExpanded, setIsMarketingExpanded] = useState<boolean>(
     activeSection === "marketing",
   );
+  const [isInfluencersExpanded, setIsInfluencersExpanded] = useState<boolean>(
+    activeSection === "influencers",
+  );
 
   // Mantém o grupo Campanhas expandido enquanto ativo
   useEffect(() => {
@@ -200,10 +233,17 @@ function SidebarNavigation({
     }
   }, [activeSection]);
 
-  // Mantém o grupo Flow Marketing AI expandido enquanto ativo (Regra Etapa 2)
+  // Mantém o grupo Flow Marketing AI expandido enquanto ativo
   useEffect(() => {
     if (activeSection === "marketing") {
       setIsMarketingExpanded(true);
+    }
+  }, [activeSection]);
+
+  // Mantém o grupo AI Influencers Studio expandido enquanto ativo
+  useEffect(() => {
+    if (activeSection === "influencers") {
+      setIsInfluencersExpanded(true);
     }
   }, [activeSection]);
 
@@ -220,6 +260,10 @@ function SidebarNavigation({
     if (item.section === "marketing") {
       setIsMarketingExpanded(true);
       onNavigateMarketingSub?.("produtos");
+    }
+    if (item.section === "influencers") {
+      setIsInfluencersExpanded(true);
+      onNavigateInfluencersSub?.("visao_geral");
     }
     onClose?.();
   };
@@ -250,6 +294,8 @@ function SidebarNavigation({
               const isCampanhasGroupActive = activeSection === "campanhas";
               const isMarketing = item.section === "marketing";
               const isMarketingGroupActive = activeSection === "marketing";
+              const isInfluencers = item.section === "influencers";
+              const isInfluencersGroupActive = activeSection === "influencers";
               const active = item.homeActive
                 ? activeSection === "home"
                 : item.section !== "home" && activeSection === item.section;
@@ -506,6 +552,140 @@ function SidebarNavigation({
                 );
               }
 
+              // Renderização Especial com Submenu Expansível para AI Influencers Studio
+              if (isInfluencers) {
+                if (isCollapsed) {
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      aria-current={isInfluencersGroupActive ? "page" : undefined}
+                      title="AI Influencers Studio"
+                      onClick={() => {
+                        onNavigate("influencers", "AI Influencers Studio");
+                        onNavigateInfluencersSub?.("visao_geral");
+                        onClose?.();
+                      }}
+                      className={cn(
+                        "group relative flex h-9 w-full items-center justify-center rounded-lg text-left transition-colors cursor-pointer",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isInfluencersGroupActive
+                          ? "bg-home-orange text-white shadow-[0_0_20px_rgba(255,98,0,0.3)]"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <Clapperboard
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4.5 shrink-0 transition-colors",
+                          isInfluencersGroupActive ? "text-white" : item.iconClassName,
+                        )}
+                      />
+                    </button>
+                  );
+                }
+
+                return (
+                  <div key={item.label} className="space-y-0.5">
+                    <button
+                      type="button"
+                      aria-current={isInfluencersGroupActive ? "page" : undefined}
+                      onClick={() => {
+                        if (!isInfluencersGroupActive) {
+                          onNavigate("influencers", "AI Influencers Studio");
+                          onNavigateInfluencersSub?.("visao_geral");
+                          setIsInfluencersExpanded(true);
+                        } else {
+                          setIsInfluencersExpanded((prev) => !prev);
+                        }
+                      }}
+                      className={cn(
+                        "group flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] font-medium transition-colors cursor-pointer",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+                        isInfluencersGroupActive
+                          ? "bg-home-orange text-white font-semibold shadow-[0_0_20px_rgba(255,98,0,0.3)]"
+                          : "text-home-foreground/80 hover:bg-home-surface-strong hover:text-home-foreground",
+                      )}
+                    >
+                      <Clapperboard
+                        aria-hidden="true"
+                        className={cn(
+                          "size-4 shrink-0 transition-colors",
+                          isInfluencersGroupActive ? "text-white" : item.iconClassName,
+                        )}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                          isInfluencersGroupActive
+                            ? "bg-black/30 text-white/95 border border-white/20"
+                            : "bg-home-orange/15 text-home-orange border border-home-orange/30",
+                        )}
+                      >
+                        Em breve
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-3.5 transition-transform duration-200 ml-0.5",
+                          isInfluencersGroupActive ? "text-white/80" : "text-home-muted",
+                          !isInfluencersExpanded && "-rotate-90",
+                        )}
+                      />
+                    </button>
+
+                    {/* Submenu de AI Influencers Studio (Visão Geral, Biblioteca, Criador, UGC Studio, Projetos, Licenças) */}
+                    {isInfluencersExpanded && (
+                      <div className="ml-3.5 mt-0.5 space-y-0.5 border-l border-home-border/60 pl-2 py-0.5">
+                        {INFLUENCERS_SUBITEMS.map((sub) => {
+                          const isSubActive =
+                            isInfluencersGroupActive && (influencersSubView || "visao_geral") === sub.id;
+                          const SubIcon = sub.icon;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (sub.ready) {
+                                  onNavigate("influencers", sub.label);
+                                  onNavigateInfluencersSub?.(sub.id);
+                                  onClose?.();
+                                } else {
+                                  toast.info(
+                                    `${sub.label} estará disponível em breve nas próximas etapas do AI Influencers Studio.`,
+                                  );
+                                }
+                              }}
+                              className={cn(
+                                "group flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-medium transition-all duration-150 cursor-pointer",
+                                isSubActive
+                                  ? "bg-home-orange text-white font-bold shadow-[0_0_15px_rgba(255,98,0,0.35)]"
+                                  : "text-home-muted hover:bg-home-surface-strong hover:text-white",
+                              )}
+                            >
+                              <SubIcon
+                                className={cn(
+                                  "size-3.5 shrink-0 transition-colors",
+                                  isSubActive ? "text-white" : "text-home-muted group-hover:text-white",
+                                )}
+                              />
+                              <span className="truncate flex-1">{sub.label}</span>
+                              {!sub.ready && (
+                                <span className="text-[9px] font-medium text-home-muted/70 group-hover:text-home-muted">
+                                  Em breve
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               if (isCollapsed) {
                 return (
                   <button
@@ -708,9 +888,11 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
           activeSection={props.activeSection}
           campanhasSubView={props.campanhasSubView}
           marketingSubView={props.marketingSubView}
+          influencersSubView={props.influencersSubView}
           onNavigate={props.onNavigate}
           onNavigateCampanhasSub={props.onNavigateCampanhasSub}
           onNavigateMarketingSub={props.onNavigateMarketingSub}
+          onNavigateInfluencersSub={props.onNavigateInfluencersSub}
           unreadNotifications={props.unreadNotifications}
           isCollapsed={isCollapsed}
         />
@@ -753,9 +935,11 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
               activeSection={props.activeSection}
               campanhasSubView={props.campanhasSubView}
               marketingSubView={props.marketingSubView}
+              influencersSubView={props.influencersSubView}
               onNavigate={props.onNavigate}
               onNavigateCampanhasSub={props.onNavigateCampanhasSub}
               onNavigateMarketingSub={props.onNavigateMarketingSub}
+              onNavigateInfluencersSub={props.onNavigateInfluencersSub}
               unreadNotifications={props.unreadNotifications}
               onClose={() => setMobileOpen(false)}
             />

@@ -43,6 +43,7 @@ import { UserProfileSection } from "@/components/perfil/UserProfileSection";
 import {
   DashboardSidebar,
   type MarketingSubView,
+  type InfluencersSubView,
 } from "@/components/home-premium/DashboardSidebar";
 import { HomePremiumView } from "@/components/home-premium/HomePremiumView";
 import { FlowMarketingPage } from "@/components/marketing-ai/FlowMarketingPage";
@@ -50,6 +51,7 @@ import { AgentesEstrategiasPage } from "@/components/marketing-ai/agentes/Agente
 import { MarketingConteudoPage } from "@/components/marketing-ai/conteudos/MarketingConteudoPage";
 import { CalendarioPublicacoesPage } from "@/components/marketing-ai/calendario/CalendarioPublicacoesPage";
 import { MarketingResultsPage } from "@/components/marketing-ai/resultados/MarketingResultsPage";
+import { AIInfluencersStudioPage } from "@/components/influencers-studio/AIInfluencersStudioPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -103,6 +105,7 @@ function Dashboard() {
   );
   const [campanhasSubView, setCampanhasSubView] = useState<CampanhasSubView>("central");
   const [marketingSubView, setMarketingSubView] = useState<MarketingSubView>("produtos");
+  const [influencersSubView, setInfluencersSubView] = useState<InfluencersSubView>("visao_geral");
   const [selectedCampanhaContext, setSelectedCampanhaContext] = useState<Campanha | null>(null);
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
@@ -225,6 +228,7 @@ function Dashboard() {
           activeSection={section}
           campanhasSubView={campanhasSubView}
           marketingSubView={marketingSubView}
+          influencersSubView={influencersSubView}
           onNavigate={handleNavClick}
           onNavigateCampanhasSub={(sub) => {
             selectSection("campanhas");
@@ -233,6 +237,10 @@ function Dashboard() {
           onNavigateMarketingSub={(sub) => {
             selectSection("marketing");
             setMarketingSubView(sub);
+          }}
+          onNavigateInfluencersSub={(sub) => {
+            selectSection("influencers");
+            setInfluencersSubView(sub);
           }}
           unreadNotifications={naoLidas}
           user={{
@@ -251,7 +259,8 @@ function Dashboard() {
             section === "leads" ||
             section === "pipeline" ||
             section === "campanhas" ||
-            section === "marketing") &&
+            section === "marketing" ||
+            section === "influencers") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
@@ -259,6 +268,7 @@ function Dashboard() {
             section !== "pipeline" &&
             section !== "campanhas" &&
             section !== "marketing" &&
+            section !== "influencers" &&
             section !== "instagram" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
@@ -392,6 +402,19 @@ function Dashboard() {
               }}
             />
           )}
+        {section === "influencers" && (
+          <AIInfluencersStudioPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToPlanos={() => {
+              selectSection("settings");
+            }}
+          />
+        )}
         {section === "whatsapp" && <WhatsAppSection />}
         {section === "automacao" && (
           <AutomacaoSection onRevisar={() => selectSection("campanhas")} />
