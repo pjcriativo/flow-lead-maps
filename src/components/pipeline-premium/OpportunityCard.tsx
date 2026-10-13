@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import type { DragEventHandler, MouseEvent } from "react";
 import {
   Building2,
   Car,
@@ -12,17 +12,12 @@ import {
   ShoppingCart,
   Sparkles,
   Truck,
+  UserRoundPlus,
   UtensilsCrossed,
   Wrench,
 } from "lucide-react";
-import {
-  SiGooglemaps,
-  SiInstagram,
-  SiLinkedin,
-  SiTiktok,
-  SiWhatsapp,
-  SiYoutube,
-} from "react-icons/si";
+import { SiGooglemaps, SiInstagram, SiLinkedin } from "react-icons/si";
+import type { LeadStatus } from "@/lib/leads-api";
 import { cn } from "@/lib/utils";
 import type { OpportunityChannel, OpportunityItem } from "./pipeline-premium-data";
 
@@ -31,6 +26,11 @@ interface OpportunityCardProps {
   isSelected?: boolean;
   onSelect: (opp: OpportunityItem) => void;
   onMoreActions?: (opp: OpportunityItem, e: MouseEvent) => void;
+  draggable?: boolean;
+  isDragging?: boolean;
+  isUpdating?: boolean;
+  onDragStart?: DragEventHandler<HTMLDivElement>;
+  onDragEnd?: DragEventHandler<HTMLDivElement>;
   className?: string;
 }
 
@@ -47,8 +47,16 @@ export function OpportunityAvatar({
   switch (type) {
     case "tooth":
       return (
-        <div className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}>
-          <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <div
+          className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}
+        >
+          <svg
+            className="size-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M12 2C8 2 6 4 6 7c0 3 1.5 5 2 9 .5 3 2 6 4 6s3.5-3 4-6c.5-4 2-6 2-9 0-3-2-5-6-5z" />
             <path d="M9 12c1.5 1.5 4.5 1.5 6 0" />
           </svg>
@@ -56,56 +64,90 @@ export function OpportunityAvatar({
       );
     case "auto":
       return (
-        <div className={cn(baseClasses, "border-blue-400/30 bg-slate-900 text-blue-400", className)}>
+        <div
+          className={cn(baseClasses, "border-blue-400/30 bg-slate-900 text-blue-400", className)}
+        >
           <Car className="size-3.5" />
         </div>
       );
     case "fitness":
       return (
-        <div className={cn(baseClasses, "border-blue-500/30 bg-blue-950/40 text-blue-400", className)}>
+        <div
+          className={cn(baseClasses, "border-blue-500/30 bg-blue-950/40 text-blue-400", className)}
+        >
           <Dumbbell className="size-3.5" />
         </div>
       );
     case "restaurant":
       return (
-        <div className={cn(baseClasses, "border-amber-500/30 bg-amber-950/40 text-amber-400", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-amber-500/30 bg-amber-950/40 text-amber-400",
+            className,
+          )}
+        >
           <UtensilsCrossed className="size-3.5" />
         </div>
       );
     case "beauty":
       return (
-        <div className={cn(baseClasses, "border-pink-500/30 bg-pink-950/40 text-pink-400", className)}>
+        <div
+          className={cn(baseClasses, "border-pink-500/30 bg-pink-950/40 text-pink-400", className)}
+        >
           <Sparkles className="size-3.5" />
         </div>
       );
     case "leaf":
       return (
-        <div className={cn(baseClasses, "border-emerald-500/30 bg-emerald-950/40 text-emerald-400", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-emerald-500/30 bg-emerald-950/40 text-emerald-400",
+            className,
+          )}
+        >
           <HeartPulse className="size-3.5" />
         </div>
       );
     case "tech":
       return (
-        <div className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}>
+        <div
+          className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}
+        >
           <Code className="size-3.5" />
         </div>
       );
     case "legal":
       return (
-        <div className={cn(baseClasses, "border-slate-400/30 bg-slate-800 text-slate-200", className)}>
+        <div
+          className={cn(baseClasses, "border-slate-400/30 bg-slate-800 text-slate-200", className)}
+        >
           <Scale className="size-3.5" />
         </div>
       );
     case "architecture":
     case "construction":
       return (
-        <div className={cn(baseClasses, "border-orange-500/30 bg-orange-950/40 text-orange-400", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-orange-500/30 bg-orange-950/40 text-orange-400",
+            className,
+          )}
+        >
           <Compass className="size-3.5" />
         </div>
       );
     case "education":
       return (
-        <div className={cn(baseClasses, "border-indigo-500/30 bg-indigo-950/40 text-indigo-400", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-indigo-500/30 bg-indigo-950/40 text-indigo-400",
+            className,
+          )}
+        >
           <GraduationCap className="size-3.5" />
         </div>
       );
@@ -126,13 +168,21 @@ export function OpportunityAvatar({
     case "agency":
     case "industry":
       return (
-        <div className={cn(baseClasses, "border-slate-500/30 bg-slate-900 text-slate-300", className)}>
+        <div
+          className={cn(baseClasses, "border-slate-500/30 bg-slate-900 text-slate-300", className)}
+        >
           <Building2 className="size-3.5" />
         </div>
       );
     case "mechanic":
       return (
-        <div className={cn(baseClasses, "border-amber-600/30 bg-amber-950/40 text-amber-500", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-amber-600/30 bg-amber-950/40 text-amber-500",
+            className,
+          )}
+        >
           <Wrench className="size-3.5" />
         </div>
       );
@@ -153,12 +203,8 @@ export function ChannelSmallIcon({ channel }: { channel: OpportunityChannel }) {
       return <SiInstagram className="size-3 text-[#ec4899]" />;
     case "linkedin":
       return <SiLinkedin className="size-3 text-[#0a66c2]" />;
-    case "youtube":
-      return <SiYoutube className="size-3 text-[#ef4444]" />;
-    case "tiktok":
-      return <SiTiktok className="size-3 text-white" />;
-    case "whatsapp":
-      return <SiWhatsapp className="size-3 text-[#22c55e]" />;
+    case "manual":
+      return <UserRoundPlus className="size-3 text-home-muted" />;
   }
 }
 
@@ -167,35 +213,49 @@ export function OpportunityCard({
   isSelected,
   onSelect,
   onMoreActions,
+  draggable,
+  isDragging,
+  isUpdating,
+  onDragStart,
+  onDragEnd,
   className,
 }: OpportunityCardProps) {
-  const getStatusBadgeStyle = (status: string) => {
+  const getStatusBadgeStyle = (status: LeadStatus) => {
     switch (status) {
-      case "Novo":
+      case "new":
         return "bg-blue-500/15 text-blue-400 border-blue-500/30";
-      case "Em contato":
+      case "contacted":
         return "bg-purple-500/15 text-purple-300 border-purple-500/30";
-      case "Qualificação":
+      case "enriched":
         return "bg-blue-600/15 text-blue-400 border-blue-600/30";
-      case "Proposta":
+      case "proposta_enviada":
         return "bg-amber-500/15 text-amber-400 border-amber-500/30";
-      case "Negociação":
+      case "responded":
+      case "meeting":
         return "bg-orange-500/15 text-orange-400 border-orange-500/30";
-      case "Vendido":
+      case "won":
         return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
-      default:
-        return "bg-slate-500/15 text-slate-400 border-slate-500/30";
+      case "lost":
+        return "bg-red-500/15 text-red-400 border-red-500/30";
+      case "nurture":
+        return "bg-cyan-500/15 text-cyan-400 border-cyan-500/30";
     }
   };
 
   return (
     <div
       onClick={() => onSelect(opportunity)}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      aria-busy={isUpdating || undefined}
       className={cn(
         "group relative flex cursor-pointer flex-col gap-2.5 rounded-xl border p-3 transition-all duration-150",
         isSelected
           ? "border-cyan-500/90 bg-home-surface shadow-[0_0_18px_rgba(6,182,212,0.22)] ring-1 ring-cyan-500/40"
           : "border-home-border/70 bg-home-surface/70 hover:border-home-border hover:bg-home-surface",
+        isDragging && "opacity-50",
+        isUpdating && "cursor-wait opacity-60",
         className,
       )}
     >
@@ -207,29 +267,29 @@ export function OpportunityCard({
             <h4 className="truncate text-xs font-semibold text-white group-hover:text-home-orange transition-colors">
               {opportunity.company}
             </h4>
-            <p className="truncate text-[10px] text-home-muted">
-              {opportunity.category}
-            </p>
+            <p className="truncate text-[10px] text-home-muted">{opportunity.category}</p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onMoreActions?.(opportunity, e);
-          }}
-          className="flex size-5 shrink-0 items-center justify-center rounded text-home-muted/60 transition-colors hover:text-white"
-        >
-          <MoreVertical className="size-3" />
-        </button>
+        {onMoreActions ? (
+          <button
+            type="button"
+            aria-label={`Mais ações para ${opportunity.company}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onMoreActions(opportunity, event);
+            }}
+            className="flex size-5 shrink-0 items-center justify-center rounded text-home-muted/60 transition-colors hover:text-white"
+          >
+            <MoreVertical className="size-3" />
+          </button>
+        ) : null}
       </div>
 
       {/* Middle row: Value */}
       <div>
-        <span className="text-xs font-bold text-white">
-          {opportunity.value}
-        </span>
+        <span className="text-xs font-bold text-white">{opportunity.value}</span>
+        <p className="mt-0.5 truncate text-[9px] text-home-muted">{opportunity.responsible}</p>
       </div>
 
       {/* Bottom row: Channel pill + Status Tag */}
@@ -244,7 +304,7 @@ export function OpportunityCard({
         <span
           className={cn(
             "rounded-md border px-2 py-0.5 text-[9px] font-semibold leading-none",
-            getStatusBadgeStyle(opportunity.statusTag),
+            getStatusBadgeStyle(opportunity.statusValue),
           )}
         >
           {opportunity.statusTag}

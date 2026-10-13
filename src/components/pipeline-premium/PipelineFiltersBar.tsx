@@ -1,4 +1,5 @@
-import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronDown, Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PipelineFiltersBarProps {
@@ -10,10 +11,12 @@ interface PipelineFiltersBarProps {
   onStageChange: (value: string) => void;
   selectedResponsible: string;
   onResponsibleChange: (value: string) => void;
-  selectedTag: string;
-  onTagChange: (value: string) => void;
+  responsibleOptions: Array<{ id: string; label: string }>;
+  selectedScore: string;
+  onScoreChange: (value: string) => void;
   activeFilterCount?: number;
   onOpenMoreFilters?: () => void;
+  onClearFilters: () => void;
   className?: string;
 }
 
@@ -26,100 +29,62 @@ export function PipelineFiltersBar({
   onStageChange,
   selectedResponsible,
   onResponsibleChange,
-  selectedTag,
-  onTagChange,
-  activeFilterCount = 2,
+  responsibleOptions,
+  selectedScore,
+  onScoreChange,
+  activeFilterCount = 0,
   onOpenMoreFilters,
+  onClearFilters,
   className,
 }: PipelineFiltersBarProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-2.5",
-        className,
-      )}
-    >
-      {/* Search Input */}
+    <div className={cn("flex flex-wrap items-center gap-2.5", className)}>
       <div className="relative min-w-[240px] flex-1 sm:min-w-[280px]">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-home-muted" />
         <input
-          type="text"
+          type="search"
           value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Buscar oportunidades..."
           className="h-9.5 w-full rounded-xl border border-home-border bg-home-surface/90 pl-10 pr-4 text-xs text-white placeholder:text-home-muted/80 focus:border-home-blue focus:outline-none focus:ring-1 focus:ring-home-blue"
         />
       </div>
 
-      {/* Select 1: Todos os canais */}
-      <div className="relative">
-        <select
-          value={selectedChannel}
-          onChange={(e) => onChannelChange(e.target.value)}
-          className="h-9.5 appearance-none rounded-xl border border-home-border bg-home-surface/90 pl-3.5 pr-8 text-xs font-medium text-white transition-colors hover:bg-home-surface focus:border-home-blue focus:outline-none"
-        >
-          <option value="all">Todos os canais</option>
-          <option value="maps">Google Maps</option>
-          <option value="instagram">Instagram</option>
-          <option value="linkedin">LinkedIn</option>
-          <option value="youtube">YouTube</option>
-          <option value="tiktok">TikTok</option>
-          <option value="whatsapp">WhatsApp</option>
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-home-muted" />
-      </div>
+      <FilterSelect value={selectedChannel} onChange={onChannelChange} label="Origem">
+        <option value="all">Todos os canais</option>
+        <option value="maps">Google Maps</option>
+        <option value="instagram">Instagram</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="manual">Cadastro manual</option>
+      </FilterSelect>
 
-      {/* Select 2: Todas as etapas */}
-      <div className="relative">
-        <select
-          value={selectedStage}
-          onChange={(e) => onStageChange(e.target.value)}
-          className="h-9.5 appearance-none rounded-xl border border-home-border bg-home-surface/90 pl-3.5 pr-8 text-xs font-medium text-white transition-colors hover:bg-home-surface focus:border-home-blue focus:outline-none"
-        >
-          <option value="all">Todas as etapas</option>
-          <option value="novo">Novo Lead</option>
-          <option value="contato">Em Contato</option>
-          <option value="qualificacao">Qualificação</option>
-          <option value="proposta">Proposta</option>
-          <option value="negociacao">Negociação</option>
-          <option value="fechado">Fechado</option>
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-home-muted" />
-      </div>
+      <FilterSelect value={selectedStage} onChange={onStageChange} label="Etapa">
+        <option value="all">Todas as etapas</option>
+        <option value="novo">Novo Lead</option>
+        <option value="contato">Em Contato</option>
+        <option value="qualificacao">Qualificação</option>
+        <option value="proposta">Proposta</option>
+        <option value="negociacao">Negociação</option>
+        <option value="fechado">Fechado</option>
+      </FilterSelect>
 
-      {/* Select 3: Todos os responsáveis */}
-      <div className="relative">
-        <select
-          value={selectedResponsible}
-          onChange={(e) => onResponsibleChange(e.target.value)}
-          className="h-9.5 appearance-none rounded-xl border border-home-border bg-home-surface/90 pl-3.5 pr-8 text-xs font-medium text-white transition-colors hover:bg-home-surface focus:border-home-blue focus:outline-none"
-        >
-          <option value="all">Todos os responsáveis</option>
-          <option value="Marcos Gonçalves">Marcos Gonçalves</option>
-          <option value="Equipe Comercial">Equipe Comercial</option>
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-home-muted" />
-      </div>
+      <FilterSelect value={selectedResponsible} onChange={onResponsibleChange} label="Responsável">
+        <option value="all">Todos os responsáveis</option>
+        <option value="none">Sem responsável</option>
+        {responsibleOptions.map((responsible) => (
+          <option key={responsible.id} value={responsible.id}>
+            {responsible.label}
+          </option>
+        ))}
+      </FilterSelect>
 
-      {/* Select 4: Todas as tags */}
-      <div className="relative">
-        <select
-          value={selectedTag}
-          onChange={(e) => onTagChange(e.target.value)}
-          className="h-9.5 appearance-none rounded-xl border border-home-border bg-home-surface/90 pl-3.5 pr-8 text-xs font-medium text-white transition-colors hover:bg-home-surface focus:border-home-blue focus:outline-none"
-        >
-          <option value="all">Todas as tags</option>
-          <option value="Alto potencial">Alto potencial</option>
-          <option value="Médio potencial">Médio potencial</option>
-          <option value="Odontologia">Odontologia</option>
-          <option value="Saúde">Saúde</option>
-          <option value="Tecnologia">Tecnologia</option>
-          <option value="Fitness">Fitness</option>
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-home-muted" />
-      </div>
+      <FilterSelect value={selectedScore} onChange={onScoreChange} label="Score">
+        <option value="all">Todos os scores</option>
+        <option value="high">Alto potencial</option>
+        <option value="medium">Médio potencial</option>
+        <option value="qualification">Em qualificação</option>
+      </FilterSelect>
 
-      {/* Button: Mais filtros with Badge 2 */}
       <button
         type="button"
         onClick={onOpenMoreFilters}
@@ -128,14 +93,50 @@ export function PipelineFiltersBar({
           "hover:border-amber-500/50 hover:bg-amber-500/20",
         )}
       >
-        <SlidersHorizontal className="size-3.5 text-amber-500" />
+        <SlidersHorizontal className="size-3.5" />
         <span>Mais filtros</span>
-        {activeFilterCount > 0 && (
+        {activeFilterCount > 0 ? (
           <span className="flex size-4.5 items-center justify-center rounded-full bg-home-orange text-[10px] font-bold text-white shadow-[0_0_8px_rgba(255,98,0,0.5)]">
             {activeFilterCount}
           </span>
-        )}
+        ) : null}
       </button>
+
+      {activeFilterCount > 0 ? (
+        <button
+          type="button"
+          onClick={onClearFilters}
+          className="inline-flex h-9.5 items-center gap-1 rounded-xl px-2.5 text-xs font-semibold text-home-muted hover:bg-home-surface hover:text-white"
+        >
+          <X className="size-3.5" /> Limpar
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function FilterSelect({
+  value,
+  onChange,
+  label,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-9.5 appearance-none rounded-xl border border-home-border bg-home-surface/90 pl-3.5 pr-8 text-xs font-medium text-white transition-colors hover:bg-home-surface focus:border-home-blue focus:outline-none"
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 size-3.5 -translate-y-1/2 text-home-muted" />
     </div>
   );
 }

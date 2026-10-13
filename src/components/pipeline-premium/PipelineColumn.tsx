@@ -1,6 +1,7 @@
 import { ArrowUpDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OpportunityItem, PipelineStageInfo } from "./pipeline-premium-data";
+import type { PipelineStageKey } from "./pipeline-premium-data";
 import { OpportunityCard } from "./OpportunityCard";
 
 interface PipelineColumnProps {
@@ -8,7 +9,14 @@ interface PipelineColumnProps {
   opportunities: OpportunityItem[];
   selectedOpportunityId: string | null;
   onSelectOpportunity: (opp: OpportunityItem) => void;
-  onAddLead?: (stageKey: string) => void;
+  onAddLead?: (stageKey: PipelineStageKey) => void;
+  onDropOpportunity: (stage: PipelineStageKey) => void;
+  onDragOverStage: (stage: PipelineStageKey | null) => void;
+  isDragOver: boolean;
+  draggedOpportunityId: string | null;
+  movingOpportunityId?: string | null;
+  onDragStart: (id: string) => void;
+  onDragEnd: () => void;
   className?: string;
 }
 
@@ -18,29 +26,47 @@ export function PipelineColumn({
   selectedOpportunityId,
   onSelectOpportunity,
   onAddLead,
+  onDropOpportunity,
+  onDragOverStage,
+  isDragOver,
+  draggedOpportunityId,
+  movingOpportunityId,
+  onDragStart,
+  onDragEnd,
   className,
 }: PipelineColumnProps) {
   return (
     <div
       className={cn(
         "flex flex-col min-w-[210px] w-full flex-1 rounded-2xl border border-home-border/80 bg-home-surface/50 p-2.5",
+        isDragOver && "border-home-orange bg-home-orange/5",
         className,
       )}
+      onDragOver={(event) => {
+        event.preventDefault();
+        onDragOverStage(stage.key);
+      }}
+      onDragLeave={(event) => {
+        const relatedTarget = event.relatedTarget;
+        if (!(relatedTarget instanceof Node) || !event.currentTarget.contains(relatedTarget)) {
+          onDragOverStage(null);
+        }
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        onDropOpportunity(stage.key);
+      }}
     >
       {/* Column Header */}
       <div className="mb-2.5 rounded-xl border border-home-border/60 bg-home-surface/80 p-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold text-white tracking-tight">
-            {stage.title}
-          </h3>
+          <h3 className="text-xs font-bold text-white tracking-tight">{stage.title}</h3>
           <ArrowUpDown className="size-3 text-home-muted/70" />
         </div>
 
         <div className="mt-1 flex items-baseline justify-between text-xs">
           <span className="font-bold text-white">{stage.count}</span>
-          <span className="text-[11px] font-medium text-home-muted">
-            {stage.totalValue}
-          </span>
+          <span className="text-[11px] font-medium text-home-muted">{stage.totalValue}</span>
         </div>
 
         {/* Button: + Adicionar lead */}
@@ -65,6 +91,11 @@ export function PipelineColumn({
             opportunity={opp}
             isSelected={selectedOpportunityId === opp.id}
             onSelect={onSelectOpportunity}
+            draggable={movingOpportunityId == null}
+            isDragging={draggedOpportunityId === opp.id}
+            isUpdating={movingOpportunityId === opp.id}
+            onDragStart={() => onDragStart(opp.id)}
+            onDragEnd={onDragEnd}
           />
         ))}
 

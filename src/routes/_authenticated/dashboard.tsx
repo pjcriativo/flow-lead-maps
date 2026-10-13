@@ -311,6 +311,7 @@ function Dashboard() {
               initials: userIniciais,
             }}
             unreadNotifications={naoLidas}
+            onOpenLead={() => selectSection("leads")}
           />
         )}
         {section === "leads" && (

@@ -63,7 +63,7 @@ export type CreateLeadInput = Pick<
   | "address"
   | "notes"
   | "list_id"
->;
+> & { initialStatus?: LeadStatus };
 
 export type ScoreTier = "quente" | "morno" | "frio";
 
@@ -383,7 +383,7 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
       address: input.address?.trim() || null,
       notes: input.notes?.trim() || null,
       list_id: input.list_id || null,
-      status: "new",
+      status: input.initialStatus ?? "new",
       score: 0,
       sem_contato: !phone && !whatsapp && !email,
       has_phone: Boolean(phone || whatsapp),
@@ -413,12 +413,33 @@ export async function fetchLeadsByIds(ids: string[]): Promise<Lead[]> {
 }
 
 /** Atualiza o status (usado pelo Kanban ao arrastar). */
-export async function updateLeadStatus(id: string, status: string): Promise<void> {
-  const { error } = await supabase
+export async function updateLeadStatus(
+  id: string,
+  status: LeadStatus,
+  expectedUpdatedAt?: string,
+): Promise<Lead> {
+  const now = new Date().toISOString();
+  let query = supabase
     .from("leads")
-    .update({ status, updated_at: new Date().toISOString() })
+    .update({
+      status,
+      updated_at: now,
+      ...(status === "lost" || status === "nurture"
+        ? {}
+        : { motivo_perda: null, motivo_perda_nota: null, perda_em: null }),
+    })
     .eq("id", id);
+  if (expectedUpdatedAt) query = query.eq("updated_at", expectedUpdatedAt);
+  const { data, error } = await query.select().maybeSingle();
   if (error) throw error;
+  if (!data) {
+    throw new Error(
+      expectedUpdatedAt
+        ? "Este lead foi atualizado em outra sessão. Recarregue o pipeline e tente novamente."
+        : "O lead não foi encontrado ou você não tem permissão para atualizá-lo.",
+    );
+  }
+  return data;
 }
 
 /** Edição genérica de campos do lead. */

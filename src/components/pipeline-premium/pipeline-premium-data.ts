@@ -1,18 +1,10 @@
-export type PipelineStageKey =
-  | "novo"
-  | "contato"
-  | "qualificacao"
-  | "proposta"
-  | "negociacao"
-  | "fechado";
+import type { Lead, LeadStatus } from "@/lib/leads-api";
+import type { Proposta } from "@/types";
 
-export type OpportunityChannel =
-  | "maps"
-  | "instagram"
-  | "linkedin"
-  | "youtube"
-  | "tiktok"
-  | "whatsapp";
+export type PipelineStageKey =
+  "novo" | "contato" | "qualificacao" | "proposta" | "negociacao" | "fechado";
+
+export type OpportunityChannel = "maps" | "instagram" | "linkedin" | "manual";
 
 export interface PipelineStageInfo {
   key: PipelineStageKey;
@@ -28,18 +20,26 @@ export interface OpportunityItem {
   company: string;
   category: string;
   value: string;
+  proposalValue: number | null;
   channel: OpportunityChannel;
   channelLabel: string;
   statusTag: string;
+  statusValue: LeadStatus;
   score: number;
-  contactName?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  website?: string;
-  description?: string;
-  responsible?: string;
-  tags?: string[];
+  contactName: string;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  address: string;
+  website: string;
+  description: string;
+  responsible: string;
+  assignedTo: string | null;
+  instagramUrl: string;
+  facebookUrl: string;
+  linkedinUrl: string;
+  createdAt: string;
+  updatedAt: string;
   avatarType:
     | "tooth"
     | "auto"
@@ -59,556 +59,335 @@ export interface OpportunityItem {
     | "agency"
     | "industry"
     | "mechanic";
+  record: Lead;
 }
 
 export interface PipelineMetricItem {
-  id: string;
+  id: "leads" | "negociacao" | "propostas" | "vendas" | "valor";
   label: string;
   value: string;
-  change: string;
   accent: "orange" | "purple" | "green" | "blue" | "amber";
-  bars: number[];
+  unavailable: boolean;
 }
 
-export const PIPELINE_METRICS: PipelineMetricItem[] = [
-  {
-    id: "leads",
-    label: "Leads no pipeline",
-    value: "1.248",
-    change: "12%",
-    accent: "orange",
-    bars: [30, 48, 40, 75, 95, 60],
-  },
-  {
-    id: "negociacao",
-    label: "Em negociação",
-    value: "892",
-    change: "18%",
-    accent: "purple",
-    bars: [25, 40, 70, 55, 90, 80],
-  },
-  {
-    id: "propostas",
-    label: "Propostas enviadas",
-    value: "312",
-    change: "24%",
-    accent: "green",
-    bars: [35, 60, 25, 95, 75, 90],
-  },
-  {
-    id: "vendas",
-    label: "Vendas realizadas",
-    value: "148",
-    change: "16%",
-    accent: "blue",
-    bars: [25, 55, 70, 40, 75, 95],
-  },
-  {
-    id: "valor",
-    label: "Valor em negociação",
-    value: "R$ 28.430",
-    change: "28%",
-    accent: "amber",
-    bars: [30, 45, 60, 75, 90, 95],
-  },
-];
-
-export const PIPELINE_STAGES: PipelineStageInfo[] = [
+export const PIPELINE_STAGE_DEFINITIONS: ReadonlyArray<
+  Pick<PipelineStageInfo, "key" | "title" | "badgeColor">
+> = [
   {
     key: "novo",
     title: "Novo Lead",
-    count: 248,
-    totalValue: "R$ 0,00",
     badgeColor: "border-slate-700/80 bg-slate-900/60 text-slate-300",
   },
   {
     key: "contato",
     title: "Em Contato",
-    count: 186,
-    totalValue: "R$ 48.430,00",
     badgeColor: "border-purple-800/80 bg-purple-950/60 text-purple-300",
   },
   {
     key: "qualificacao",
     title: "Qualificação",
-    count: 142,
-    totalValue: "R$ 98.220,00",
     badgeColor: "border-blue-800/80 bg-blue-950/60 text-blue-300",
   },
   {
     key: "proposta",
     title: "Proposta",
-    count: 98,
-    totalValue: "R$ 164.500,00",
     badgeColor: "border-amber-800/80 bg-amber-950/60 text-amber-300",
   },
   {
     key: "negociacao",
     title: "Negociação",
-    count: 76,
-    totalValue: "R$ 212.340,00",
     badgeColor: "border-orange-800/80 bg-orange-950/60 text-orange-300",
   },
   {
     key: "fechado",
     title: "Fechado",
-    count: 64,
-    totalValue: "R$ 356.780,00",
     badgeColor: "border-emerald-800/80 bg-emerald-950/60 text-emerald-300",
   },
 ];
 
-export const MOCK_OPPORTUNITIES: OpportunityItem[] = [
-  // Coluna 1: Novo Lead
-  {
-    id: "opp-1",
-    stage: "novo",
-    company: "Clínica Odonto Prime",
-    category: "Clínica odontológica",
-    value: "R$ 0,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Novo",
-    score: 92,
-    contactName: "Dr. Carlos Silva",
-    phone: "(41) 3222-1234",
-    email: "contato@odontoprime.com.br",
-    address: "Av. Getúlio Vargas, 1234\nCentro, Curitiba - PR",
-    website: "www.odontoprime.com.br",
-    description:
-      "Clínica moderna com foco em odontologia estética, implantes e tratamentos especializados.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Alto potencial", "Odontologia"],
-    avatarType: "tooth",
-  },
-  {
-    id: "opp-2",
-    stage: "novo",
-    company: "Auto Center Brasil",
-    category: "Auto center",
-    value: "R$ 0,00",
-    channel: "instagram",
-    channelLabel: "Instagram",
-    statusTag: "Novo",
-    score: 59,
-    contactName: "Paulo Henrique",
-    phone: "(41) 3555-4433",
-    email: "vendas@autocenter.com.br",
-    address: "Linha Verde, 4500 - Curitiba - PR",
-    website: "www.autocenterbrasil.com.br",
-    description: "Centro automotivo completo com oficina de ponta e funilaria express.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Em qualificação", "Automotivo"],
-    avatarType: "auto",
-  },
-  {
-    id: "opp-3",
-    stage: "novo",
-    company: "Academia Evolution",
-    category: "Academia",
-    value: "R$ 0,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Novo",
-    score: 76,
-    contactName: "Ricardo Mendes",
-    phone: "(41) 3444-8901",
-    email: "ricardo@evolution.com.br",
-    address: "Av. Paulista, 1500 - São Paulo - SP",
-    website: "www.academiaevolution.com.br",
-    description: "Complexo esportivo com treinamento funcional e alta adesão de alunos.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Médio potencial", "Fitness"],
-    avatarType: "fitness",
-  },
-  {
-    id: "opp-4",
-    stage: "novo",
-    company: "Restaurante Sabor & Arte",
-    category: "Restaurante",
-    value: "R$ 0,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Novo",
-    score: 88,
-    contactName: "Ana Paula",
-    phone: "(41) 3333-5678",
-    email: "contato@saborarte.com.br",
-    address: "Rua XV de Novembro, 890 - Curitiba - PR",
-    website: "www.saborarte.com.br",
-    description: "Alta gastronomia contemporânea com adega selecionada e público executivo.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Alto potencial", "Gastronomia"],
-    avatarType: "restaurant",
-  },
-  {
-    id: "opp-5",
-    stage: "novo",
-    company: "Estética Bem Estar",
-    category: "Estética",
-    value: "R$ 0,00",
-    channel: "tiktok",
-    channelLabel: "TikTok",
-    statusTag: "Novo",
-    score: 81,
-    contactName: "Camila Rocha",
-    phone: "(11) 3999-8877",
-    email: "contato@bemestar.com.br",
-    address: "Rua Haddock Lobo, 800 - São Paulo - SP",
-    website: "www.bemestar.com.br",
-    description: "Procedimentos estéticos avançados com lasers e tecnologia de ponta.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Alto potencial", "Estética"],
-    avatarType: "beauty",
-  },
+const STATUS_STAGE: Record<LeadStatus, PipelineStageKey> = {
+  new: "novo",
+  contacted: "contato",
+  enriched: "qualificacao",
+  nurture: "qualificacao",
+  proposta_enviada: "proposta",
+  responded: "negociacao",
+  meeting: "negociacao",
+  won: "fechado",
+  lost: "fechado",
+};
 
-  // Coluna 2: Em Contato
-  {
-    id: "opp-6",
-    stage: "contato",
-    company: "Clínica Vida Leve",
-    category: "Clínica médica",
-    value: "R$ 12.500,00",
-    channel: "whatsapp",
-    channelLabel: "WhatsApp",
-    statusTag: "Em contato",
-    score: 85,
-    contactName: "Juliana Martins",
-    phone: "(11) 98877-6655",
-    email: "contato@vidaleve.com.br",
-    address: "Rua Oscar Freire, 420 - São Paulo - SP",
-    website: "www.vidaleve.com.br",
-    description: "Saúde integrativa e medicina preventiva.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Alto potencial", "Saúde"],
-    avatarType: "leaf",
-  },
-  {
-    id: "opp-7",
-    stage: "contato",
-    company: "Souza Tecnologia",
-    category: "Tecnologia",
-    value: "R$ 8.900,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Em contato",
-    score: 72,
-    contactName: "Ricardo Souza",
-    phone: "(71) 3337-6655",
-    email: "contato@souzatec.com.br",
-    address: "Av. Tancredo Neves, 620 - Salvador - BA",
-    website: "www.souzatec.com.br",
-    description: "Soluções em cloud e inteligência corporativa.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Médio potencial", "Tecnologia"],
-    avatarType: "tech",
-  },
-  {
-    id: "opp-8",
-    stage: "contato",
-    company: "Studio Beleza Total",
-    category: "Salão de beleza",
-    value: "R$ 6.800,00",
-    channel: "instagram",
-    channelLabel: "Instagram",
-    statusTag: "Em contato",
-    score: 77,
-    contactName: "Mariana Lima",
-    phone: "(41) 3777-2211",
-    email: "contato@belezatotal.com.br",
-    address: "Av. Batel, 1550 - Curitiba - PR",
-    website: "www.belezatotal.com.br",
-    description: "Salão conceito em visagismo e cuidados premium.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Médio potencial", "Beleza"],
-    avatarType: "beauty",
-  },
-  {
-    id: "opp-9",
-    stage: "contato",
-    company: "Mendes Advocacia",
-    category: "Advocacia",
-    value: "R$ 15.000,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Em contato",
-    score: 90,
-    contactName: "Carlos Mendes",
-    phone: "(21) 4111-2233",
-    email: "contato@mendesadv.com.br",
-    address: "Av. Rio Branco, 110 - Rio de Janeiro - RJ",
-    website: "www.mendesadv.com.br",
-    description: "Escritório de advocacia empresarial e direito tributário.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Alto potencial", "Jurídico"],
-    avatarType: "legal",
-  },
-  {
-    id: "opp-10",
-    stage: "contato",
-    company: "Costa Arquitetura",
-    category: "Arquitetura",
-    value: "R$ 9.400,00",
-    channel: "youtube",
-    channelLabel: "YouTube",
-    statusTag: "Em contato",
-    score: 68,
-    contactName: "Fernanda Costa",
-    phone: "(31) 3666-9878",
-    email: "fernanda@costaarq.com.br",
-    address: "Rua da Bahia, 1200 - Belo Horizonte - MG",
-    website: "www.costaarq.com.br",
-    description: "Projetos de arquitetura comercial e residencial.",
-    responsible: "Marcos Gonçalves",
-    tags: ["Em negociação", "Arquitetura"],
-    avatarType: "architecture",
-  },
+export const STAGE_TARGET_STATUS: Record<PipelineStageKey, LeadStatus> = {
+  novo: "new",
+  contato: "contacted",
+  qualificacao: "enriched",
+  proposta: "proposta_enviada",
+  negociacao: "meeting",
+  fechado: "won",
+};
 
-  // Coluna 3: Qualificação
-  {
-    id: "opp-11",
-    stage: "qualificacao",
-    company: "Educa Mais",
-    category: "Educação",
-    value: "R$ 18.900,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Qualificação",
-    score: 84,
-    avatarType: "education",
-  },
-  {
-    id: "opp-12",
-    stage: "qualificacao",
-    company: "Clínica Saúde Total",
-    category: "Clínica médica",
-    value: "R$ 22.500,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Qualificação",
-    score: 86,
-    avatarType: "leaf",
-  },
-  {
-    id: "opp-13",
-    stage: "qualificacao",
-    company: "Mercado Boa Compra",
-    category: "Supermercado",
-    value: "R$ 12.400,00",
-    channel: "whatsapp",
-    channelLabel: "WhatsApp",
-    statusTag: "Qualificação",
-    score: 79,
-    avatarType: "supermarket",
-  },
-  {
-    id: "opp-14",
-    stage: "qualificacao",
-    company: "Transportes Silva",
-    category: "Transporte",
-    value: "R$ 16.800,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Qualificação",
-    score: 73,
-    avatarType: "transport",
-  },
-  {
-    id: "opp-15",
-    stage: "qualificacao",
-    company: "Consultoria Alves",
-    category: "Consultoria",
-    value: "R$ 25.000,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Qualificação",
-    score: 88,
-    avatarType: "consulting",
-  },
+export function stageForStatus(status: LeadStatus): PipelineStageKey {
+  return STATUS_STAGE[status];
+}
 
-  // Coluna 4: Proposta
-  {
-    id: "opp-16",
-    stage: "proposta",
-    company: "Construtora Horizonte",
-    category: "Construção",
-    value: "R$ 28.500,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Proposta",
-    score: 89,
-    avatarType: "construction",
-  },
-  {
-    id: "opp-17",
-    stage: "proposta",
-    company: "Clínica Odonto Mais",
-    category: "Clínica odontológica",
-    value: "R$ 18.200,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Proposta",
-    score: 83,
-    avatarType: "tooth",
-  },
-  {
-    id: "opp-18",
-    stage: "proposta",
-    company: "Restaurante do Chef",
-    category: "Restaurante",
-    value: "R$ 14.900,00",
-    channel: "instagram",
-    channelLabel: "Instagram",
-    statusTag: "Proposta",
-    score: 80,
-    avatarType: "restaurant",
-  },
-  {
-    id: "opp-19",
-    stage: "proposta",
-    company: "Tech Solutions",
-    category: "Tecnologia",
-    value: "R$ 32.400,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Proposta",
-    score: 91,
-    avatarType: "tech",
-  },
-  {
-    id: "opp-20",
-    stage: "proposta",
-    company: "Imobiliária Smart",
-    category: "Imobiliária",
-    value: "R$ 26.800,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Proposta",
-    score: 85,
-    avatarType: "construction",
-  },
+export function parseLeadStatus(status: string): LeadStatus {
+  switch (status) {
+    case "new":
+    case "enriched":
+    case "contacted":
+    case "proposta_enviada":
+    case "responded":
+    case "meeting":
+    case "won":
+    case "lost":
+    case "nurture":
+      return status;
+    default:
+      throw new Error(`Status comercial não suportado: ${status}`);
+  }
+}
 
-  // Coluna 5: Negociação
-  {
-    id: "opp-21",
-    stage: "negociacao",
-    company: "Indústria Forte",
-    category: "Indústria",
-    value: "R$ 48.500,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Negociação",
-    score: 94,
-    avatarType: "industry",
-  },
-  {
-    id: "opp-22",
-    stage: "negociacao",
-    company: "Clínica Harmonia",
-    category: "Clínica médica",
-    value: "R$ 36.200,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Negociação",
-    score: 87,
-    avatarType: "tooth",
-  },
-  {
-    id: "opp-23",
-    stage: "negociacao",
-    company: "Escola do Futuro",
-    category: "Educação",
-    value: "R$ 29.900,00",
-    channel: "instagram",
-    channelLabel: "Instagram",
-    statusTag: "Negociação",
-    score: 82,
-    avatarType: "education",
-  },
-  {
-    id: "opp-24",
-    stage: "negociacao",
-    company: "Grupo Almeida",
-    category: "Holding",
-    value: "R$ 52.400,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Negociação",
-    score: 96,
-    avatarType: "holding",
-  },
-  {
-    id: "opp-25",
-    stage: "negociacao",
-    company: "Agência Criativa",
-    category: "Marketing",
-    value: "R$ 28.900,00",
-    channel: "youtube",
-    channelLabel: "YouTube",
-    statusTag: "Negociação",
-    score: 84,
-    avatarType: "agency",
-  },
+export function statusLabel(status: LeadStatus): string {
+  switch (status) {
+    case "new":
+      return "Novo";
+    case "enriched":
+      return "Qualificação";
+    case "contacted":
+      return "Em contato";
+    case "proposta_enviada":
+      return "Proposta enviada";
+    case "responded":
+      return "Respondeu";
+    case "meeting":
+      return "Reunião";
+    case "won":
+      return "Ganho";
+    case "lost":
+      return "Perdido";
+    case "nurture":
+      return "Nutrição";
+  }
+}
 
-  // Coluna 6: Fechado
-  {
-    id: "opp-26",
-    stage: "fechado",
-    company: "Clínica Vida Plena",
-    category: "Clínica médica",
-    value: "R$ 18.000,00",
-    channel: "whatsapp",
-    channelLabel: "WhatsApp",
-    statusTag: "Vendido",
-    score: 93,
-    avatarType: "tooth",
-  },
-  {
-    id: "opp-27",
-    stage: "fechado",
-    company: "Restaurante Aroma",
-    category: "Restaurante",
-    value: "R$ 24.500,00",
-    channel: "instagram",
-    channelLabel: "Instagram",
-    statusTag: "Vendido",
-    score: 89,
-    avatarType: "restaurant",
-  },
-  {
-    id: "opp-28",
-    stage: "fechado",
-    company: "Mecânica do Vale",
-    category: "Auto center",
-    value: "R$ 16.800,00",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    statusTag: "Vendido",
-    score: 81,
-    avatarType: "mechanic",
-  },
-  {
-    id: "opp-29",
-    stage: "fechado",
-    company: "Fitness Center",
-    category: "Academia",
-    value: "R$ 22.400,00",
-    channel: "tiktok",
-    channelLabel: "TikTok",
-    statusTag: "Vendido",
-    score: 85,
-    avatarType: "fitness",
-  },
-  {
-    id: "opp-30",
-    stage: "fechado",
-    company: "Clínica Sorriso",
-    category: "Clínica odontológica",
-    value: "R$ 28.900,00",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    statusTag: "Vendido",
-    score: 92,
-    avatarType: "tooth",
-  },
-];
+function sourceFor(lead: Lead): { channel: OpportunityChannel; label: string } {
+  if (lead.origem_fonte === "instagram") return { channel: "instagram", label: "Instagram" };
+  if (lead.origem_fonte === "linkedin") return { channel: "linkedin", label: "LinkedIn" };
+  if (lead.origem_fonte === "google_maps" || lead.place_id) {
+    return { channel: "maps", label: "Google Maps" };
+  }
+  return { channel: "manual", label: "Cadastro manual" };
+}
+
+function avatarFor(category: string | null): OpportunityItem["avatarType"] {
+  const value = (category ?? "").toLocaleLowerCase("pt-BR");
+  if (value.includes("odont")) return "tooth";
+  if (value.includes("auto")) return "auto";
+  if (value.includes("academ") || value.includes("fitness")) return "fitness";
+  if (value.includes("restaurant") || value.includes("gastronom")) return "restaurant";
+  if (value.includes("estét") || value.includes("beleza")) return "beauty";
+  if (value.includes("saúde") || value.includes("clín")) return "leaf";
+  if (value.includes("advoc") || value.includes("juríd")) return "legal";
+  if (value.includes("arquit")) return "architecture";
+  if (value.includes("educ") || value.includes("escola")) return "education";
+  if (value.includes("mercado") || value.includes("supermerc")) return "supermarket";
+  if (value.includes("transport")) return "transport";
+  if (value.includes("consult")) return "consulting";
+  if (value.includes("constr")) return "construction";
+  if (value.includes("mecân")) return "mechanic";
+  return "tech";
+}
+
+export function formatCurrency(value: number | null): string {
+  if (value == null) return "Sem valor";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+export function latestProposalValues(proposals: readonly Proposta[]): Map<string, number | null> {
+  const latest = new Map<string, { createdAt: number; value: number | null }>();
+  for (const proposal of proposals) {
+    const createdAt = new Date(proposal.criada_em).getTime();
+    const current = latest.get(proposal.lead_id);
+    if (!current || createdAt > current.createdAt) {
+      latest.set(proposal.lead_id, { createdAt, value: proposal.valor });
+    }
+  }
+  return new Map([...latest].map(([leadId, proposal]) => [leadId, proposal.value]));
+}
+
+export function proposalsForLeads(
+  proposals: readonly Proposta[],
+  leads: readonly Lead[],
+): Proposta[] {
+  const authorizedLeadIds = new Set(leads.map((lead) => lead.id));
+  return proposals.filter((proposal) => authorizedLeadIds.has(proposal.lead_id));
+}
+
+export function moveLeadInCache(leads: readonly Lead[], id: string, status: LeadStatus): Lead[] {
+  return leads.map((lead) => (lead.id === id ? { ...lead, status } : lead));
+}
+
+export function toOpportunity(
+  lead: Lead,
+  proposalValue: number | null,
+  responsibleName: string,
+  proposalDataAvailable = true,
+): OpportunityItem {
+  const source = sourceFor(lead);
+  const status = parseLeadStatus(lead.status);
+  return {
+    id: lead.id,
+    stage: stageForStatus(status),
+    company: lead.business_name,
+    category: lead.category ?? "Categoria não informada",
+    value: proposalDataAvailable ? formatCurrency(proposalValue) : "Indisponível",
+    proposalValue,
+    channel: source.channel,
+    channelLabel: source.label,
+    statusTag: statusLabel(status),
+    statusValue: status,
+    score: lead.score,
+    contactName: lead.owner_name ?? "",
+    phone: lead.phone ?? "",
+    whatsapp: lead.whatsapp ?? "",
+    email: lead.email ?? "",
+    address: lead.address ?? [lead.city, lead.state].filter(Boolean).join(" - "),
+    website: lead.website ?? "",
+    description: lead.notes ?? "",
+    responsible: responsibleName,
+    assignedTo: lead.assigned_to,
+    instagramUrl: lead.instagram_url ?? "",
+    facebookUrl: lead.facebook_url ?? "",
+    linkedinUrl: lead.linkedin_url ?? "",
+    createdAt: lead.created_at,
+    updatedAt: lead.updated_at,
+    avatarType: avatarFor(lead.category),
+    record: lead,
+  };
+}
+
+export function buildPipelineStages(
+  opportunities: readonly OpportunityItem[],
+  proposalDataAvailable = true,
+): PipelineStageInfo[] {
+  return PIPELINE_STAGE_DEFINITIONS.map((definition) => {
+    const stageItems = opportunities.filter((item) => item.stage === definition.key);
+    const knownValues = stageItems
+      .map((item) => item.proposalValue)
+      .filter((value): value is number => value != null);
+    return {
+      ...definition,
+      count: stageItems.length,
+      totalValue: !proposalDataAvailable
+        ? "Indisponível"
+        : knownValues.length
+          ? formatCurrency(knownValues.reduce((total, value) => total + value, 0))
+          : "Sem valores",
+    };
+  });
+}
+
+export function buildPipelineMetrics(
+  leads: readonly Lead[],
+  proposals: readonly Proposta[],
+  proposalDataAvailable = true,
+): PipelineMetricItem[] {
+  const proposalValues = latestProposalValues(proposals);
+  const negotiationLeads = leads.filter(
+    (lead) => lead.status === "responded" || lead.status === "meeting",
+  );
+  const negotiationValues = negotiationLeads
+    .map((lead) => proposalValues.get(lead.id))
+    .filter((value): value is number => value != null);
+  const sentLeadIds = new Set(
+    proposals
+      .filter((proposal) => proposal.status === "enviada")
+      .map((proposal) => proposal.lead_id),
+  );
+  return [
+    metric("leads", "Leads no pipeline", leads.length.toLocaleString("pt-BR"), "orange"),
+    metric(
+      "negociacao",
+      "Em negociação",
+      negotiationLeads.length.toLocaleString("pt-BR"),
+      "purple",
+    ),
+    metric(
+      "propostas",
+      "Propostas enviadas",
+      proposalDataAvailable ? sentLeadIds.size.toLocaleString("pt-BR") : "—",
+      "green",
+      !proposalDataAvailable,
+    ),
+    metric(
+      "vendas",
+      "Vendas realizadas",
+      leads.filter((lead) => lead.status === "won").length.toLocaleString("pt-BR"),
+      "blue",
+    ),
+    metric(
+      "valor",
+      "Valor em negociação",
+      proposalDataAvailable && negotiationValues.length
+        ? formatCurrency(negotiationValues.reduce((total, value) => total + value, 0))
+        : "—",
+      "amber",
+      !proposalDataAvailable,
+    ),
+  ];
+}
+
+function metric(
+  id: PipelineMetricItem["id"],
+  label: string,
+  value: string,
+  accent: PipelineMetricItem["accent"],
+  unavailable = false,
+): PipelineMetricItem {
+  return { id, label, value, accent, unavailable };
+}
+
+export type PipelineFilters = {
+  search: string;
+  channel: "all" | OpportunityChannel;
+  stage: "all" | PipelineStageKey;
+  responsible: string;
+  score: "all" | "high" | "medium" | "qualification";
+  createdFrom: string;
+  createdTo: string;
+};
+
+export function filterOpportunities(
+  opportunities: readonly OpportunityItem[],
+  filters: PipelineFilters,
+): OpportunityItem[] {
+  const search = filters.search.trim().toLocaleLowerCase("pt-BR");
+  const from = filters.createdFrom ? new Date(`${filters.createdFrom}T00:00:00`).getTime() : null;
+  const to = filters.createdTo ? new Date(`${filters.createdTo}T23:59:59.999`).getTime() : null;
+  return opportunities.filter((item) => {
+    if (
+      search &&
+      ![item.company, item.contactName, item.phone, item.email, item.website]
+        .join(" ")
+        .toLocaleLowerCase("pt-BR")
+        .includes(search)
+    )
+      return false;
+    if (filters.channel !== "all" && item.channel !== filters.channel) return false;
+    if (filters.stage !== "all" && item.stage !== filters.stage) return false;
+    if (filters.responsible === "none" && item.assignedTo != null) return false;
+    if (
+      filters.responsible !== "all" &&
+      filters.responsible !== "none" &&
+      item.assignedTo !== filters.responsible
+    )
+      return false;
+    if (filters.score === "high" && item.score < 80) return false;
+    if (filters.score === "medium" && (item.score < 70 || item.score >= 80)) return false;
+    if (filters.score === "qualification" && item.score >= 70) return false;
+    const createdAt = new Date(item.createdAt).getTime();
+    if (from != null && createdAt < from) return false;
+    if (to != null && createdAt > to) return false;
+    return true;
+  });
+}
