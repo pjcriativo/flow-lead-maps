@@ -1,6 +1,6 @@
 import { FileText, PhoneCall, Share2, Sparkles, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LEADS_METRICS, type MetricCardItem } from "./leads-premium-data";
+import type { MetricCardItem } from "./leads-premium-data";
 
 const ACCENT_STYLES = {
   orange: {
@@ -39,27 +39,24 @@ const ICONS = {
 };
 
 export function LeadsStatsCards({
-  metrics = LEADS_METRICS,
+  metrics,
+  unavailable = false,
   className,
 }: {
-  metrics?: MetricCardItem[];
+  metrics: MetricCardItem[];
+  unavailable?: boolean;
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5",
-        className,
-      )}
-    >
+    <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5", className)}>
       {metrics.map((metric) => {
-        const IconComponent =
-          ICONS[metric.id as keyof typeof ICONS] || Share2;
+        const IconComponent = ICONS[metric.id as keyof typeof ICONS] || Share2;
         const style = ACCENT_STYLES[metric.accent];
 
         return (
           <div
             key={metric.id}
+            title={unavailable ? "Indicador indisponível no momento" : undefined}
             className={cn(
               "relative flex flex-col justify-between overflow-hidden rounded-2xl border border-home-border",
               "bg-home-surface/80 p-4 transition-all duration-200 hover:border-home-border/80 hover:bg-home-surface",
@@ -85,28 +82,33 @@ export function LeadsStatsCards({
                 </span>
                 <div className="mt-0.5 flex items-center gap-1.5">
                   <span className="text-xs text-home-muted">{metric.label}</span>
-                  <span className="inline-flex items-center text-[11px] font-semibold text-emerald-400">
-                    ↑ {metric.change}
-                  </span>
+                  {metric.change ? (
+                    <span className="inline-flex items-center text-[11px] font-semibold text-emerald-400">
+                      ↑ {metric.change}
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
               {/* Mini vertical bar chart */}
-              <div
-                aria-hidden="true"
-                className="flex items-end gap-1 pb-1"
-              >
-                {metric.bars.map((height, i) => (
-                  <div
-                    key={i}
-                    style={{ height: `${Math.max(6, Math.round(height * 0.22))}px` }}
-                    className={cn(
-                      "w-1 rounded-t-sm transition-all duration-300",
-                      style.barColor,
-                      i === metric.bars.length - 1 && style.barGlow,
-                    )}
-                  />
-                ))}
+              <div aria-hidden="true" className="flex items-end gap-1 pb-1">
+                {metric.bars.length ? (
+                  metric.bars.map((height, i) => (
+                    <div
+                      key={`${metric.id}-${height}-${i}`}
+                      style={{ height: `${Math.max(6, Math.round(height * 0.22))}px` }}
+                      className={cn(
+                        "w-1 rounded-t-sm transition-all duration-300",
+                        style.barColor,
+                        i === metric.bars.length - 1 && style.barGlow,
+                      )}
+                    />
+                  ))
+                ) : (
+                  <span className="text-[9px] text-home-muted/70">
+                    {unavailable ? "Indisponível" : "Sem histórico"}
+                  </span>
+                )}
               </div>
             </div>
           </div>

@@ -33,7 +33,11 @@ interface LeadRowProps {
   isChecked: boolean;
   onToggleCheck: (id: string, e: MouseEvent) => void;
   onSelectLead: (lead: LeadItem) => void;
-  onQuickAction?: (action: "phone" | "whatsapp" | "email" | "more", lead: LeadItem, e: MouseEvent) => void;
+  onQuickAction?: (
+    action: "phone" | "whatsapp" | "email" | "more",
+    lead: LeadItem,
+    e: MouseEvent,
+  ) => void;
 }
 
 export function CompanyLogo({
@@ -49,8 +53,16 @@ export function CompanyLogo({
   switch (type) {
     case "tooth":
       return (
-        <div className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}>
-          <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <div
+          className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}
+        >
+          <svg
+            className="size-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M12 2C8 2 6 4 6 7c0 3 1.5 5 2 9 .5 3 2 6 4 6s3.5-3 4-6c.5-4 2-6 2-9 0-3-2-5-6-5z" />
             <path d="M9 12c1.5 1.5 4.5 1.5 6 0" />
           </svg>
@@ -58,55 +70,85 @@ export function CompanyLogo({
       );
     case "restaurant":
       return (
-        <div className={cn(baseClasses, "border-amber-500/30 bg-amber-950/40 text-amber-400", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-amber-500/30 bg-amber-950/40 text-amber-400",
+            className,
+          )}
+        >
           <UtensilsCrossed className="size-3.5" />
         </div>
       );
     case "fitness":
       return (
-        <div className={cn(baseClasses, "border-blue-500/30 bg-blue-950/40 text-blue-400", className)}>
+        <div
+          className={cn(baseClasses, "border-blue-500/30 bg-blue-950/40 text-blue-400", className)}
+        >
           <Dumbbell className="size-3.5" />
         </div>
       );
     case "leaf":
       return (
-        <div className={cn(baseClasses, "border-emerald-500/30 bg-emerald-950/40 text-emerald-400", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-emerald-500/30 bg-emerald-950/40 text-emerald-400",
+            className,
+          )}
+        >
           <HeartPulse className="size-3.5" />
         </div>
       );
     case "legal":
       return (
-        <div className={cn(baseClasses, "border-slate-400/30 bg-slate-800 text-slate-200", className)}>
+        <div
+          className={cn(baseClasses, "border-slate-400/30 bg-slate-800 text-slate-200", className)}
+        >
           <Scale className="size-3.5" />
         </div>
       );
     case "architecture":
       return (
-        <div className={cn(baseClasses, "border-orange-500/30 bg-orange-950/40 text-orange-400", className)}>
+        <div
+          className={cn(
+            baseClasses,
+            "border-orange-500/30 bg-orange-950/40 text-orange-400",
+            className,
+          )}
+        >
           <Compass className="size-3.5" />
         </div>
       );
     case "tech":
       return (
-        <div className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}>
+        <div
+          className={cn(baseClasses, "border-cyan-500/30 bg-cyan-950/40 text-cyan-400", className)}
+        >
           <Code className="size-3.5" />
         </div>
       );
     case "beauty":
       return (
-        <div className={cn(baseClasses, "border-pink-500/30 bg-pink-950/40 text-pink-400", className)}>
+        <div
+          className={cn(baseClasses, "border-pink-500/30 bg-pink-950/40 text-pink-400", className)}
+        >
           <Sparkles className="size-3.5" />
         </div>
       );
     case "auto":
       return (
-        <div className={cn(baseClasses, "border-blue-400/30 bg-slate-900 text-blue-400", className)}>
+        <div
+          className={cn(baseClasses, "border-blue-400/30 bg-slate-900 text-blue-400", className)}
+        >
           <Car className="size-3.5" />
         </div>
       );
     case "hair":
       return (
-        <div className={cn(baseClasses, "border-rose-500/30 bg-rose-950/40 text-rose-400", className)}>
+        <div
+          className={cn(baseClasses, "border-rose-500/30 bg-rose-950/40 text-rose-400", className)}
+        >
           <Scissors className="size-3.5" />
         </div>
       );
@@ -129,13 +171,19 @@ export function ChannelBadgeIcon({
   switch (channel) {
     case "maps":
       return (
-        <span title="Google Maps" className={cn("inline-flex items-center text-red-500", className)}>
+        <span
+          title="Google Maps"
+          className={cn("inline-flex items-center text-red-500", className)}
+        >
           <SiGooglemaps className="size-4" />
         </span>
       );
     case "instagram":
       return (
-        <span title="Instagram" className={cn("inline-flex items-center text-[#ec4899]", className)}>
+        <span
+          title="Instagram"
+          className={cn("inline-flex items-center text-[#ec4899]", className)}
+        >
           <SiInstagram className="size-4" />
         </span>
       );
@@ -161,6 +209,15 @@ export function ChannelBadgeIcon({
       return (
         <span title="WhatsApp" className={cn("inline-flex items-center text-[#22c55e]", className)}>
           <SiWhatsapp className="size-4" />
+        </span>
+      );
+    case "manual":
+      return (
+        <span
+          title="Cadastro manual"
+          className={cn("inline-flex items-center text-home-muted", className)}
+        >
+          <Building2 className="size-4" />
         </span>
       );
   }
@@ -210,7 +267,7 @@ export function LeadRow({
               {lead.company}
             </span>
             <span className="block truncate text-[11px] text-home-muted">
-              {lead.contactName}
+              {lead.contactName || "Contato não informado"}
             </span>
           </div>
         </div>
@@ -221,10 +278,10 @@ export function LeadRow({
         <div className="min-w-0 space-y-0.5">
           <div className="flex items-center gap-1.5 text-[11px] text-home-foreground/90">
             <Phone className="size-3 shrink-0 text-home-blue" />
-            <span className="truncate">{lead.phone}</span>
+            <span className="truncate">{lead.phone || lead.whatsapp || "—"}</span>
           </div>
           <div className="truncate text-[10px] text-home-muted">
-            {lead.email}
+            {lead.email || "E-mail não informado"}
           </div>
         </div>
       </td>
@@ -236,7 +293,7 @@ export function LeadRow({
 
       {/* Localização */}
       <td className="px-3 py-3 whitespace-nowrap text-xs text-home-foreground/80">
-        {lead.city}, {lead.state}
+        {[lead.city, lead.state].filter(Boolean).join(", ") || "—"}
       </td>
 
       {/* Score */}
@@ -256,16 +313,14 @@ export function LeadRow({
       </td>
 
       {/* Ações */}
-      <td
-        className="px-3 py-3 text-right"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">
           <button
             type="button"
             title="Ligar"
             onClick={(e) => onQuickAction?.("phone", lead, e)}
-            className="flex size-7 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface hover:text-white"
+            disabled={!lead.phone}
+            className="flex size-7 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Phone className="size-3.5" />
           </button>
@@ -273,7 +328,8 @@ export function LeadRow({
             type="button"
             title="WhatsApp"
             onClick={(e) => onQuickAction?.("whatsapp", lead, e)}
-            className="flex size-7 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface hover:text-[#22c55e]"
+            disabled={!lead.whatsapp && !lead.phone}
+            className="flex size-7 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface hover:text-[#22c55e] disabled:cursor-not-allowed disabled:opacity-35"
           >
             <SiWhatsapp className="size-3.5" />
           </button>
@@ -281,7 +337,8 @@ export function LeadRow({
             type="button"
             title="E-mail"
             onClick={(e) => onQuickAction?.("email", lead, e)}
-            className="flex size-7 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface hover:text-white"
+            disabled={!lead.email}
+            className="flex size-7 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Mail className="size-3.5" />
           </button>

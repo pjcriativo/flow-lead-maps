@@ -1,10 +1,11 @@
-import { Download, Plus, Upload } from "lucide-react";
+import { Download, Loader2, Plus, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LeadsHeaderProps {
   onImport?: () => void;
   onExport?: () => void;
   onNewLead?: () => void;
+  exporting?: boolean;
   className?: string;
 }
 
@@ -12,6 +13,7 @@ export function LeadsHeader({
   onImport,
   onExport,
   onNewLead,
+  exporting = false,
   className,
 }: LeadsHeaderProps) {
   return (
@@ -22,9 +24,7 @@ export function LeadsHeader({
       )}
     >
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[28px]">
-          Leads
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-[28px]">Leads</h1>
         <p className="mt-1 text-xs text-home-muted sm:text-[13px]">
           Gerencie todos os leads capturados em seus canais de aquisição.
         </p>
@@ -34,9 +34,11 @@ export function LeadsHeader({
         <button
           type="button"
           onClick={onImport}
+          disabled={!onImport}
+          title={!onImport ? "Importação indisponível: não há serviço validado" : undefined}
           className={cn(
             "inline-flex h-9.5 items-center gap-2 rounded-xl border border-home-border bg-home-surface px-3.5 text-xs font-semibold text-white transition-colors",
-            "hover:bg-home-surface-strong hover:border-home-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+            "hover:bg-home-surface-strong hover:border-home-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange disabled:cursor-not-allowed disabled:opacity-50",
           )}
         >
           <Download className="size-4 text-home-muted" />
@@ -46,13 +48,18 @@ export function LeadsHeader({
         <button
           type="button"
           onClick={onExport}
+          disabled={exporting}
           className={cn(
             "inline-flex h-9.5 items-center gap-2 rounded-xl border border-home-border bg-home-surface px-3.5 text-xs font-semibold text-white transition-colors",
             "hover:bg-home-surface-strong hover:border-home-border/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
           )}
         >
-          <Upload className="size-4 text-home-muted" />
-          <span>Exportar</span>
+          {exporting ? (
+            <Loader2 className="size-4 animate-spin text-home-muted" />
+          ) : (
+            <Upload className="size-4 text-home-muted" />
+          )}
+          <span>{exporting ? "Exportando..." : "Exportar"}</span>
         </button>
 
         <button

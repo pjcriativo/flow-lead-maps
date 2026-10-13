@@ -1,14 +1,16 @@
-import { useState, type MouseEvent } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import {
-  ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
   ChevronLeft,
   ChevronRight,
   Download,
   FolderPlus,
+  Loader2,
   MessageSquare,
+  RefreshCw,
   UserPlus,
 } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { LeadItem } from "./leads-premium-data";
 import { LeadRow } from "./LeadRow";
@@ -16,68 +18,111 @@ import { LeadRow } from "./LeadRow";
 interface LeadsTableProps {
   leads: LeadItem[];
   selectedLeadId: string | null;
+  selectedIds: Set<string>;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  loading: boolean;
+  refreshing: boolean;
+  error: string | null;
+  sortDirection: "asc" | "desc";
   onSelectLead: (lead: LeadItem) => void;
+  onSelectionChange: (ids: Set<string>) => void;
+  onPageChange: (page: number) => void;
+  onRetry: () => void;
+  onSortDate: () => void;
+  onAssignSelected: () => void;
+  onAddSelectedToList: () => void;
+  onExportSelected: () => void;
   className?: string;
+}
+
+function paginationItems(page: number, totalPages: number): Array<number | "ellipsis"> {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  const pages = new Set([1, totalPages, page - 1, page, page + 1]);
+  const valid = [...pages]
+    .filter((value) => value >= 1 && value <= totalPages)
+    .sort((a, b) => a - b);
+  const result: Array<number | "ellipsis"> = [];
+  valid.forEach((value, index) => {
+    if (index > 0 && value - valid[index - 1] > 1) result.push("ellipsis");
+    result.push(value);
+  });
+  return result;
 }
 
 export function LeadsTable({
   leads,
   selectedLeadId,
+  selectedIds,
+  page,
+  pageSize,
+  total,
+  totalPages,
+  loading,
+  refreshing,
+  error,
+  sortDirection,
   onSelectLead,
+  onSelectionChange,
+  onPageChange,
+  onRetry,
+  onSortDate,
+  onAssignSelected,
+  onAddSelectedToList,
+  onExportSelected,
   className,
 }: LeadsTableProps) {
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const allChecked =
-    leads.length > 0 && leads.every((lead) => checkedIds.has(lead.id));
+  const pageIds = leads.map((lead) => lead.id);
+  const allChecked = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const selectedOnPage = pageIds.filter((id) => selectedIds.has(id)).length;
 
   const handleToggleAll = () => {
-    if (allChecked) {
-      setCheckedIds(new Set());
-    } else {
-      setCheckedIds(new Set(leads.map((l) => l.id)));
-    }
+    const next = new Set(selectedIds);
+    if (allChecked) pageIds.forEach((id) => next.delete(id));
+    else pageIds.forEach((id) => next.add(id));
+    onSelectionChange(next);
   };
 
-  const handleToggleCheck = (id: string, e: MouseEvent) => {
-    e.stopPropagation();
-    const next = new Set(checkedIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setCheckedIds(next);
+  const handleToggleCheck = (id: string, event: MouseEvent) => {
+    event.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onSelectionChange(next);
   };
 
   const handleQuickAction = (
     action: "phone" | "whatsapp" | "email" | "more",
     lead: LeadItem,
-    e: MouseEvent,
+    event: MouseEvent,
   ) => {
-    e.stopPropagation();
-    if (action === "phone") {
-      toast.success(`Ligando para ${lead.company}: ${lead.phone}`);
-      window.open(`tel:${lead.phone.replace(/\D/g, "")}`, "_self");
-    } else if (action === "whatsapp") {
-      toast.success(`Abrindo WhatsApp de ${lead.company}...`);
-      window.open(`https://wa.me/55${lead.phone.replace(/\D/g, "")}`, "_blank");
-    } else if (action === "email") {
-      toast.success(`Enviando e-mail para ${lead.email}...`);
-      window.open(`mailto:${lead.email}`, "_blank");
-    } else {
-      toast.info(`Mais opções para ${lead.company}`);
-    }
-  };
-
-  const handleBulkAction = (actionName: string) => {
-    if (checkedIds.size === 0) {
-      toast.warning("Selecione pelo menos um lead para esta ação");
+    event.stopPropagation();
+    if (action === "phone" && lead.phone) {
+      window.location.href = `tel:${lead.phone.replace(/\D/g, "")}`;
       return;
     }
-    toast.success(`${actionName} executada para ${checkedIds.size} leads!`);
+    if (action === "whatsapp") {
+      const number = (lead.whatsapp || lead.phone).replace(/\D/g, "");
+      if (number)
+        window.open(
+          `https://wa.me/${number.startsWith("55") ? number : `55${number}`}`,
+          "_blank",
+          "noopener,noreferrer",
+        );
+      return;
+    }
+    if (action === "email" && lead.email) {
+      window.location.href = `mailto:${lead.email}`;
+      return;
+    }
+    if (action === "more") onSelectLead(lead);
   };
+
+  const firstVisible = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const lastVisible = Math.min(total, page * pageSize);
+  const hasSelection = selectedIds.size > 0;
 
   return (
     <div
@@ -86,7 +131,6 @@ export function LeadsTable({
         className,
       )}
     >
-      {/* Table Container */}
       <div className="min-w-0 flex-1 overflow-x-auto">
         <table className="w-full border-collapse text-left text-xs">
           <thead>
@@ -96,7 +140,7 @@ export function LeadsTable({
                   type="checkbox"
                   checked={allChecked}
                   onChange={handleToggleAll}
-                  aria-label="Selecionar todos os leads"
+                  aria-label="Selecionar leads desta página"
                   className="size-3.5 rounded border-home-border bg-home-surface text-home-orange focus:ring-1 focus:ring-home-orange"
                 />
               </th>
@@ -107,16 +151,45 @@ export function LeadsTable({
               <th className="px-3 py-3 text-center">SCORE</th>
               <th className="px-3 py-3 text-center">STATUS</th>
               <th className="px-3 py-3">
-                <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onSortDate}
+                  className="flex items-center gap-1 hover:text-white"
+                >
                   <span>DATA</span>
-                  <ArrowUpDown className="size-3 text-home-muted" />
-                </div>
+                  {sortDirection === "desc" ? (
+                    <ArrowDown className="size-3" />
+                  ) : (
+                    <ArrowUp className="size-3" />
+                  )}
+                </button>
               </th>
               <th className="px-3 py-3 text-right">AÇÕES</th>
             </tr>
           </thead>
           <tbody>
-            {leads.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={9} className="py-14 text-center text-home-muted">
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="size-4 animate-spin" /> Carregando leads...
+                  </span>
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={9} className="py-12 text-center">
+                  <p className="text-sm text-red-300">{error}</p>
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-home-border px-3 py-1.5 text-xs text-white hover:bg-home-surface-strong"
+                  >
+                    <RefreshCw className="size-3.5" /> Tentar novamente
+                  </button>
+                </td>
+              </tr>
+            ) : leads.length === 0 ? (
               <tr>
                 <td colSpan={9} className="py-12 text-center text-home-muted">
                   Nenhum lead encontrado para os filtros selecionados.
@@ -128,7 +201,7 @@ export function LeadsTable({
                   key={lead.id}
                   lead={lead}
                   isSelected={selectedLeadId === lead.id}
-                  isChecked={checkedIds.has(lead.id)}
+                  isChecked={selectedIds.has(lead.id)}
                   onToggleCheck={handleToggleCheck}
                   onSelectLead={onSelectLead}
                   onQuickAction={handleQuickAction}
@@ -139,103 +212,86 @@ export function LeadsTable({
         </table>
       </div>
 
-      {/* Table Footer Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-home-border/70 bg-home-surface px-4 py-3 text-xs text-home-muted">
-        {/* Bulk Selection Actions */}
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 pr-2 text-xs font-medium text-home-foreground/90">
             <input
               type="checkbox"
-              checked={checkedIds.size > 0}
+              checked={allChecked}
               onChange={handleToggleAll}
               className="size-3.5 rounded border-home-border bg-home-surface text-home-orange"
             />
-            <span>{checkedIds.size} selecionados</span>
+            <span>{selectedIds.size} selecionados</span>
           </label>
-
-          <button
-            type="button"
-            onClick={() => handleBulkAction("Atribuir")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-home-border bg-home-surface px-2.5 py-1 text-[11px] font-semibold text-home-foreground/90 transition-colors hover:bg-home-surface-strong hover:text-white"
-          >
-            <UserPlus className="size-3 text-home-muted" />
-            <span>Atribuir</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleBulkAction("Adicionar à lista")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-home-border bg-home-surface px-2.5 py-1 text-[11px] font-semibold text-home-foreground/90 transition-colors hover:bg-home-surface-strong hover:text-white"
-          >
-            <FolderPlus className="size-3 text-home-muted" />
-            <span>Adicionar à lista</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleBulkAction("Enviar mensagem")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-home-border bg-home-surface px-2.5 py-1 text-[11px] font-semibold text-home-foreground/90 transition-colors hover:bg-home-surface-strong hover:text-white"
-          >
-            <MessageSquare className="size-3 text-home-muted" />
-            <span>Enviar mensagem</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleBulkAction("Exportar selecionados")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-home-border bg-home-surface px-2.5 py-1 text-[11px] font-semibold text-home-foreground/90 transition-colors hover:bg-home-surface-strong hover:text-white"
-          >
-            <Download className="size-3 text-home-muted" />
-            <span>Exportar</span>
-          </button>
+          <BulkButton
+            label="Atribuir"
+            disabled={!hasSelection}
+            onClick={onAssignSelected}
+            icon={<UserPlus className="size-3 text-home-muted" />}
+          />
+          <BulkButton
+            label="Adicionar à lista"
+            disabled={!hasSelection}
+            onClick={onAddSelectedToList}
+            icon={<FolderPlus className="size-3 text-home-muted" />}
+          />
+          <BulkButton
+            label="Enviar mensagem"
+            disabled
+            title="Envio em lote não possui contrato seguro nesta tela"
+            icon={<MessageSquare className="size-3 text-home-muted" />}
+          />
+          <BulkButton
+            label="Exportar"
+            disabled={!hasSelection}
+            onClick={onExportSelected}
+            icon={<Download className="size-3 text-home-muted" />}
+          />
+          {selectedOnPage > 0 && selectedOnPage < leads.length ? (
+            <span className="text-[10px]">{selectedOnPage} nesta página</span>
+          ) : null}
         </div>
 
-        {/* Pagination */}
         <div className="flex items-center gap-1">
+          <span className="mr-2 text-[10px]">
+            {firstVisible}–{lastVisible} de {total}
+          </span>
+          {refreshing && !loading ? <Loader2 className="mr-1 size-3 animate-spin" /> : null}
           <button
             type="button"
             aria-label="Página anterior"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            onClick={() => onPageChange(page - 1)}
             className="flex size-7 items-center justify-center rounded-lg border border-home-border bg-home-surface text-home-muted transition-colors hover:bg-home-surface-strong hover:text-white disabled:opacity-40"
           >
             <ChevronLeft className="size-3.5" />
           </button>
-
-          {[1, 2, 3, 4, 5].map((page) => (
-            <button
-              key={page}
-              type="button"
-              onClick={() => setCurrentPage(page)}
-              className={cn(
-                "flex size-7 items-center justify-center rounded-lg text-xs font-semibold transition-colors",
-                currentPage === page
-                  ? "bg-home-orange font-bold text-white shadow-[0_0_12px_rgba(255,98,0,0.4)]"
-                  : "border border-home-border bg-home-surface text-home-muted hover:bg-home-surface-strong hover:text-white",
-              )}
-            >
-              {page}
-            </button>
-          ))}
-
-          <span className="px-1 text-xs text-home-muted">...</span>
-
-          <button
-            type="button"
-            onClick={() => setCurrentPage(125)}
-            className={cn(
-              "flex size-7 items-center justify-center rounded-lg border border-home-border bg-home-surface text-xs font-semibold text-home-muted transition-colors hover:bg-home-surface-strong hover:text-white",
-              currentPage === 125 && "bg-home-orange text-white",
-            )}
-          >
-            125
-          </button>
-
+          {paginationItems(page, totalPages).map((item, index) =>
+            item === "ellipsis" ? (
+              <span key={`ellipsis-${index}`} className="px-1">
+                ...
+              </span>
+            ) : (
+              <button
+                key={item}
+                type="button"
+                onClick={() => onPageChange(item)}
+                className={cn(
+                  "flex size-7 items-center justify-center rounded-lg text-xs font-semibold transition-colors",
+                  page === item
+                    ? "bg-home-orange font-bold text-white shadow-[0_0_12px_rgba(255,98,0,0.4)]"
+                    : "border border-home-border bg-home-surface text-home-muted hover:bg-home-surface-strong hover:text-white",
+                )}
+              >
+                {item}
+              </button>
+            ),
+          )}
           <button
             type="button"
             aria-label="Próxima página"
-            disabled={currentPage === 125}
-            onClick={() => setCurrentPage((p) => Math.min(125, p + 1))}
+            disabled={page === totalPages}
+            onClick={() => onPageChange(page + 1)}
             className="flex size-7 items-center justify-center rounded-lg border border-home-border bg-home-surface text-home-muted transition-colors hover:bg-home-surface-strong hover:text-white disabled:opacity-40"
           >
             <ChevronRight className="size-3.5" />
@@ -243,5 +299,32 @@ export function LeadsTable({
         </div>
       </div>
     </div>
+  );
+}
+
+function BulkButton({
+  label,
+  icon,
+  disabled,
+  onClick,
+  title,
+}: {
+  label: string;
+  icon: ReactNode;
+  disabled?: boolean;
+  onClick?: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-home-border bg-home-surface px-2.5 py-1 text-[11px] font-semibold text-home-foreground/90 transition-colors hover:bg-home-surface-strong hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }

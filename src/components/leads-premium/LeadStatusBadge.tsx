@@ -19,25 +19,45 @@ const STATUS_CONFIG: Record<
     text: "text-blue-400",
     border: "border-blue-500/30",
   },
-  "Em contato": {
+  Enriquecido: {
+    bg: "bg-cyan-500/15",
+    text: "text-cyan-300",
+    border: "border-cyan-500/30",
+  },
+  Contatado: {
     bg: "bg-purple-500/15",
     text: "text-purple-300",
     border: "border-purple-500/30",
   },
-  Oportunidade: {
-    bg: "bg-emerald-500/15",
-    text: "text-emerald-400",
-    border: "border-emerald-500/30",
-  },
-  Proposta: {
+  "Proposta enviada": {
     bg: "bg-amber-500/15",
     text: "text-amber-400",
     border: "border-amber-500/30",
   },
-  Negociação: {
+  Respondeu: {
+    bg: "bg-emerald-500/15",
+    text: "text-emerald-400",
+    border: "border-emerald-500/30",
+  },
+  Reunião: {
     bg: "bg-orange-500/15",
     text: "text-orange-400",
     border: "border-orange-500/30",
+  },
+  Ganho: {
+    bg: "bg-emerald-500/20",
+    text: "text-emerald-300",
+    border: "border-emerald-400/40",
+  },
+  Perdido: {
+    bg: "bg-red-500/15",
+    text: "text-red-400",
+    border: "border-red-500/30",
+  },
+  Nutrição: {
+    bg: "bg-slate-500/15",
+    text: "text-slate-300",
+    border: "border-slate-500/30",
   },
 };
 

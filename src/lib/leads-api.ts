@@ -4,6 +4,66 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 export type Lead = Database["public"]["Tables"]["leads"]["Row"];
+export type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
+
+export type LeadSortField = "score" | "created_at" | "updated_at" | "business_name";
+
+export type LeadPageFilters = {
+  search?: string;
+  status?: string;
+  source?: "google_maps" | "instagram" | "linkedin" | "manual";
+  score?: "90+" | "80+" | "70-79" | "below-70";
+  listId?: string;
+  assignedTo?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+};
+
+export type LeadPageRequest = {
+  page: number;
+  pageSize: number;
+  sortBy: LeadSortField;
+  sortDirection: "asc" | "desc";
+  filters: LeadPageFilters;
+};
+
+export type LeadPage = {
+  leads: Lead[];
+  total: number;
+};
+
+export type LeadMetrics = {
+  total: number;
+  contacted: number;
+  opportunities: number;
+  proposals: number;
+  customers: number;
+};
+
+export type LeadWorkspaceContext = {
+  userId: string;
+  orgId: string;
+  role: string;
+  canDelete: boolean;
+};
+
+export type CreateLeadInput = Pick<
+  LeadInsert,
+  | "business_name"
+  | "owner_name"
+  | "phone"
+  | "whatsapp"
+  | "email"
+  | "website"
+  | "category"
+  | "city"
+  | "state"
+  | "address"
+  | "notes"
+  | "list_id"
+>;
 
 export type ScoreTier = "quente" | "morno" | "frio";
 
@@ -173,6 +233,180 @@ export async function fetchLeads(): Promise<Lead[]> {
     .from("leads")
     .select("*")
     .order("score", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+function safePostgrestSearch(value: string): string {
+  return value
+    .replace(/[,%()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Lista operacional paginada. O escopo de organização e responsável é imposto pelas policies
+ * de `leads`; os filtros abaixo apenas estreitam o conjunto que o usuário já pode visualizar.
+ */
+export async function fetchLeadsPage(request: LeadPageRequest): Promise<LeadPage> {
+  const page = Math.max(1, Math.trunc(request.page));
+  const pageSize = Math.min(100, Math.max(1, Math.trunc(request.pageSize)));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const { filters } = request;
+
+  let query = supabase.from("leads").select("*", { count: "exact" });
+  const search = safePostgrestSearch(filters.search ?? "");
+  if (search) {
+    const pattern = `%${search}%`;
+    query = query.or(
+      [
+        `business_name.ilike.${pattern}`,
+        `owner_name.ilike.${pattern}`,
+        `phone.ilike.${pattern}`,
+        `whatsapp.ilike.${pattern}`,
+        `email.ilike.${pattern}`,
+        `website.ilike.${pattern}`,
+        `place_id.ilike.${pattern}`,
+      ].join(","),
+    );
+  }
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.source === "google_maps") {
+    query = query.or("origem_fonte.eq.google_maps,and(origem_fonte.is.null,place_id.not.is.null)");
+  } else if (filters.source === "manual") {
+    query = query.is("origem_fonte", null).is("place_id", null);
+  } else if (filters.source) {
+    query = query.eq("origem_fonte", filters.source);
+  }
+  if (filters.score === "90+") query = query.gte("score", 90);
+  if (filters.score === "80+") query = query.gte("score", 80).lt("score", 90);
+  if (filters.score === "70-79") query = query.gte("score", 70).lt("score", 80);
+  if (filters.score === "below-70") query = query.lt("score", 70);
+  if (filters.listId === "none") query = query.is("list_id", null);
+  else if (filters.listId) query = query.eq("list_id", filters.listId);
+  if (filters.assignedTo === "none") query = query.is("assigned_to", null);
+  else if (filters.assignedTo) query = query.eq("assigned_to", filters.assignedTo);
+  if (filters.createdFrom) query = query.gte("created_at", filters.createdFrom);
+  if (filters.createdTo) query = query.lte("created_at", filters.createdTo);
+  if (filters.updatedFrom) query = query.gte("updated_at", filters.updatedFrom);
+  if (filters.updatedTo) query = query.lte("updated_at", filters.updatedTo);
+
+  const { data, error, count } = await query
+    .order(request.sortBy, { ascending: request.sortDirection === "asc" })
+    .order("id", { ascending: true })
+    .range(from, to);
+  if (error) throw error;
+  return { leads: data ?? [], total: count ?? 0 };
+}
+
+export async function fetchAllLeadsForExport(
+  filters: LeadPageFilters,
+  sortBy: LeadSortField,
+  sortDirection: "asc" | "desc",
+): Promise<Lead[]> {
+  const pageSize = 100;
+  const first = await fetchLeadsPage({ page: 1, pageSize, sortBy, sortDirection, filters });
+  const all = [...first.leads];
+  const totalPages = Math.ceil(first.total / pageSize);
+  for (let page = 2; page <= totalPages; page += 1) {
+    const next = await fetchLeadsPage({ page, pageSize, sortBy, sortDirection, filters });
+    all.push(...next.leads);
+  }
+  return all;
+}
+
+async function countLeadsByStatuses(statuses?: readonly string[]): Promise<number> {
+  let query = supabase.from("leads").select("id", { count: "exact", head: true });
+  if (statuses?.length) query = query.in("status", [...statuses]);
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** KPIs calculados sobre todo o conjunto autorizado pela RLS, nunca sobre a página atual. */
+export async function fetchLeadMetrics(): Promise<LeadMetrics> {
+  const [total, contacted, opportunities, proposals, customers] = await Promise.all([
+    countLeadsByStatuses(),
+    countLeadsByStatuses(["contacted"]),
+    countLeadsByStatuses(["responded", "meeting"]),
+    countLeadsByStatuses(["proposta_enviada"]),
+    countLeadsByStatuses(["won"]),
+  ]);
+  return { total, contacted, opportunities, proposals, customers };
+}
+
+export async function getLeadWorkspaceContext(): Promise<LeadWorkspaceContext> {
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) throw authError ?? new Error("Usuário não autenticado.");
+  const { data: membership, error } = await supabase
+    .from("memberships")
+    .select("org_id, papel")
+    .eq("user_id", auth.user.id)
+    .order("criada_em", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!membership) throw new Error("Workspace não encontrado para o usuário atual.");
+  return {
+    userId: auth.user.id,
+    orgId: membership.org_id,
+    role: membership.papel,
+    canDelete: membership.papel === "admin" || membership.papel === "gerente",
+  };
+}
+
+export async function createLead(input: CreateLeadInput): Promise<Lead> {
+  const context = await getLeadWorkspaceContext();
+  const businessName = input.business_name.trim();
+  if (!businessName) throw new Error("Informe o nome da empresa.");
+  const phone = input.phone?.trim() || null;
+  const whatsapp = input.whatsapp?.trim() || null;
+  const email = input.email?.trim().toLowerCase() || null;
+  const website = input.website?.trim() || null;
+  const { data, error } = await supabase
+    .from("leads")
+    .insert({
+      user_id: context.userId,
+      org_id: context.orgId,
+      assigned_to: context.userId,
+      business_name: businessName,
+      owner_name: input.owner_name?.trim() || null,
+      phone,
+      whatsapp,
+      email,
+      website,
+      category: input.category?.trim() || null,
+      city: input.city?.trim() || null,
+      state: input.state?.trim().toUpperCase() || null,
+      address: input.address?.trim() || null,
+      notes: input.notes?.trim() || null,
+      list_id: input.list_id || null,
+      status: "new",
+      score: 0,
+      sem_contato: !phone && !whatsapp && !email,
+      has_phone: Boolean(phone || whatsapp),
+      has_website: Boolean(website),
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchLeadById(id: string): Promise<Lead> {
+  const { data, error } = await supabase.from("leads").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchLeadsByIds(ids: string[]): Promise<Lead[]> {
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from("leads")
+    .select("*")
+    .in("id", ids)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];

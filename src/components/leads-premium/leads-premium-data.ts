@@ -1,29 +1,27 @@
+import type { Lead, LeadMetrics } from "@/lib/leads-api";
+
 export type LeadStatus =
   | "Novo"
-  | "Em contato"
-  | "Oportunidade"
-  | "Proposta"
-  | "Negociação";
+  | "Enriquecido"
+  | "Contatado"
+  | "Proposta enviada"
+  | "Respondeu"
+  | "Reunião"
+  | "Ganho"
+  | "Perdido"
+  | "Nutrição";
 
 export type LeadChannel =
-  | "maps"
-  | "instagram"
-  | "linkedin"
-  | "youtube"
-  | "tiktok"
-  | "whatsapp";
+  "maps" | "instagram" | "linkedin" | "youtube" | "tiktok" | "whatsapp" | "manual";
 
-export type LeadScoreClassification =
-  | "Alto potencial"
-  | "Médio potencial"
-  | "Em negociação"
-  | "Em qualificação";
+export type LeadScoreClassification = "Alto potencial" | "Médio potencial" | "Em qualificação";
 
 export interface LeadItem {
   id: string;
   company: string;
   contactName: string;
   phone: string;
+  whatsapp: string;
   email: string;
   channel: LeadChannel;
   channelLabel: string;
@@ -32,6 +30,7 @@ export interface LeadItem {
   address: string;
   score: number;
   status: LeadStatus;
+  statusValue: string;
   date: string;
   time: string;
   category: string;
@@ -50,289 +49,210 @@ export interface LeadItem {
     | "beauty"
     | "auto"
     | "hair";
+  assignedTo: string | null;
+  listId: string | null;
+  orgId: string | null;
+  instagramUrl: string;
+  facebookUrl: string;
+  linkedinUrl: string;
+  createdAt: string;
+  updatedAt: string;
+  record: Lead;
 }
 
 export interface MetricCardItem {
-  id: string;
+  id: "total" | "contato" | "oportunidades" | "propostas" | "clientes";
   label: string;
   value: string;
-  change: string;
+  change: null;
   accent: "orange" | "purple" | "green" | "blue" | "amber";
-  bars: number[]; // heights in % (0 - 100)
+  bars: number[];
 }
 
-export const LEADS_METRICS: MetricCardItem[] = [
-  {
-    id: "total",
-    label: "Total de leads",
-    value: "1.248",
-    change: "12%",
-    accent: "orange",
-    bars: [30, 48, 40, 75, 95, 60],
-  },
-  {
-    id: "contato",
-    label: "Em contato",
-    value: "892",
-    change: "18%",
-    accent: "purple",
-    bars: [25, 40, 70, 55, 90, 80],
-  },
-  {
-    id: "oportunidades",
-    label: "Oportunidades",
-    value: "312",
-    change: "24%",
-    accent: "green",
-    bars: [35, 60, 25, 95, 75, 90],
-  },
-  {
-    id: "propostas",
-    label: "Propostas",
-    value: "148",
-    change: "16%",
-    accent: "blue",
-    bars: [25, 55, 70, 40, 75, 95],
-  },
-  {
-    id: "clientes",
-    label: "Clientes",
-    value: "86",
-    change: "28%",
-    accent: "amber",
-    bars: [30, 45, 60, 75, 90, 95],
-  },
-];
+const STATUS_LABELS: Record<string, LeadStatus> = {
+  new: "Novo",
+  enriched: "Enriquecido",
+  contacted: "Contatado",
+  proposta_enviada: "Proposta enviada",
+  responded: "Respondeu",
+  meeting: "Reunião",
+  won: "Ganho",
+  lost: "Perdido",
+  nurture: "Nutrição",
+};
 
-export const MOCK_LEADS: LeadItem[] = [
-  {
-    id: "lead-1",
-    company: "Clínica Odonto Prime",
-    contactName: "Dr. Carlos Silva",
-    phone: "(41) 3222-1234",
-    email: "contato@odontoprime.com.br",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    city: "Curitiba",
-    state: "PR",
-    address: "Av. Getúlio Vargas, 1234\nCentro, Curitiba - PR, 80020-300",
-    score: 92,
-    status: "Novo",
-    date: "30/10/2025",
-    time: "14:32",
-    category: "Clínica odontológica",
-    website: "www.odontoprime.com.br",
-    description:
-      "Clínica moderna com foco em odontologia estética, implantes e tratamentos especializados com equipamentos de última geração.",
-    classification: "Alto potencial",
-    tags: ["Google Maps", "Alto potencial", "Nova oportunidade"],
-    avatarType: "tooth",
-  },
-  {
-    id: "lead-2",
-    company: "Restaurante Sabor & Arte",
-    contactName: "Ana Paula",
-    phone: "(41) 3333-5678",
-    email: "contato@saborarte.com.br",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    city: "Curitiba",
-    state: "PR",
-    address: "Rua XV de Novembro, 890\nCentro, Curitiba - PR, 80020-310",
-    score: 88,
-    status: "Em contato",
-    date: "30/10/2025",
-    time: "13:45",
-    category: "Restaurante e Gastronomia",
-    website: "www.saborarte.com.br",
-    description:
-      "Culinária contemporânea refinada, atendimento corporativo executivo e adega com rótulos premiados.",
-    classification: "Alto potencial",
-    tags: ["Google Maps", "Alto potencial", "Gastronomia"],
-    avatarType: "restaurant",
-  },
-  {
-    id: "lead-3",
-    company: "Academia Evolution",
-    contactName: "Ricardo Mendes",
-    phone: "(41) 3444-8901",
-    email: "ricardo@evolution.com.br",
-    channel: "instagram",
-    channelLabel: "Instagram",
-    city: "São Paulo",
-    state: "SP",
-    address: "Av. Paulista, 1500\nBela Vista, São Paulo - SP, 01310-100",
-    score: 76,
-    status: "Oportunidade",
-    date: "30/10/2025",
-    time: "12:20",
-    category: "Fitness e Saúde",
-    website: "www.academiaevolution.com.br",
-    description:
-      "Complexo fitness com musculação de ponta, consultoria esportiva e alta taxa de retenção de membros.",
-    classification: "Médio potencial",
-    tags: ["Instagram", "Médio potencial", "Fitness"],
-    avatarType: "fitness",
-  },
-  {
-    id: "lead-4",
-    company: "Clínica Vida Leve",
-    contactName: "Juliana Martins",
-    phone: "(11) 98877-6655",
-    email: "contato@vidaleve.com.br",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    city: "São Paulo",
-    state: "SP",
-    address: "Rua Oscar Freire, 420\nCerqueira César, São Paulo - SP, 01426-000",
-    score: 85,
-    status: "Em contato",
-    date: "30/10/2025",
-    time: "11:18",
-    category: "Clínica Médica e Nutrição",
-    website: "www.vidaleve.com.br",
-    description:
-      "Saúde integrativa, tratamentos corporais e emagrecimento sustentável com corpo clínico qualificado.",
-    classification: "Alto potencial",
-    tags: ["Google Maps", "Alto potencial", "Saúde"],
-    avatarType: "leaf",
-  },
-  {
-    id: "lead-5",
-    company: "Mendes Advocacia",
-    contactName: "Carlos Mendes",
-    phone: "(21) 4111-2233",
-    email: "contato@mendesadv.com.br",
-    channel: "linkedin",
-    channelLabel: "LinkedIn",
-    city: "Rio de Janeiro",
-    state: "RJ",
-    address: "Av. Rio Branco, 110\nCentro, Rio de Janeiro - RJ, 20040-001",
-    score: 90,
-    status: "Proposta",
-    date: "30/10/2025",
-    time: "10:50",
-    category: "Advocacia e Consultoria",
-    website: "www.mendesadv.com.br",
-    description:
-      "Boutique jurídica com foco em direito tributário, societário e contratos corporativos de alto valor.",
-    classification: "Alto potencial",
-    tags: ["LinkedIn", "Alto potencial", "Jurídico"],
-    avatarType: "legal",
-  },
-  {
-    id: "lead-6",
-    company: "Costa Arquitetura",
-    contactName: "Fernanda Costa",
-    phone: "(31) 3666-9878",
-    email: "fernanda@costaarq.com.br",
-    channel: "youtube",
-    channelLabel: "YouTube",
-    city: "Belo Horizonte",
-    state: "MG",
-    address: "Rua da Bahia, 1200\nLourdes, Belo Horizonte - MG, 30160-011",
-    score: 68,
-    status: "Negociação",
-    date: "29/10/2025",
-    time: "16:45",
-    category: "Arquitetura e Interiores",
-    website: "www.costaarq.com.br",
-    description:
-      "Projetos arquitetônicos residenciais e corporativos de alto padrão com forte apelo visual digital.",
-    classification: "Em negociação",
-    tags: ["YouTube", "Em negociação", "Arquitetura"],
-    avatarType: "architecture",
-  },
-  {
-    id: "lead-7",
-    company: "Souza Tecnologia",
-    contactName: "Ricardo Souza",
-    phone: "(71) 3337-6655",
-    email: "contato@souzatec.com.br",
-    channel: "tiktok",
-    channelLabel: "TikTok",
-    city: "Salvador",
-    state: "BA",
-    address: "Av. Tancredo Neves, 620\nCaminho das Árvores, Salvador - BA, 41820-020",
-    score: 72,
-    status: "Em contato",
-    date: "29/10/2025",
-    time: "15:30",
-    category: "Tecnologia e Cloud",
-    website: "www.souzatec.com.br",
-    description:
-      "Desenvolvimento de software empresarial, integrações de APIs e soluções digitais modernas.",
-    classification: "Médio potencial",
-    tags: ["TikTok", "Médio potencial", "Tecnologia"],
-    avatarType: "tech",
-  },
-  {
-    id: "lead-8",
-    company: "Estética Bem Estar",
-    contactName: "Camila Rocha",
-    phone: "(11) 3999-8877",
-    email: "contato@bemestar.com.br",
-    channel: "whatsapp",
-    channelLabel: "WhatsApp",
-    city: "São Paulo",
-    state: "SP",
-    address: "Rua Haddock Lobo, 800\nCerqueira César, São Paulo - SP, 01414-000",
-    score: 81,
-    status: "Oportunidade",
-    date: "29/10/2025",
-    time: "14:10",
-    category: "Estética Avançada",
-    website: "www.bemestar.com.br",
-    description:
-      "Clínica de estética avançada com tratamentos corporais e faciais tecnológicos e equipe multidisciplinar.",
-    classification: "Alto potencial",
-    tags: ["WhatsApp", "Alto potencial", "Estética"],
-    avatarType: "beauty",
-  },
-  {
-    id: "lead-9",
-    company: "Auto Center Brasil",
-    contactName: "Paulo Henrique",
-    phone: "(41) 3555-4433",
-    email: "vendas@autocenter.com.br",
-    channel: "maps",
-    channelLabel: "Google Maps",
-    city: "Curitiba",
-    state: "PR",
-    address: "Linha Verde, 4500\nPrado Velho, Curitiba - PR, 81690-000",
-    score: 59,
-    status: "Novo",
-    date: "29/10/2025",
-    time: "12:35",
-    category: "Centro Automotivo Multimarcas",
-    website: "www.autocenterbrasil.com.br",
-    description:
-      "Serviços mecânicos completos, diagnóstico eletrônico e manutenção automotiva especializada.",
-    classification: "Em qualificação",
-    tags: ["Google Maps", "Em qualificação", "Automotivo"],
-    avatarType: "auto",
-  },
-  {
-    id: "lead-10",
-    company: "Studio Beleza Total",
-    contactName: "Mariana Lima",
-    phone: "(41) 3777-2211",
-    email: "contato@belezatotal.com.br",
-    channel: "instagram",
-    channelLabel: "Instagram",
-    city: "Curitiba",
-    state: "PR",
-    address: "Av. do Batel, 1550\nBatel, Curitiba - PR, 80420-090",
-    score: 77,
-    status: "Em contato",
-    date: "29/10/2025",
-    time: "11:20",
-    category: "Salão de Beleza e Visagismo",
-    website: "www.belezatotal.com.br",
-    description:
-      "Salão premium especializado em mechas, visagismo, estética capilar e tratamentos personalizados.",
-    classification: "Médio potencial",
-    tags: ["Instagram", "Médio potencial", "Beleza"],
-    avatarType: "hair",
-  },
-];
+function channelFor(lead: Lead): { channel: LeadChannel; label: string } {
+  if (lead.origem_fonte === "instagram") return { channel: "instagram", label: "Instagram" };
+  if (lead.origem_fonte === "linkedin") return { channel: "linkedin", label: "LinkedIn" };
+  if (lead.origem_fonte === "google_maps" || lead.place_id) {
+    return { channel: "maps", label: "Google Maps" };
+  }
+  return { channel: "manual", label: "Cadastro manual" };
+}
+
+function avatarFor(category: string | null): LeadItem["avatarType"] {
+  const value = (category ?? "").toLocaleLowerCase("pt-BR");
+  if (value.includes("odont")) return "tooth";
+  if (value.includes("restaurant") || value.includes("gastronom")) return "restaurant";
+  if (value.includes("academ") || value.includes("fitness")) return "fitness";
+  if (value.includes("saúde") || value.includes("clin")) return "leaf";
+  if (value.includes("advoc") || value.includes("juríd")) return "legal";
+  if (value.includes("arquit")) return "architecture";
+  if (value.includes("tecnolog") || value.includes("software")) return "tech";
+  if (value.includes("estét")) return "beauty";
+  if (value.includes("auto")) return "auto";
+  if (value.includes("beleza") || value.includes("salão")) return "hair";
+  return "tech";
+}
+
+export function classifyLeadScore(score: number): LeadScoreClassification {
+  if (score >= 80) return "Alto potencial";
+  if (score >= 70) return "Médio potencial";
+  return "Em qualificação";
+}
+
+export function toLeadItem(lead: Lead): LeadItem {
+  const channel = channelFor(lead);
+  const createdAt = new Date(lead.created_at);
+  const location = [lead.city, lead.state].filter(Boolean).join(" - ");
+  return {
+    id: lead.id,
+    company: lead.business_name,
+    contactName: lead.owner_name ?? "",
+    phone: lead.phone ?? "",
+    whatsapp: lead.whatsapp ?? "",
+    email: lead.email ?? "",
+    channel: channel.channel,
+    channelLabel: channel.label,
+    city: lead.city ?? "",
+    state: lead.state ?? "",
+    address: lead.address ?? location,
+    score: lead.score,
+    status: STATUS_LABELS[lead.status] ?? "Novo",
+    statusValue: lead.status,
+    date: Number.isNaN(createdAt.getTime()) ? "—" : createdAt.toLocaleDateString("pt-BR"),
+    time: Number.isNaN(createdAt.getTime())
+      ? ""
+      : createdAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    category: lead.category ?? "",
+    website: lead.website ?? "",
+    description: lead.notes ?? "",
+    classification: classifyLeadScore(lead.score),
+    tags: [],
+    avatarType: avatarFor(lead.category),
+    assignedTo: lead.assigned_to,
+    listId: lead.list_id,
+    orgId: lead.org_id,
+    instagramUrl: lead.instagram_url ?? "",
+    facebookUrl: lead.facebook_url ?? "",
+    linkedinUrl: lead.linkedin_url ?? "",
+    createdAt: lead.created_at,
+    updatedAt: lead.updated_at,
+    record: lead,
+  };
+}
+
+export function metricsFromCounts(metrics: LeadMetrics): MetricCardItem[] {
+  return [
+    {
+      id: "total",
+      label: "Total de leads",
+      value: metrics.total.toLocaleString("pt-BR"),
+      change: null,
+      accent: "orange",
+      bars: [],
+    },
+    {
+      id: "contato",
+      label: "Em contato",
+      value: metrics.contacted.toLocaleString("pt-BR"),
+      change: null,
+      accent: "purple",
+      bars: [],
+    },
+    {
+      id: "oportunidades",
+      label: "Oportunidades",
+      value: metrics.opportunities.toLocaleString("pt-BR"),
+      change: null,
+      accent: "green",
+      bars: [],
+    },
+    {
+      id: "propostas",
+      label: "Propostas",
+      value: metrics.proposals.toLocaleString("pt-BR"),
+      change: null,
+      accent: "blue",
+      bars: [],
+    },
+    {
+      id: "clientes",
+      label: "Clientes",
+      value: metrics.customers.toLocaleString("pt-BR"),
+      change: null,
+      accent: "amber",
+      bars: [],
+    },
+  ];
+}
+
+export function validateLeadForm(values: {
+  businessName: string;
+  email: string;
+  state: string;
+  phone?: string;
+  whatsapp?: string;
+}): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const validPhone = (value: string | undefined) => {
+    const digits = value?.replace(/\D/g, "") ?? "";
+    return !digits || (digits.length >= 8 && digits.length <= 15);
+  };
+  if (!values.businessName.trim()) errors.businessName = "Informe o nome da empresa.";
+  if (values.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
+    errors.email = "Informe um e-mail válido.";
+  }
+  if (values.state.trim() && !/^[A-Za-z]{2}$/.test(values.state.trim())) {
+    errors.state = "Use a sigla da UF com duas letras.";
+  }
+  if (!validPhone(values.phone)) errors.phone = "Informe um telefone válido.";
+  if (!validPhone(values.whatsapp)) errors.whatsapp = "Informe um WhatsApp válido.";
+  return errors;
+}
+
+export function leadsToCsv(leads: readonly Lead[]): string {
+  const headers = [
+    "Empresa",
+    "Contato",
+    "Categoria",
+    "Cidade",
+    "UF",
+    "Telefone",
+    "WhatsApp",
+    "E-mail",
+    "Site",
+    "Score",
+    "Status",
+    "Origem",
+    "Criado em",
+  ];
+  const rows = leads.map((lead) => [
+    lead.business_name,
+    lead.owner_name,
+    lead.category,
+    lead.city,
+    lead.state,
+    lead.phone,
+    lead.whatsapp,
+    lead.email,
+    lead.website,
+    lead.score,
+    STATUS_LABELS[lead.status] ?? lead.status,
+    channelFor(lead).label,
+    lead.created_at,
+  ]);
+  return [headers, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+}
