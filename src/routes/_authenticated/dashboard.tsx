@@ -28,6 +28,7 @@ import { FinanceiroSection } from "@/components/financeiro/FinanceiroSection";
 import { ContratosSection } from "@/components/contratos/ContratosSection";
 import { RedesignSection } from "@/components/redesign/RedesignSection";
 import { MinhasListasSection } from "@/components/leads/MinhasListasSection";
+import { ListasPremiumView } from "@/components/listas-premium/ListasPremiumView";
 import { PublicarSection } from "@/components/publicar/PublicarSection";
 import { WhatsAppSection } from "@/components/whatsapp/WhatsAppSection";
 import { CampanhasSection } from "@/components/campanhas/CampanhasSection";
@@ -222,6 +223,7 @@ function Dashboard() {
         "flex min-h-svh w-full",
         section === "home" ||
           section === "leads" ||
+          section === "listas" ||
           section === "pipeline" ||
           section === "campanhas" ||
           section === "marketing" ||
@@ -297,11 +299,28 @@ function Dashboard() {
         )}
         {section === "instagram" && <InstagramWorkspace onExit={() => selectSection("home")} />}
         {section === "listas" && (
-          <MinhasListasSection
-            onOpenRedesign={(leadId) => {
-              setFocusRedesignLead(leadId);
-              selectSection("redesign");
+          <ListasPremiumView
+            user={{
+              name: userProfile?.full_name || "João Silva",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+              plan:
+                userProfile?.plan === "enterprise"
+                  ? "Plano Enterprise"
+                  : userProfile?.plan === "growth"
+                    ? "Plano Growth"
+                    : "Plano Pro",
             }}
+            unreadNotifications={naoLidas}
+            onOpenSearch={() => selectSection("buscar")}
+            onOpenLeads={(listId) => {
+              if (listId) setFocusedLeadId(null);
+              selectSection("leads");
+            }}
+            onOpenCampaigns={() => {
+              selectSection("campanhas");
+            }}
+            onBack={() => selectSection("home")}
           />
         )}
         {section === "pipeline" && (

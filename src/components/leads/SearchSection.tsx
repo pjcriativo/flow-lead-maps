@@ -79,6 +79,7 @@ export function SearchSection({
   const [nicho, setNicho] = useState("");
   const [cidade, setCidade] = useState("");
   const [uf, setUf] = useState("");
+  const [nomeListaCustom, setNomeListaCustom] = useState("");
   const [limite, setLimite] = useState(50);
   const [buscarEmails, setBuscarEmails] = useState(true);
   const [fonte, setFonte] = useState<FonteBusca>("osm");
@@ -269,7 +270,7 @@ export function SearchSection({
       const ids = insertedIdsRef.current;
       if (ids.length > 0) {
         try {
-          const nome = nomeAutoLista(nicho, cidade, uf);
+          const nome = nomeListaCustom.trim() || nomeAutoLista(nicho, cidade, uf);
           const lista = await criarListaComLeads({
             name: nome,
             niche: nicho,
@@ -357,6 +358,28 @@ export function SearchSection({
           )}
           {noMaps && (
             <>
+              {/* Campo para nome customizado da lista (Etapa 7) */}
+              <div className="mb-3">
+                <Label
+                  htmlFor="nome-lista-custom"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Nome da lista (opcional)
+                </Label>
+                <Input
+                  id="nome-lista-custom"
+                  placeholder={
+                    nicho || cidade
+                      ? nomeAutoLista(nicho, cidade, uf)
+                      : "ex.: Clínicas Odontológicas — São Paulo"
+                  }
+                  value={nomeListaCustom}
+                  onChange={(e) => setNomeListaCustom(e.target.value)}
+                  disabled={running}
+                  className="max-w-md"
+                />
+              </div>
+
               <div className="grid gap-3 md:grid-cols-[1.6fr_1fr_100px_auto]">
                 <div>
                   <Label
