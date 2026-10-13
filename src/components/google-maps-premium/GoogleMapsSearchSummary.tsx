@@ -151,9 +151,16 @@ export function GoogleMapsSearchSummary({
 
         {/* Filtros por Captura */}
         <div className="space-y-1.5 pt-1">
-          <div className="flex items-center gap-2 text-home-muted">
-            <Sliders className="size-3.5 text-home-orange shrink-0" />
-            <span className="text-[11px] font-medium">Filtros por captura</span>
+          <div className="flex items-center justify-between text-home-muted">
+            <div className="flex items-center gap-2">
+              <Sliders className="size-3.5 text-home-orange shrink-0" />
+              <span className="text-[11px] font-medium">Filtros por captura</span>
+            </div>
+            {filtrosCaptura.length > 0 && (
+              <span className="text-[10px] font-semibold text-home-orange">
+                {filtrosCaptura.length} selecionado{filtrosCaptura.length > 1 ? "s" : ""}
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-1.5">
@@ -170,16 +177,21 @@ export function GoogleMapsSearchSummary({
                   key={f.id}
                   type="button"
                   onClick={() => onToggleFiltroCaptura(f.id)}
+                  aria-pressed={ativo}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors border",
+                    "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium transition-all duration-200 border cursor-pointer select-none",
                     ativo
-                      ? "bg-home-orange/20 border-home-orange text-white font-semibold"
-                      : "bg-[#101720] border-home-border text-home-muted hover:text-white hover:border-home-border/80",
+                      ? "bg-gradient-to-r from-[#ff6200] to-[#ff7a29] border-[#ff8c42] text-white font-bold shadow-[0_2px_12px_rgba(255,98,0,0.45)] ring-1 ring-white/20 scale-[1.02]"
+                      : "bg-[#101720] border-home-border text-home-muted hover:text-white hover:border-home-border/80 hover:bg-[#16202c]",
                   )}
                 >
-                  <Icon className="size-3" />
+                  <Icon
+                    className={cn("size-3 shrink-0", ativo ? "text-white" : "text-home-muted")}
+                  />
                   <span>{f.label}</span>
-                  {ativo && <Check className="size-3 text-home-orange" />}
+                  {ativo && (
+                    <Check className="size-3 stroke-[3] text-white shrink-0 animate-in zoom-in-75 duration-150" />
+                  )}
                 </button>
               );
             })}
