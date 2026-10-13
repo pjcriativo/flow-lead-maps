@@ -1,0 +1,459 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { posthog } from "@/lib/posthog";
+import { streamSearchLeads, type Lead, type SearchEvent } from "@/lib/leads-api";
+import { criarListaComLeads } from "@/lib/lists-api";
+import { resolveListName } from "@/lib/list-naming";
+import { geocodeCidade } from "@/lib/geo";
+import { NICHOS_POR_CATEGORIA } from "@/lib/niches";
+
+import { GoogleMapsTopbar } from "./GoogleMapsTopbar";
+import { GoogleMapsHeader } from "./GoogleMapsHeader";
+import { GoogleMapsStatsCards } from "./GoogleMapsStatsCards";
+import { GoogleMapsNicheInput } from "./GoogleMapsNicheInput";
+import { GoogleMapsCategories } from "./GoogleMapsCategories";
+import { GoogleMapsLocation } from "./GoogleMapsLocation";
+import { GoogleMapsMapPanel } from "./GoogleMapsMapPanel";
+import { GoogleMapsSearchSummary } from "./GoogleMapsSearchSummary";
+import { GoogleMapsResultsPanel } from "./GoogleMapsResultsPanel";
+import { useGoogleMapsStats } from "./useGoogleMapsStats";
+import { Radar } from "lucide-react";
+
+export interface GoogleMapsPremiumViewProps {
+  user?: {
+    name: string;
+    email: string;
+    avatarUrl: string;
+    initials: string;
+    role?: string;
+  };
+  unreadNotifications?: number;
+  onOpenMinhasListas?: () => void;
+  onFinished?: () => void;
+}
+
+export function GoogleMapsPremiumView({
+  user = {
+    name: "Marcos Gonçalves",
+    email: "marcos@flowbusiness.com",
+    avatarUrl: "",
+    initials: "MG",
+    role: "Administrador",
+  },
+  unreadNotifications = 3,
+  onOpenMinhasListas,
+  onFinished,
+}: GoogleMapsPremiumViewProps) {
+  // Hook de métricas reais da organização
+  const stats = useGoogleMapsStats();
+
+  // Estados de Configuração da Busca
+  const [nicho, setNicho] = useState("Clínica odontológica");
+  const [categoriaAtiva, setCategoriaAtiva] = useState<string | undefined>("Saúde & Bem-estar");
+  const [uf, setUf] = useState("PR");
+  const [cidade, setCidade] = useState("Curitiba");
+  const [nomeListaCustom, setNomeListaCustom] = useState("");
+  const [limite, setLimite] = useState(50);
+  const [buscarEmails, setBuscarEmails] = useState(true);
+  const [raioKm, setRaioKm] = useState(10);
+  const [filtrosCaptura, setFiltrosCaptura] = useState<string[]>([]);
+
+  // Estados do Mapa
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>({
+    lat: -25.4284,
+    lng: -49.2733,
+  });
+  const [pinManual, setPinManual] = useState(false);
+
+  // Estados Operacionais da Coleta
+  const [running, setRunning] = useState(false);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [status, setStatus] = useState("Pronto para prospecção");
+  const [progress, setProgress] = useState({ found: 0, target: 50 });
+  const [listaCriadaId, setListaCriadaId] = useState<string | undefined>();
+
+  const abortRef = useRef<AbortController | null>(null);
+  const insertedIdsRef = useRef<string[]>([]);
+  const geoAbort = useRef<AbortController | null>(null);
+
+  // Nome resolvido da lista
+  const nomeListaResolvido = resolveListName(nomeListaCustom, nicho, cidade, uf);
+
+  // Descobre a categoria correspondente ao nicho no catálogo (se houver correspondência exata)
+  const categoriaCorrespondente = useCallback((termo: string) => {
+    const t = termo.toLowerCase().trim();
+    if (!t) return undefined;
+    for (const cat of NICHOS_POR_CATEGORIA) {
+      if (cat.nichos.some((n) => n.toLowerCase().trim() === t)) {
+        return cat.categoria;
+      }
+    }
+    return undefined;
+  }, []);
+
+  // Geocodificação resiliente da cidade
+  const geocodar = useCallback(async (c: string, u: string) => {
+    if (!c.trim()) return null;
+    geoAbort.current?.abort();
+    const ctrl = new AbortController();
+    geoAbort.current = ctrl;
+
+    try {
+      const g = await geocodeCidade(c.trim(), u, ctrl.signal);
+      if (g) {
+        setPin({ lat: g.lat, lng: g.lng });
+        setPinManual(false);
+        setRaioKm(g.raioKmSugerido);
+      }
+      return g;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Ao alterar a cidade ou a UF, recalcula as coordenadas do mapa (com debounce)
+  useEffect(() => {
+    if (!cidade.trim()) return;
+    const timer = setTimeout(() => {
+      void geocodar(cidade, uf);
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [cidade, uf, geocodar]);
+
+  // Limpeza de AbortControllers ao desmontar
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      geoAbort.current?.abort();
+    };
+  }, []);
+
+  const pushLog = (line: string) =>
+    setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${line}`]);
+
+  // Seleção de Nicho a partir de Chips ou Autocomplete
+  const handleSelectNicho = (novoNicho: string, categoria?: string) => {
+    setNicho(novoNicho);
+    const cat = categoria || categoriaCorrespondente(novoNicho);
+    setCategoriaAtiva(cat);
+  };
+
+  // Alternar filtros de captura (telefone, site, instagram)
+  const handleToggleFiltroCaptura = (filtro: string) => {
+    setFiltrosCaptura((prev) =>
+      prev.includes(filtro) ? prev.filter((f) => f !== filtro) : [...prev, filtro],
+    );
+  };
+
+  // Centralizar endereço digitado no mapa
+  const handleSearchEndereco = async (endereco: string) => {
+    try {
+      const g = await geocodeCidade(endereco, uf);
+      if (g) {
+        setPin({ lat: g.lat, lng: g.lng });
+        setPinManual(true);
+        toast.success(`Mapa centralizado em: ${g.rotulo}`);
+      } else {
+        toast.error("Endereço não localizado no mapa.");
+      }
+    } catch {
+      toast.error("Erro ao localizar endereço.");
+    }
+  };
+
+  // Salvar preferências do usuário
+  const handleSalvarConfiguracao = () => {
+    try {
+      const config = { nicho, uf, cidade, limite, raioKm, buscarEmails };
+      localStorage.setItem("flow_google_maps_preset", JSON.stringify(config));
+      toast.success("Configuração de busca salva com sucesso!");
+    } catch {
+      toast.error("Falha ao salvar configuração.");
+    }
+  };
+
+  // DISPARAR PROSPECÇÃO VIA MOTOR EXISTENTE (Apify)
+  const handleIniciarProspeccao = async () => {
+    if (!nicho.trim()) {
+      toast.error("Informe um nicho para a busca.");
+      return;
+    }
+    if (!cidade.trim() && !pinManual) {
+      toast.error("Selecione um município oficial ou marque um ponto no mapa.");
+      return;
+    }
+
+    setRunning(true);
+    setLeads([]);
+    setLogs([]);
+    setProgress({ found: 0, target: limite });
+    insertedIdsRef.current = [];
+    setListaCriadaId(undefined);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let streamHadError = false;
+
+    try {
+      let centro = pin;
+      let raio = raioKm;
+
+      if (!pinManual && cidade.trim()) {
+        const g = await geocodeCidade(cidade.trim(), uf, controller.signal).catch(() => null);
+        if (g) {
+          centro = { lat: g.lat, lng: g.lng };
+          raio = g.raioKmSugerido;
+          setPin(centro);
+          setRaioKm(raio);
+        }
+      }
+
+      const usarMapa = Boolean(centro);
+      setStatus(
+        `Buscando: ${nicho} em ${cidade}${uf ? "/" + uf : ""}${usarMapa ? ` · raio ${raio}km` : ""}...`,
+      );
+      posthog.capture("search_leads_started", {
+        nicho,
+        cidade,
+        uf,
+        limite,
+        fonte: "apify",
+        usarMapa,
+      });
+
+      // Executa o motor real search-leads com provedor 'apify' explícito
+      await streamSearchLeads(
+        {
+          nicho,
+          cidade,
+          uf,
+          limite,
+          buscarEmails,
+          fonte: "apify",
+          ...(usarMapa
+            ? {
+                lat: centro!.lat,
+                lng: centro!.lng,
+                raioKm: raio,
+                usarAreaMapa: pinManual,
+              }
+            : {}),
+        },
+        (ev: SearchEvent) => {
+          switch (ev.type) {
+            case "log":
+              pushLog(ev.message);
+              break;
+            case "lead":
+              setLeads((prev) => [...prev, ev.lead]);
+              if (ev.lead.id) insertedIdsRef.current.push(ev.lead.id);
+              break;
+            case "progress":
+              setProgress({ found: ev.found, target: ev.target });
+              setStatus(`Qualificando... ${ev.found}/${ev.target} leads encontrados`);
+              break;
+            case "done":
+              setStatus(ev.inserted > 0 ? "Finalizando lista..." : "Concluído — nenhum lead novo");
+              pushLog(`Coleta finalizada. ${ev.inserted} leads encontrados no banco.`);
+              break;
+            case "error":
+              streamHadError = true;
+              setStatus(`Erro: ${ev.message}`);
+              pushLog(`✖ ${ev.message}`);
+              toast.error(ev.message);
+              break;
+          }
+        },
+        controller.signal,
+      );
+
+      // Vincula os leads inseridos em uma nova lista persistida
+      const ids = insertedIdsRef.current;
+      if (ids.length > 0) {
+        try {
+          const nomeFinal = resolveListName(nomeListaCustom, nicho, cidade, uf);
+          const lista = await criarListaComLeads({
+            name: nomeFinal,
+            niche: nicho,
+            city: cidade,
+            uf,
+            fonte: "apify",
+            radius: raio,
+            leadIds: ids,
+          });
+
+          setListaCriadaId(lista.id);
+          pushLog(
+            `🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Acesse em "Minhas Listas".`,
+          );
+          setStatus(
+            streamHadError
+              ? `Parcial — ${ids.length} leads vinculados à lista`
+              : `Concluído — ${ids.length} leads vinculados à lista`,
+          );
+          toast.success(`Lista "${lista.name}" criada com ${ids.length} leads!`);
+
+          posthog.capture("search_leads_done", {
+            inserted: ids.length,
+            partial: streamHadError,
+          });
+          posthog.capture("lead_list_created", {
+            list_id: lista.id,
+            total: ids.length,
+            nicho,
+            cidade,
+            uf,
+            fonte: "apify",
+          });
+
+          onFinished?.();
+        } catch (err) {
+          const msg = (err as Error).message ?? "Falha ao vincular leads à lista";
+          pushLog(`⚠️ Atenção: ${msg}`);
+          toast.error(msg);
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        const msg = (err as Error).message ?? "Erro inesperado na busca";
+        setStatus(`Erro: ${msg}`);
+        pushLog(`✖ ${msg}`);
+        toast.error(msg);
+      }
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
+      {/* 1. Topbar Oficial */}
+      <GoogleMapsTopbar user={user} unreadNotifications={unreadNotifications} />
+
+      {/* Conteúdo Principal com espaçamentos da referência */}
+      <main className="px-4 sm:px-6 lg:px-8 pt-5 space-y-5 max-w-[1680px] mx-auto">
+        {/* 2. Cabeçalho: Título, Descrição e Breadcrumbs */}
+        <GoogleMapsHeader />
+
+        {/* 3. Indicadores Superiores (5 cards) */}
+        <GoogleMapsStatsCards stats={stats} />
+
+        {/* 4. Composição Principal em Três Colunas */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 items-start">
+          {/* Coluna 1: Esquerda (4 cols) — Formulário de Nichos e Categorias */}
+          <section className="lg:col-span-4 rounded-2xl border border-home-border bg-home-surface/90 p-4 space-y-3.5 shadow-sm">
+            <div className="flex items-center gap-2 border-b border-home-border/60 pb-3">
+              <Radar className="size-4 text-home-orange" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+                Buscar por nicho e localização
+              </h2>
+            </div>
+
+            {/* Nome da Lista + Nicho Livre com Autocomplete */}
+            <GoogleMapsNicheInput
+              nicho={nicho}
+              onChangeNicho={(v) => {
+                setNicho(v);
+                setCategoriaAtiva(categoriaCorrespondente(v));
+              }}
+              nomeLista={nomeListaCustom}
+              onChangeNomeLista={setNomeListaCustom}
+              onSelectNicho={handleSelectNicho}
+              categoriaAtiva={categoriaAtiva}
+            />
+
+            {/* Catálogo de 132 Categorias / Segmentos */}
+            <GoogleMapsCategories
+              nichoSelecionado={nicho}
+              onSelectCategoria={(n, cat) => {
+                setNicho(n);
+                setCategoriaAtiva(cat);
+              }}
+              disabled={running}
+            />
+          </section>
+
+          {/* Coluna 2: Centro (5 cols) — Localização (UF antes de Cidade), Mapa e Raio */}
+          <section className="lg:col-span-5 space-y-3">
+            {/* Barra de Localização: UF → Cidade (IBGE) → Apify → E-mails */}
+            <GoogleMapsLocation
+              uf={uf}
+              cidade={cidade}
+              onSelectUf={(novaUf) => {
+                setUf(novaUf);
+                setCidade("");
+                setPin(null);
+                setPinManual(false);
+              }}
+              onSelectCidade={(novaCidade) => {
+                setCidade(novaCidade);
+                void geocodar(novaCidade, uf);
+              }}
+              buscarEmails={buscarEmails}
+              onToggleBuscarEmails={setBuscarEmails}
+              disabled={running}
+            />
+
+            {/* Mapa Interativo Leaflet Dark com Raio e Marcador */}
+            <GoogleMapsMapPanel
+              pin={pin}
+              raioKm={raioKm}
+              cidade={cidade}
+              uf={uf}
+              onChangeRaio={setRaioKm}
+              onPickPin={(p) => {
+                setPin(p);
+                setPinManual(true);
+              }}
+              onSearchEndereco={handleSearchEndereco}
+            />
+          </section>
+
+          {/* Coluna 3: Direita (3 cols) — Resumo da Prospecção e Ações */}
+          <section className="lg:col-span-3">
+            <GoogleMapsSearchSummary
+              nicho={nicho}
+              categoria={categoriaAtiva}
+              cidade={cidade}
+              uf={uf}
+              raioKm={raioKm}
+              limite={limite}
+              onChangeLimite={setLimite}
+              maxLimite={1000}
+              nomeLista={nomeListaResolvido}
+              onEditarNomeLista={() => {
+                const novo = window.prompt(
+                  "Nome personalizado da lista:",
+                  nomeListaCustom || nomeListaResolvido,
+                );
+                if (novo !== null) setNomeListaCustom(novo.trim());
+              }}
+              filtrosCaptura={filtrosCaptura}
+              onToggleFiltroCaptura={handleToggleFiltroCaptura}
+              buscarEmails={buscarEmails}
+              running={running}
+              onIniciar={handleIniciarProspeccao}
+              onSalvarConfiguracao={handleSalvarConfiguracao}
+            />
+          </section>
+        </div>
+
+        {/* 5. Área Inferior: Resultados da Busca */}
+        <section className="pt-2">
+          <GoogleMapsResultsPanel
+            leads={leads}
+            running={running}
+            status={status}
+            logs={logs}
+            progress={progress}
+            filtrosCaptura={filtrosCaptura}
+            onLimparFiltrosCaptura={() => setFiltrosCaptura([])}
+            listaCriadaId={listaCriadaId}
+            onVerMinhasListas={onOpenMinhasListas}
+          />
+        </section>
+      </main>
+    </div>
+  );
+}

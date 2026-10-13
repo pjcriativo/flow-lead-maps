@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { posthog } from "@/lib/posthog";
 import { SearchSection } from "@/components/leads/SearchSection";
+import { GoogleMapsPremiumView } from "@/components/google-maps-premium/GoogleMapsPremiumView";
 import { InstagramWorkspace } from "@/components/instagram/InstagramWorkspace";
 import { FlowAcademyComingSoon } from "@/components/academy/FlowAcademyComingSoon";
 import { BusinessNetworkComingSoon } from "@/components/network/BusinessNetworkComingSoon";
@@ -125,6 +126,7 @@ function Dashboard() {
     email: string;
     avatar_url: string;
     plan: string;
+    is_super_admin?: boolean;
   } | null>(null);
   const [upgradeModal, setUpgradeModal] = useState<{ isOpen: boolean; recurso: string }>({
     isOpen: false,
@@ -177,6 +179,7 @@ function Dashboard() {
             email: perfil.email ?? data.user.email ?? "",
             avatar_url: perfil.avatar_url ?? "",
             plan: perfil.plan ?? "starter",
+            is_super_admin: perfil.is_super_admin ?? false,
           });
         }
       }
@@ -269,7 +272,8 @@ function Dashboard() {
             section === "pipeline" ||
             section === "campanhas" ||
             section === "marketing" ||
-            section === "influencers") &&
+            section === "influencers" ||
+            section === "buscar") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
@@ -279,6 +283,7 @@ function Dashboard() {
             section !== "marketing" &&
             section !== "influencers" &&
             section !== "instagram" &&
+            section !== "buscar" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
       >
@@ -295,7 +300,17 @@ function Dashboard() {
           />
         )}
         {section === "buscar" && (
-          <SearchSection onOpenInstagram={() => selectSection("instagram")} />
+          <GoogleMapsPremiumView
+            user={{
+              name: userProfile?.full_name || "Marcos Gonçalves",
+              email: userProfile?.email || "marcos@flowbusiness.com",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+              role: userProfile?.is_super_admin ? "Administrador" : "Membro",
+            }}
+            unreadNotifications={naoLidas}
+            onOpenMinhasListas={() => selectSection("listas")}
+          />
         )}
         {section === "instagram" && <InstagramWorkspace onExit={() => selectSection("home")} />}
         {section === "listas" && (
