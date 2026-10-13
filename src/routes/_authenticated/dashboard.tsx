@@ -49,6 +49,7 @@ import { FlowMarketingPage } from "@/components/marketing-ai/FlowMarketingPage";
 import { AgentesEstrategiasPage } from "@/components/marketing-ai/agentes/AgentesEstrategiasPage";
 import { MarketingConteudoPage } from "@/components/marketing-ai/conteudos/MarketingConteudoPage";
 import { CalendarioPublicacoesPage } from "@/components/marketing-ai/calendario/CalendarioPublicacoesPage";
+import { MarketingResultsPage } from "@/components/marketing-ai/resultados/MarketingResultsPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -369,10 +370,14 @@ function Dashboard() {
             }}
           />
         )}
+        {section === "marketing" && marketingSubView === "resultados_roi" && (
+          <MarketingResultsPage />
+        )}
         {section === "marketing" &&
           marketingSubView !== "agentes" &&
           marketingSubView !== "campanhas_conteudo" &&
-          marketingSubView !== "calendario" && (
+          marketingSubView !== "calendario" &&
+          marketingSubView !== "resultados_roi" && (
             <FlowMarketingPage
               user={{
                 name: userProfile?.full_name || "Carlos Mendes",

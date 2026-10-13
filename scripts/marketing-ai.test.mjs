@@ -410,5 +410,91 @@ test("o painel lateral da Tela 4 possui o assistente com 6 ações e o card de a
   assert.ok(panelContent.includes("Ativar publicação automática"));
 });
 
+test("todos os componentes da Tela 5 (Resultados e ROI) existem e estão presentes", () => {
+  const requiredFiles = [
+    "src/components/marketing-ai/resultados/resultados-data.ts",
+    "src/components/marketing-ai/resultados/MarketingResultsHeader.tsx",
+    "src/components/marketing-ai/resultados/MarketingResultsKpis.tsx",
+    "src/components/marketing-ai/resultados/MarketingResultsSubnav.tsx",
+    "src/components/marketing-ai/resultados/RevenueInvestmentChart.tsx",
+    "src/components/marketing-ai/resultados/LeadsByChannelChart.tsx",
+    "src/components/marketing-ai/resultados/ChannelPerformanceChart.tsx",
+    "src/components/marketing-ai/resultados/MarketingConversionFunnel.tsx",
+    "src/components/marketing-ai/resultados/TopCampaignsTable.tsx",
+    "src/components/marketing-ai/resultados/MarketingResultsAssistantPanel.tsx",
+    "src/components/marketing-ai/resultados/GerarRelatorioModal.tsx",
+    "src/components/marketing-ai/resultados/CampanhaDetalhesDrawer.tsx",
+    "src/components/marketing-ai/resultados/AnalisarResultadosModal.tsx",
+    "src/components/marketing-ai/resultados/MarketingResultsPage.tsx",
+  ];
+
+  for (const file of requiredFiles) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo obrigatório da Tela 5 ausente: ${file}`);
+  }
+});
+
+test("a Tela 5 possui os 6 KPIs, séries financeiras, funil de 4 etapas e 4 melhores campanhas", () => {
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/marketing-ai/resultados/resultados-data.ts"),
+    "utf8",
+  );
+
+  // 6 KPIs superiores da Tela 5
+  assert.ok(dataContent.includes("Investimento total") && dataContent.includes('"R$ 4.850"'));
+  assert.ok(dataContent.includes("Receita atribuída") && dataContent.includes('"R$ 24.580"'));
+  assert.ok(dataContent.includes("ROI geral") && dataContent.includes('"406%"'));
+  assert.ok(dataContent.includes("Leads gerados") && dataContent.includes('"486"'));
+  assert.ok(dataContent.includes("Custo por lead") && dataContent.includes('"R$ 9,98"'));
+  assert.ok(dataContent.includes("Vendas realizadas") && dataContent.includes('"18"'));
+
+  // 4 Etapas do funil
+  assert.ok(dataContent.includes("Visitantes") && dataContent.includes("8420"));
+  assert.ok(dataContent.includes("Leads") && dataContent.includes("486"));
+  assert.ok(dataContent.includes("Propostas") && dataContent.includes("124"));
+  assert.ok(dataContent.includes("Vendas") && dataContent.includes("18"));
+
+  // 4 Melhores campanhas
+  assert.ok(dataContent.includes("Experiência Gastronômica") && dataContent.includes('"620%"'));
+  assert.ok(dataContent.includes("Plano Fitness Premium") && dataContent.includes('"591%"'));
+  assert.ok(dataContent.includes("Consultoria Imobiliária") && dataContent.includes('"477%"'));
+  assert.ok(dataContent.includes("Curso de Marketing Digital") && dataContent.includes('"521%"'));
+
+  // 6 Ações do Assistente e 4 Insights
+  assert.ok(dataContent.includes("Analisar desempenho geral"));
+  assert.ok(dataContent.includes("Identificar oportunidades"));
+  assert.ok(dataContent.includes("Sugerir ajustes nas campanhas"));
+  assert.ok(dataContent.includes("Alto potencial de crescimento"));
+  assert.ok(dataContent.includes("Reduzir custo por lead"));
+  assert.ok(dataContent.includes("Produto em destaque"));
+  assert.ok(dataContent.includes("Expandir para novos canais"));
+});
+
+test("o dashboard e sidebar conectam a Tela 5 (Resultados e ROI) com ready true", () => {
+  const sidebarContent = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    sidebarContent.includes('{ id: "resultados_roi" as const, label: "Resultados e ROI", icon: ChartNoAxesCombined, ready: true }'),
+    "Resultados e ROI deve estar ativo com ready: true na sidebar",
+  );
+
+  assert.ok(
+    dashContent.includes("MarketingResultsPage"),
+    "Dashboard deve importar MarketingResultsPage",
+  );
+  assert.ok(
+    dashContent.includes('marketingSubView === "resultados_roi"'),
+    "Dashboard deve renderizar MarketingResultsPage para marketingSubView === 'resultados_roi'",
+  );
+});
+
+
 
 
