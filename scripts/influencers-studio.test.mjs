@@ -141,3 +141,90 @@ test("os 6 indicadores superiores e dados da referência visual estão configura
   assert.ok(dataContent.includes("Oferta e Promoção"));
   assert.ok(dataContent.includes("Tutorial e Dicas"));
 });
+
+test("todos os componentes de Tela 2 (Biblioteca de Influencers) existem e estão presentes", () => {
+  const requiredFiles = [
+    "src/components/influencers-studio/biblioteca/biblioteca-data.ts",
+    "src/components/influencers-studio/biblioteca/InfluencersLibraryHeader.tsx",
+    "src/components/influencers-studio/biblioteca/NicheCategoriesBar.tsx",
+    "src/components/influencers-studio/biblioteca/InfluencersFiltersBar.tsx",
+    "src/components/influencers-studio/biblioteca/InfluencerCard.tsx",
+    "src/components/influencers-studio/biblioteca/InfluencersCatalogGrid.tsx",
+    "src/components/influencers-studio/biblioteca/InfluencersBottomPromoCards.tsx",
+    "src/components/influencers-studio/biblioteca/InfluencerDetailsSidebar.tsx",
+    "src/components/influencers-studio/biblioteca/UsarInfluencerModal.tsx",
+    "src/components/influencers-studio/biblioteca/InfluencersLibraryPage.tsx",
+  ];
+
+  for (const file of requiredFiles) {
+    const fullPath = path.join(root, file);
+    assert.ok(fs.existsSync(fullPath), `Arquivo da Biblioteca ausente: ${file}`);
+  }
+});
+
+test("dados da Biblioteca de Influencers contemplam 10 nichos e 10 influencers aprovados", () => {
+  const dataContent = fs.readFileSync(
+    path.join(root, "src/components/influencers-studio/biblioteca/biblioteca-data.ts"),
+    "utf8",
+  );
+
+  // 10 Categorias
+  assert.ok(dataContent.includes("NICHE_CATEGORIES"));
+  assert.ok(dataContent.includes("128 influencers"));
+  assert.ok(dataContent.includes("Lifestyle") && dataContent.includes("24 influencers"));
+  assert.ok(dataContent.includes("Negócios") && dataContent.includes("18 influencers"));
+  assert.ok(dataContent.includes("Saúde e Bem-estar") && dataContent.includes("16 influencers"));
+  assert.ok(dataContent.includes("Beleza e Moda") && dataContent.includes("18 influencers"));
+  assert.ok(dataContent.includes("Tecnologia") && dataContent.includes("12 influencers"));
+  assert.ok(dataContent.includes("Educação") && dataContent.includes("10 influencers"));
+  assert.ok(dataContent.includes("Gastronomia") && dataContent.includes("10 influencers"));
+  assert.ok(dataContent.includes("Viagens") && dataContent.includes("8 influencers"));
+  assert.ok(dataContent.includes("Esportes") && dataContent.includes("6 influencers"));
+
+  // 10 Influencers do catálogo
+  assert.ok(dataContent.includes("INFLUENCERS_CATALOG"));
+  assert.ok(dataContent.includes("Isabella") && dataContent.includes("Lifestyle e Beleza"));
+  assert.ok(dataContent.includes("Lucas") && dataContent.includes("Tecnologia e Negócios"));
+  assert.ok(dataContent.includes("Mariana") && dataContent.includes("Saúde e Bem-estar"));
+  assert.ok(dataContent.includes("Rafael") && dataContent.includes("Negócios e Finanças"));
+  assert.ok(dataContent.includes("Camila") && dataContent.includes("Moda e Lifestyle"));
+  assert.ok(dataContent.includes("Bruno") && dataContent.includes("Esportes e Saúde"));
+  assert.ok(dataContent.includes("Fernanda") && dataContent.includes("Educação e Carreira"));
+  assert.ok(dataContent.includes("Thiago") && dataContent.includes("Gastronomia"));
+  assert.ok(dataContent.includes("Juliana") && dataContent.includes("Viagens e Lifestyle"));
+  assert.ok(dataContent.includes("Mateus") && dataContent.includes("Moda Masculina"));
+
+  // Badges específicas
+  assert.ok(dataContent.includes("Mais usado"));
+  assert.ok(dataContent.includes("Novo"));
+  assert.ok(dataContent.includes("Em alta"));
+});
+
+test("DashboardSidebar ativa Biblioteca de Influencers como pronta (ready: true)", () => {
+  const sidebarContent = fs.readFileSync(
+    path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    sidebarContent.includes('{ id: "biblioteca" as const, label: "Biblioteca de Influencers", icon: Users, ready: true }'),
+    "Biblioteca de Influencers deve estar pronta (ready: true) no submenu",
+  );
+});
+
+test("a rota dashboard renderiza InfluencersLibraryPage quando influencersSubView for biblioteca", () => {
+  const dashContent = fs.readFileSync(
+    path.join(root, "src/routes/_authenticated/dashboard.tsx"),
+    "utf8",
+  );
+
+  assert.ok(
+    dashContent.includes("InfluencersLibraryPage"),
+    "Deve importar InfluencersLibraryPage",
+  );
+  assert.ok(
+    dashContent.includes('section === "influencers" && influencersSubView === "biblioteca"'),
+    "Deve renderizar condicionalmente InfluencersLibraryPage quando influencersSubView for biblioteca",
+  );
+});
+

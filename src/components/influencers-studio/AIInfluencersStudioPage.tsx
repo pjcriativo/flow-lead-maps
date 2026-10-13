@@ -24,12 +24,14 @@ interface AIInfluencersStudioPageProps {
   };
   unreadNotifications?: number;
   onNavigateToPlanos?: () => void;
+  onNavigateToBiblioteca?: () => void;
 }
 
 export const AIInfluencersStudioPage: React.FC<AIInfluencersStudioPageProps> = ({
   user,
   unreadNotifications,
   onNavigateToPlanos,
+  onNavigateToBiblioteca,
 }) => {
   // Modal states
   const [isCriarVideoOpen, setIsCriarVideoOpen] = useState(false);
@@ -117,8 +119,12 @@ export const AIInfluencersStudioPage: React.FC<AIInfluencersStudioPageProps> = (
             <AvataresDestaqueSection
               onSelectAvatar={handleSelectAvatar}
               onViewAll={() => {
-                const el = document.getElementById("avatares-destaque");
-                el?.scrollIntoView({ behavior: "smooth" });
+                if (onNavigateToBiblioteca) {
+                  onNavigateToBiblioteca();
+                } else {
+                  const el = document.getElementById("avatares-destaque");
+                  el?.scrollIntoView({ behavior: "smooth" });
+                }
               }}
             />
           </div>

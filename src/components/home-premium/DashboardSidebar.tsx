@@ -182,7 +182,7 @@ export const MARKETING_SUBITEMS = [
 
 export const INFLUENCERS_SUBITEMS = [
   { id: "visao_geral" as const, label: "Visão Geral", icon: LayoutDashboard, ready: true },
-  { id: "biblioteca" as const, label: "Biblioteca de Influencers", icon: Users, ready: false },
+  { id: "biblioteca" as const, label: "Biblioteca de Influencers", icon: Users, ready: true },
   { id: "criador" as const, label: "Criador de Avatares", icon: UserPlus, ready: false },
   { id: "ugc_studio" as const, label: "AI UGC Video Studio", icon: Video, ready: false },
   { id: "projetos" as const, label: "Projetos e Biblioteca", icon: FolderGit2, ready: false },

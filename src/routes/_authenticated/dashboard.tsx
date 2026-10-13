@@ -52,6 +52,7 @@ import { MarketingConteudoPage } from "@/components/marketing-ai/conteudos/Marke
 import { CalendarioPublicacoesPage } from "@/components/marketing-ai/calendario/CalendarioPublicacoesPage";
 import { MarketingResultsPage } from "@/components/marketing-ai/resultados/MarketingResultsPage";
 import { AIInfluencersStudioPage } from "@/components/influencers-studio/AIInfluencersStudioPage";
+import { InfluencersLibraryPage } from "@/components/influencers-studio/biblioteca/InfluencersLibraryPage";
 import { usePlanPermissions } from "@/hooks/usePlanPermissions";
 import { UpgradePlanModal } from "@/components/planos/UpgradePlanModal";
 import { listarMinhasNotificacoes } from "@/services/notificacoes";
@@ -218,7 +219,8 @@ function Dashboard() {
           section === "leads" ||
           section === "pipeline" ||
           section === "campanhas" ||
-          section === "marketing"
+          section === "marketing" ||
+          section === "influencers"
           ? "bg-home-background text-home-foreground"
           : "bg-background text-foreground",
       )}
@@ -402,7 +404,19 @@ function Dashboard() {
               }}
             />
           )}
-        {section === "influencers" && (
+        {section === "influencers" && influencersSubView === "biblioteca" && (
+          <InfluencersLibraryPage
+            user={{
+              name: userProfile?.full_name || "Carlos Mendes",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateToCriador={() => setInfluencersSubView("criador")}
+            onNavigateToUgcStudio={() => setInfluencersSubView("ugc_studio")}
+          />
+        )}
+        {section === "influencers" && influencersSubView !== "biblioteca" && (
           <AIInfluencersStudioPage
             user={{
               name: userProfile?.full_name || "Carlos Mendes",
@@ -412,6 +426,9 @@ function Dashboard() {
             unreadNotifications={naoLidas}
             onNavigateToPlanos={() => {
               selectSection("settings");
+            }}
+            onNavigateToBiblioteca={() => {
+              setInfluencersSubView("biblioteca");
             }}
           />
         )}
