@@ -21,6 +21,46 @@ export type ApifyIncrementalCachePlan = {
 
 export const APIFY_MAX_INCREMENTAL_DEPTH = 1_000;
 
+export function calcularAlvoCandidatosApify(solicitado: number, alvo: number): number {
+  const pedido = Math.max(0, Math.floor(solicitado));
+  const reserva = Math.max(0, Math.ceil(alvo));
+  return Math.min(APIFY_MAX_INCREMENTAL_DEPTH, Math.max(pedido, reserva));
+}
+
+/**
+ * Prepara candidatos em paralelo, mas confirma cada resultado em ordem e para
+ * exatamente na meta. Assim o enriquecimento lento não serializa a busca e a
+ * persistência nunca ultrapassa a quantidade contratada pelo cliente.
+ */
+export async function processarCandidatosEmLotes<T, P>({
+  candidatos,
+  tamanhoLote,
+  meta,
+  preparar,
+  consumir,
+}: {
+  candidatos: readonly T[];
+  tamanhoLote: number;
+  meta: number;
+  preparar: (candidato: T) => Promise<P>;
+  consumir: (preparado: P) => Promise<boolean>;
+}): Promise<number> {
+  const limite = Math.max(0, Math.floor(meta));
+  if (limite === 0) return 0;
+
+  const tamanho = Math.max(1, Math.floor(tamanhoLote));
+  let aceitos = 0;
+  for (let inicio = 0; inicio < candidatos.length && aceitos < limite; inicio += tamanho) {
+    const lote = candidatos.slice(inicio, inicio + tamanho);
+    const preparados = await Promise.all(lote.map(preparar));
+    for (const preparado of preparados) {
+      if (aceitos >= limite) break;
+      if (await consumir(preparado)) aceitos += 1;
+    }
+  }
+  return aceitos;
+}
+
 function normalizarTexto(value: string): string {
   return value
     .normalize("NFD")

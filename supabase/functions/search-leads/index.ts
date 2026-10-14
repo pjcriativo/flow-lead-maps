@@ -12,7 +12,7 @@ import { searchOsm } from "../_shared/providers/osm.ts";
 import { searchGeoapify, setGeoapifyKeyOverride } from "../_shared/providers/geoapify.ts";
 import { searchApify, setApifyPoolContext } from "../_shared/providers/apify.ts";
 import { searchApifyComCache } from "../_shared/apify-cache.ts";
-import { planejarColetaApify } from "../_shared/apify-economy.ts";
+import { planejarColetaApify, processarCandidatosEmLotes } from "../_shared/apify-economy.ts";
 import { searchPlaces } from "../_shared/providers/places.ts";
 import { enrichFromWebsite } from "../_shared/enrich.ts";
 import { computeScore } from "../_shared/score.ts";
@@ -39,6 +39,8 @@ const PROVIDERS: Record<Fonte, ProviderSearch> = {
   apify: searchApify,
   places: searchPlaces,
 };
+
+const ENRICHMENT_BATCH_SIZE = 20;
 
 type Body = {
   org_id?: string;
@@ -264,111 +266,124 @@ Deno.serve(async (req) => {
         send({ type: "log", message: `${candidates.length} candidatos únicos. Qualificando...` });
 
         // Fase 2 (comum a toda fonte): enriquecer, pontuar e gravar.
-        let inserted = 0;
-        for (const p of candidates) {
-          if (inserted >= limiteEfetivo) break;
-
-          // Às vezes o "site" cadastrado é, na verdade, um perfil de Instagram/Facebook.
-          let website = p.website;
-          let instagram: string | null = p.instagram;
-          let facebook: string | null = p.facebook;
-          if (website) {
-            const igm = website.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
-            const fbm = website.match(/facebook\.com\/([A-Za-z0-9_.]+)/i);
-            if (igm && !instagram) {
-              instagram = `https://instagram.com/${igm[1].replace(/\/$/, "")}`;
-              website = null;
-            } else if (fbm && !facebook) {
-              facebook = website;
-              website = null;
+        let confirmed = 0;
+        const inserted = await processarCandidatosEmLotes({
+          candidatos: candidates,
+          tamanhoLote: ENRICHMENT_BATCH_SIZE,
+          meta: limiteEfetivo,
+          preparar: async (p) => {
+            // Às vezes o "site" cadastrado é, na verdade, um perfil de Instagram/Facebook.
+            let website = p.website;
+            let instagram: string | null = p.instagram;
+            let facebook: string | null = p.facebook;
+            if (website) {
+              const igm = website.match(/instagram\.com\/([A-Za-z0-9_.]+)/i);
+              const fbm = website.match(/facebook\.com\/([A-Za-z0-9_.]+)/i);
+              if (igm && !instagram) {
+                instagram = `https://instagram.com/${igm[1].replace(/\/$/, "")}`;
+                website = null;
+              } else if (fbm && !facebook) {
+                facebook = website;
+                website = null;
+              }
             }
-          }
-          const hasWebsite = !!website;
-          let email: string | null = null;
-          let whatsapp: string | null = firstBrWhatsapp(p.phone);
-          let site = null;
+            const hasWebsite = !!website;
+            let email: string | null = null;
+            let whatsapp: string | null = firstBrWhatsapp(p.phone);
+            let site = null;
 
-          if (buscarEmails && hasWebsite) {
-            const enr = await enrichFromWebsite(website!, p.phone);
-            email = enr.email;
-            whatsapp = enr.whatsapp ?? whatsapp;
-            instagram = instagram ?? enr.instagram; // fonte tem prioridade; senão, o que o site trouxe
-            facebook = facebook ?? enr.facebook;
-            site = enr.site;
-            send({
-              type: "log",
-              message: `↳ ${p.name}: ${sanitizeGoogleMapsUserMessage(enr.debug)}`,
+            if (buscarEmails && hasWebsite) {
+              const enr = await enrichFromWebsite(website!, p.phone);
+              email = enr.email;
+              whatsapp = enr.whatsapp ?? whatsapp;
+              instagram = instagram ?? enr.instagram; // fonte tem prioridade; senão, o que o site trouxe
+              facebook = facebook ?? enr.facebook;
+              site = enr.site;
+              send({
+                type: "log",
+                message: `↳ ${p.name}: ${sanitizeGoogleMapsUserMessage(enr.debug)}`,
+              });
+            }
+
+            if (
+              !matchesCaptureFilters(
+                { phone: p.phone, whatsapp, website, instagram },
+                filtrosCaptura,
+              )
+            ) {
+              return null;
+            }
+
+            const breakdown = computeScore({
+              hasWebsite,
+              site,
+              hasInstagram: !!instagram,
+              hasFacebook: !!facebook,
+              hasWhatsapp: !!whatsapp,
+              hasPhone: !!p.phone,
+              hasEmail: !!email,
+              rating: p.rating,
+              reviewCount: p.review_count,
             });
-          }
 
-          if (
-            !matchesCaptureFilters({ phone: p.phone, whatsapp, website, instagram }, filtrosCaptura)
-          ) {
-            continue;
-          }
+            const row = {
+              org_id: orgId,
+              user_id: userId,
+              assigned_to: userId,
+              place_id: p.source_id,
+              business_name: p.name,
+              address: p.address,
+              bairro: extrairBairro(p.address),
+              city: cidade,
+              state: uf || null,
+              phone: p.phone,
+              whatsapp,
+              website,
+              category: p.category ?? nicho,
+              rating: p.rating,
+              review_count: p.review_count ?? 0,
+              has_website: hasWebsite,
+              has_phone: !!p.phone,
+              email,
+              instagram_url: instagram,
+              facebook_url: facebook,
+              latitude: p.lat,
+              longitude: p.lng,
+              score: breakdown.score,
+              score_breakdown: breakdown,
+              status: email ? "enriched" : "new",
+              enriched_at: buscarEmails && hasWebsite ? new Date().toISOString() : null,
+            };
 
-          const breakdown = computeScore({
-            hasWebsite,
-            site,
-            hasInstagram: !!instagram,
-            hasFacebook: !!facebook,
-            hasWhatsapp: !!whatsapp,
-            hasPhone: !!p.phone,
-            hasEmail: !!email,
-            rating: p.rating,
-            reviewCount: p.review_count,
-          });
+            return { p, row };
+          },
+          consumir: async (prepared) => {
+            if (!prepared) return false;
+            const { p, row } = prepared;
 
-          const row = {
-            org_id: orgId,
-            user_id: userId,
-            assigned_to: userId,
-            place_id: p.source_id,
-            business_name: p.name,
-            address: p.address,
-            bairro: extrairBairro(p.address),
-            city: cidade,
-            state: uf || null,
-            phone: p.phone,
-            whatsapp,
-            website,
-            category: p.category ?? nicho,
-            rating: p.rating,
-            review_count: p.review_count ?? 0,
-            has_website: hasWebsite,
-            has_phone: !!p.phone,
-            email,
-            instagram_url: instagram,
-            facebook_url: facebook,
-            latitude: p.lat,
-            longitude: p.lng,
-            score: breakdown.score,
-            score_breakdown: breakdown,
-            status: email ? "enriched" : "new",
-            enriched_at: buscarEmails && hasWebsite ? new Date().toISOString() : null,
-          };
+            const { data: insertedLead, error: upErr } = await supabase
+              .from("leads")
+              .upsert(row, { onConflict: "org_id,place_id", ignoreDuplicates: true })
+              .select()
+              .maybeSingle();
 
-          const { data: insertedLead, error: upErr } = await supabase
-            .from("leads")
-            .upsert(row, { onConflict: "org_id,place_id", ignoreDuplicates: true })
-            .select()
-            .maybeSingle();
-
-          if (upErr) {
-            send({ type: "log", message: `Falha ao gravar ${p.name}: ${upErr.message}` });
-            continue;
-          }
-          if (!insertedLead) {
-            send({
-              type: "log",
-              message: `${p.name} já existe nesta conta e não foi contabilizado novamente.`,
-            });
-            continue;
-          }
-          inserted++;
-          send({ type: "lead", lead: insertedLead });
-          send({ type: "progress", found: inserted, target: limiteEfetivo });
-        }
+            if (upErr) {
+              send({ type: "log", message: `Falha ao gravar ${p.name}: ${upErr.message}` });
+              return false;
+            }
+            if (!insertedLead) {
+              send({
+                type: "log",
+                message: `${p.name} já existe nesta conta e não foi contabilizado novamente.`,
+              });
+              return false;
+            }
+            confirmed += 1;
+            send({ type: "lead", lead: insertedLead });
+            send({ type: "progress", found: confirmed, target: limiteEfetivo });
+            return true;
+          },
+        });
 
         // registra o consumo REAL do mês (só o que entrou). super_admin também conta (para o
         // painel mostrar uso), mas nunca é bloqueado (limite null).

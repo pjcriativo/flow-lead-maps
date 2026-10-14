@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import {
   APIFY_MAX_INCREMENTAL_DEPTH,
+  calcularAlvoCandidatosApify,
   criarChaveCacheApify,
   planejarCacheIncrementalApify,
   selecionarIneditosApify,
@@ -206,6 +207,7 @@ export async function searchApifyComCache({
   ...params
 }: ApifyCachedSearchParams): Promise<RawPlace[]> {
   const queryKey = criarChaveCacheApify(params);
+  const alvoCandidatos = calcularAlvoCandidatosApify(params.limite, params.alvo);
   const registrarEvento = async ({
     catalogReturned,
     cacheReturned,
@@ -242,16 +244,16 @@ export async function searchApifyComCache({
     }
   };
 
-  const catalogPlaces = await buscarCatalogoCompartilhado(admin, orgId, params, params.limite);
+  const catalogPlaces = await buscarCatalogoCompartilhado(admin, orgId, params, alvoCandidatos);
   const seenComCatalogo = incluirNoHistorico(seen, catalogPlaces);
   const existing = await lerCache(admin, queryKey);
   const existingPlaces = parsePlaces(existing?.items);
   const existingFresh = cacheFresco(existing);
   const cachePlaces = existingFresh
-    ? selecionarIneditos(existingPlaces, params.limite, seenComCatalogo)
+    ? selecionarIneditos(existingPlaces, alvoCandidatos, seenComCatalogo)
     : [];
   const local = combinarFontesIneditas({
-    solicitado: params.limite,
+    solicitado: alvoCandidatos,
     catalogo: catalogPlaces,
     cache: cachePlaces,
     identidade: leadCatalogIdentity,
@@ -259,7 +261,7 @@ export async function searchApifyComCache({
   const buscaPagaRecente = await organizacaoJaPagouConsulta(admin, orgId, queryKey);
   const cacheEsgotado = existingFresh && Boolean(existing?.exhausted);
   const basePlan = planejarComplementoBaseFirst({
-    solicitado: params.limite,
+    solicitado: alvoCandidatos,
     catalogoDisponivel: local.doCatalogo,
     cacheDisponivel: local.doCache,
     pagamentoBloqueado: buscaPagaRecente || cacheEsgotado,
@@ -295,7 +297,7 @@ export async function searchApifyComCache({
   }
 
   const ineditosCache = contarIneditos(existingPlaces, seenComCatalogo);
-  const desejadoDoCacheOuProvider = Math.max(0, params.limite - local.doCatalogo);
+  const desejadoDoCacheOuProvider = Math.max(0, alvoCandidatos - local.doCatalogo);
   const existingPlan = planejarCacheIncrementalApify({
     solicitado: desejadoDoCacheOuProvider,
     itensCache: existingPlaces.length,
@@ -322,9 +324,9 @@ export async function searchApifyComCache({
   }
 
   const finalizarComCache = async (places: readonly RawPlace[], exhausted: boolean) => {
-    const filteredCache = selecionarIneditos(places, params.limite, seenComCatalogo);
+    const filteredCache = selecionarIneditos(places, alvoCandidatos, seenComCatalogo);
     const combined = combinarFontesIneditas({
-      solicitado: params.limite,
+      solicitado: alvoCandidatos,
       catalogo: catalogPlaces,
       cache: filteredCache,
       identidade: leadCatalogIdentity,
@@ -405,7 +407,7 @@ export async function searchApifyComCache({
     const seenComLocal = incluirNoHistorico(seen, local.items);
     const providerPlaces = selecionarIneditos(
       places,
-      Math.max(0, params.limite - local.items.length),
+      Math.max(0, alvoCandidatos - local.items.length),
       seenComLocal,
     );
     const result = [...local.items, ...providerPlaces];

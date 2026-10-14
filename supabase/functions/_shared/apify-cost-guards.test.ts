@@ -3,9 +3,11 @@ import test from "node:test";
 
 import { orcamentoRestanteRunApify } from "../../../src/lib/redes-teto.ts";
 import {
+  calcularAlvoCandidatosApify,
   criarChaveCacheApify,
   planejarCacheIncrementalApify,
   planejarColetaApify,
+  processarCandidatosEmLotes,
   selecionarIneditosApify,
 } from "./apify-economy.ts";
 
@@ -107,4 +109,49 @@ test("fonte esgotada nunca abre novo run mesmo sem inéditos", () => {
     }),
     { servidoDoCache: true, profundidadeColeta: 0 },
   );
+});
+
+test("meta de entrega preserva a reserva de candidatos pedida pelo pipeline", () => {
+  assert.equal(calcularAlvoCandidatosApify(100, 250), 250);
+  assert.equal(calcularAlvoCandidatosApify(100, 40), 100);
+  assert.equal(calcularAlvoCandidatosApify(100, 10_000), 1_000);
+});
+
+test("processamento em lotes limita a concorrência e para exatamente na meta", async () => {
+  let ativos = 0;
+  let maximoAtivos = 0;
+
+  const aceitos = await processarCandidatosEmLotes({
+    candidatos: Array.from({ length: 20 }, (_, index) => index),
+    tamanhoLote: 4,
+    meta: 5,
+    preparar: async (candidato) => {
+      ativos += 1;
+      maximoAtivos = Math.max(maximoAtivos, ativos);
+      await Promise.resolve();
+      ativos -= 1;
+      return candidato;
+    },
+    consumir: async (candidato) => candidato % 2 === 0,
+  });
+
+  assert.equal(aceitos, 5);
+  assert.equal(maximoAtivos, 4);
+});
+
+test("meta zero não inicia nenhum enriquecimento", async () => {
+  let preparados = 0;
+  const aceitos = await processarCandidatosEmLotes({
+    candidatos: [1, 2, 3],
+    tamanhoLote: 2,
+    meta: 0,
+    preparar: async (candidato) => {
+      preparados += 1;
+      return candidato;
+    },
+    consumir: async () => true,
+  });
+
+  assert.equal(aceitos, 0);
+  assert.equal(preparados, 0);
 });
