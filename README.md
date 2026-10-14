@@ -9,7 +9,7 @@ exporte contatos de empresas locais.
 - **Framework:** TanStack Start (SSR) + TanStack Router/Query
 - **Estilo:** Tailwind CSS v4
 - **Auth & DB:** Supabase
-- **Deploy:** Cloudflare (Nitro)
+- **Deploy:** Vercel
 
 ## Desenvolvimento
 
