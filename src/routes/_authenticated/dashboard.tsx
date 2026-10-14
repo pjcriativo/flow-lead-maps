@@ -238,6 +238,7 @@ function Dashboard() {
       {section !== "instagram" ? (
         <DashboardSidebar
           activeSection={section}
+          isSuperAdmin={userProfile?.is_super_admin === true}
           campanhasSubView={campanhasSubView}
           marketingSubView={marketingSubView}
           influencersSubView={influencersSubView}

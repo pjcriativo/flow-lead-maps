@@ -29,6 +29,7 @@ import {
   Plug,
   ScrollText,
   Share2,
+  ShieldCheck,
   Sliders,
   Sparkles,
   Users,
@@ -65,6 +66,7 @@ export type InfluencersSubView =
 
 interface DashboardSidebarProps {
   activeSection: DashboardSection;
+  isSuperAdmin: boolean;
   campanhasSubView?: CampanhasSubView;
   marketingSubView?: MarketingSubView;
   influencersSubView?: InfluencersSubView;
@@ -972,7 +974,24 @@ function UserFooter({
   );
 }
 
+function SuperAdminLink({ isCollapsed = false }: { isCollapsed?: boolean }) {
+  return (
+    <Link
+      to="/admin"
+      title={isCollapsed ? "Painel Admin" : undefined}
+      className={cn(
+        "mx-3 mb-2 flex h-9 items-center rounded-lg border border-home-orange/30 bg-home-orange/10 text-[13px] font-semibold text-home-orange transition-colors hover:bg-home-orange/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+        isCollapsed ? "justify-center px-0" : "gap-3 px-3",
+      )}
+    >
+      <ShieldCheck aria-hidden="true" className="size-4.5 shrink-0" />
+      {isCollapsed ? null : <span>Painel Admin</span>}
+    </Link>
+  );
+}
+
 export function DashboardSidebar(props: DashboardSidebarProps) {
+  const { isSuperAdmin } = props;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -1040,6 +1059,7 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
           unreadNotifications={props.unreadNotifications}
           isCollapsed={isCollapsed}
         />
+        {isSuperAdmin ? <SuperAdminLink isCollapsed={isCollapsed} /> : null}
         <UserFooter user={props.user} onNavigate={props.onNavigate} isCollapsed={isCollapsed} />
       </aside>
 
@@ -1087,6 +1107,7 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
               unreadNotifications={props.unreadNotifications}
               onClose={() => setMobileOpen(false)}
             />
+            {isSuperAdmin ? <SuperAdminLink /> : null}
             <UserFooter user={props.user} onNavigate={props.onNavigate} />
           </aside>
         </div>
