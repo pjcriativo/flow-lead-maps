@@ -18,6 +18,7 @@ import { GoogleMapsSearchSummary } from "./GoogleMapsSearchSummary";
 import { GoogleMapsResultsPanel } from "./GoogleMapsResultsPanel";
 import { GoogleMapsRunningView } from "./GoogleMapsRunningView";
 import { GoogleMapsSearchResultsView } from "./GoogleMapsSearchResultsView";
+import { GoogleMapsApproachView } from "./GoogleMapsApproachView";
 import { useGoogleMapsStats } from "./useGoogleMapsStats";
 import { Radar } from "lucide-react";
 
@@ -83,12 +84,15 @@ export function GoogleMapsPremiumView({
   const insertedIdsRef = useRef<string[]>([]);
   const geoAbort = useRef<AbortController | null>(null);
 
-  // Estados de visualização: "config" (Tela 01), "running" (Tela 02) ou "results" (Tela 03)
-  const [activeView, setActiveView] = useState<"config" | "running" | "results">("config");
+  // Estados de visualização: "config" (Tela 01), "running" (Tela 02), "results" (Tela 03) ou "approach" (Tela 04)
+  const [activeView, setActiveView] = useState<"config" | "running" | "results" | "approach">(
+    "config",
+  );
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [duplicatasCount, setDuplicatasCount] = useState(0);
   const [isParcial, setIsParcial] = useState(false);
   const [dataUltimaBusca, setDataUltimaBusca] = useState<string>("");
+  const [approachSelectedIds, setApproachSelectedIds] = useState<Set<string>>(new Set());
 
   // Timer em tempo real durante a execução ativa
   useEffect(() => {
@@ -446,6 +450,31 @@ export function GoogleMapsPremiumView({
         onVerMinhasListas={onOpenMinhasListas}
         onOpenLeads={onOpenLeads}
         onOpenCampanhas={onOpenCampanhas}
+        onPrepararAbordagem={(selectedIds) => {
+          setApproachSelectedIds(selectedIds);
+          setActiveView("approach");
+        }}
+      />
+    );
+  }
+
+  // Renderização da Tela 04: Preparar Abordagem Comercial
+  if (activeView === "approach") {
+    return (
+      <GoogleMapsApproachView
+        user={user}
+        unreadNotifications={unreadNotifications}
+        leads={leads}
+        initialSelectedLeadIds={approachSelectedIds}
+        nicho={nicho}
+        categoria={categoriaAtiva}
+        cidade={cidade}
+        uf={uf}
+        nomeLista={nomeListaResolvido}
+        listaCriadaId={listaCriadaId}
+        onVoltarParaResultados={() => setActiveView("results")}
+        onOpenCampanhas={onOpenCampanhas}
+        onOpenMinhasListas={onOpenMinhasListas}
       />
     );
   }

@@ -52,6 +52,7 @@ export interface GoogleMapsSearchResultsViewProps {
   onVerMinhasListas?: () => void;
   onOpenLeads?: (leadId?: string) => void;
   onOpenCampanhas?: () => void;
+  onPrepararAbordagem?: (selectedLeadIds: Set<string>) => void;
 }
 
 /** Sanitização anti-CSV Formula Injection conforme boas práticas OWASP */
@@ -86,6 +87,7 @@ export function GoogleMapsSearchResultsView({
   onVerMinhasListas,
   onOpenLeads,
   onOpenCampanhas,
+  onPrepararAbordagem,
 }: GoogleMapsSearchResultsViewProps) {
   // Formatação amigável da data da busca
   const dataBuscaFormatada = useMemo(() => {
@@ -550,7 +552,9 @@ export function GoogleMapsSearchResultsView({
             onExportarSelecionados={handleExportCsv}
             onVerNoMapa={() => setModalMapaAberto(true)}
             onEnviarParaCampanha={() => {
-              if (onOpenCampanhas) {
+              if (onPrepararAbordagem) {
+                onPrepararAbordagem(selectedLeadIds);
+              } else if (onOpenCampanhas) {
                 onOpenCampanhas();
               } else {
                 toast.info("Módulo de Campanhas pronto para estruturação.");
