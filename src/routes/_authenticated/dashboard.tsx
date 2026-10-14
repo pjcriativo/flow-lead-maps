@@ -116,6 +116,7 @@ function Dashboard() {
   const [selectedCampanhaContext, setSelectedCampanhaContext] = useState<Campanha | null>(null);
   const [focusRedesignLead, setFocusRedesignLead] = useState<string | null>(null);
   const [focusedLeadId, setFocusedLeadId] = useState<string | null>(null);
+  const [preselectedListId, setPreselectedListId] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState("");
   const [sheetVerified, setSheetVerified] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
@@ -343,6 +344,10 @@ function Dashboard() {
             onOpenCampaigns={() => {
               selectSection("campanhas");
             }}
+            onOpenCampaignsWithList={(listId) => {
+              setPreselectedListId(listId);
+              selectSection("campanhas");
+            }}
             onBack={() => selectSection("home")}
           />
         )}
@@ -389,6 +394,8 @@ function Dashboard() {
             onSubViewChange={(sub) => setCampanhasSubView(sub)}
             selectedCampanhaContext={selectedCampanhaContext}
             onSelectCampanhaContext={(c) => setSelectedCampanhaContext(c)}
+            preselectedListId={preselectedListId}
+            onClearPreselectedList={() => setPreselectedListId(null)}
           />
         )}
         {section === "marketing" && marketingSubView === "calendario" && (

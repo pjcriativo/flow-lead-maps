@@ -24,6 +24,7 @@ export interface ListasPremiumViewProps {
   onOpenSearch?: () => void;
   onOpenLeads?: (listId?: string) => void;
   onOpenCampaigns?: (campId?: string) => void;
+  onOpenCampaignsWithList?: (listId: string) => void;
   onBack?: () => void;
 }
 
@@ -38,6 +39,7 @@ export function ListasPremiumView({
   onOpenSearch = () => {},
   onOpenLeads = () => {},
   onOpenCampaigns = () => {},
+  onOpenCampaignsWithList = () => {},
   onBack,
 }: ListasPremiumViewProps) {
   const {
@@ -114,8 +116,7 @@ export function ListasPremiumView({
               onRenameList={handleOpenRename}
               onExportList={handleExport}
               onCreateCampaign={(l) => {
-                setSelectedListId(l.id);
-                setIsCriarCampanhaOpen(true);
+                onOpenCampaignsWithList(l.id);
               }}
               onDeleteList={(l) => handleExcluir(l.id)}
             />
@@ -131,7 +132,9 @@ export function ListasPremiumView({
                 linkedCampaigns={linkedCampaigns}
                 onRename={() => handleOpenRename(selectedList)}
                 onExport={() => handleExport(selectedList)}
-                onCreateCampaign={() => setIsCriarCampanhaOpen(true)}
+                onCreateCampaign={() => {
+                  onOpenCampaignsWithList(selectedList!.id);
+                }}
                 onOpenLeadsCentral={() => onOpenLeads(selectedList.id)}
                 onOpenCampaignsCentral={() => onOpenCampaigns()}
               />

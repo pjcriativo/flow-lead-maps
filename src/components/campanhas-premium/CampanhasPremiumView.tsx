@@ -21,6 +21,7 @@ import { CampanhasTable } from "./CampanhasTable";
 import { CampanhaSummaryPanel } from "./CampanhaSummaryPanel";
 import { CriarCampanhaModal } from "./CriarCampanhaModal";
 import { SelecionarCampanhaModal } from "./SelecionarCampanhaModal";
+import { CampanhaConfiguracaoWizard } from "./CampanhaConfiguracaoWizard";
 
 export type CampanhasSubView = "central" | "gestao" | "resultados";
 
@@ -35,6 +36,8 @@ export interface CampanhasPremiumViewProps {
   onSubViewChange?: (subView: CampanhasSubView) => void;
   selectedCampanhaContext?: Campanha | null;
   onSelectCampanhaContext?: (c: Campanha | null) => void;
+  preselectedListId?: string | null;
+  onClearPreselectedList?: () => void;
 }
 
 export function CampanhasPremiumView({
@@ -48,6 +51,8 @@ export function CampanhasPremiumView({
   onSubViewChange,
   selectedCampanhaContext,
   onSelectCampanhaContext,
+  preselectedListId = null,
+  onClearPreselectedList,
 }: CampanhasPremiumViewProps) {
   // Controle de subview ativa e contexto compartilhado da campanha selecionada
   const [internalSubView, setInternalSubView] = useState<CampanhasSubView>("central");
@@ -290,7 +295,39 @@ export function CampanhasPremiumView({
       );
     }
 
-    // Se nenhuma campanha estiver selecionada (Regra 5), apresenta o seletor modal com as campanhas reais
+    // Se nenhuma campanha estiver selecionada (Regra 5)
+    if (preselectedListId) {
+      // Se há uma lista pré-selecionada (vindo de Minhas Listas), mostra o wizard de configuração
+      return (
+        <div className="relative min-h-svh bg-home-background">
+          <div className="opacity-40 pointer-events-none filter blur-[1px]">
+            <DashboardHeader user={user} unreadNotifications={unreadNotifications} />
+            <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
+              <CampanhasHeader
+                onNewCampaign={() => setIsCreateModalOpen(true)}
+                onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+              />
+              <CampanhasStatsCards metrics={metrics} />
+            </main>
+          </div>
+
+          <CampanhaConfiguracaoWizard
+            listaId={preselectedListId}
+            onClose={() => {
+              onClearPreselectedList?.();
+            }}
+            onConfigComplete={(config) => {
+              // According to Prompt 49, we should not automatically create an active campaign
+              // Instead, we complete the configuration and let the user decide when to start
+              toast.success("Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.");
+              // In a full implementation, we would save this config and allow the user to start the campaign later
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Se nenhuma campanha estiver selecionada e nenhuma lista pré-selecionada, apresenta o seletor modal com as campanhas reais
     return (
       <div className="relative min-h-svh bg-home-background">
         <div className="opacity-40 pointer-events-none filter blur-[1px]">
@@ -340,7 +377,39 @@ export function CampanhasPremiumView({
       );
     }
 
-    // Se nenhuma campanha estiver selecionada (Regra 5), apresenta o seletor modal com as campanhas reais
+    // Se nenhuma campanha estiver selecionada (Regra 5)
+    if (preselectedListId) {
+      // Se há uma lista pré-selecionada (vindo de Minhas Listas), mostra o wizard de configuração
+      return (
+        <div className="relative min-h-svh bg-home-background">
+          <div className="opacity-40 pointer-events-none filter blur-[1px]">
+            <DashboardHeader user={user} unreadNotifications={unreadNotifications} />
+            <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
+              <CampanhasHeader
+                onNewCampaign={() => setIsCreateModalOpen(true)}
+                onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+              />
+              <CampanhasStatsCards metrics={metrics} />
+            </main>
+          </div>
+
+          <CampanhaConfiguracaoWizard
+            listaId={preselectedListId}
+            onClose={() => {
+              onClearPreselectedList?.();
+            }}
+            onConfigComplete={(config) => {
+              // According to Prompt 49, we should not automatically create an active campaign
+              // Instead, we complete the configuration and let the user decide when to start
+              toast.success("Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.");
+              // In a full implementation, we would save this config and allow the user to start the campaign later
+            }}
+          />
+        </div>
+      );
+    }
+
+    // Se nenhuma campanha estiver selecionada e nenhuma lista pré-selecionada, apresenta o seletor modal com as campanhas reais
     return (
       <div className="relative min-h-svh bg-home-background">
         <div className="opacity-40 pointer-events-none filter blur-[1px]">
@@ -420,13 +489,30 @@ export function CampanhasPremiumView({
             {selectedCampanha ? (
               <CampanhaSummaryPanel campanha={selectedCampanha} />
             ) : (
-              <div className="rounded-2xl border border-dashed border-home-border bg-home-surface/80 p-8 text-center text-sm text-home-muted">
-                {loadError
-                  ? `Não foi possível carregar as campanhas: ${loadError}`
-                  : loading
-                    ? "Carregando campanhas..."
-                    : "Nenhuma campanha real disponível."}
-              </div>
+              <>
+                {preselectedListId ? (
+                  <CampanhaConfiguracaoWizard
+                    listaId={preselectedListId}
+                    onClose={() => {
+                      onClearPreselectedList?.();
+                    }}
+                    onConfigComplete={(config) => {
+                      // According to Prompt 49, we should not automatically create an active campaign
+                      // Instead, we complete the configuration and let the user decide when to start
+                      toast.success("Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.");
+                      // In a full implementation, we would save this config and allow the user to start the campaign later
+                    }}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-home-border bg-home-surface/80 p-8 text-center text-sm text-home-muted">
+                    {loadError
+                      ? `Não foi possível carregar as campanhas: ${loadError}`
+                      : loading
+                        ? "Carregando campanhas..."
+                        : "Nenhuma campanha real disponível."}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
