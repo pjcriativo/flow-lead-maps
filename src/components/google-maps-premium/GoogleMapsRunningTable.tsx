@@ -7,12 +7,18 @@ interface GoogleMapsRunningTableProps {
   leads: Lead[];
   running: boolean;
   duplicatasCount: number;
+  paginaAtual?: number;
+  itensPorPagina?: number;
+  totalLeads?: number;
 }
 
 export function GoogleMapsRunningTable({
   leads,
   running,
   duplicatasCount,
+  paginaAtual = 1,
+  itensPorPagina = 10,
+  totalLeads = 0,
 }: GoogleMapsRunningTableProps) {
   const [tabFiltro, setTabFiltro] = useState<"todos" | "ineditos" | "duplicatas">("todos");
   const [buscaNome, setBuscaNome] = useState("");
@@ -33,8 +39,16 @@ export function GoogleMapsRunningTable({
     return res;
   }, [leads, buscaNome]);
 
-  const totalIneditos = leads.length;
-  const totalGeral = leads.length + duplicatasCount;
+  const totalIneditos = leadsFiltrados.length;
+  const totalGeral = leadsFiltrados.length + duplicatasCount;
+
+  // Paginação dos resultados filtrados
+  const leadsPaginados = useMemo(() => {
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    return leadsFiltrados.slice(inicio, inicio + itensPorPagina);
+  }, [leadsFiltrados, paginaAtual, itensPorPagina]);
+
+  const totalPaginas = Math.max(1, Math.ceil(totalGeral / itensPorPagina));
 
   // Exportar dados em CSV
   const handleExportarCSV = () => {
@@ -226,7 +240,7 @@ export function GoogleMapsRunningTable({
                 </td>
               </tr>
             ) : (
-              leadsFiltrados.map((lead) => {
+              leadsPaginados.map((lead) => {
                 const isSelected = selecionados.includes(lead.id);
 
                 return (

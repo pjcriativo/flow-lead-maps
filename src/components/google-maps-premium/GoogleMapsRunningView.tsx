@@ -75,6 +75,9 @@ export function GoogleMapsRunningView({
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [modalCancelarAberto, setModalCancelarAberto] = useState(false);
   const [lastUpdate, setLastUpdate] = useState("");
+  // Estados de Paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(10);
 
   // Atualiza timestamp da última atividade recebida
   useEffect(() => {
@@ -148,6 +151,18 @@ export function GoogleMapsRunningView({
               </div>
             </div>
           </div>
+
+          {/* Botão: Voltar à configuração (visível quando não está running) */}
+          {!running && (
+            <button
+              type="button"
+              onClick={onVoltarConfiguracao}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+            >
+              <span className="text-xs font-medium">←</span>
+              <span>Voltar à configuração</span>
+            </button>
+          )}
 
           {/* Botões do Topo Direito (Ver detalhes e Cancelar busca) */}
           <div className="flex items-center gap-2.5 shrink-0">
@@ -249,7 +264,81 @@ export function GoogleMapsRunningView({
             leads={leads}
             running={running}
             duplicatasCount={duplicatasCount}
+            paginaAtual={paginaAtual}
+            itensPorPagina={itensPorPagina}
+            totalLeads={leads.length + duplicatasCount}
           />
+
+          {/* Controles de Paginação */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 space-y-3 sm:space-y-0">
+            {/* Informações de Paginação */}
+            <div className="text-xs text-home-muted">
+              {/* Calculamos os totais filtrados para consistência com a tabela */}
+              {(tabFiltro === "duplicatas" ? (
+                duplicatasCount > 0 ? (
+                  <>
+                    {duplicatasCount} empresas já pertenciam à sua organização
+                  </>
+                ) : (
+                  "Nenhuma duplicata descartada nesta execução."
+                )
+              ) : (
+                leadsFiltrados.length === 0 ? (
+                  running
+                    ? "Buscando e qualificando empresas na região..."
+                    : "Nenhum lead encontrado."
+                ) : (
+                  <>
+                    Mostrando {(paginaAtual - 1) * itensPorPagina + 1}-{Math.min(paginaAtual * itensPorPagina, leadsFiltrados.length + duplicatasCount)} de {leadsFiltrados.length + duplicatasCount} leads
+                  </>
+              ))}
+            </div>
+
+            {/* Controles de Navegação e Tamanho da Página */}
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
+              {/* Seletor de Itens por Página */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-home-muted">Itens por página:</span>
+                <select
+                  value={itensPorPagina}
+                  onChange={(e) => {
+                    setItensPorPagina(Number(e.target.value));
+                    setPaginaAtual(1); // Reset para primeira página ao mudar o tamanho
+                  }}
+                  className="h-8 rounded-xl border border-home-border bg-[#101720] px-3 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option
+                </select>
+              </div>
+
+              {/* Navegação de Páginas */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))]
+                  disabled={paginaAtual <= 1 || (tabFiltro !== "duplicatas" && leadsFiltrados.length === 0 && duplicatasCount === 0)}
+                  className="flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+                >
+                  <span className="text-xs font-medium">←</span>
+                  <span>Anterior</span>
+                </button>
+
+                <span className="text-xs text-home-muted">
+                  Página {paginaAtual} de {Math.max(1, tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina))}
+                </span>
+
+                <button
+                  onClick={() => setPaginaAtual(Math.min(tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina), paginaAtual + 1))}
+                  disabled={paginaAtual >= Math.max(1, tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina)) || (tabFiltro !== "duplicatas" && leadsFiltrados.length === 0 && duplicatasCount === 0)}
+                  className="flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+                >
+                  <span>Próximo</span>
+                  <span className="text-xs font-medium">→</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
 
