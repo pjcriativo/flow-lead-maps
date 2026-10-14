@@ -251,7 +251,7 @@ export function GoogleMapsMapPanel({
 
         {/* Atribuição no Canto Inferior Direito */}
         <div className="absolute bottom-1 right-2 z-[400] text-[9px] text-home-muted/60 select-none">
-          Leaflet | © OpenStreetMap contributors
+          © Dados cartográficos
         </div>
       </div>
 

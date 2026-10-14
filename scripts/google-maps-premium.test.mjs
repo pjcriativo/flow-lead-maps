@@ -34,6 +34,40 @@ const ibge = readFileSync("src/lib/ibge.ts", "utf8");
 const statsHook = readFileSync("src/components/google-maps-premium/useGoogleMapsStats.ts", "utf8");
 const dashboardRoute = readFileSync("src/routes/_authenticated/dashboard.tsx", "utf8");
 const sidebar = readFileSync("src/components/home-premium/DashboardSidebar.tsx", "utf8");
+const leadsApi = readFileSync("src/lib/leads-api.ts", "utf8");
+const searchFunction = readFileSync("supabase/functions/search-leads/index.ts", "utf8");
+const runningConfig = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsRunningConfigCard.tsx",
+  "utf8",
+);
+const runningStepper = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsRunningStepper.tsx",
+  "utf8",
+);
+const runningView = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsRunningView.tsx",
+  "utf8",
+);
+const resultsHeader = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsResultsHeader.tsx",
+  "utf8",
+);
+const companyDetails = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsCompanyDetails.tsx",
+  "utf8",
+);
+const historyDetails = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsHistoryDetails.tsx",
+  "utf8",
+);
+const historyHook = readFileSync(
+  "src/components/google-maps-premium/useGoogleMapsHistory.ts",
+  "utf8",
+);
+const searchResultsView = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsSearchResultsView.tsx",
+  "utf8",
+);
 
 // 1. Renderização da interface
 test("1. Renderização da interface: a View principal reúne todos os blocos do layout", () => {
@@ -159,13 +193,21 @@ test("16. Filtros por captura: permite alternar telefone, site e instagram", () 
   assert.match(summary, /id:\s*"site"/);
   assert.match(summary, /id:\s*"instagram"/);
   assert.match(resultsPanel, /capturaOk/);
+  assert.match(summary, /aria-pressed=\{ativo\}/);
+  assert.match(view, /toggleCaptureFilter/);
+  assert.match(view, /const config = \{[^}]*filtrosCaptura/s);
+  assert.match(view, /buscarEmails,\s*filtrosCaptura,\s*fonte:/);
+  assert.match(leadsApi, /filtrosCaptura:\s*CaptureFilter\[\]/);
+  assert.match(leadsApi, /filtros_captura:\s*params\.filtrosCaptura/);
+  assert.match(searchFunction, /filtros_captura\?:\s*unknown/);
+  assert.match(searchFunction, /matchesCaptureFilters/);
 });
 
 // 17. Enriquecimento por e-mail
 test("17. Enriquecimento por e-mail: controle 'Buscar e-mails (visita ao site)' com switch", () => {
   assert.match(location, /Buscar e-mails/);
   assert.match(location, /Switch/);
-  assert.match(view, /buscarEmails,\s*fonte:\s*"apify"/);
+  assert.match(view, /buscarEmails,\s*filtrosCaptura,\s*fonte:\s*"apify"/);
 });
 
 // 18. Quantidade por plano
@@ -174,10 +216,31 @@ test("18. Quantidade por plano: slider de quantidade respeita teto máximo", () 
   assert.match(summary, /max=\{Math\.min\(maxLimite,\s*500\)\}/);
 });
 
-// 19. Origem Apify explícita
-test("19. Origem Apify explícita: chamada do Google Maps envia obrigatoriamente fonte: 'apify'", () => {
+// 19. Origem técnica oculta
+test("19. Origem técnica oculta: integração configurada sem revelar fornecedor", () => {
   assert.match(view, /fonte:\s*"apify"/);
-  assert.match(location, /Google Maps \(Apify\)/);
+  assert.doesNotMatch(location, /Apify|Geoapify|OpenStreetMap|Scraper/i);
+  assert.match(location, /Base conectada/);
+});
+
+test("19.1. Nenhuma tela, modal ou exportacao do modulo revela fornecedor tecnico", () => {
+  const userFacingModules = [
+    location,
+    summary,
+    runningConfig,
+    runningStepper,
+    runningView,
+    resultsHeader,
+    companyDetails,
+    historyDetails,
+    searchResultsView,
+  ];
+  const forbidden = /Apify|Geoapify|OpenStreetMap|Google Places|Scraper|Provedor/i;
+
+  for (const moduleSource of userFacingModules) {
+    assert.doesNotMatch(moduleSource, forbidden);
+  }
+  assert.doesNotMatch(historyHook, /"Provedor"|sanitizeCsvField\(item\.provedor\)/);
 });
 
 // 20. Ausência de fallback silencioso para OSM
@@ -222,7 +285,7 @@ test("24. Área de resultados preservada: status, 4 contadores, tabela ao vivo e
 // 25. Estados de erro
 test("25. Estados de erro: falhas na busca geram log explícito e toast de erro", () => {
   assert.match(view, /toast\.error/);
-  assert.match(view, /pushLog\(`✖ \$\{ev\.message\}`\)/);
+  assert.match(view, /pushLog\(`✖ \$\{sanitizeGoogleMapsUserMessage\(ev\.message\)\}`\)/);
   assert.match(resultsPanel, /status\.startsWith\("Erro"\)/);
 });
 

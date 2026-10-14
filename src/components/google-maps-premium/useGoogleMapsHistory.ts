@@ -31,19 +31,34 @@ function resolverCategoriaPorNicho(nicho: string): string {
   if (t.includes("odont") || t.includes("médic") || t.includes("saúde") || t.includes("clínica")) {
     return "Saúde & Bem-estar";
   }
-  if (t.includes("restaurante") || t.includes("comida") || t.includes("café") || t.includes("pizz")) {
+  if (
+    t.includes("restaurante") ||
+    t.includes("comida") ||
+    t.includes("café") ||
+    t.includes("pizz")
+  ) {
     return "Alimentação";
   }
   if (t.includes("academia") || t.includes("crossfit") || t.includes("fitness")) {
     return "Saúde & Bem-estar";
   }
-  if (t.includes("beleza") || t.includes("estética") || t.includes("salão") || t.includes("barbearia")) {
+  if (
+    t.includes("beleza") ||
+    t.includes("estética") ||
+    t.includes("salão") ||
+    t.includes("barbearia")
+  ) {
     return "Beleza & Estética";
   }
   if (t.includes("roupa") || t.includes("loja") || t.includes("moda") || t.includes("calçado")) {
     return "Varejo";
   }
-  if (t.includes("oficina") || t.includes("mecânica") || t.includes("auto") || t.includes("carro")) {
+  if (
+    t.includes("oficina") ||
+    t.includes("mecânica") ||
+    t.includes("auto") ||
+    t.includes("carro")
+  ) {
     return "Automotivo";
   }
   if (t.includes("hotel") || t.includes("pousada") || t.includes("hospedag")) {
@@ -113,7 +128,7 @@ export function useGoogleMapsHistory() {
 
       // 3. Obter leads agregados por lista para métricas de contato e coordenadas
       const listIds = (listas ?? []).map((l) => l.id);
-      let leadsPorLista = new Map<string, Lead[]>();
+      const leadsPorLista = new Map<string, Lead[]>();
 
       if (listIds.length > 0) {
         const { data: leadsData, error: errLeads } = await supabase
@@ -137,7 +152,8 @@ export function useGoogleMapsHistory() {
 
       for (const lista of listas ?? []) {
         const leadsLista = leadsPorLista.get(lista.id) || [];
-        const nicho = lista.niche && lista.niche !== "—" ? lista.niche : lista.name.split(" — ")[0] || "Geral";
+        const nicho =
+          lista.niche && lista.niche !== "—" ? lista.niche : lista.name.split(" — ")[0] || "Geral";
         const categoria = resolverCategoriaPorNicho(nicho);
         const cidade = lista.city && lista.city !== "—" ? lista.city : "Curitiba";
         const uf = lista.uf || "PR";
@@ -151,11 +167,12 @@ export function useGoogleMapsHistory() {
 
         // Encontrar primeiro ponto com coordenadas válidas para o mini-mapa
         const leadComGeo = leadsLista.find((l) => l.latitude != null && l.longitude != null);
-        const center = leadComGeo && leadComGeo.latitude && leadComGeo.longitude
-          ? { lat: Number(leadComGeo.latitude), lng: Number(leadComGeo.longitude) }
-          : cidade.toLowerCase().includes("curitiba")
-            ? { lat: -25.4284, lng: -49.2733 }
-            : null;
+        const center =
+          leadComGeo && leadComGeo.latitude && leadComGeo.longitude
+            ? { lat: Number(leadComGeo.latitude), lng: Number(leadComGeo.longitude) }
+            : cidade.toLowerCase().includes("curitiba")
+              ? { lat: -25.4284, lng: -49.2733 }
+              : null;
 
         // Determinar status comprovado
         let status: SearchHistoryStatus = "concluida";
@@ -183,7 +200,6 @@ export function useGoogleMapsHistory() {
           status,
           statusLabel,
           tempoColeta: null, // "—" para não inventar métrica não persistida
-          provedor: lista.fonte ? `Apify (${lista.fonte.toUpperCase()})` : "Google Maps",
           nomeLista: lista.name,
           center,
           emailsCount,
@@ -206,11 +222,14 @@ export function useGoogleMapsHistory() {
         // Evitar duplicar se já foi representado por uma lista no mesmo minuto
         const logTime = new Date(log.created_at).getTime();
         const jaExiste = itensConstruidos.some(
-          (item) => Math.abs(item.timestamp - logTime) < 60000 && item.nicho.toLowerCase() === nicho.toLowerCase(),
+          (item) =>
+            Math.abs(item.timestamp - logTime) < 60000 &&
+            item.nicho.toLowerCase() === nicho.toLowerCase(),
         );
 
         if (!jaExiste) {
-          const isError = runStatus === "FAILED" || runStatus === "ABORTED" || runStatus === "TIMED-OUT";
+          const isError =
+            runStatus === "FAILED" || runStatus === "ABORTED" || runStatus === "TIMED-OUT";
           const status: SearchHistoryStatus = isError ? "erro" : "parcial";
           const statusLabel = isError ? "Erro" : "Parcial";
 
@@ -232,7 +251,6 @@ export function useGoogleMapsHistory() {
             status,
             statusLabel,
             tempoColeta: null,
-            provedor: "Google Maps",
             nomeLista: null,
             center: null,
             emailsCount: 0,
@@ -369,7 +387,10 @@ export function useGoogleMapsHistory() {
       }
 
       // Categoria
-      if (filters.categoria !== "todas" && item.categoria.toLowerCase() !== filters.categoria.toLowerCase()) {
+      if (
+        filters.categoria !== "todas" &&
+        item.categoria.toLowerCase() !== filters.categoria.toLowerCase()
+      ) {
         return false;
       }
 
@@ -432,7 +453,8 @@ export function useGoogleMapsHistory() {
     const buscasConcluidas = filteredItems.filter((i) => i.status === "concluida").length;
     const taxaSucesso = totalBuscas > 0 ? Math.round((buscasConcluidas / totalBuscas) * 100) : 0;
     const taxaSucessoFormatada = totalBuscas > 0 ? `${taxaSucesso}%` : "—";
-    const taxaSucessoSub = totalBuscas > 0 ? `${buscasConcluidas} de ${totalBuscas} buscas` : "Nenhuma busca no período";
+    const taxaSucessoSub =
+      totalBuscas > 0 ? `${buscasConcluidas} de ${totalBuscas} buscas` : "Nenhuma busca no período";
 
     // Período subtext
     let periodoLabel = "nos últimos 90 dias";
@@ -506,9 +528,7 @@ export function useGoogleMapsHistory() {
     (itensParaExportar?: SearchHistoryItem[]) => {
       const exportList =
         itensParaExportar ||
-        (selectedRowIds.size > 0
-          ? items.filter((i) => selectedRowIds.has(i.id))
-          : sortedItems);
+        (selectedRowIds.size > 0 ? items.filter((i) => selectedRowIds.has(i.id)) : sortedItems);
 
       if (exportList.length === 0) return;
 
@@ -525,7 +545,6 @@ export function useGoogleMapsHistory() {
         "Duplicatas",
         "Status",
         "Nome da Lista",
-        "Provedor",
       ];
 
       const rows = exportList.map((item) => [
@@ -541,7 +560,6 @@ export function useGoogleMapsHistory() {
         sanitizeCsvField(item.duplicatas),
         sanitizeCsvField(item.statusLabel),
         sanitizeCsvField(item.nomeLista || "—"),
-        sanitizeCsvField(item.provedor),
       ]);
 
       const csvContent =

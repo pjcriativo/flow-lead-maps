@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { CaptureFilter } from "@/lib/google-maps-capture";
 
 interface GoogleMapsRunningConfigCardProps {
   nicho: string;
@@ -20,7 +21,7 @@ interface GoogleMapsRunningConfigCardProps {
   limite: number;
   nomeLista: string;
   buscarEmails: boolean;
-  filtrosCaptura: string[];
+  filtrosCaptura: CaptureFilter[];
   running: boolean;
   onEditarConfiguracao: () => void;
 }
@@ -127,7 +128,7 @@ export function GoogleMapsRunningConfigCard({
             <span className="text-[11px] font-medium">Fonte de busca</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-white text-[11px]">Google Maps via Apify</span>
+            <span className="font-semibold text-white text-[11px]">Base conectada</span>
             <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20">
               ATIVA
             </span>
@@ -162,11 +163,13 @@ export function GoogleMapsRunningConfigCard({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {[
-              { id: "telefone", label: "Telefone", icon: Phone },
-              { id: "site", label: "Site", icon: Globe },
-              { id: "instagram", label: "Instagram", icon: Instagram },
-            ].map((f) => {
+            {(
+              [
+                { id: "telefone", label: "Telefone", icon: Phone },
+                { id: "site", label: "Site", icon: Globe },
+                { id: "instagram", label: "Instagram", icon: Instagram },
+              ] as const
+            ).map((f) => {
               const ativo = filtrosCaptura.includes(f.id);
               const Icon = f.icon;
 

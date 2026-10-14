@@ -6,6 +6,11 @@ import { criarListaComLeads } from "@/lib/lists-api";
 import { resolveListName } from "@/lib/list-naming";
 import { geocodeCidade } from "@/lib/geo";
 import { NICHOS_POR_CATEGORIA } from "@/lib/niches";
+import {
+  sanitizeGoogleMapsUserMessage,
+  toggleCaptureFilter,
+  type CaptureFilter,
+} from "@/lib/google-maps-capture";
 
 import { GoogleMapsTopbar } from "./GoogleMapsTopbar";
 import { GoogleMapsHeader } from "./GoogleMapsHeader";
@@ -64,7 +69,7 @@ export function GoogleMapsPremiumView({
   const [limite, setLimite] = useState(50);
   const [buscarEmails, setBuscarEmails] = useState(true);
   const [raioKm, setRaioKm] = useState(10);
-  const [filtrosCaptura, setFiltrosCaptura] = useState<string[]>([]);
+  const [filtrosCaptura, setFiltrosCaptura] = useState<CaptureFilter[]>([]);
 
   // Estados do Mapa
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>({
@@ -171,10 +176,8 @@ export function GoogleMapsPremiumView({
   };
 
   // Alternar filtros de captura (telefone, site, instagram)
-  const handleToggleFiltroCaptura = (filtro: string) => {
-    setFiltrosCaptura((prev) =>
-      prev.includes(filtro) ? prev.filter((f) => f !== filtro) : [...prev, filtro],
-    );
+  const handleToggleFiltroCaptura = (filtro: CaptureFilter) => {
+    setFiltrosCaptura((prev) => toggleCaptureFilter(prev, filtro));
   };
 
   // Centralizar endereço digitado no mapa
@@ -196,7 +199,7 @@ export function GoogleMapsPremiumView({
   // Salvar preferências do usuário
   const handleSalvarConfiguracao = () => {
     try {
-      const config = { nicho, uf, cidade, limite, raioKm, buscarEmails };
+      const config = { nicho, uf, cidade, limite, raioKm, buscarEmails, filtrosCaptura };
       localStorage.setItem("flow_google_maps_preset", JSON.stringify(config));
       toast.success("Configuração de busca salva com sucesso!");
     } catch {
@@ -204,7 +207,7 @@ export function GoogleMapsPremiumView({
     }
   };
 
-  // DISPARAR PROSPECÇÃO VIA MOTOR EXISTENTE (Apify)
+  // Disparar prospecção pelo motor de busca configurado no backend.
   const handleIniciarProspeccao = async () => {
     if (!nicho.trim()) {
       toast.error("Informe um nicho para a busca.");
@@ -263,7 +266,7 @@ export function GoogleMapsPremiumView({
         usarMapa,
       });
 
-      // Executa o motor real search-leads com provedor 'apify' explícito
+      // Executa o motor real de prospecção.
       await streamSearchLeads(
         {
           nicho,
@@ -271,6 +274,7 @@ export function GoogleMapsPremiumView({
           uf,
           limite,
           buscarEmails,
+          filtrosCaptura,
           fonte: "apify",
           ...(usarMapa
             ? {
@@ -284,7 +288,7 @@ export function GoogleMapsPremiumView({
         (ev: SearchEvent) => {
           switch (ev.type) {
             case "log":
-              pushLog(ev.message);
+              pushLog(sanitizeGoogleMapsUserMessage(ev.message));
               if (
                 ev.message.toLowerCase().includes("já pertenci") ||
                 ev.message.toLowerCase().includes("já existe") ||
@@ -313,9 +317,9 @@ export function GoogleMapsPremiumView({
               break;
             case "error":
               streamHadError = true;
-              setStatus(`Erro: ${ev.message}`);
-              pushLog(`✖ ${ev.message}`);
-              toast.error(ev.message);
+              setStatus(`Erro: ${sanitizeGoogleMapsUserMessage(ev.message)}`);
+              pushLog(`✖ ${sanitizeGoogleMapsUserMessage(ev.message)}`);
+              toast.error(sanitizeGoogleMapsUserMessage(ev.message));
               break;
           }
         },
@@ -363,7 +367,9 @@ export function GoogleMapsPremiumView({
 
           onFinished?.();
         } catch (err) {
-          const msg = (err as Error).message ?? "Falha ao vincular leads à lista";
+          const msg = sanitizeGoogleMapsUserMessage(
+            (err as Error).message ?? "Falha ao vincular leads à lista",
+          );
           pushLog(`⚠️ Atenção: ${msg}`);
           toast.error(msg);
         }
@@ -376,7 +382,9 @@ export function GoogleMapsPremiumView({
     } catch (err) {
       setIsParcial(true);
       if ((err as Error).name !== "AbortError") {
-        const msg = (err as Error).message ?? "Erro inesperado na busca";
+        const msg = sanitizeGoogleMapsUserMessage(
+          (err as Error).message ?? "Erro inesperado na busca",
+        );
         setStatus(`Erro: ${msg}`);
         pushLog(`✖ ${msg}`);
         toast.error(msg);
@@ -583,7 +591,7 @@ export function GoogleMapsPremiumView({
 
           {/* Coluna 2: Centro (5 cols) — Localização (UF antes de Cidade), Mapa e Raio */}
           <section className="lg:col-span-5 space-y-3 relative">
-            {/* Barra de Localização: UF → Cidade (IBGE) → Apify → E-mails */}
+            {/* Barra de Localização: UF → Cidade (IBGE) → busca → E-mails */}
             <div className="relative z-30">
               <GoogleMapsLocation
                 uf={uf}

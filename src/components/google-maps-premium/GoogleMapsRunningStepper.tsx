@@ -51,7 +51,7 @@ export function GoogleMapsRunningStepper({
     {
       id: 2,
       title: "Coletando do Google Maps",
-      subtitle: "Buscando empresas na região via Apify",
+      subtitle: "Buscando empresas na região selecionada",
       timeOrStatus:
         currentStep > 2
           ? "Concluído"

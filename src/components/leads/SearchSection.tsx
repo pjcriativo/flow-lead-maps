@@ -234,6 +234,7 @@ export function SearchSection({
           uf,
           limite,
           buscarEmails,
+          filtrosCaptura: [],
           fonte,
           ...(usarMapa
             ? { lat: centro!.lat, lng: centro!.lng, raioKm: raio, usarAreaMapa: pinManual }

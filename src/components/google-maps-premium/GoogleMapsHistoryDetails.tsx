@@ -46,17 +46,24 @@ export function GoogleMapsHistoryDetails({
 
   // Percentuais calculados com segurança
   const totalEncontrados = item.encontrados || leads.length;
-  const pctIneditos = totalEncontrados > 0 ? Math.round((item.ineditos / totalEncontrados) * 100) : 0;
-  const pctDuplicatas = totalEncontrados > 0 ? Math.round((item.duplicatas / totalEncontrados) * 100) : 0;
+  const pctIneditos =
+    totalEncontrados > 0 ? Math.round((item.ineditos / totalEncontrados) * 100) : 0;
+  const pctDuplicatas =
+    totalEncontrados > 0 ? Math.round((item.duplicatas / totalEncontrados) * 100) : 0;
 
   const totalLeadsConhecidos = leads.length > 0 ? leads.length : item.encontrados;
   const emailsTotal = item.emailsCount || leads.filter((l) => Boolean(l.email)).length;
-  const telefonesTotal = item.telefonesCount || leads.filter((l) => Boolean(l.phone || l.whatsapp)).length;
-  const instagramTotal = item.instagramCount || leads.filter((l) => Boolean(l.instagram_url)).length;
+  const telefonesTotal =
+    item.telefonesCount || leads.filter((l) => Boolean(l.phone || l.whatsapp)).length;
+  const instagramTotal =
+    item.instagramCount || leads.filter((l) => Boolean(l.instagram_url)).length;
 
-  const pctEmails = totalLeadsConhecidos > 0 ? Math.round((emailsTotal / totalLeadsConhecidos) * 100) : 0;
-  const pctTelefones = totalLeadsConhecidos > 0 ? Math.round((telefonesTotal / totalLeadsConhecidos) * 100) : 0;
-  const pctInstagram = totalLeadsConhecidos > 0 ? Math.round((instagramTotal / totalLeadsConhecidos) * 100) : 0;
+  const pctEmails =
+    totalLeadsConhecidos > 0 ? Math.round((emailsTotal / totalLeadsConhecidos) * 100) : 0;
+  const pctTelefones =
+    totalLeadsConhecidos > 0 ? Math.round((telefonesTotal / totalLeadsConhecidos) * 100) : 0;
+  const pctInstagram =
+    totalLeadsConhecidos > 0 ? Math.round((instagramTotal / totalLeadsConhecidos) * 100) : 0;
 
   // Formatação de data
   const dataFormatada = new Date(item.dataHora).toLocaleDateString("pt-BR", {
@@ -175,9 +182,7 @@ export function GoogleMapsHistoryDetails({
           {/* Linha 1 de Indicadores de Resultados: Encontradas | Inéditos | Duplicatas */}
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-home-border/80 bg-home-surface p-2.5 text-center">
-              <span className="block text-base font-extrabold text-white">
-                {totalEncontrados}
-              </span>
+              <span className="block text-base font-extrabold text-white">{totalEncontrados}</span>
               <span className="block text-[10px] text-home-muted mt-0.5 leading-tight">
                 Empresas encontradas
               </span>
@@ -285,14 +290,7 @@ export function GoogleMapsHistoryDetails({
 
             <div className="flex items-center justify-between pt-1.5 text-home-muted">
               <span>Tempo de coleta</span>
-              <span className="font-semibold text-white text-right">
-                {item.tempoColeta || "—"}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between pt-1.5 text-home-muted">
-              <span>Provedor</span>
-              <span className="font-semibold text-white text-right">{item.provedor}</span>
+              <span className="font-semibold text-white text-right">{item.tempoColeta || "—"}</span>
             </div>
           </div>
         </div>

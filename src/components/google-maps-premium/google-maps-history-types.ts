@@ -5,11 +5,7 @@
 import type { Lead } from "@/lib/leads-api";
 
 export type SearchHistoryStatus =
-  | "concluida"
-  | "parcial"
-  | "interrompida"
-  | "erro"
-  | "nao_confirmado";
+  "concluida" | "parcial" | "interrompida" | "erro" | "nao_confirmado";
 
 export interface SearchHistoryItem {
   id: string;
@@ -29,7 +25,6 @@ export interface SearchHistoryItem {
   status: SearchHistoryStatus;
   statusLabel: string;
   tempoColeta: string | null; // e.g. "18min 42s" ou null para dado indisponível
-  provedor: string;
   nomeLista: string | null;
   center: { lat: number; lng: number } | null;
   emailsCount: number;

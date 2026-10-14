@@ -25,7 +25,7 @@ export const MAP_CONFIG = {
   /**
    * Atribuição legal padrão exigida pelos termos de uso do OSM / Leaflet
    */
-  attribution: "Leaflet | © OpenStreetMap contributors",
+  attribution: "© Dados cartográficos",
 
   /**
    * Subdomínios padrão para balanceamento de carga de tiles

@@ -1,7 +1,7 @@
 /**
  * FLOW BUSINESS — TEST SUITE PROMPT 41
  * GOOGLE MAPS PREMIUM — TELA 02: PROSPECÇÃO EM ANDAMENTO & CONFIGURAÇÃO CARTOGRÁFICA
- * 
+ *
  * Executa 30 testes rigorosos validando fidelidade visual, contratos funcionais,
  * remoção da marca d'água de API e não-regressão de toda a plataforma.
  */
@@ -74,7 +74,8 @@ test("5. Preservação da configuração real: a Tela 02 recebe e exibe nicho, l
   assert.match(configCard, /Quantidade solicitada/);
   assert.match(configCard, /Nome da lista/);
   assert.match(configCard, /Fonte de busca/);
-  assert.match(configCard, /Google Maps via Apify/);
+  assert.match(configCard, /Base conectada/);
+  assert.doesNotMatch(configCard, /Apify|Geoapify|Scraper|Provedor/i);
 });
 
 // 6. Barra de 5 etapas
@@ -92,8 +93,9 @@ test("7. Etapa 1 Inicializando: valida configuração e reserva de cota", () => 
 });
 
 // 8. Etapa 2 Coletando do Google Maps
-test("8. Etapa 2 Coletando do Google Maps: busca empresas na região via Apify", () => {
-  assert.match(stepper, /Buscando empresas na região via Apify/);
+test("8. Etapa 2 Coletando do Google Maps: busca empresas sem revelar fornecedor", () => {
+  assert.match(stepper, /Buscando empresas na região selecionada/);
+  assert.doesNotMatch(stepper, /Apify|Geoapify|Scraper|Provedor/i);
 });
 
 // 9. Etapa 3 Processando resultados

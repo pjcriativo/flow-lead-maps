@@ -282,7 +282,6 @@ export function GoogleMapsSearchResultsView({
       "Cidade",
       "UF",
       "Score",
-      "Origem",
     ];
 
     const rows = leadsParaExportar.map((l) => [
@@ -299,7 +298,6 @@ export function GoogleMapsSearchResultsView({
       sanitizeCsvValue(l.city),
       sanitizeCsvValue(l.state),
       sanitizeCsvValue(l.score),
-      sanitizeCsvValue("Google Maps"),
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");

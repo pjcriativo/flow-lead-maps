@@ -24,6 +24,11 @@ import { resolverChave } from "../_shared/chaves.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
 import type { ProviderUsage } from "../_shared/providers/types.ts";
 import { leadBusinessIdentity, loadSeenLeadIdentitiesForOrg } from "../_shared/lead-dedupe.ts";
+import {
+  matchesCaptureFilters,
+  normalizeCaptureFilters,
+  sanitizeGoogleMapsUserMessage,
+} from "../../../src/lib/google-maps-capture.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
 const PROVIDERS: Record<Fonte, ProviderSearch> = {
@@ -39,6 +44,7 @@ type Body = {
   uf?: string;
   limite?: number;
   buscarEmails?: boolean;
+  filtros_captura?: unknown;
   fonte?: Fonte;
   /** Busca por área no mapa (alternativa a cidade/uf). */
   lat?: number;
@@ -93,6 +99,7 @@ Deno.serve(async (req) => {
   const TETO_MAX_BUSCA = configPlataforma.max_leads_busca ?? 1000;
   const limite = Math.min(Math.max(Number(body.limite) || 50, 1), TETO_MAX_BUSCA);
   const buscarEmails = body.buscarEmails !== false;
+  const filtrosCaptura = normalizeCaptureFilters(body.filtros_captura);
   const fonte: Fonte = body.fonte && body.fonte in PROVIDERS ? body.fonte : "osm";
   const provider = PROVIDERS[fonte];
   let lat = typeof body.lat === "number" ? body.lat : null;
@@ -113,7 +120,7 @@ Deno.serve(async (req) => {
       try {
         send({
           type: "log",
-          message: `Fonte: ${fonte} — ${nicho} em ${cidade}${uf ? "/" + uf : ""} (meta ${limite})`,
+          message: `Busca iniciada — ${nicho} em ${cidade}${uf ? "/" + uf : ""} (meta ${limite})`,
         });
 
         // Caminho padrão: sem pino, geocodifica cidade+UF (respeita a UF) e busca
@@ -126,12 +133,12 @@ Deno.serve(async (req) => {
             raioKm = raioKm ?? g.raioKm;
             send({
               type: "log",
-              message: `Geocode ${cidade}/${uf}: ${g.lat.toFixed(3)},${g.lng.toFixed(3)} · raio ${raioKm}km`,
+              message: `Localização confirmada em ${cidade}/${uf} · raio ${raioKm}km`,
             });
           } else {
             send({
               type: "log",
-              message: `Geocode falhou — usando busca por nome da cidade (a fonte pode ignorar a UF)`,
+              message: "Localização aproximada pela cidade selecionada.",
             });
           }
         }
@@ -191,18 +198,18 @@ Deno.serve(async (req) => {
             { onConflict: "service,external_id" },
           );
           if (usageError) {
-            throw new Error(`Falha ao registrar custo real da Apify: ${usageError.message}`);
+            throw new Error(`Falha ao registrar o consumo da busca: ${usageError.message}`);
           }
           const runStatus = usage.metadata.run_status;
           send(
             runStatus === "RUNNING" || runStatus === "READY"
               ? {
                   type: "log",
-                  message: `Run Apify vinculado à sua conta: ${usage.externalId}`,
+                  message: "Coleta conectada à sua conta.",
                 }
               : {
                   type: "log",
-                  message: `Custo real registrado: US$ ${usage.costUsd.toFixed(4)} (run ${usage.externalId})`,
+                  message: "Consumo da coleta registrado.",
                 },
           );
         };
@@ -217,7 +224,8 @@ Deno.serve(async (req) => {
           usarAreaMapa,
           alvo: Math.ceil(limiteEfetivo * 2.5),
           limite: limiteEfetivo,
-          log: (message: string) => send({ type: "log", message }),
+          log: (message: string) =>
+            send({ type: "log", message: sanitizeGoogleMapsUserMessage(message) }),
           reportUsage,
         };
         const collected =
@@ -281,7 +289,16 @@ Deno.serve(async (req) => {
             instagram = instagram ?? enr.instagram; // fonte tem prioridade; senão, o que o site trouxe
             facebook = facebook ?? enr.facebook;
             site = enr.site;
-            send({ type: "log", message: `↳ ${p.name}: ${enr.debug}` });
+            send({
+              type: "log",
+              message: `↳ ${p.name}: ${sanitizeGoogleMapsUserMessage(enr.debug)}`,
+            });
+          }
+
+          if (
+            !matchesCaptureFilters({ phone: p.phone, whatsapp, website, instagram }, filtrosCaptura)
+          ) {
+            continue;
           }
 
           const breakdown = computeScore({
@@ -356,7 +373,10 @@ Deno.serve(async (req) => {
         send({ type: "done", inserted, total: inserted, fonte });
         controller.close();
       } catch (e) {
-        send({ type: "error", message: e instanceof Error ? e.message : String(e) });
+        send({
+          type: "error",
+          message: sanitizeGoogleMapsUserMessage(e instanceof Error ? e.message : String(e)),
+        });
         controller.close();
       }
     },

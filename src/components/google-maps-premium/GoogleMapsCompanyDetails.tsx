@@ -526,10 +526,6 @@ export function GoogleMapsCompanyDetails({
               </span>
             </div>
             <div className="flex justify-between py-1 border-b border-home-border/40">
-              <span className="text-home-muted">Origem:</span>
-              <span className="font-semibold text-white">Google Maps (Apify)</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-home-border/40">
               <span className="text-home-muted">Score Comercial:</span>
               <span className="font-bold text-home-orange">{lead.score ?? "—"}</span>
             </div>

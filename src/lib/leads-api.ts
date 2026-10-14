@@ -2,6 +2,7 @@
 // A chave da Google Places NUNCA passa por aqui — fica no secret da Edge Function.
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import type { CaptureFilter } from "@/lib/google-maps-capture";
 
 export type Lead = Database["public"]["Tables"]["leads"]["Row"];
 export type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
@@ -103,6 +104,7 @@ export type SearchParams = {
   uf: string;
   limite: number;
   buscarEmails: boolean;
+  filtrosCaptura: CaptureFilter[];
   fonte: FonteBusca;
   /** Busca por área no mapa (alternativa a cidade/UF). */
   lat?: number | null;
@@ -150,6 +152,7 @@ export async function streamSearchLeads(
       uf: params.uf,
       limite: params.limite,
       buscarEmails: params.buscarEmails,
+      filtros_captura: params.filtrosCaptura,
       fonte: params.fonte,
       ...(params.lat != null && params.lng != null
         ? {

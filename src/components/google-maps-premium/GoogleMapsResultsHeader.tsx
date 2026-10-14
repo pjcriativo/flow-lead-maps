@@ -116,10 +116,6 @@ export function GoogleMapsResultsHeader({
 
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-home-border/40">
-                <span className="text-home-muted">Provedor:</span>
-                <span className="font-semibold text-white">Google Maps (Apify Scraper)</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-home-border/40">
                 <span className="text-home-muted">Nicho Informado:</span>
                 <span className="font-semibold text-white">{nicho}</span>
               </div>

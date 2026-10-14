@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import type { CaptureFilter } from "@/lib/google-maps-capture";
 
 interface GoogleMapsSearchSummaryProps {
   nicho: string;
@@ -30,8 +31,8 @@ interface GoogleMapsSearchSummaryProps {
   maxLimite: number;
   nomeLista: string;
   onEditarNomeLista?: () => void;
-  filtrosCaptura: string[]; // ["telefone", "site", "instagram"]
-  onToggleFiltroCaptura: (filtro: string) => void;
+  filtrosCaptura: CaptureFilter[];
+  onToggleFiltroCaptura: (filtro: CaptureFilter) => void;
   buscarEmails: boolean;
   running: boolean;
   onIniciar: () => void;
@@ -165,11 +166,13 @@ export function GoogleMapsSearchSummary({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {[
-              { id: "telefone", label: "Telefone", icon: Phone },
-              { id: "site", label: "Site", icon: Globe },
-              { id: "instagram", label: "Instagram", icon: Instagram },
-            ].map((f) => {
+            {(
+              [
+                { id: "telefone", label: "Telefone", icon: Phone },
+                { id: "site", label: "Site", icon: Globe },
+                { id: "instagram", label: "Instagram", icon: Instagram },
+              ] as const
+            ).map((f) => {
               const ativo = filtrosCaptura.includes(f.id);
               const Icon = f.icon;
 
@@ -206,7 +209,7 @@ export function GoogleMapsSearchSummary({
             <span className="text-[11px] font-medium">Fonte de busca</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-white text-[11px]">Google Maps (Apify)</span>
+            <span className="font-semibold text-white text-[11px]">Base conectada</span>
             <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">
               ATIVA
             </span>

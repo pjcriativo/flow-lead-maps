@@ -29,6 +29,7 @@ import {
   PAGE_SIZE,
 } from "@/components/leads/leads-shared";
 import { Button } from "@/components/ui/button";
+import { matchesCaptureFilters, type CaptureFilter } from "@/lib/google-maps-capture";
 
 interface GoogleMapsResultsPanelProps {
   leads: Lead[];
@@ -36,7 +37,7 @@ interface GoogleMapsResultsPanelProps {
   status: string;
   logs: string[];
   progress: { found: number; target: number };
-  filtrosCaptura: string[];
+  filtrosCaptura: CaptureFilter[];
   onLimparFiltrosCaptura?: () => void;
   listaCriadaId?: string;
   onVerMinhasListas?: () => void;
@@ -58,18 +59,7 @@ export function GoogleMapsResultsPanel({
   const logRef = useRef<HTMLDivElement>(null);
 
   // Filtro de captura client-side
-  const capturaOk = (l: Lead) => {
-    if (filtrosCaptura.length === 0) return true;
-    return filtrosCaptura.some((f) =>
-      f === "telefone"
-        ? Boolean(l.phone)
-        : f === "site"
-          ? Boolean(l.website)
-          : f === "instagram"
-            ? Boolean(l.instagram_url)
-            : false,
-    );
-  };
+  const capturaOk = (lead: Lead) => matchesCaptureFilters(lead, filtrosCaptura);
 
   const sorted = [...leads].filter(capturaOk).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const goldCount = sorted.filter(

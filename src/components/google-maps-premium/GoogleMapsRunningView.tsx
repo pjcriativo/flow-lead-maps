@@ -8,6 +8,7 @@ import { GoogleMapsRunningMapPanel } from "./GoogleMapsRunningMapPanel";
 import { GoogleMapsRunningLiveStatus } from "./GoogleMapsRunningLiveStatus";
 import { GoogleMapsRunningTable } from "./GoogleMapsRunningTable";
 import type { Lead } from "@/lib/leads-api";
+import type { CaptureFilter } from "@/lib/google-maps-capture";
 
 export interface GoogleMapsRunningViewProps {
   user?: {
@@ -27,7 +28,7 @@ export interface GoogleMapsRunningViewProps {
   limite: number;
   nomeLista: string;
   buscarEmails: boolean;
-  filtrosCaptura: string[];
+  filtrosCaptura: CaptureFilter[];
   pin: { lat: number; lng: number } | null;
   // Estados operacionais da execução
   running: boolean;
@@ -259,10 +260,6 @@ export function GoogleMapsRunningView({
             </div>
 
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-home-border/40">
-                <span className="text-home-muted">Provedor:</span>
-                <span className="font-semibold text-white">Apify (Google Maps Scraper)</span>
-              </div>
               <div className="flex justify-between py-1 border-b border-home-border/40">
                 <span className="text-home-muted">Nicho:</span>
                 <span className="font-semibold text-white">{nicho}</span>
