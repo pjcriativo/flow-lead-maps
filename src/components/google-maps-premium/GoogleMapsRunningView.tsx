@@ -129,7 +129,7 @@ export function GoogleMapsRunningView({
             <div className="flex items-center gap-1.5 text-xs text-home-muted font-medium">
               <span>Google Maps</span>
               <span className="text-home-muted/50">›</span>
-              <span className="text-white font-semibold">Prospecção em Andamento</span>
+              <span className="text-home-muted font-semibold">Prospecção em Andamento</span>
             </div>
 
             {/* Título e Subtítulo com Ícone */}
@@ -139,7 +139,7 @@ export function GoogleMapsRunningView({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-extrabold text-white tracking-tight">Google Maps</h1>
+                  <h1 className="text-xl font-extrabold text-home-muted tracking-tight">Google Maps</h1>
                   <span className="rounded-full bg-home-orange/15 px-2 py-0.5 text-[10px] font-bold text-home-orange border border-home-orange/30">
                     Prospecção em andamento
                   </span>
@@ -157,7 +157,7 @@ export function GoogleMapsRunningView({
             <button
               type="button"
               onClick={onVoltarConfiguracao}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[bg-home-surface/60] px-3.5 text-xs font-semibold text-home-muted hover:text-white hover:bg-home-surface transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="text-xs font-medium">←</span>
               <span>Voltar à configuração</span>
@@ -169,7 +169,7 @@ export function GoogleMapsRunningView({
             <button
               type="button"
               onClick={() => setModalDetalhesAberto(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[bg-home-surface/60] px-3.5 text-xs font-semibold text-home-muted hover:text-white hover:bg-home-surface transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Eye className="size-3.5 text-home-muted" />
               <span>Ver detalhes da busca</span>
@@ -179,7 +179,7 @@ export function GoogleMapsRunningView({
               <button
                 type="button"
                 onClick={() => setModalCancelarAberto(true)}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 hover:border-red-500/50 transition-colors cursor-pointer"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 text-xs font-semibold text-red-400 hover:bg-red-500/20 hover:border-red-500/50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <XCircle className="size-3.5 text-red-400" />
                 <span>Cancelar busca</span>
@@ -188,10 +188,10 @@ export function GoogleMapsRunningView({
               <button
                 type="button"
                 onClick={onVerResultados}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-home-orange px-4 text-xs font-bold text-white shadow-md shadow-home-orange/20 hover:bg-home-orange-hover transition-colors cursor-pointer"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-home-orange px-4 text-xs font-bold text-home-muted shadow-md shadow-home-orange/20 hover:bg-home-orange-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>Ver resultados da busca</span>
-                <span className="text-white/80">→</span>
+                <span className="text-home-muted/80">→</span>
               </button>
             ) : null}
           </div>
@@ -291,25 +291,24 @@ export function GoogleMapsRunningView({
                   <>
                     Mostrando {(paginaAtual - 1) * itensPorPagina + 1}-{Math.min(paginaAtual * itensPorPagina, leadsFiltrados.length + duplicatasCount)} de {leadsFiltrados.length + duplicatasCount} leads
                   </>
-              ))}
+              )}
             </div>
 
             {/* Controles de Navegação e Tamanho da Página */}
             <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
               {/* Seletor de Itens por Página */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-home-muted">Itens por página:</span>
-                <select
-                  value={itensPorPagina}
-                  onChange={(e) => {
-                    setItensPorPagina(Number(e.target.value));
-                    setPaginaAtual(1); // Reset para primeira página ao mudar o tamanho
-                  }}
-                  className="h-8 rounded-xl border border-home-border bg-[#101720] px-3 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option
+                  <select
+                    value={itensPorPagina}
+                    onChange={(e) => {
+                      setItensPorPagina(Number(e.target.value));
+                      setPaginaAtual(1); // Reset para primeira página ao mudar o tamanho
+                    }}
+                    className="h-8 rounded-lg border border-home-border bg-home-surface/80 px-2 text-xs text-white focus:border-home-orange focus:outline-none cursor-pointer"
+                  >
+                    <option value={10}>10 por página</option>
+                    <option value={25}>25 por página</option>
+                    <option value={50}>50 por página</option>
                 </select>
               </div>
 
@@ -318,7 +317,7 @@ export function GoogleMapsRunningView({
                 <button
                   onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))]
                   disabled={paginaAtual <= 1 || (tabFiltro !== "duplicatas" && leadsFiltrados.length === 0 && duplicatasCount === 0)}
-                  className="flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+                  className="flex size-7 items-center justify-center rounded-lg border border-home-border bg-home-surface/60 text-home-muted hover:text-white hover:bg-home-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 >
                   <span className="text-xs font-medium">←</span>
                   <span>Anterior</span>
@@ -331,7 +330,7 @@ export function GoogleMapsRunningView({
                 <button
                   onClick={() => setPaginaAtual(Math.min(tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina), paginaAtual + 1))}
                   disabled={paginaAtual >= Math.max(1, tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina)) || (tabFiltro !== "duplicatas" && leadsFiltrados.length === 0 && duplicatasCount === 0)}
-                  className="flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+                  className="flex size-7 items-center justify-center rounded-lg border border-home-border bg-home-surface/60 text-home-muted hover:text-white hover:bg-home-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 >
                   <span>Próximo</span>
                   <span className="text-xs font-medium">→</span>
@@ -345,13 +344,13 @@ export function GoogleMapsRunningView({
       {/* Modal: Detalhes da Busca */}
       {modalDetalhesAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-home-border bg-[#101720] p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-2xl border border-home-border bg-[bg-home-surface/60] p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-home-border/60 pb-3">
-              <h3 className="text-sm font-bold text-white">Detalhes da Execução</h3>
+              <h3 className="text-sm font-bold text-home-muted">Detalhes da Execução</h3>
               <button
                 type="button"
                 onClick={() => setModalDetalhesAberto(false)}
-                className="text-home-muted hover:text-white transition-colors"
+                className="text-home-muted hover:text-home-muted transition-colors"
               >
                 ✕
               </button>
@@ -360,25 +359,25 @@ export function GoogleMapsRunningView({
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-home-border/40">
                 <span className="text-home-muted">Nicho:</span>
-                <span className="font-semibold text-white">{nicho}</span>
+                <span className="font-semibold text-home-muted">{nicho}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-home-border/40">
                 <span className="text-home-muted">Localização:</span>
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-home-muted">
                   {cidade} - {uf} ({raioKm} km)
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-home-border/40">
                 <span className="text-home-muted">Quantidade Solicitada:</span>
-                <span className="font-semibold text-white">{limite} leads</span>
+                <span className="font-semibold text-home-muted">{limite} leads</span>
               </div>
               <div className="flex justify-between py-1 border-b border-home-border/40">
                 <span className="text-home-muted">Lista de Destino:</span>
-                <span className="font-semibold text-white truncate max-w-[200px]">{nomeLista}</span>
+                <span className="font-semibold text-home-muted truncate max-w-[200px]">{nomeLista}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-home-muted">Enriquecimento de E-mails:</span>
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-home-muted">
                   {buscarEmails ? "Ativado" : "Desativado"}
                 </span>
               </div>
@@ -387,7 +386,7 @@ export function GoogleMapsRunningView({
             <button
               type="button"
               onClick={() => setModalDetalhesAberto(false)}
-              className="w-full rounded-xl bg-home-orange py-2 text-xs font-bold text-white hover:bg-home-orange-hover transition-colors"
+              className="w-full rounded-xl bg-home-orange py-2 text-xs font-bold text-home-muted hover:bg-home-orange-hover transition-colors"
             >
               Fechar
             </button>
@@ -398,10 +397,10 @@ export function GoogleMapsRunningView({
       {/* Modal: Confirmação de Cancelamento Honesto */}
       {modalCancelarAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[#101720] p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[bg-home-surface/60] p-5 shadow-2xl space-y-4">
             <div className="flex items-center gap-2.5 text-red-400">
               <XCircle className="size-5 shrink-0" />
-              <h3 className="text-sm font-bold text-white">Interromper Prospecção</h3>
+              <h3 className="text-sm font-bold text-home-muted">Interromper Prospecção</h3>
             </div>
 
             <p className="text-xs text-home-muted leading-relaxed">
@@ -417,7 +416,7 @@ export function GoogleMapsRunningView({
               <button
                 type="button"
                 onClick={() => setModalCancelarAberto(false)}
-                className="rounded-xl border border-home-border bg-home-surface px-4 py-2 text-xs font-semibold text-white hover:bg-home-surface-strong transition-colors cursor-pointer"
+                className="rounded-xl border border-home-border bg-home-surface px-4 py-2 text-xs font-semibold text-home-muted hover:bg-home-surface-strong transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Continuar busca
               </button>
@@ -427,7 +426,7 @@ export function GoogleMapsRunningView({
                   setModalCancelarAberto(false);
                   onCancelarBusca();
                 }}
-                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 transition-colors cursor-pointer"
+                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-home-muted hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Confirmar interrupção
               </button>

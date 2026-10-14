@@ -322,3 +322,33 @@ test("36. Preservação da Tela 02: Prospecção em Andamento continua integralm
   assert.match(runningView, /GoogleMapsRunningLiveStatus/);
   assert.match(runningView, /GoogleMapsRunningTable/);
 });
+
+test("37. Resultados retornam ao snapshot da prospeccao sem iniciar nova coleta", () => {
+  assert.match(header, /Voltar à prospecção/);
+  assert.match(resultsView, /onVoltarProspeccao/);
+  assert.match(premiumView, /onVoltarProspeccao=\{handleVoltarProspeccao\}/);
+});
+
+test("38. Breadcrumb Google Maps e Nova busca retornam a configuracao por acoes distintas", () => {
+  assert.match(header, /onVoltarConfiguracao/);
+  assert.match(header, /<button[\s\S]*Google Maps[\s\S]*<\/button>/);
+  assert.match(premiumView, /onNovaBusca=\{handleNovaBusca\}/);
+  assert.match(premiumView, /setLeads\(\[\]\)/);
+  assert.match(premiumView, /setListaCriadaId\(undefined\)/);
+});
+
+test("39. Filtros e ordenacao usam status e score reais do lead", () => {
+  assert.match(resultsView, /lead\.status !== filtroStatus/);
+  assert.match(resultsView, /filtroScore/);
+  assert.match(resultsView, /ordenacaoScore/);
+  assert.match(table, /Score/);
+  assert.match(table, /STATUS_LABELS/);
+  assert.doesNotMatch(table, />\s*Novo lead\s*</);
+});
+
+test("40. Layout restringe overflow global e mantem scroll somente na tabela", () => {
+  assert.match(resultsView, /overflow-x-hidden/);
+  assert.match(resultsView, /min-w-0/);
+  assert.match(table, /overflow-x-auto/);
+  assert.match(detailsPanel, /max-h-\[calc\(100dvh/);
+});

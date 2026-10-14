@@ -252,3 +252,19 @@ test("30. Não regressão dos módulos globais: Leads, Minhas Listas, Pipeline e
   assert.ok(pipelineSection.length > 500);
   assert.ok(campanhasView.length > 500);
 });
+
+test("31. Tabela ao vivo pagina 10, 25 ou 50 itens sem descartar a colecao", () => {
+  assert.match(runningTable, /itensPorPagina/);
+  assert.match(runningTable, /setItensPorPagina/);
+  assert.match(runningTable, /\.slice\(inicio, inicio \+ itensPorPagina\)/);
+  assert.match(runningTable, /10 por página/);
+  assert.match(runningTable, /25 por página/);
+  assert.match(runningTable, /50 por página/);
+  assert.match(runningTable, /max-h-/);
+});
+
+test("32. Tela 02 oferece retorno seguro a configuracao sem tratar navegacao como cancelamento", () => {
+  assert.match(runningView, /Voltar à configuração/);
+  assert.match(runningView, /continuará em andamento/);
+  assert.match(runningView, /onVoltarConfiguracao/);
+});

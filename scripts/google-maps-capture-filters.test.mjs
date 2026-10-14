@@ -72,3 +72,12 @@ test("mensagens visiveis ocultam nomes e termos tecnicos do fornecedor", () => {
 
   assert.doesNotMatch(sanitized, /Apify|scraper|API|dataset|HTTP 500/i);
 });
+
+test("mensagens publicas removem custo, saldo, ids externos e status tecnico", () => {
+  const sanitized = sanitizeGoogleMapsUserMessage(
+    "Apify actor RUNNING - custo ~US$ 0.002, saldo BRL 12, runId abc123",
+  );
+
+  assert.doesNotMatch(sanitized, /Apify|actor|RUNNING|US\$|BRL|saldo|custo|runId|abc123/i);
+  assert.match(sanitized, /Processando empresas encontradas/);
+});

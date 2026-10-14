@@ -477,6 +477,7 @@ export function GoogleMapsSearchResultsView({
           selectedCount={selectedLeadIds.size}
           onNovaBusca={onNovaBusca}
           onAdicionarSelecionados={handleAbrirModalLista}
+          onEditarPesquisa={onEditarPesquisa}
         />
 
         {/* 3. Seis Indicadores KPI Superiores */}
@@ -588,7 +589,7 @@ export function GoogleMapsSearchResultsView({
               />
 
               {/* Paginação */}
-              {filteredLeads.length > 0 && (
+              {true && (
                 <div className="rounded-2xl border border-home-border bg-[#101720]/90">
                   <GoogleMapsResultsPagination
                     totalItens={filteredLeads.length}

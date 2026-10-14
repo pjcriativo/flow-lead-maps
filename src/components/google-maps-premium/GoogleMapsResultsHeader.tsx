@@ -12,6 +12,7 @@ export interface GoogleMapsResultsHeaderProps {
   selectedCount: number;
   onNovaBusca: () => void;
   onAdicionarSelecionados: () => void;
+  onEditarPesquisa: () => void;
 }
 
 export function GoogleMapsResultsHeader({
@@ -33,9 +34,14 @@ export function GoogleMapsResultsHeader({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Lado Esquerdo: Breadcrumb, Ícone e Títulos */}
         <div className="space-y-1">
-          {/* Breadcrumb Oficial */}
+          {/* Breadcrumb Oficial - Tornado interativo */}
           <div className="flex items-center gap-1.5 text-xs text-home-muted font-medium">
-            <span>Google Maps</span>
+            <span
+              onClick={onNovaBusca}
+              className="cursor-pointer hover:text-home-orange transition-colors"
+            >
+              Google Maps
+            </span>
             <span className="text-home-muted/50">›</span>
             <span className="text-white font-semibold">Resultados da Busca</span>
           </div>
@@ -61,7 +67,17 @@ export function GoogleMapsResultsHeader({
 
         {/* Lado Direito: Ações Principais do Topo */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          {/* Botão 1: Ver detalhes da pesquisa */}
+          {/* Botão 1: Voltar à prospecção */}
+          <button
+            type="button"
+            onClick={onEditarPesquisa}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
+          >
+            <span className="text-xs font-medium">←</span>
+            <span>Voltar à prospecção</span>
+          </button>
+
+          {/* Botão 2: Ver detalhes da pesquisa */}
           <button
             type="button"
             onClick={() => setModalDetalhesAberto(true)}
@@ -71,7 +87,7 @@ export function GoogleMapsResultsHeader({
             <span>Ver detalhes da pesquisa</span>
           </button>
 
-          {/* Botão 2: Nova busca */}
+          {/* Botão 3: Nova busca */}
           <button
             type="button"
             onClick={onNovaBusca}

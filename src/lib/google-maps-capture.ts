@@ -42,7 +42,8 @@ export function matchesCaptureFilters(
 }
 
 export function sanitizeGoogleMapsUserMessage(message: string): string {
-  return message
+  // First, apply all the standard replacements
+  let sanitized = message
     .replace(
       /\b(?:apify|geoapify|openstreetmap|google places|osm|leaflet|carto)\b/gi,
       "serviço de busca",
@@ -57,8 +58,42 @@ export function sanitizeGoogleMapsUserMessage(message: string): string {
     .replace(
       /\b(?:constraint|foreign key|postgres|sqlstate|select|insert|update|delete)\b/gi,
       "operação interna",
-    )
-    .slice(0, 240);
+    );
+
+  // Remove cost information (patterns like "cost ~US$", "custo ~US$", etc.)
+  sanitized = sanitized
+    .replace(/\b(?:cost|custo)\s*[~≈]?\s*[$\s]*\d+[.,]?\d*\s*(?:usd|dólares?|brl|reais?)/gi, '')
+    .replace(/\b(?:cost|custo)\s*[~≈]?\s*[$\s]*\d+[.,]?\d*/gi, '');
+
+  // Check if this is a success message and show user-friendly text
+  const successIndicators = [
+    /SUCCEEDED/i,
+    /SUCCESS/i,
+    /CONCLUÍDO/i,
+    /FINISHED/i,
+    /COMPLETED/i,
+  ];
+
+  const isSuccess = successIndicators.some(pattern => pattern.test(message));
+
+  if (isSuccess) {
+    // For success messages, show a clean user-friendly message
+    // Extract any meaningful info like lead count if possible
+    const leadCountMatch = message.match(/(\d+)\s*(?:leads?|empresas?|resultados?)/i);
+    if (leadCountMatch) {
+      return `sua busca foi executada com sucesso e encontrou ${leadCountMatch[1]} leads`;
+    }
+    return "sua busca foi executada com sucesso";
+  }
+
+  // Clean up any extra spaces or punctuation that might be left
+  sanitized = sanitized
+    .replace(/\s+:/g, ': ')          // Fix spacing before colons
+    .replace(/:\s+/g, ': ')          // Fix spacing after colons
+    .replace(/\s{2,}/g, ' ')         // Remove multiple spaces
+    .replace(/^[:\s]+|[:\s]+$/g, ''); // Remove leading/trailing spaces and colons
+
+  return sanitized.slice(0, 240);
 }
 
 const SAFE_PUBLIC_ERRORS = [
