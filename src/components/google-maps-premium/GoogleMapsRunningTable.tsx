@@ -7,22 +7,18 @@ interface GoogleMapsRunningTableProps {
   leads: Lead[];
   running: boolean;
   duplicatasCount: number;
-  paginaAtual?: number;
-  itensPorPagina?: number;
-  totalLeads?: number;
 }
 
 export function GoogleMapsRunningTable({
   leads,
   running,
   duplicatasCount,
-  paginaAtual = 1,
-  itensPorPagina = 10,
-  totalLeads = 0,
 }: GoogleMapsRunningTableProps) {
   const [tabFiltro, setTabFiltro] = useState<"todos" | "ineditos" | "duplicatas">("todos");
   const [buscaNome, setBuscaNome] = useState("");
   const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(10);
 
   // Filtra por tab e busca por texto
   const leadsFiltrados = useMemo(() => {
@@ -43,12 +39,12 @@ export function GoogleMapsRunningTable({
   const totalGeral = leadsFiltrados.length + duplicatasCount;
 
   // Paginação dos resultados filtrados
+  const totalPaginas = Math.max(1, Math.ceil(leadsFiltrados.length / itensPorPagina));
+  const paginaEfetiva = Math.min(paginaAtual, totalPaginas);
   const leadsPaginados = useMemo(() => {
-    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const inicio = (paginaEfetiva - 1) * itensPorPagina;
     return leadsFiltrados.slice(inicio, inicio + itensPorPagina);
-  }, [leadsFiltrados, paginaAtual, itensPorPagina]);
-
-  const totalPaginas = Math.max(1, Math.ceil(totalGeral / itensPorPagina));
+  }, [leadsFiltrados, paginaEfetiva, itensPorPagina]);
 
   // Exportar dados em CSV
   const handleExportarCSV = () => {
@@ -126,7 +122,10 @@ export function GoogleMapsRunningTable({
           <div className="flex rounded-xl border border-home-border bg-[#101720] p-1 text-xs">
             <button
               type="button"
-              onClick={() => setTabFiltro("todos")}
+              onClick={() => {
+                setTabFiltro("todos");
+                setPaginaAtual(1);
+              }}
               className={cn(
                 "rounded-lg px-2.5 py-1 font-semibold transition-colors cursor-pointer",
                 tabFiltro === "todos"
@@ -138,7 +137,10 @@ export function GoogleMapsRunningTable({
             </button>
             <button
               type="button"
-              onClick={() => setTabFiltro("ineditos")}
+              onClick={() => {
+                setTabFiltro("ineditos");
+                setPaginaAtual(1);
+              }}
               className={cn(
                 "rounded-lg px-2.5 py-1 font-semibold transition-colors cursor-pointer",
                 tabFiltro === "ineditos"
@@ -150,7 +152,10 @@ export function GoogleMapsRunningTable({
             </button>
             <button
               type="button"
-              onClick={() => setTabFiltro("duplicatas")}
+              onClick={() => {
+                setTabFiltro("duplicatas");
+                setPaginaAtual(1);
+              }}
               className={cn(
                 "rounded-lg px-2.5 py-1 font-semibold transition-colors cursor-pointer",
                 tabFiltro === "duplicatas"
@@ -168,7 +173,10 @@ export function GoogleMapsRunningTable({
             <input
               type="text"
               value={buscaNome}
-              onChange={(e) => setBuscaNome(e.target.value)}
+              onChange={(e) => {
+                setBuscaNome(e.target.value);
+                setPaginaAtual(1);
+              }}
               placeholder="Buscar empresa por nome..."
               className="h-8.5 w-full rounded-xl border border-home-border bg-[#101720] pl-8.5 pr-3 text-xs text-white placeholder:text-home-muted outline-none focus:border-home-orange transition-colors"
             />
@@ -188,7 +196,7 @@ export function GoogleMapsRunningTable({
       </div>
 
       {/* Tabela de Empresas */}
-      <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-home-border">
+      <div className="max-h-[560px] overflow-auto scrollbar-none">
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-home-border/60 bg-[#0e141d]/70 text-[10px] font-bold uppercase tracking-wider text-home-muted select-none">
@@ -375,6 +383,56 @@ export function GoogleMapsRunningTable({
           </tbody>
         </table>
       </div>
+
+      {tabFiltro !== "duplicatas" && leadsFiltrados.length > 0 ? (
+        <div className="flex flex-col gap-3 border-t border-home-border/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-home-muted">
+            Mostrando {(paginaEfetiva - 1) * itensPorPagina + 1}–
+            {Math.min(paginaEfetiva * itensPorPagina, leadsFiltrados.length)} de{" "}
+            {leadsFiltrados.length} leads
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-home-muted">
+              <span>Exibir</span>
+              <select
+                value={itensPorPagina}
+                onChange={(event) => {
+                  setItensPorPagina(Number(event.target.value));
+                  setPaginaAtual(1);
+                }}
+                className="h-8 rounded-lg border border-home-border bg-home-surface px-2 text-xs text-white outline-none focus-visible:ring-2 focus-visible:ring-home-orange"
+              >
+                <option value={10}>10 por página</option>
+                <option value={25}>25 por página</option>
+                <option value={50}>50 por página</option>
+              </select>
+            </label>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPaginaAtual((page) => Math.max(1, page - 1))}
+                disabled={paginaEfetiva === 1}
+                className="rounded-lg border border-home-border bg-home-surface px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-home-orange disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <span className="text-xs text-home-muted">
+                Página {paginaEfetiva} de {totalPaginas}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPaginaAtual((page) => Math.min(totalPaginas, page + 1))}
+                disabled={paginaEfetiva === totalPaginas}
+                className="rounded-lg border border-home-border bg-home-surface px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:border-home-orange disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Próximo
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -182,17 +182,17 @@ test("21. Marcadores de empresas reais: o mapa da Tela 02 plota pinos para empre
 });
 
 // 22. Painel de status em tempo real
-test("22. Painel de status em tempo real: GoogleMapsRunningLiveStatus consome logs reais do stream", () => {
+test("22. Painel de status em tempo real: exibe apenas estados públicos seguros", () => {
   assert.match(liveStatus, /Status em tempo real/);
-  assert.match(liveStatus, /Última atualização:/);
-  assert.match(liveStatus, /logs\.map/);
+  assert.match(liveStatus, /Pesquisa em andamento|Pesquisa concluída/);
+  assert.doesNotMatch(liveStatus, /logs\.map|US\$|USD|BRL|custo\s|saldo\s|RUNNING|SUCCEEDED/);
 });
 
 // 23. Categorização de logs
 test("23. Categorização de logs: marcadores coloridos diferenciam requisição, leads, duplicatas e erros", () => {
-  assert.match(liveStatus, /getLogDotColor/);
+  assert.match(liveStatus, /A busca continua em segundo plano/);
   assert.match(liveStatus, /emerald-400/);
-  assert.match(liveStatus, /amber-400/);
+  assert.doesNotMatch(liveStatus, /message|log\.match/);
 });
 
 // 24. Tabela de empresas encontradas
@@ -256,6 +256,7 @@ test("30. Não regressão dos módulos globais: Leads, Minhas Listas, Pipeline e
 test("31. Tabela ao vivo pagina 10, 25 ou 50 itens sem descartar a colecao", () => {
   assert.match(runningTable, /itensPorPagina/);
   assert.match(runningTable, /setItensPorPagina/);
+  assert.match(runningTable, /useState\(10\)/);
   assert.match(runningTable, /\.slice\(inicio, inicio \+ itensPorPagina\)/);
   assert.match(runningTable, /10 por página/);
   assert.match(runningTable, /25 por página/);

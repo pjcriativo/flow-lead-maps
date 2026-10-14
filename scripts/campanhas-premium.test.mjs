@@ -312,7 +312,7 @@ test("edge de WhatsApp trata falha de persistência e não confunde opt-out de e
   );
 });
 
-test("Sidebar Premium: implementa recolhimento/expansão e rolagem vertical estável", () => {
+test("Sidebar Premium: implementa recolhimento/expansão e rolagem sem barra visível", () => {
   const file = fs.readFileSync(
     path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
     "utf8",
@@ -325,10 +325,8 @@ test("Sidebar Premium: implementa recolhimento/expansão e rolagem vertical est�
   assert.ok(file.includes("w-[272px]"), "Deveria expandir com 272px para evitar nomes cortados");
   assert.ok(file.includes("w-[72px]"), "Deveria recolher para 72px em modo ícones");
   assert.ok(file.includes("overflow-y-auto"), "Deveria permitir rolagem vertical");
-  assert.ok(
-    file.includes("[scrollbar-gutter:stable]"),
-    "Deveria reservar espaço estável para a barra de rolagem",
-  );
+  assert.ok(file.includes("scrollbar-none"), "Deveria ocultar a barra de rolagem visual");
+  assert.ok(!file.includes("[scrollbar-gutter:stable]"), "Não deveria reservar uma faixa lateral");
   assert.ok(
     file.includes("overflow-x-hidden"),
     "Deveria impedir truncamento por rolagem horizontal",

@@ -299,7 +299,7 @@ function SidebarNavigation({
     <nav
       aria-label="Navegação principal"
       className={cn(
-        "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-4 [scrollbar-gutter:stable]",
+        "scrollbar-none min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-4",
         isCollapsed ? "px-2" : "px-3",
       )}
     >

@@ -74,10 +74,8 @@ export function GoogleMapsRunningView({
 }: GoogleMapsRunningViewProps) {
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
   const [modalCancelarAberto, setModalCancelarAberto] = useState(false);
+  const [modalVoltarAberto, setModalVoltarAberto] = useState(false);
   const [lastUpdate, setLastUpdate] = useState("");
-  // Estados de Paginação
-  const [paginaAtual, setPaginaAtual] = useState(1);
-  const [itensPorPagina, setItensPorPagina] = useState(10);
 
   // Atualiza timestamp da última atividade recebida
   useEffect(() => {
@@ -139,7 +137,9 @@ export function GoogleMapsRunningView({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-extrabold text-home-muted tracking-tight">Google Maps</h1>
+                  <h1 className="text-xl font-extrabold text-home-muted tracking-tight">
+                    Google Maps
+                  </h1>
                   <span className="rounded-full bg-home-orange/15 px-2 py-0.5 text-[10px] font-bold text-home-orange border border-home-orange/30">
                     Prospecção em andamento
                   </span>
@@ -152,24 +152,21 @@ export function GoogleMapsRunningView({
             </div>
           </div>
 
-          {/* Botão: Voltar à configuração (visível quando não está running) */}
-          {!running && (
-            <button
-              type="button"
-              onClick={onVoltarConfiguracao}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[bg-home-surface/60] px-3.5 text-xs font-semibold text-home-muted hover:text-white hover:bg-home-surface transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <span className="text-xs font-medium">←</span>
-              <span>Voltar à configuração</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => (running ? setModalVoltarAberto(true) : onVoltarConfiguracao())}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-home-surface/60 px-3.5 text-xs font-semibold text-home-muted transition-colors hover:bg-home-surface hover:text-white"
+          >
+            <span className="text-xs font-medium">←</span>
+            <span>Voltar à configuração</span>
+          </button>
 
           {/* Botões do Topo Direito (Ver detalhes e Cancelar busca) */}
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
               onClick={() => setModalDetalhesAberto(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[bg-home-surface/60] px-3.5 text-xs font-semibold text-home-muted hover:text-white hover:bg-home-surface transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-home-surface/60 px-3.5 text-xs font-semibold text-home-muted transition-colors hover:bg-home-surface hover:text-white"
             >
               <Eye className="size-3.5 text-home-muted" />
               <span>Ver detalhes da busca</span>
@@ -251,7 +248,6 @@ export function GoogleMapsRunningView({
           <section className="lg:col-span-3">
             <GoogleMapsRunningLiveStatus
               status={status}
-              logs={logs}
               running={running}
               lastUpdate={lastUpdate}
             />
@@ -264,87 +260,47 @@ export function GoogleMapsRunningView({
             leads={leads}
             running={running}
             duplicatasCount={duplicatasCount}
-            paginaAtual={paginaAtual}
-            itensPorPagina={itensPorPagina}
-            totalLeads={leads.length + duplicatasCount}
           />
-
-          {/* Controles de Paginação */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 space-y-3 sm:space-y-0">
-            {/* Informações de Paginação */}
-            <div className="text-xs text-home-muted">
-              {/* Calculamos os totais filtrados para consistência com a tabela */}
-              {(tabFiltro === "duplicatas" ? (
-                duplicatasCount > 0 ? (
-                  <>
-                    {duplicatasCount} empresas já pertenciam à sua organização
-                  </>
-                ) : (
-                  "Nenhuma duplicata descartada nesta execução."
-                )
-              ) : (
-                leadsFiltrados.length === 0 ? (
-                  running
-                    ? "Buscando e qualificando empresas na região..."
-                    : "Nenhum lead encontrado."
-                ) : (
-                  <>
-                    Mostrando {(paginaAtual - 1) * itensPorPagina + 1}-{Math.min(paginaAtual * itensPorPagina, leadsFiltrados.length + duplicatasCount)} de {leadsFiltrados.length + duplicatasCount} leads
-                  </>
-              )}
-            </div>
-
-            {/* Controles de Navegação e Tamanho da Página */}
-            <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
-              {/* Seletor de Itens por Página */}
-              <div className="flex items-center gap-2">
-                  <select
-                    value={itensPorPagina}
-                    onChange={(e) => {
-                      setItensPorPagina(Number(e.target.value));
-                      setPaginaAtual(1); // Reset para primeira página ao mudar o tamanho
-                    }}
-                    className="h-8 rounded-lg border border-home-border bg-home-surface/80 px-2 text-xs text-white focus:border-home-orange focus:outline-none cursor-pointer"
-                  >
-                    <option value={10}>10 por página</option>
-                    <option value={25}>25 por página</option>
-                    <option value={50}>50 por página</option>
-                </select>
-              </div>
-
-              {/* Navegação de Páginas */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPaginaAtual(Math.max(1, paginaAtual - 1))]
-                  disabled={paginaAtual <= 1 || (tabFiltro !== "duplicatas" && leadsFiltrados.length === 0 && duplicatasCount === 0)}
-                  className="flex size-7 items-center justify-center rounded-lg border border-home-border bg-home-surface/60 text-home-muted hover:text-white hover:bg-home-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                  <span className="text-xs font-medium">←</span>
-                  <span>Anterior</span>
-                </button>
-
-                <span className="text-xs text-home-muted">
-                  Página {paginaAtual} de {Math.max(1, tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina))}
-                </span>
-
-                <button
-                  onClick={() => setPaginaAtual(Math.min(tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina), paginaAtual + 1))}
-                  disabled={paginaAtual >= Math.max(1, tabFiltro === "duplicatas" ? 1 : Math.ceil((leadsFiltrados.length + duplicatasCount) / itensPorPagina)) || (tabFiltro !== "duplicatas" && leadsFiltrados.length === 0 && duplicatasCount === 0)}
-                  className="flex size-7 items-center justify-center rounded-lg border border-home-border bg-home-surface/60 text-home-muted hover:text-white hover:bg-home-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                  <span>Próximo</span>
-                  <span className="text-xs font-medium">→</span>
-                </button>
-              </div>
-            </div>
-          </div>
         </section>
       </main>
+
+      {modalVoltarAberto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-home-border bg-home-surface p-5 shadow-2xl">
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-white">Voltar à configuração?</h3>
+              <p className="text-xs leading-relaxed text-home-muted">
+                A busca continuará em andamento. Voltar não cancela o processamento nem inicia uma
+                nova pesquisa.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setModalVoltarAberto(false)}
+                className="rounded-xl border border-home-border px-4 py-2 text-xs font-semibold text-white"
+              >
+                Permanecer aqui
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalVoltarAberto(false);
+                  onVoltarConfiguracao();
+                }}
+                className="rounded-xl bg-home-orange px-4 py-2 text-xs font-bold text-white"
+              >
+                Voltar à configuração
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Modal: Detalhes da Busca */}
       {modalDetalhesAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-home-border bg-[bg-home-surface/60] p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-home-border bg-home-surface/60 p-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-home-border/60 pb-3">
               <h3 className="text-sm font-bold text-home-muted">Detalhes da Execução</h3>
               <button
@@ -373,7 +329,9 @@ export function GoogleMapsRunningView({
               </div>
               <div className="flex justify-between py-1 border-b border-home-border/40">
                 <span className="text-home-muted">Lista de Destino:</span>
-                <span className="font-semibold text-home-muted truncate max-w-[200px]">{nomeLista}</span>
+                <span className="font-semibold text-home-muted truncate max-w-[200px]">
+                  {nomeLista}
+                </span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-home-muted">Enriquecimento de E-mails:</span>
@@ -397,7 +355,7 @@ export function GoogleMapsRunningView({
       {/* Modal: Confirmação de Cancelamento Honesto */}
       {modalCancelarAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[bg-home-surface/60] p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-red-500/30 bg-home-surface/60 p-5 shadow-2xl">
             <div className="flex items-center gap-2.5 text-red-400">
               <XCircle className="size-5 shrink-0" />
               <h3 className="text-sm font-bold text-home-muted">Interromper Prospecção</h3>

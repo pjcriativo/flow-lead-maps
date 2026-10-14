@@ -104,3 +104,9 @@ test("a sidebar usa lucide para interface e Simple Icons para canais", () => {
     assert.match(sidebar, new RegExp(channel.replace("&", "\\&")));
   }
 });
+
+test("o menu lateral continua rolavel sem exibir a barra de rolagem", () => {
+  assert.match(sidebar, /overflow-y-auto/);
+  assert.match(sidebar, /scrollbar-none/);
+  assert.doesNotMatch(sidebar, /scrollbar-gutter:stable/);
+});
