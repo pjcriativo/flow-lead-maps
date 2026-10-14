@@ -5,7 +5,7 @@
 // pontua (score cliente-ouro) e grava em `leads` respeitando RLS.
 // Responde em streaming NDJSON.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsHeaders, corsPreflightResponse, json } from "../_shared/cors.ts";
 import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import type { Fonte, ProviderSearch } from "../_shared/providers/types.ts";
 import { searchOsm } from "../_shared/providers/osm.ts";
@@ -58,8 +58,8 @@ type Body = {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
-  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+  if (req.method === "OPTIONS") return corsPreflightResponse(req);
+  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405, req);
 
   const authHeader = req.headers.get("Authorization") ?? "";
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
@@ -67,16 +67,16 @@ Deno.serve(async (req) => {
   });
 
   const { data: userData, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
+  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401, req);
   if (!(await acessoFerramentaLiberado(supabase, userData.user.id)))
-    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
+    return json({ error: "Acesso aguardando liberação do administrador" }, 403, req);
   const userId = userData.user.id;
 
   let body: Body;
   try {
     body = await req.json();
   } catch {
-    return json({ error: "Requisição inválida." }, 400);
+    return json({ error: "Requisição inválida." }, 400, req);
   }
 
   // service role para medir o consumo do plano (funções SECURITY DEFINER; resolvem a org)
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
   setApifyPoolContext(admin);
   const organizationAccess = await validateOrganizationAccess(admin, userId, body.org_id);
   if (!organizationAccess) {
-    return json({ error: "Você não tem permissão para usar esta organização." }, 403);
+    return json({ error: "Você não tem permissão para usar esta organização." }, 403, req);
   }
   const orgId = organizationAccess.orgId;
 
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
   const usarAreaMapa = body.usar_area_mapa === true && porMapa;
 
   if (!nicho || (!cidade && !porMapa)) {
-    return json({ error: "Informe o nicho e a cidade (ou marque um ponto no mapa)." }, 400);
+    return json({ error: "Informe o nicho e a cidade (ou marque um ponto no mapa)." }, 400, req);
   }
 
   const encoder = new TextEncoder();
