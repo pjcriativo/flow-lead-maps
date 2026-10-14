@@ -2,17 +2,21 @@ import { Bell, Command, Moon, Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface GoogleMapsTopbarProps {
-  user: {
-    name: string;
-    email: string;
-    avatarUrl: string;
-    initials: string;
+  user?: {
+    name?: string;
+    email?: string;
+    avatarUrl?: string;
+    initials?: string;
     role?: string;
   };
   unreadNotifications?: number;
 }
 
-export function GoogleMapsTopbar({ user, unreadNotifications = 3 }: GoogleMapsTopbarProps) {
+export function GoogleMapsTopbar({ user = {}, unreadNotifications = 3 }: GoogleMapsTopbarProps) {
+  const name = user.name || "Marcos Gonçalves";
+  const avatarUrl = user.avatarUrl || "";
+  const initials = user.initials || "MG";
+  const role = user.role || "Administrador";
   return (
     <header className="flex min-h-15 items-center justify-between gap-4 border-b border-home-border bg-home-background px-4 sm:px-6 lg:px-8 select-none">
       {/* Busca Global */}
@@ -57,18 +61,18 @@ export function GoogleMapsTopbar({ user, unreadNotifications = 3 }: GoogleMapsTo
         {/* Perfil do Usuário */}
         <div className="flex items-center gap-2.5 rounded-xl border border-home-border/80 bg-home-surface/90 px-2.5 py-1.5 transition-colors">
           <Avatar className="size-8.5 border border-home-orange/40 bg-[#1e1509]">
-            <AvatarImage src={user.avatarUrl} alt={user.name} />
+            <AvatarImage src={avatarUrl} alt={name} />
             <AvatarFallback className="bg-[#1e1509] text-[11px] font-bold text-home-orange">
-              {user.initials || "MG"}
+              {initials}
             </AvatarFallback>
           </Avatar>
 
           <div className="hidden flex-col text-left sm:flex leading-tight">
             <span className="text-xs font-bold text-white line-clamp-1">
-              {user.name || "Marcos Gonçalves"}
+              {name}
             </span>
             <span className="text-[10px] font-medium text-home-muted">
-              {user.role || "Administrador"}
+              {role}
             </span>
           </div>
         </div>

@@ -307,32 +307,28 @@ export function GoogleMapsResultsPanel({
                       </div>
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      <RatingCell rating={lead.rating} reviews={lead.reviews_count} />
+                      <RatingCell lead={lead} />
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap font-mono text-[11px]">
                       {lead.phone || <span className="text-home-muted/50">—</span>}
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      <WhatsCell whatsapp={lead.whatsapp} phone={lead.phone} />
+                      <WhatsCell lead={lead} />
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      <EmailCell email={lead.email} />
+                      <EmailCell lead={lead} />
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      <SiteCell website={lead.website} />
+                      <SiteCell lead={lead} />
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
-                      <InstagramCell instagram={lead.instagram_url} />
+                      <InstagramCell lead={lead} />
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">
                       <StatusBadge status={lead.status} />
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap text-right">
-                      <MapsButton
-                        nome={lead.business_name}
-                        cidade={lead.city}
-                        endereco={lead.address}
-                      />
+                      <MapsButton lead={lead} />
                     </td>
                   </tr>
                 ))}

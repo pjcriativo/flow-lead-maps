@@ -50,6 +50,7 @@ export function GoogleMapsSearchSummary({
   nomeLista,
   onEditarNomeLista,
   filtrosCaptura,
+  onToggleFiltroCaptura,
   buscarEmails,
   running,
   onIniciar,

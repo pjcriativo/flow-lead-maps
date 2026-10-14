@@ -19,6 +19,7 @@ import { GoogleMapsResultsPanel } from "./GoogleMapsResultsPanel";
 import { GoogleMapsRunningView } from "./GoogleMapsRunningView";
 import { GoogleMapsSearchResultsView } from "./GoogleMapsSearchResultsView";
 import { GoogleMapsApproachView } from "./GoogleMapsApproachView";
+import { GoogleMapsHistoryView } from "./GoogleMapsHistoryView";
 import { useGoogleMapsStats } from "./useGoogleMapsStats";
 import { Radar } from "lucide-react";
 
@@ -84,10 +85,10 @@ export function GoogleMapsPremiumView({
   const insertedIdsRef = useRef<string[]>([]);
   const geoAbort = useRef<AbortController | null>(null);
 
-  // Estados de visualização: "config" (Tela 01), "running" (Tela 02), "results" (Tela 03) ou "approach" (Tela 04)
-  const [activeView, setActiveView] = useState<"config" | "running" | "results" | "approach">(
-    "config",
-  );
+  // Estados de visualização: "config" (Tela 01), "running" (Tela 02), "results" (Tela 03), "approach" (Tela 04) ou "history" (Tela 05)
+  const [activeView, setActiveView] = useState<
+    "config" | "running" | "results" | "approach" | "history"
+  >("config");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [duplicatasCount, setDuplicatasCount] = useState(0);
   const [isParcial, setIsParcial] = useState(false);
@@ -479,6 +480,59 @@ export function GoogleMapsPremiumView({
     );
   }
 
+  // Renderização da Tela 05: Histórico de Buscas
+  if (activeView === "history") {
+    return (
+      <GoogleMapsHistoryView
+        user={user}
+        unreadNotifications={unreadNotifications}
+        onNovaBusca={() => setActiveView("config")}
+        onVoltarParaConfig={() => setActiveView("config")}
+        onNovaBuscaComCriterios={(criterios) => {
+          setNicho(criterios.nicho);
+          setCategoriaAtiva(criterios.categoria || categoriaCorrespondente(criterios.nicho));
+          setCidade(criterios.cidade);
+          setUf(criterios.uf);
+          setRaioKm(criterios.raioKm);
+          setLimite(criterios.limite);
+          if (criterios.nomeLista) setNomeListaCustom(criterios.nomeLista);
+          setActiveView("config");
+        }}
+        onVerResultadosBusca={(item) => {
+          if (item.leads && item.leads.length > 0) {
+            setLeads(item.leads);
+            setNicho(item.nicho);
+            setCategoriaAtiva(item.categoria);
+            setCidade(item.cidade);
+            setUf(item.uf);
+            setRaioKm(item.raioKm);
+            setLimite(item.solicitado);
+            setDuplicatasCount(item.duplicatas);
+            setListaCriadaId(item.listId || undefined);
+            setDataUltimaBusca(item.dataHora);
+            setActiveView("results");
+          }
+        }}
+        onUsarLeads={(item) => {
+          if (item.leads && item.leads.length > 0) {
+            setLeads(item.leads);
+            setNicho(item.nicho);
+            setCategoriaAtiva(item.categoria);
+            setCidade(item.cidade);
+            setUf(item.uf);
+            setApproachSelectedIds(new Set(item.leads.map((l) => l.id)));
+            setListaCriadaId(item.listId || undefined);
+            setActiveView("approach");
+          } else {
+            onOpenMinhasListas?.();
+          }
+        }}
+        onOpenMinhasListas={onOpenMinhasListas}
+        onOpenLeads={onOpenLeads}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
       {/* 1. Topbar Oficial */}
@@ -486,8 +540,8 @@ export function GoogleMapsPremiumView({
 
       {/* Conteúdo Principal com espaçamentos da referência */}
       <main className="px-4 sm:px-6 lg:px-8 pt-5 space-y-5 max-w-[1680px] mx-auto">
-        {/* 2. Cabeçalho: Título, Descrição e Breadcrumbs */}
-        <GoogleMapsHeader />
+        {/* 2. Cabeçalho: Título, Descrição e Breadcrumbs com Acesso ao Histórico */}
+        <GoogleMapsHeader onOpenHistorico={() => setActiveView("history")} />
 
         {/* 3. Indicadores Superiores (5 cards) */}
         <GoogleMapsStatsCards stats={stats} />
