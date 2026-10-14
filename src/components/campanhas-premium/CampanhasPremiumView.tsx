@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { DashboardHeader } from "@/components/home-premium/DashboardHeader";
 import { GestaoProducaoView } from "./GestaoProducaoView";
 import { ResultadosCampanhaView } from "./ResultadosCampanhaView";
+import { BibliotecaTemplatesView } from "./templates/BibliotecaTemplatesView";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -23,7 +24,7 @@ import { CriarCampanhaModal } from "./CriarCampanhaModal";
 import { SelecionarCampanhaModal } from "./SelecionarCampanhaModal";
 import { CampanhaConfiguracaoWizard } from "./CampanhaConfiguracaoWizard";
 
-export type CampanhasSubView = "central" | "gestao" | "resultados";
+export type CampanhasSubView = "central" | "gestao" | "resultados" | "templates";
 
 export interface CampanhasPremiumViewProps {
   user?: {
@@ -281,6 +282,20 @@ export function CampanhasPremiumView({
     }
   };
 
+  // Subview Biblioteca de Templates (Tela 01 - Prompt 50)
+  if (currentSubView === "templates") {
+    return (
+      <BibliotecaTemplatesView
+        user={user}
+        unreadNotifications={unreadNotifications}
+        onBackToCampanhas={() => handleSubViewChange("central")}
+        onSelectTemplateForCampaign={(templateId) => {
+          // Contrato preparado para integração com o futuro Estúdio de Campanhas (Prompt 51)
+        }}
+      />
+    );
+  }
+
   // Se a subview for Resultados e Métricas (Tela 3)
   if (currentSubView === "resultados") {
     if (currentCampanha) {
@@ -305,7 +320,7 @@ export function CampanhasPremiumView({
             <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
               <CampanhasHeader
                 onNewCampaign={() => setIsCreateModalOpen(true)}
-                onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+                onOpenTemplates={() => handleSubViewChange("templates")}
               />
               <CampanhasStatsCards metrics={metrics} />
             </main>
@@ -319,7 +334,9 @@ export function CampanhasPremiumView({
             onConfigComplete={(config) => {
               // According to Prompt 49, we should not automatically create an active campaign
               // Instead, we complete the configuration and let the user decide when to start
-              toast.success("Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.");
+              toast.success(
+                "Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.",
+              );
               // In a full implementation, we would save this config and allow the user to start the campaign later
             }}
           />
@@ -335,7 +352,7 @@ export function CampanhasPremiumView({
           <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
             <CampanhasHeader
               onNewCampaign={() => setIsCreateModalOpen(true)}
-              onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+              onOpenTemplates={() => handleSubViewChange("templates")}
             />
             <CampanhasStatsCards metrics={metrics} />
           </main>
@@ -387,7 +404,7 @@ export function CampanhasPremiumView({
             <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
               <CampanhasHeader
                 onNewCampaign={() => setIsCreateModalOpen(true)}
-                onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+                onOpenTemplates={() => handleSubViewChange("templates")}
               />
               <CampanhasStatsCards metrics={metrics} />
             </main>
@@ -401,7 +418,9 @@ export function CampanhasPremiumView({
             onConfigComplete={(config) => {
               // According to Prompt 49, we should not automatically create an active campaign
               // Instead, we complete the configuration and let the user decide when to start
-              toast.success("Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.");
+              toast.success(
+                "Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.",
+              );
               // In a full implementation, we would save this config and allow the user to start the campaign later
             }}
           />
@@ -417,7 +436,7 @@ export function CampanhasPremiumView({
           <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
             <CampanhasHeader
               onNewCampaign={() => setIsCreateModalOpen(true)}
-              onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+              onOpenTemplates={() => handleSubViewChange("templates")}
             />
             <CampanhasStatsCards metrics={metrics} />
           </main>
@@ -453,7 +472,7 @@ export function CampanhasPremiumView({
         {/* Cabeçalho da página: Título + Botão Modelos + Botão Nova Campanha */}
         <CampanhasHeader
           onNewCampaign={() => setIsCreateModalOpen(true)}
-          onOpenTemplates={() => toast.info("Modelos de campanhas por nicho em breve.")}
+          onOpenTemplates={() => handleSubViewChange("templates")}
         />
 
         {/* 5 Cards de Métricas Superiores */}
@@ -499,7 +518,9 @@ export function CampanhasPremiumView({
                     onConfigComplete={(config) => {
                       // According to Prompt 49, we should not automatically create an active campaign
                       // Instead, we complete the configuration and let the user decide when to start
-                      toast.success("Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.");
+                      toast.success(
+                        "Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.",
+                      );
                       // In a full implementation, we would save this config and allow the user to start the campaign later
                     }}
                   />

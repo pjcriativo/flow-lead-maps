@@ -205,11 +205,19 @@ function Dashboard() {
       selectSection("instagram");
       toast.error("Não foi possível conectar a conta do Instagram.");
     }
-    // deep-link de seção (ex.: /dashboard?secao=automacao — usado pelo painel /admin)
+    // deep-link de seção e subview
+    const sub = params.get("sub") || params.get("subview");
+    if (sub === "templates" || sub === "biblioteca") {
+      selectSection("campanhas");
+      setCampanhasSubView("templates");
+    }
     const secao = params.get("secao");
     if (secao === "configuracoes" || secao === "perfil") selectSection("settings");
     else if (secao === "inteligencia" || secao === "competitors") selectSection("instagram");
-    else if (isDashboardSection(secao)) selectSection(secao);
+    else if (secao === "templates" || secao === "biblioteca") {
+      selectSection("campanhas");
+      setCampanhasSubView("templates");
+    } else if (isDashboardSection(secao)) selectSection(secao);
   }, [selectSection]);
 
   if (!userReady) return null;

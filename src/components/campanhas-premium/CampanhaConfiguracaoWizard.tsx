@@ -1,11 +1,32 @@
 import { useState } from "react";
-import { Loader2, MapPin, Mail, Check, Send, Clock, Settings, List, Terminal, Bot, AlertCircle, AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
+import {
+  Loader2,
+  MapPin,
+  Mail,
+  Check,
+  Send,
+  Clock,
+  Settings,
+  List,
+  Terminal,
+  Bot,
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { formatData } from "@/lib/format";
 import type { LeadListComStats } from "@/lib/lists-api";
@@ -15,12 +36,7 @@ import { getLeadWorkspaceContext } from "@/lib/leads-api";
 import { toast } from "sonner";
 
 export type ConfigStep =
-  | "destinatarios"
-  | "remetente"
-  | "conteudo"
-  | "programacao"
-  | "revisao"
-  | "concluido";
+  "destinatarios" | "remetente" | "conteudo" | "programacao" | "revisao" | "concluido";
 
 interface CampanhaConfiguracaoWizardProps {
   listaId: string;
@@ -58,7 +74,9 @@ export function CampanhaConfiguracaoWizard({
   const [preCabecalho, setPreCabecalho] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [variaveis, setVariaveis] = useState<Record<string, string>>({});
-  const [horarioEnvio, setHorarioEnvio] = useState<"rascunho" | "imediato" | "agendado">("rascunho");
+  const [horarioEnvio, setHorarioEnvio] = useState<"rascunho" | "imediato" | "agendado">(
+    "rascunho",
+  );
   const [dataAgendamento, setDataAgendamento] = useState<string | null>(null);
   const [fusoHorario, setFusoHorario] = useState("");
 
@@ -70,7 +88,9 @@ export function CampanhaConfiguracaoWizard({
       const context = await getLeadWorkspaceContext();
       const { data: listasData, error: listasError } = await supabase
         .from("lead_lists")
-        .select("id, name, niche, city, uf, fonte, leads_atuais, gold_count, enriched_atuais, proposta_enviada_atuais")
+        .select(
+          "id, name, niche, city, uf, fonte, leads_atuais, gold_count, enriched_atuais, proposta_enviada_atuais",
+        )
         .eq("id", listaId)
         .eq("org_id", context.orgId)
         .single();
@@ -120,7 +140,7 @@ export function CampanhaConfiguracaoWizard({
 
     // Get default fuso horário
     try {
-      const configPublica = await fetch(`/api/config-publica`).then(res => res.json());
+      const configPublica = await fetch(`/api/config-publica`).then((res) => res.json());
       setFusoHorario(configPublica.fuso_horario || "America/Sao_Paulo");
     } catch (err) {
       setFusoHorario("America/Sao_Paulo"); // fallback
@@ -132,7 +152,13 @@ export function CampanhaConfiguracaoWizard({
   // we'll call it in event handlers or render if needed
 
   const handleBack = () => {
-    const steps: ConfigStep[] = ["destinatarios", "remetente", "conteudo", "programacao", "revisao"];
+    const steps: ConfigStep[] = [
+      "destinatarios",
+      "remetente",
+      "conteudo",
+      "programacao",
+      "revisao",
+    ];
     const currentIndex = steps.indexOf(step);
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1]);
@@ -142,7 +168,13 @@ export function CampanhaConfiguracaoWizard({
   };
 
   const handleNext = async () => {
-    const steps: ConfigStep[] = ["destinatarios", "remetente", "conteudo", "programacao", "revisao"];
+    const steps: ConfigStep[] = [
+      "destinatarios",
+      "remetente",
+      "conteudo",
+      "programacao",
+      "revisao",
+    ];
     const currentIndex = steps.indexOf(step);
 
     // Basic validation per step
@@ -177,7 +209,7 @@ export function CampanhaConfiguracaoWizard({
         // Instead, we just complete the configuration and let the user decide
 
         const config = {
-          nomeCampanha: nomeCampanha || (lista?.name || "Nova Campanha"),
+          nomeCampanha: nomeCampanha || lista?.name || "Nova Campanha",
           listaId,
           remetenteNome,
           remetenteEmail,
@@ -225,38 +257,48 @@ export function CampanhaConfiguracaoWizard({
         {/* Steps Indicator */}
         <div className="flex flex-col space-y-2 text-xs text-home-muted">
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-3 h-3 rounded-full transition-colors",
-              step === "destinatarios" ? "bg-home-orange" : "bg-home-surface/60"
-            )} />
+            <div
+              className={cn(
+                "w-3 h-3 rounded-full transition-colors",
+                step === "destinatarios" ? "bg-home-orange" : "bg-home-surface/60",
+              )}
+            />
             <span>Destinatários</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-3 h-3 rounded-full transition-colors",
-              step === "remetente" ? "bg-home-orange" : "bg-home-surface/60"
-            )} />
+            <div
+              className={cn(
+                "w-3 h-3 rounded-full transition-colors",
+                step === "remetente" ? "bg-home-orange" : "bg-home-surface/60",
+              )}
+            />
             <span>Remetente</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-3 h-3 rounded-full transition-colors",
-              step === "conteudo" ? "bg-home-orange" : "bg-home-surface/60"
-            )} />
+            <div
+              className={cn(
+                "w-3 h-3 rounded-full transition-colors",
+                step === "conteudo" ? "bg-home-orange" : "bg-home-surface/60",
+              )}
+            />
             <span>Conteúdo</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-3 h-3 rounded-full transition-colors",
-              step === "programacao" ? "bg-home-orange" : "bg-home-surface/60"
-            )} />
+            <div
+              className={cn(
+                "w-3 h-3 rounded-full transition-colors",
+                step === "programacao" ? "bg-home-orange" : "bg-home-surface/60",
+              )}
+            />
             <span>Programação</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-3 h-3 rounded-full transition-colors",
-              step === "revisao" ? "bg-home-orange" : "bg-home-surface/60"
-            )} />
+            <div
+              className={cn(
+                "w-3 h-3 rounded-full transition-colors",
+                step === "revisao" ? "bg-home-orange" : "bg-home-surface/60",
+              )}
+            />
             <span>Revisão</span>
           </div>
         </div>
@@ -287,7 +329,9 @@ export function CampanhaConfiguracaoWizard({
                     </div>
                     <div className="text-center space-y-1">
                       <p className="text-xs text-home-muted font-semibold">Leads</p>
-                      <p className="text-2xl font-bold tabular-nums text-home-foreground">{lista.leads_atuais}</p>
+                      <p className="text-2xl font-bold tabular-nums text-home-foreground">
+                        {lista.leads_atuais}
+                      </p>
                     </div>
                     <div className="text-center space-y-1">
                       <p className="text-xs text-home-muted font-semibold">Com e-mail</p>
@@ -314,7 +358,7 @@ export function CampanhaConfiguracaoWizard({
                     className="border-home-border bg-home-background text-xs text-home-foreground placeholder:text-home-muted focus:border-home-orange"
                   />
                 </div>
-              )
+              </div>
             ) : (
               <div className="text-center py-8">
                 <p className="text-xs text-home-muted">Nenhuma lista selecionada</p>
@@ -357,7 +401,9 @@ export function CampanhaConfiguracaoWizard({
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
                   <Check className="size-3.5 text-home-orange" />
-                  <span className="text-xs text-home-foreground">simuladodominiodeexemplo.com.br</span>
+                  <span className="text-xs text-home-foreground">
+                    simuladodominiodeexemplo.com.br
+                  </span>
                 </div>
               </div>
             </div>
@@ -411,10 +457,14 @@ export function CampanhaConfiguracaoWizard({
               </Label>
               <div className="space-y-2">
                 <div className="flex items-center gap-2 mb-2">
-                  <Button variant="outline" size="sm" onClick={() => {
-                    // In a full implementation, this would open a modal to manage variables
-                    toast.info("Gerenciador de variáveis em breve");
-                  }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // In a full implementation, this would open a modal to manage variables
+                      toast.info("Gerenciador de variáveis em breve");
+                    }}
+                  >
                     Gerenciar variáveis
                   </Button>
                 </div>
@@ -476,7 +526,9 @@ export function CampanhaConfiguracaoWizard({
                   <SelectItem value="America/Fortaleza">Horário do Ceará</SelectItem>
                   <SelectItem value="America/Recife">Horário de Pernambuco</SelectItem>
                   <SelectItem value="America/Araguaina">Horário do Tocantins</SelectItem>
-                  <SelectItem value="America/Argentina/Buenos_Aires">Horário da Argentina</SelectItem>
+                  <SelectItem value="America/Argentina/Buenos_Aires">
+                    Horário da Argentina
+                  </SelectItem>
                   <SelectItem value="America/Santiago">Horário do Chile</SelectItem>
                   <SelectItem value="America/Bogota">Horário da Colômbia</SelectItem>
                   <SelectItem value="America/Lima">Horário do Peru</SelectItem>
@@ -495,13 +547,17 @@ export function CampanhaConfiguracaoWizard({
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-xs text-home-muted">Nome da campanha:</span>
-                    <span className="font-semibold text-white">{nomeCampanha || "(não definido)"}</span>
+                    <span className="font-semibold text-white">
+                      {nomeCampanha || "(não definido)"}
+                    </span>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-xs text-home-muted">Lista selecionada:</span>
-                    <span className="font-semibold text-white">{lista?.name || "(não definida)"}</span>
+                    <span className="font-semibold text-white">
+                      {lista?.name || "(não definida)"}
+                    </span>
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -511,4 +567,37 @@ export function CampanhaConfiguracaoWizard({
                       {lista?.leads_atuais || 0}
                     </span>
                   </div>
-                </div
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer Navigation Buttons */}
+        <div className="flex items-center justify-between border-t border-home-border/60 pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleBack}
+            disabled={currentIndex === 0 || loading}
+            className="border-home-border bg-home-surface text-xs font-semibold text-white hover:bg-home-surface-strong"
+          >
+            Voltar
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleNext}
+            disabled={loading}
+            className="bg-home-orange text-xs font-bold text-white hover:bg-home-orange/90"
+          >
+            {loading ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
+            {currentIndex === steps.length - 1 ? "Concluir configuração" : "Avançar"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

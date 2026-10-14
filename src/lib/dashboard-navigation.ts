@@ -34,7 +34,13 @@ export function dashboardSectionFromSearch(search: string): DashboardSection {
   if (requested === "configuracoes" || requested === "perfil") return "settings";
   if (requested === "inteligencia" || requested === "competitors") return "instagram";
   if (requested === "flow_marketing" || requested === "marketing_ai") return "marketing";
-  if (requested === "influencers_studio" || requested === "ai_influencers" || requested === "influencer") return "influencers";
+  if (
+    requested === "influencers_studio" ||
+    requested === "ai_influencers" ||
+    requested === "influencer"
+  )
+    return "influencers";
+  if (requested === "templates" || requested === "biblioteca") return "campanhas";
   return isDashboardSection(requested) ? requested : "home";
 }
 
