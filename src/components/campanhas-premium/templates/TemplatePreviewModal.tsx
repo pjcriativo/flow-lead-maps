@@ -163,7 +163,7 @@ export function TemplatePreviewModal({
                   <div className="flex items-center gap-2">
                     <span className="text-zinc-500">De:</span>
                     <span className="text-zinc-300">
-                      {variables.nome_remetente || "Equipe"} &lt;contato@flowbusiness.com.br&gt;
+                      {variables.nome_remetente || "Remetente não configurado"}
                     </span>
                   </div>
                 </div>

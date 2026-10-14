@@ -4,81 +4,56 @@ import type {
   StudioFiltrosEnvio,
   StudioValidationResult,
 } from "@/types/campaign-studio";
-import { OFFICIAL_EMAIL_TEMPLATES } from "@/components/campanhas-premium/templates/templates-data";
+import {
+  OFFICIAL_CORPORATE_SIGNATURES,
+  OFFICIAL_EMAIL_TEMPLATES,
+} from "@/components/campanhas-premium/templates/templates-data";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
+import {
+  loadStudioLists,
+  type SimpleStudioListItem,
+  type StudioListRepository,
+} from "@/lib/campaign-studio-lists";
 import { obterAssinaturaPadraoOrg, obterContextoOrgAtiva } from "./templates-service";
 
-export interface SimpleListaItem {
-  id: string;
-  nome: string;
-  nicho: string;
-  cidade: string;
-  totalLeads: number;
-  leadsQualificados: number;
-  leadsComEmail: number;
-}
+export type SimpleListaItem = SimpleStudioListItem;
 
 // Chave isolada por organização para salvar rascunho do estúdio
 const STORAGE_ESTUDIO_CURRENT_KEY = (orgId: string) =>
   `flow_business_estudio_draft_current_${orgId}`;
-const STORAGE_ESTUDIO_LIST_KEY = (orgId: string) =>
-  `flow_business_estudio_drafts_list_${orgId}`;
+const STORAGE_ESTUDIO_LIST_KEY = (orgId: string) => `flow_business_estudio_drafts_list_${orgId}`;
 
 /**
- * Carrega listas reais do usuário para alimentar o seletor do estúdio.
- * Se nenhuma lista for encontrada, fornece o fallback oficial da referência "Dentistas em Curitiba".
+ * Carrega somente listas e contagens reais da organização ativa.
  */
 export async function carregarListasEstudio(orgId: string): Promise<SimpleListaItem[]> {
-  try {
-    const { data, error } = await supabase
-      .from("lead_lists")
-      .select("id, name, niche, city, leads_atuais, gold_count, enriched_atuais")
-      .order("created_at", { ascending: false });
-
-    if (!error && data && data.length > 0) {
-      return data.map((l) => ({
-        id: l.id,
-        nome: l.name,
-        nicho: l.nicho || l.niche || "Geral",
-        cidade: l.city || "Curitiba",
-        totalLeads: l.leads_atuais || 0,
-        leadsQualificados: l.gold_count || Math.round((l.leads_atuais || 0) * 0.7),
-        leadsComEmail: l.enriched_atuais || Math.round((l.leads_atuais || 0) * 0.9),
-      }));
-    }
-  } catch (err) {
-    console.warn("Erro ao buscar lead_lists do Supabase:", err);
+  const activeOrganization = await getActiveOrganizationContext();
+  if (activeOrganization.orgId !== orgId) {
+    throw new Error("A organização solicitada não é a organização ativa.");
   }
 
-  // Fallback garantido que reproduz fielmente a referência oficial aprovada
-  return [
-    {
-      id: "lista-dentistas-curitiba",
-      nome: "Dentistas em Curitiba",
-      nicho: "Odontologia",
-      cidade: "Curitiba",
-      totalLeads: 85,
-      leadsQualificados: 77,
-      leadsComEmail: 77,
+  const repository: StudioListRepository = {
+    async listLists(scopedOrgId) {
+      const { data, error } = await supabase
+        .from("lead_lists")
+        .select("id, org_id, name, niche, city, uf")
+        .eq("org_id", scopedOrgId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
-    {
-      id: "lista-clinicas-sp",
-      nome: "Clínicas Médicas SP",
-      nicho: "Saúde & Estética",
-      cidade: "São Paulo",
-      totalLeads: 120,
-      leadsQualificados: 94,
-      leadsComEmail: 108,
+    async listLeads(scopedOrgId, listIds) {
+      const { data, error } = await supabase
+        .from("leads")
+        .select("list_id, email, score_breakdown")
+        .eq("org_id", scopedOrgId)
+        .in("list_id", listIds);
+      if (error) throw error;
+      return data ?? [];
     },
-    {
-      id: "lista-escritorios-advocacia",
-      nome: "Escritórios de Advocacia",
-      nicho: "Jurídico",
-      cidade: "Belo Horizonte",
-      totalLeads: 64,
-      leadsQualificados: 52,
-      leadsComEmail: 61,
-    },
-  ];
+  };
+
+  return loadStudioLists(repository, orgId);
 }
 
 /**
@@ -89,12 +64,19 @@ export async function criarRascunhoInicial(
   preselectedListId?: string | null,
 ): Promise<StudioCampaignDraft> {
   const ctx = await obterContextoOrgAtiva();
+  if (ctx.orgId !== orgId) throw new Error("A organização solicitada não é a organização ativa.");
   const listas = await carregarListasEstudio(orgId);
 
-  // Seleciona lista pré-definida ou a primeira da lista (Dentistas em Curitiba)
-  const listaAtiva =
-    (preselectedListId && listas.find((l) => l.id === preselectedListId)) ||
-    listas[0];
+  const listaAtiva = preselectedListId
+    ? listas.find((list) => list.id === preselectedListId)
+    : listas[0];
+  if (!listaAtiva) {
+    throw new Error(
+      preselectedListId
+        ? "A lista selecionada não existe ou não pertence à organização ativa."
+        : "Nenhuma lista de leads está disponível para esta organização.",
+    );
+  }
 
   const templateBase = OFFICIAL_EMAIL_TEMPLATES[0]; // Apresentação Comercial
   const sigPadrao = obterAssinaturaPadraoOrg(orgId);
@@ -103,7 +85,7 @@ export async function criarRascunhoInicial(
     id: `draft_${Date.now()}`,
     orgId,
     userId: ctx.userId,
-    nome: "Reativação Outubro — Dentistas Curitiba",
+    nome: `Nova campanha — ${listaAtiva.nome}`,
     listaId: listaAtiva.id,
     listaNome: listaAtiva.nome,
     totalLeads: listaAtiva.totalLeads,
@@ -116,11 +98,12 @@ export async function criarRascunhoInicial(
       novosLeads: true,
     },
     leadsIdsSelecionados: [],
-    remetenteNome: ctx.userName || "Marcos Gonçalves",
-    remetenteEmail: ctx.userEmail || "contato@flowbusiness.com.br",
-    responderPara: ctx.replyToEmail || "comercial@flowbusiness.com.br",
-    assinaturaId: sigPadrao.id || "consultor-comercial",
-    assinaturaNome: "Equipe Comercial",
+    remetenteNome: ctx.userName,
+    remetenteEmail: ctx.userEmail,
+    responderPara: ctx.replyToEmail,
+    assinaturaId: sigPadrao.id,
+    assinaturaNome:
+      OFFICIAL_CORPORATE_SIGNATURES.find((signature) => signature.id === sigPadrao.id)?.nome ?? "",
     templateId: templateBase.id,
     templateNome: templateBase.nome,
     assunto: "Uma ideia para aumentar seus resultados em Curitiba",
@@ -156,9 +139,9 @@ export async function criarRascunhoInicial(
       },
     ],
     programacao: {
-      modo: "agendar",
-      dataEnvio: "2026-10-18",
-      horarioEnvio: "09:00",
+      modo: "imediato",
+      dataEnvio: "",
+      horarioEnvio: "",
       fusoHorario: "America/Sao_Paulo",
     },
     status: "rascunho",
@@ -170,30 +153,29 @@ export async function criarRascunhoInicial(
 /**
  * Salva rascunho com isolamento multi-tenant por orgId.
  */
-export function salvarRascunhoEstudio(draft: StudioCampaignDraft): void {
-  if (typeof window === "undefined") return;
-  const orgId = draft.orgId || "default_org";
+export function salvarRascunhoEstudio(draft: StudioCampaignDraft): StudioCampaignDraft {
+  if (typeof window === "undefined") {
+    throw new Error("O armazenamento local não está disponível.");
+  }
+  if (!draft.orgId) throw new Error("O rascunho não possui uma organização válida.");
+  const orgId = draft.orgId;
   const updated = {
     ...draft,
     atualizadoEm: new Date().toISOString(),
   };
 
-  try {
-    localStorage.setItem(STORAGE_ESTUDIO_CURRENT_KEY(orgId), JSON.stringify(updated));
+  localStorage.setItem(STORAGE_ESTUDIO_CURRENT_KEY(orgId), JSON.stringify(updated));
 
-    // Salva na lista histórica de rascunhos da org
-    const listRaw = localStorage.getItem(STORAGE_ESTUDIO_LIST_KEY(orgId));
-    const list: StudioCampaignDraft[] = listRaw ? JSON.parse(listRaw) : [];
-    const idx = list.findIndex((item) => item.id === draft.id);
-    if (idx >= 0) {
-      list[idx] = updated;
-    } else {
-      list.unshift(updated);
-    }
-    localStorage.setItem(STORAGE_ESTUDIO_LIST_KEY(orgId), JSON.stringify(list.slice(0, 20)));
-  } catch (err) {
-    console.error("Falha ao salvar rascunho no localStorage:", err);
+  const listRaw = localStorage.getItem(STORAGE_ESTUDIO_LIST_KEY(orgId));
+  const list: StudioCampaignDraft[] = listRaw ? JSON.parse(listRaw) : [];
+  const idx = list.findIndex((item) => item.id === draft.id);
+  if (idx >= 0) {
+    list[idx] = updated;
+  } else {
+    list.unshift(updated);
   }
+  localStorage.setItem(STORAGE_ESTUDIO_LIST_KEY(orgId), JSON.stringify(list.slice(0, 20)));
+  return updated;
 }
 
 /**
@@ -206,8 +188,8 @@ export function obterUltimoRascunhoEstudio(orgId: string): StudioCampaignDraft |
     if (raw) {
       return JSON.parse(raw);
     }
-  } catch {
-    // fallback
+  } catch (error) {
+    console.error("Falha ao recuperar o rascunho local:", error);
   }
   return null;
 }

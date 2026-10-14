@@ -1,25 +1,9 @@
-import { useState } from "react";
-import {
-  Loader2,
-  MapPin,
-  Mail,
-  Check,
-  Send,
-  Clock,
-  Settings,
-  List,
-  Terminal,
-  Bot,
-  AlertCircle,
-  AlertTriangle,
-  ArrowLeft,
-  ArrowRight,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -28,15 +12,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { formatData } from "@/lib/format";
-import type { LeadListComStats } from "@/lib/lists-api";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-import { getLeadWorkspaceContext } from "@/lib/leads-api";
 import { toast } from "sonner";
+import { carregarListasEstudio, type SimpleListaItem } from "@/services/campaign-studio-service";
+import { obterContextoOrgAtiva } from "@/services/templates-service";
 
 export type ConfigStep =
   "destinatarios" | "remetente" | "conteudo" | "programacao" | "revisao" | "concluido";
+
+const CONFIG_STEPS: ConfigStep[] = [
+  "destinatarios",
+  "remetente",
+  "conteudo",
+  "programacao",
+  "revisao",
+];
 
 interface CampanhaConfiguracaoWizardProps {
   listaId: string;
@@ -63,7 +52,7 @@ export function CampanhaConfiguracaoWizard({
 }: CampanhaConfiguracaoWizardProps) {
   const [step, setStep] = useState<ConfigStep>("destinatarios");
   const [loading, setLoading] = useState(false);
-  const [lista, setLista] = useState<LeadListComStats | null>(null);
+  const [lista, setLista] = useState<SimpleListaItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Form state
@@ -77,106 +66,47 @@ export function CampanhaConfiguracaoWizard({
   const [horarioEnvio, setHorarioEnvio] = useState<"rascunho" | "imediato" | "agendado">(
     "rascunho",
   );
-  const [dataAgendamento, setDataAgendamento] = useState<string | null>(null);
-  const [fusoHorario, setFusoHorario] = useState("");
+  const [dataAgendamento, setDataAgendamento] = useState("");
+  const [fusoHorario, setFusoHorario] = useState("America/Sao_Paulo");
 
-  // Load list data
-  const carregarLista = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const context = await getLeadWorkspaceContext();
-      const { data: listasData, error: listasError } = await supabase
-        .from("lead_lists")
-        .select(
-          "id, name, niche, city, uf, fonte, leads_atuais, gold_count, enriched_atuais, proposta_enviada_atuais",
-        )
-        .eq("id", listaId)
-        .eq("org_id", context.orgId)
-        .single();
-
-      if (listasError) throw listasError;
-      if (!listasData) throw new Error("Lista não encontrada ou acesso negado");
-
-      setLista({
-        id: listasData.id,
-        name: listasData.name,
-        niche: listasData.niche || "—",
-        city: listasData.city || "—",
-        uf: listasData.uf || null,
-        fonte: listasData.fonte || null,
-        leads_atuais: listasData.leads_atuais,
-        gold_count: listasData.gold_count,
-        enriched_atuais: listasData.enriched_atuais,
-        proposta_enviada_atuais: listasData.proposta_enviada_atuais,
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao carregar lista");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Initialize form with list data if available
-  const initializeForm = async () => {
-    await carregarLista();
-
-    // Try to get user profile for remetente
-    try {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", (await supabase.auth.getUser()).data.user?.id)
-        .single();
-
-      if (profileData) {
-        setNomeCampanha(profileData.full_name || "");
-        setRemetenteNome(profileData.full_name || "");
-        setRemetenteEmail(profileData.email || "");
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const context = await obterContextoOrgAtiva();
+        const lists = await carregarListasEstudio(context.orgId);
+        const selectedList = lists.find((item) => item.id === listaId);
+        if (!selectedList) {
+          throw new Error("Lista não encontrada ou sem acesso na organização ativa.");
+        }
+        if (!active) return;
+        setLista(selectedList);
+        setRemetenteNome(context.userName);
+        setRemetenteEmail(context.userEmail);
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Falha ao carregar lista");
+      } finally {
+        if (active) setLoading(false);
       }
-    } catch (err) {
-      // Ignore profile errors - form can still be filled manually
-    }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [listaId]);
 
-    // Get default fuso horário
-    try {
-      const configPublica = await fetch(`/api/config-publica`).then((res) => res.json());
-      setFusoHorario(configPublica.fuso_horario || "America/Sao_Paulo");
-    } catch (err) {
-      setFusoHorario("America/Sao_Paulo"); // fallback
-    }
-  };
-
-  // Initialize on mount
-  // Note: In a real implementation, we'd use useEffect here, but for simplicity
-  // we'll call it in event handlers or render if needed
+  const currentIndex = CONFIG_STEPS.indexOf(step);
 
   const handleBack = () => {
-    const steps: ConfigStep[] = [
-      "destinatarios",
-      "remetente",
-      "conteudo",
-      "programacao",
-      "revisao",
-    ];
-    const currentIndex = steps.indexOf(step);
     if (currentIndex > 0) {
-      setStep(steps[currentIndex - 1]);
+      setStep(CONFIG_STEPS[currentIndex - 1]);
     } else {
       onClose();
     }
   };
 
   const handleNext = async () => {
-    const steps: ConfigStep[] = [
-      "destinatarios",
-      "remetente",
-      "conteudo",
-      "programacao",
-      "revisao",
-    ];
-    const currentIndex = steps.indexOf(step);
-
     // Basic validation per step
     if (step === "destinatarios" && !lista) {
       toast.error("Erro ao carregar dados da lista");
@@ -198,8 +128,8 @@ export function CampanhaConfiguracaoWizard({
       return;
     }
 
-    if (currentIndex < steps.length - 1) {
-      setStep(steps[currentIndex + 1]);
+    if (currentIndex < CONFIG_STEPS.length - 1) {
+      setStep(CONFIG_STEPS[currentIndex + 1]);
     } else {
       // Final step - complete configuration
       try {
@@ -209,7 +139,7 @@ export function CampanhaConfiguracaoWizard({
         // Instead, we just complete the configuration and let the user decide
 
         const config = {
-          nomeCampanha: nomeCampanha || lista?.name || "Nova Campanha",
+          nomeCampanha: nomeCampanha || lista?.nome || "Nova Campanha",
           listaId,
           remetenteNome,
           remetenteEmail,
@@ -218,7 +148,7 @@ export function CampanhaConfiguracaoWizard({
           mensagem,
           variaveis,
           horarioEnvio,
-          dataAgendamento,
+          ...(dataAgendamento ? { dataAgendamento } : {}),
           fusoHorario,
         };
 
@@ -231,10 +161,6 @@ export function CampanhaConfiguracaoWizard({
       }
     }
   };
-
-  // Load initial data
-  // In a real implementation, this would be in useEffect
-  // For now, we'll check if lista is null and load if needed
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -321,27 +247,29 @@ export function CampanhaConfiguracaoWizard({
                 <div className="border-home-border/60 bg-home-surface/50 rounded-xl p-4">
                   <div className="flex items-center gap-3">
                     <div className="flex-1">
-                      <p className="font-semibold text-white">{lista.name}</p>
+                      <p className="font-semibold text-white">{lista.nome}</p>
                       <p className="text-xs text-home-muted">
-                        {lista.niche} {lista.city ? `· ${lista.city}` : ""}
+                        {lista.nicho} {lista.cidade ? `· ${lista.cidade}` : ""}
                         {lista.uf ? `/${lista.uf}` : ""}
                       </p>
                     </div>
                     <div className="text-center space-y-1">
                       <p className="text-xs text-home-muted font-semibold">Leads</p>
                       <p className="text-2xl font-bold tabular-nums text-home-foreground">
-                        {lista.leads_atuais}
+                        {lista.totalLeads}
                       </p>
                     </div>
                     <div className="text-center space-y-1">
                       <p className="text-xs text-home-muted font-semibold">Com e-mail</p>
-                      {/* Calculate leads with email - for now we'll show a placeholder */}
-                      <p className="text-2xl font-bold tabular-nums text-home-foreground">-</p>
+                      <p className="text-2xl font-bold tabular-nums text-home-foreground">
+                        {lista.leadsComEmail}
+                      </p>
                     </div>
                     <div className="text-center space-y-1">
                       <p className="text-xs text-home-muted font-semibold">Contatos habilitados</p>
-                      {/* Calculate enabled contacts - for now we'll show a placeholder */}
-                      <p className="text-2xl font-bold tabular-nums text-home-foreground">-</p>
+                      <p className="text-2xl font-bold tabular-nums text-home-foreground">
+                        {lista.leadsQualificados}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -395,17 +323,10 @@ export function CampanhaConfiguracaoWizard({
               />
             </div>
             <div className="space-y-3">
-              <Label htmlFor="dominio-verificado" className="text-xs font-semibold text-white">
-                Domínio verificado
-              </Label>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <Check className="size-3.5 text-home-orange" />
-                  <span className="text-xs text-home-foreground">
-                    simuladodominiodeexemplo.com.br
-                  </span>
-                </div>
-              </div>
+              <Label className="text-xs font-semibold text-white">Domínio de envio</Label>
+              <p className="text-xs text-home-muted">
+                A verificação do domínio será configurada em uma etapa posterior.
+              </p>
             </div>
           </div>
         )}
@@ -447,8 +368,6 @@ export function CampanhaConfiguracaoWizard({
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
                 className="border-home-border bg-home-background text-xs text-home-foreground placeholder:text-home-muted focus:border-home-orange h-24"
-                minRows={4}
-                maxRows={8}
               />
             </div>
             <div className="space-y-3">
@@ -483,7 +402,14 @@ export function CampanhaConfiguracaoWizard({
               <Label htmlFor="horario-envio" className="text-xs font-semibold text-white">
                 Quando enviar
               </Label>
-              <Select value={horarioEnvio} onValueChange={setHorarioEnvio}>
+              <Select
+                value={horarioEnvio}
+                onValueChange={(value) => {
+                  if (value === "rascunho" || value === "imediato" || value === "agendado") {
+                    setHorarioEnvio(value);
+                  }
+                }}
+              >
                 <SelectTrigger id="horario-envio">
                   <SelectValue placeholder="Selecione uma opção" />
                 </SelectTrigger>
@@ -504,7 +430,7 @@ export function CampanhaConfiguracaoWizard({
                   type="datetime-local"
                   id="data-agendamento"
                   value={dataAgendamento || ""}
-                  onChange={(e) => setDataAgendamento(e.target.value || null)}
+                  onChange={(e) => setDataAgendamento(e.target.value)}
                   className="border-home-border bg-home-background text-xs text-home-foreground placeholder:text-home-muted focus:border-home-orange w-full"
                 />
               </div>
@@ -556,7 +482,7 @@ export function CampanhaConfiguracaoWizard({
                   <div className="flex justify-between">
                     <span className="text-xs text-home-muted">Lista selecionada:</span>
                     <span className="font-semibold text-white">
-                      {lista?.name || "(não definida)"}
+                      {lista?.nome || "(não definida)"}
                     </span>
                   </div>
                 </div>
@@ -564,7 +490,7 @@ export function CampanhaConfiguracaoWizard({
                   <div className="flex justify-between">
                     <span className="text-xs text-home-muted">Quantidade de destinatários:</span>
                     <span className="font-semibold text-white tabular-nums">
-                      {lista?.leads_atuais || 0}
+                      {lista?.totalLeads || 0}
                     </span>
                   </div>
                 </div>
@@ -594,7 +520,7 @@ export function CampanhaConfiguracaoWizard({
             className="bg-home-orange text-xs font-bold text-white hover:bg-home-orange/90"
           >
             {loading ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
-            {currentIndex === steps.length - 1 ? "Concluir configuração" : "Avançar"}
+            {currentIndex === CONFIG_STEPS.length - 1 ? "Concluir configuração" : "Avançar"}
           </Button>
         </div>
       </div>

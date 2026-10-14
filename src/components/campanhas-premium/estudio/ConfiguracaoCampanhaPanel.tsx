@@ -1,13 +1,5 @@
 import React from "react";
-import {
-  Settings,
-  Users,
-  Mail,
-  PenTool,
-  RotateCcw,
-  Check,
-  ChevronDown,
-} from "lucide-react";
+import { Settings, Users, Mail, PenTool, RotateCcw, Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StudioCampaignDraft } from "@/types/campaign-studio";
 import { OFFICIAL_CORPORATE_SIGNATURES } from "../templates/templates-data";
@@ -60,9 +52,7 @@ export function ConfiguracaoCampanhaPanel({
         <div className="flex size-7 items-center justify-center rounded-lg bg-[#ff6200]/10 text-[#ff6200]">
           <Settings className="size-4" />
         </div>
-        <h3 className="text-sm font-bold text-white tracking-wide">
-          Configuração da campanha
-        </h3>
+        <h3 className="text-sm font-bold text-white tracking-wide">Configuração da campanha</h3>
       </div>
 
       {/* 1. Nome da campanha */}
@@ -73,9 +63,7 @@ export function ConfiguracaoCampanhaPanel({
         <input
           type="text"
           value={draft.nome}
-          onChange={(e) =>
-            onChangeDraft((prev) => ({ ...prev, nome: e.target.value }))
-          }
+          onChange={(e) => onChangeDraft((prev) => ({ ...prev, nome: e.target.value }))}
           placeholder="Ex: Reativação Outubro — Dentistas Curitiba"
           className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 text-xs text-white placeholder-zinc-500 focus:border-[#ff6200] focus:outline-none transition-colors"
         />
@@ -89,9 +77,7 @@ export function ConfiguracaoCampanhaPanel({
         </div>
 
         <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-            Lista de leads
-          </label>
+          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Lista de leads</label>
           <div className="relative">
             <select
               value={draft.listaId || ""}
@@ -203,9 +189,7 @@ export function ConfiguracaoCampanhaPanel({
           <input
             type="text"
             value={draft.remetenteNome}
-            onChange={(e) =>
-              onChangeDraft((prev) => ({ ...prev, remetenteNome: e.target.value }))
-            }
+            onChange={(e) => onChangeDraft((prev) => ({ ...prev, remetenteNome: e.target.value }))}
             className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 text-xs text-white placeholder-zinc-500 focus:border-[#ff6200] focus:outline-none"
           />
         </div>
@@ -222,14 +206,8 @@ export function ConfiguracaoCampanhaPanel({
               }
               className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 pr-8 text-xs font-medium text-zinc-200 focus:border-[#ff6200] focus:outline-none cursor-pointer appearance-none"
             >
-              <option value="contato@flowbusiness.com.br" className="bg-[#10131b]">
-                contato@flowbusiness.com.br
-              </option>
-              <option value="comercial@flowbusiness.com.br" className="bg-[#10131b]">
-                comercial@flowbusiness.com.br
-              </option>
-              <option value="atendimento@flowbusiness.com.br" className="bg-[#10131b]">
-                atendimento@flowbusiness.com.br
+              <option value={draft.remetenteEmail} className="bg-[#10131b]">
+                {draft.remetenteEmail || "E-mail não configurado"}
               </option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />
@@ -237,9 +215,7 @@ export function ConfiguracaoCampanhaPanel({
         </div>
 
         <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-            Responder para
-          </label>
+          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Responder para</label>
           <div className="relative">
             <select
               value={draft.responderPara}
@@ -248,11 +224,8 @@ export function ConfiguracaoCampanhaPanel({
               }
               className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 pr-8 text-xs font-medium text-zinc-200 focus:border-[#ff6200] focus:outline-none cursor-pointer appearance-none"
             >
-              <option value="comercial@flowbusiness.com.br" className="bg-[#10131b]">
-                comercial@flowbusiness.com.br
-              </option>
-              <option value="contato@flowbusiness.com.br" className="bg-[#10131b]">
-                contato@flowbusiness.com.br
+              <option value={draft.responderPara} className="bg-[#10131b]">
+                {draft.responderPara || "E-mail não configurado"}
               </option>
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />

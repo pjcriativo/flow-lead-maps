@@ -10,6 +10,7 @@ import {
   Check,
   Save,
   ArrowRight,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -59,7 +60,9 @@ export function EstudioCampanhasView({
   onCampaignCreated,
 }: EstudioCampanhasViewProps) {
   const [loading, setLoading] = useState(true);
-  const [orgId, setOrgId] = useState("org-default");
+  const [orgId, setOrgId] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [activeStep, setActiveStep] = useState<StudioStepId>("conteudo");
 
   // Estado do Rascunho da Campanha
@@ -78,6 +81,7 @@ export function EstudioCampanhasView({
     async function init() {
       try {
         setLoading(true);
+        setLoadError(null);
         const ctx = await obterContextoOrgAtiva();
         if (!isMounted) return;
         setOrgId(ctx.orgId);
@@ -97,11 +101,15 @@ export function EstudioCampanhasView({
               sessionStorage.removeItem("flow_campanha_contrato"); // consumido
             }
           }
-        } catch {}
+        } catch (error) {
+          console.error("Falha ao ler o contrato local da biblioteca:", error);
+        }
 
         // Tenta recuperar rascunho anterior ou cria um novo
         const saved = obterUltimoRascunhoEstudio(ctx.orgId);
-        if (saved && !preselectedListId && !templateVindoDaBiblioteca) {
+        const savedListIsAvailable =
+          saved?.orgId === ctx.orgId && loadedListas.some((list) => list.id === saved.listaId);
+        if (saved && savedListIsAvailable && !preselectedListId && !templateVindoDaBiblioteca) {
           setDraft(saved);
         } else {
           const novo = await criarRascunhoInicial(ctx.orgId, preselectedListId);
@@ -115,6 +123,14 @@ export function EstudioCampanhasView({
         }
       } catch (err) {
         console.error("Falha ao inicializar Estúdio de Campanhas:", err);
+        if (isMounted) {
+          setDraft(null);
+          setLoadError(
+            err instanceof Error
+              ? err.message
+              : "Não foi possível carregar os dados do Estúdio de Campanhas.",
+          );
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -124,9 +140,9 @@ export function EstudioCampanhasView({
     return () => {
       isMounted = false;
     };
-  }, [preselectedListId]);
+  }, [preselectedListId, reloadToken]);
 
-  if (loading || !draft) {
+  if (loading) {
     return (
       <div className="flex min-h-[600px] w-full items-center justify-center bg-[#090b10] text-white">
         <div className="flex flex-col items-center gap-3">
@@ -139,12 +155,39 @@ export function EstudioCampanhasView({
     );
   }
 
+  if (!draft) {
+    return (
+      <div className="flex min-h-[600px] w-full items-center justify-center bg-[#090b10] px-6 text-white">
+        <div className="max-w-md rounded-2xl border border-rose-900/50 bg-[#12141c] p-6 text-center">
+          <h2 className="text-base font-bold">Não foi possível abrir o Estúdio</h2>
+          <p className="mt-2 text-sm text-zinc-400">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => setReloadToken((value) => value + 1)}
+            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#ff6200] px-4 py-2 text-xs font-bold text-white"
+          >
+            <RefreshCw className="size-3.5" /> Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const validation = validarRascunhoCampanha(draft);
+  const updateDraft = (updater: (current: StudioCampaignDraft) => StudioCampaignDraft) => {
+    setDraft((current) => (current ? updater(current) : current));
+  };
 
   // Manipuladores de Ação
   const handleSaveDraft = () => {
-    salvarRascunhoEstudio(draft);
-    toast.success("Rascunho da campanha salvo com sucesso!");
+    try {
+      const saved = salvarRascunhoEstudio(draft);
+      setDraft(saved);
+      toast.success("Rascunho salvo neste navegador.");
+    } catch (error) {
+      console.error("Falha ao salvar rascunho:", error);
+      toast.error("Não foi possível salvar o rascunho neste navegador.");
+    }
   };
 
   const handleSelectTemplate = (template: EmailTemplateItem) => {
@@ -177,19 +220,23 @@ export function EstudioCampanhasView({
   };
 
   const handleSaveDraftAndExit = () => {
-    salvarRascunhoEstudio(draft);
-    setIsRevisaoModalOpen(false);
-    toast.success("Campanha validada e salva com sucesso no módulo Campanhas!");
-    if (onCampaignCreated) {
-      onCampaignCreated();
-    } else {
-      onBack();
+    try {
+      salvarRascunhoEstudio(draft);
+      setIsRevisaoModalOpen(false);
+      toast.success("Rascunho validado e salvo neste navegador.");
+      if (onCampaignCreated) {
+        onCampaignCreated();
+      } else {
+        onBack();
+      }
+    } catch (error) {
+      console.error("Falha ao salvar rascunho:", error);
+      toast.error("Não foi possível salvar o rascunho; ele não foi concluído.");
     }
   };
 
   const activeTemplateItem =
-    OFFICIAL_EMAIL_TEMPLATES.find((t) => t.id === draft.templateId) ||
-    OFFICIAL_EMAIL_TEMPLATES[0];
+    OFFICIAL_EMAIL_TEMPLATES.find((t) => t.id === draft.templateId) || OFFICIAL_EMAIL_TEMPLATES[0];
 
   return (
     <div className="min-h-svh w-full bg-[#08090d] text-white flex flex-col font-sans select-none">
@@ -209,11 +256,7 @@ export function EstudioCampanhasView({
           </button>
 
           <div className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
-            <button
-              type="button"
-              onClick={onBack}
-              className="hover:text-white transition-colors"
-            >
+            <button type="button" onClick={onBack} className="hover:text-white transition-colors">
               Campanhas
             </button>
             <span className="text-zinc-600">&gt;</span>
@@ -248,11 +291,7 @@ export function EstudioCampanhasView({
           <div className="flex items-center gap-2.5 border-l border-zinc-800 pl-4">
             <div className="size-8 rounded-full border border-zinc-700 bg-zinc-800 flex items-center justify-center text-xs font-bold text-white overflow-hidden">
               {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.name}
-                  className="w-full h-full object-cover"
-                />
+                <img src={user.avatarUrl} alt={user.name} className="w-full h-full object-cover" />
               ) : (
                 user.initials || "JS"
               )}
@@ -276,8 +315,8 @@ export function EstudioCampanhasView({
               Estúdio de Campanhas
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-zinc-400 max-w-2xl">
-              Configure destinatários, conteúdo, assinatura, testes e agendamento da sua
-              campanha de e-mail.
+              Configure destinatários, conteúdo, assinatura, testes e agendamento da sua campanha de
+              e-mail.
             </p>
           </div>
 
@@ -391,9 +430,7 @@ export function EstudioCampanhasView({
               <div className="flex size-6 sm:size-7 items-center justify-center rounded-full bg-[#ff6200] text-white text-[11px] font-bold shadow-lg shadow-[#ff6200]/30 ring-4 ring-[#ff6200]/20">
                 3
               </div>
-              <span className="text-[10px] sm:text-xs font-extrabold text-[#ff6200]">
-                Conteúdo
-              </span>
+              <span className="text-[10px] sm:text-xs font-extrabold text-[#ff6200]">Conteúdo</span>
             </div>
 
             {/* Etapa 4 */}
@@ -401,9 +438,7 @@ export function EstudioCampanhasView({
               <div className="flex size-6 sm:size-7 items-center justify-center rounded-full border border-zinc-700 bg-[#161922] text-zinc-400 text-[11px] font-medium">
                 4
               </div>
-              <span className="text-[10px] sm:text-xs font-medium text-zinc-400">
-                Assinatura
-              </span>
+              <span className="text-[10px] sm:text-xs font-medium text-zinc-400">Assinatura</span>
             </div>
 
             {/* Etapa 5 */}
@@ -424,9 +459,7 @@ export function EstudioCampanhasView({
               <div className="flex size-6 sm:size-7 items-center justify-center rounded-full border border-zinc-700 bg-[#161922] text-zinc-400 text-[11px] font-medium">
                 6
               </div>
-              <span className="text-[10px] sm:text-xs font-medium text-zinc-400">
-                Agendamento
-              </span>
+              <span className="text-[10px] sm:text-xs font-medium text-zinc-400">Agendamento</span>
             </div>
           </div>
         </div>
@@ -438,7 +471,7 @@ export function EstudioCampanhasView({
             <ConfiguracaoCampanhaPanel
               draft={draft}
               listasDisponiveis={listas}
-              onChangeDraft={setDraft}
+              onChangeDraft={updateDraft}
               onOpenAlterarLista={() => setIsAlterarListaOpen(true)}
               onInsertVariable={handleInsertVariable}
             />
@@ -448,7 +481,7 @@ export function EstudioCampanhasView({
           <div className="flex-1 w-full min-w-0">
             <EditorEmailCanvas
               draft={draft}
-              onChangeDraft={setDraft}
+              onChangeDraft={updateDraft}
               onSaveDraft={handleSaveDraft}
               onOpenPreview={() => setIsPreviewModalOpen(true)}
               onChangeTemplate={() => setIsAlterarTemplateOpen(true)}
@@ -460,7 +493,7 @@ export function EstudioCampanhasView({
             <PreviaAgendamentoPanel
               draft={draft}
               validation={validation}
-              onChangeDraft={setDraft}
+              onChangeDraft={updateDraft}
               onAvancarRevisao={handleAvancarRevisao}
             />
           </div>

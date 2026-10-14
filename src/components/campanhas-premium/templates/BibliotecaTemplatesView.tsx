@@ -87,12 +87,13 @@ export function BibliotecaTemplatesView({
   onSelectTemplateForCampaign,
 }: BibliotecaTemplatesViewProps) {
   // Contexto da organização e usuário ativo (multi-tenant)
-  const [orgId, setOrgId] = useState<string>("default-org");
+  const [orgId, setOrgId] = useState("");
+  const [userId, setUserId] = useState("");
   const [variables, setVariables] = useState<TemplateVariables>({
     nome_remetente: user.name,
-    empresa_remetente: "Flow Business",
-    telefone_remetente: "+55 11 98765-4321",
-    site_remetente: "https://flowbusiness.com.br",
+    empresa_remetente: "",
+    telefone_remetente: "",
+    site_remetente: "",
   });
 
   // Aba principal: Templates de E-mail vs Assinaturas Corporativas
@@ -130,21 +131,27 @@ export function BibliotecaTemplatesView({
   useEffect(() => {
     let active = true;
     void (async () => {
-      const ctx = await obterContextoOrgAtiva();
-      if (!active) return;
-      setOrgId(ctx.orgId);
+      try {
+        const ctx = await obterContextoOrgAtiva();
+        if (!active) return;
+        setOrgId(ctx.orgId);
+        setUserId(ctx.userId);
 
-      const vars = await carregarVariaveisOrganizacao();
-      if (!active) return;
-      setVariables(vars);
+        const vars = await carregarVariaveisOrganizacao();
+        if (!active) return;
+        setVariables(vars);
 
-      const favs = listarFavoritosOrg(ctx.orgId);
-      const custom = listarModelosPersonalizadosOrg(ctx.orgId);
-      const defaultSig = obterAssinaturaPadraoOrg(ctx.orgId);
+        const favs = listarFavoritosOrg(ctx.orgId);
+        const custom = listarModelosPersonalizadosOrg(ctx.orgId);
+        const defaultSig = obterAssinaturaPadraoOrg(ctx.orgId);
 
-      setFavoritosIds(favs);
-      setMeusModelos(custom);
-      setAssinaturaPadrao(defaultSig);
+        setFavoritosIds(favs);
+        setMeusModelos(custom);
+        setAssinaturaPadrao(defaultSig);
+      } catch (error) {
+        console.error("Falha ao carregar a biblioteca da organização ativa:", error);
+        if (active) toast.error("Não foi possível carregar os dados da organização ativa.");
+      }
     })();
 
     return () => {
@@ -179,52 +186,78 @@ export function BibliotecaTemplatesView({
   const handleSaveCustomTemplate = (
     data: Partial<CustomTemplateItem> & { nome: string; categoria: EmailTemplateItem["categoria"] },
   ) => {
-    const saved = salvarModeloPersonalizadoOrg(orgId, data);
-    setMeusModelos(listarModelosPersonalizadosOrg(orgId));
-    toast.success(`Modelo "${saved.nome}" salvo com sucesso!`);
+    try {
+      const saved = salvarModeloPersonalizadoOrg(orgId, userId, data);
+      setMeusModelos(listarModelosPersonalizadosOrg(orgId));
+      toast.success(`Modelo "${saved.nome}" salvo neste navegador.`);
+      return true;
+    } catch (error) {
+      console.error("Falha ao salvar modelo personalizado:", error);
+      toast.error("Não foi possível salvar o modelo neste navegador.");
+      return false;
+    }
   };
 
   // Definir assinatura padrão
   const handleSetDefaultSignature = (sig: CorporateSignatureItem) => {
-    definirAssinaturaPadraoOrg(orgId, sig.id, assinaturaPadrao.data);
-    setAssinaturaPadrao({
-      id: sig.id,
-      data: assinaturaPadrao.data,
-      definida: true,
-    });
-    toast.success(`Assinatura "${sig.nome}" definida como padrão da organização!`);
+    if (!orgId) {
+      toast.error("Selecione uma organização ativa antes de definir a assinatura.");
+      return;
+    }
+    try {
+      definirAssinaturaPadraoOrg(orgId, sig.id, assinaturaPadrao.data);
+      setAssinaturaPadrao({
+        id: sig.id,
+        data: assinaturaPadrao.data,
+        definida: true,
+      });
+      toast.success(`Assinatura "${sig.nome}" definida neste navegador.`);
+    } catch (error) {
+      console.error("Falha ao definir assinatura padrão:", error);
+      toast.error("Não foi possível definir a assinatura neste navegador.");
+    }
   };
 
   // Salvar edição da assinatura padrão
   const handleSaveSignature = (sigData: SignatureData, setAsDef: boolean) => {
-    const currentSigId = signatureToEdit?.id || assinaturaPadrao.id;
-    if (setAsDef) {
-      definirAssinaturaPadraoOrg(orgId, currentSigId, sigData);
-      setAssinaturaPadrao({
-        id: currentSigId,
-        data: sigData,
-        definida: true,
-      });
+    try {
+      const currentSigId = signatureToEdit?.id || assinaturaPadrao.id;
+      if (setAsDef) {
+        if (!orgId) throw new Error("Contexto da organização ativa indisponível.");
+        definirAssinaturaPadraoOrg(orgId, currentSigId, sigData);
+        setAssinaturaPadrao({
+          id: currentSigId,
+          data: sigData,
+          definida: true,
+        });
+        toast.success("Dados da assinatura salvos neste navegador.");
+      } else {
+        toast.info("Alterações usadas apenas na prévia; a assinatura padrão não foi alterada.");
+      }
+      return true;
+    } catch (error) {
+      console.error("Falha ao salvar assinatura:", error);
+      toast.error("Não foi possível salvar a assinatura neste navegador.");
+      return false;
     }
-    toast.success("Dados da assinatura atualizados com sucesso!");
   };
 
   // Ação "Usar template" (Preparação estrita do contrato para Estúdio Prompt 51)
   const handleUseTemplate = (template: EmailTemplateItem) => {
-    const contract = prepararContratoEstudio({
-      template,
-      variaveis: variables,
-      orgId,
-    });
-
-    toast.success(
-      `Template "${template.nome}" preparado com sucesso! O contrato comercial está pronto para o futuro Estúdio de Campanhas (Prompt 51).`,
-      {
-        duration: 5000,
-      },
-    );
-
-    onSelectTemplateForCampaign?.(template.id);
+    try {
+      if (!orgId) throw new Error("Contexto da organização ativa indisponível.");
+      const contract = prepararContratoEstudio({
+        template,
+        variaveis: variables,
+        orgId,
+      });
+      sessionStorage.setItem("flow_campanha_contrato", JSON.stringify(contract));
+      toast.success(`Template "${template.nome}" selecionado para o Estúdio.`);
+      onSelectTemplateForCampaign?.(template.id);
+    } catch (error) {
+      console.error("Falha ao preparar template para o Estúdio:", error);
+      toast.error("Não foi possível levar o template ao Estúdio.");
+    }
   };
 
   // Filtragem dos templates de e-mail

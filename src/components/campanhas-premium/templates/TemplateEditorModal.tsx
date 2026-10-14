@@ -14,7 +14,7 @@ interface TemplateEditorModalProps {
       nome: string;
       categoria: EmailTemplateItem["categoria"];
     },
-  ) => void;
+  ) => boolean;
 }
 
 export function TemplateEditorModal({
@@ -46,7 +46,7 @@ export function TemplateEditorModal({
       return;
     }
 
-    onSave({
+    const saved = onSave({
       id: template.isPersonalizado ? template.id : undefined,
       nome: nome.trim(),
       descricao: `Modelo personalizado baseado em ${template.nome}`,
@@ -59,8 +59,7 @@ export function TemplateEditorModal({
       temaEscuro: template.temaEscuro,
     });
 
-    toast.success("Modelo personalizado salvo com sucesso no workspace da sua organização!");
-    onClose();
+    if (saved) onClose();
   };
 
   return (

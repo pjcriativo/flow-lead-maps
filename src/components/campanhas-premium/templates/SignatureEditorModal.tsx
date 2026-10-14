@@ -9,7 +9,7 @@ interface SignatureEditorModalProps {
   signature: CorporateSignatureItem | null;
   currentData: SignatureData;
   onClose: () => void;
-  onSave: (data: SignatureData, setAsDefault: boolean) => void;
+  onSave: (data: SignatureData, setAsDefault: boolean) => boolean;
 }
 
 export function SignatureEditorModal({
@@ -32,9 +32,7 @@ export function SignatureEditorModal({
       return;
     }
 
-    onSave(data, isDefault);
-    toast.success("Assinatura corporativa salva com sucesso!");
-    onClose();
+    if (onSave(data, isDefault)) onClose();
   };
 
   return (

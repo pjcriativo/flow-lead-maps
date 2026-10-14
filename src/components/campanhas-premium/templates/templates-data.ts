@@ -4,6 +4,70 @@ import type {
   SignatureData,
   TemplateVariables,
 } from "@/types/templates";
+import createDOMPurify from "dompurify";
+
+const SIGNATURE_ALLOWED_TAGS = [
+  "a",
+  "br",
+  "div",
+  "img",
+  "span",
+  "strong",
+  "table",
+  "tbody",
+  "td",
+  "tr",
+];
+const SIGNATURE_ALLOWED_ATTRS = [
+  "alt",
+  "border",
+  "cellpadding",
+  "cellspacing",
+  "height",
+  "href",
+  "role",
+  "src",
+  "style",
+  "target",
+  "title",
+  "width",
+];
+
+export function escapeSignatureText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function normalizeSignatureUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "#";
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "https:" ? parsed.toString() : "#";
+  } catch {
+    return "#";
+  }
+}
+
+function normalizeSignatureSite(value: string): string {
+  const withoutProtocol = value.trim().replace(/^https?:\/\//i, "");
+  if (!withoutProtocol) return "";
+  const normalized = normalizeSignatureUrl(`https://${withoutProtocol}`);
+  return normalized === "#" ? "" : normalized.slice("https://".length);
+}
+
+function sanitizeSignatureHtml(html: string): string {
+  if (typeof window === "undefined") return html;
+  return createDOMPurify(window).sanitize(html, {
+    ALLOWED_TAGS: SIGNATURE_ALLOWED_TAGS,
+    ALLOWED_ATTR: SIGNATURE_ALLOWED_ATTRS,
+    ALLOW_DATA_ATTR: false,
+  });
+}
 
 /**
  * Utilitário de interpolação segura de variáveis de template de e-mail.
@@ -900,17 +964,22 @@ export const DEFAULT_SIGNATURE_DATA: SignatureData = {
 };
 
 export function renderSignatureHtml(htmlTemplate: string, data: SignatureData): string {
-  return htmlTemplate
-    .replace(/\{\{nome\}\}/g, data.nome || "Colaborador")
-    .replace(/\{\{cargo\}\}/g, data.cargo || "Equipe Comercial")
-    .replace(/\{\{empresa\}\}/g, data.empresa || "Flow Business")
-    .replace(/\{\{telefone\}\}/g, data.telefone || "+55 11 98765-4321")
-    .replace(/\{\{email\}\}/g, data.email || "contato@empresa.com.br")
-    .replace(/\{\{site\}\}/g, data.site || "www.empresa.com.br")
-    .replace(/\{\{endereco\}\}/g, data.endereco || "São Paulo - SP")
-    .replace(/\{\{linkedin\}\}/g, data.linkedin || "#")
-    .replace(/\{\{instagram\}\}/g, data.instagram || "#")
-    .replace(/\{\{whatsapp\}\}/g, data.whatsapp || "#");
+  const phone = /^[+()\d\s.-]*$/.test(data.telefone.trim()) ? data.telefone.trim() : "";
+  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim()) ? data.email.trim() : "";
+  const site = normalizeSignatureSite(data.site);
+  const rendered = htmlTemplate
+    .replace(/\{\{nome\}\}/g, escapeSignatureText(data.nome))
+    .replace(/\{\{cargo\}\}/g, escapeSignatureText(data.cargo))
+    .replace(/\{\{empresa\}\}/g, escapeSignatureText(data.empresa))
+    .replace(/\{\{telefone\}\}/g, escapeSignatureText(phone))
+    .replace(/\{\{email\}\}/g, escapeSignatureText(email))
+    .replace(/\{\{site\}\}/g, escapeSignatureText(site))
+    .replace(/\{\{endereco\}\}/g, escapeSignatureText(data.endereco ?? ""))
+    .replace(/\{\{linkedin\}\}/g, escapeSignatureText(normalizeSignatureUrl(data.linkedin ?? "")))
+    .replace(/\{\{instagram\}\}/g, escapeSignatureText(normalizeSignatureUrl(data.instagram ?? "")))
+    .replace(/\{\{whatsapp\}\}/g, escapeSignatureText(normalizeSignatureUrl(data.whatsapp ?? "")));
+
+  return sanitizeSignatureHtml(rendered);
 }
 
 export const OFFICIAL_CORPORATE_SIGNATURES: CorporateSignatureItem[] = [

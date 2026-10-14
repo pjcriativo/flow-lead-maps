@@ -355,9 +355,7 @@ export function CampanhasPremiumView({
             onConfigComplete={(config) => {
               // According to Prompt 49, we should not automatically create an active campaign
               // Instead, we complete the configuration and let the user decide when to start
-              toast.success(
-                "Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.",
-              );
+              toast.info("A configuração não foi persistida; revise-a novamente antes de sair.");
               // In a full implementation, we would save this config and allow the user to start the campaign later
             }}
           />
@@ -439,9 +437,7 @@ export function CampanhasPremiumView({
             onConfigComplete={(config) => {
               // According to Prompt 49, we should not automatically create an active campaign
               // Instead, we complete the configuration and let the user decide when to start
-              toast.success(
-                "Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.",
-              );
+              toast.info("A configuração não foi persistida; revise-a novamente antes de sair.");
               // In a full implementation, we would save this config and allow the user to start the campaign later
             }}
           />
@@ -539,8 +535,8 @@ export function CampanhasPremiumView({
                     onConfigComplete={(config) => {
                       // According to Prompt 49, we should not automatically create an active campaign
                       // Instead, we complete the configuration and let the user decide when to start
-                      toast.success(
-                        "Configuração da campanha concluída! Você pode iniciá-la quando estiver pronto.",
+                      toast.info(
+                        "A configuração não foi persistida; revise-a novamente antes de sair.",
                       );
                       // In a full implementation, we would save this config and allow the user to start the campaign later
                     }}

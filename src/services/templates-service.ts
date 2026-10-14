@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 import type {
   CampaignTemplateContract,
   CorporateSignatureItem,
@@ -28,54 +29,36 @@ export async function obterContextoOrgAtiva(): Promise<{
   replyToEmail: string;
   avatarUrl: string;
 }> {
-  const { data: authData } = await supabase.auth.getUser();
-  const userId = authData.user?.id || "anon-user";
-  const userEmail = authData.user?.email || "contato@flowbusiness.com.br";
-
-  let orgId = userId;
-  let userName = "Marcos Gonçalves";
-  let companyName = "Flow Business";
-  let phone = "+55 11 98765-4321";
-  let replyToEmail = userEmail;
-  let avatarUrl = "";
-
-  try {
-    const [{ data: perfil }, { data: membership }] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("full_name, phone, avatar_url, reply_to_email, company_name")
-        .eq("id", userId)
-        .maybeSingle(),
-      supabase.from("memberships").select("org_id").eq("user_id", userId).maybeSingle(),
-    ]);
-
-    if (perfil) {
-      if (perfil.full_name) userName = perfil.full_name.trim();
-      if (perfil.company_name) companyName = perfil.company_name.trim();
-      if (perfil.phone) phone = perfil.phone.trim();
-      if (perfil.reply_to_email) replyToEmail = perfil.reply_to_email.trim();
-      if (perfil.avatar_url) avatarUrl = perfil.avatar_url.trim();
-    }
-
-    if (membership?.org_id) {
-      orgId = membership.org_id;
-    }
-  } catch (err) {
-    console.warn(
-      "Não foi possível carregar perfil completo da org, usando dados padrão autorizados:",
-      err,
-    );
+  const activeOrganization = await getActiveOrganizationContext();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user || authData.user.id !== activeOrganization.userId) {
+    throw authError ?? new Error("Usuário não autenticado.");
   }
 
+  const [{ data: perfil, error: profileError }, { data: organization, error: orgError }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name, phone, avatar_url, reply_to_email")
+        .eq("id", activeOrganization.userId)
+        .maybeSingle(),
+      supabase.from("orgs").select("nome").eq("id", activeOrganization.orgId).maybeSingle(),
+    ]);
+  if (profileError) throw profileError;
+  if (orgError) throw orgError;
+  if (!organization) throw new Error("Organização ativa não encontrada.");
+
+  const userEmail = authData.user.email?.trim() ?? "";
+
   return {
-    userId,
-    orgId,
-    userName,
+    userId: activeOrganization.userId,
+    orgId: activeOrganization.orgId,
+    userName: perfil?.full_name?.trim() ?? "",
     userEmail,
-    companyName,
-    phone,
-    replyToEmail,
-    avatarUrl,
+    companyName: organization.nome.trim(),
+    phone: perfil?.phone?.trim() ?? "",
+    replyToEmail: perfil?.reply_to_email?.trim() || userEmail,
+    avatarUrl: perfil?.avatar_url?.trim() ?? "",
   };
 }
 
@@ -88,7 +71,7 @@ export async function carregarVariaveisOrganizacao(): Promise<TemplateVariables>
     nome_remetente: ctx.userName,
     empresa_remetente: ctx.companyName,
     telefone_remetente: ctx.phone,
-    site_remetente: "https://flowbusiness.com.br",
+    site_remetente: "",
   };
 }
 
@@ -177,6 +160,7 @@ export function listarModelosPersonalizadosOrg(orgId: string): CustomTemplateIte
  */
 export function salvarModeloPersonalizadoOrg(
   orgId: string,
+  userId: string,
   template: Partial<CustomTemplateItem> & {
     nome: string;
     categoria: EmailTemplateItem["categoria"];
@@ -185,6 +169,7 @@ export function salvarModeloPersonalizadoOrg(
   if (typeof window === "undefined") {
     throw new Error("Armazenamento indisponível no ambiente de execução.");
   }
+  if (!orgId || !userId) throw new Error("Contexto da organização ativa indisponível.");
   const lista = listarModelosPersonalizadosOrg(orgId);
   const now = new Date().toISOString();
 
@@ -211,7 +196,7 @@ export function salvarModeloPersonalizadoOrg(
     ],
     conteudoHtml: template.conteudoHtml || OFFICIAL_EMAIL_TEMPLATES[0].conteudoHtml,
     orgId,
-    userId: "owner",
+    userId,
     isPersonalizado: true,
     isFavorito: template.isFavorito ?? false,
     criadoEm: index >= 0 ? lista[index].criadoEm : now,
