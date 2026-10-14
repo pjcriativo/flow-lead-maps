@@ -2,7 +2,19 @@
 // Validação dos 12 templates de e-mail, 10 assinaturas corporativas,
 // variáveis dinâmicas, fallback e contratos para o Estúdio de Campanhas.
 
-import { OFFICIAL_EMAIL_TEMPLATES, OFFICIAL_CORPORATE_SIGNATURES, interpolateVariables, renderSignatureHtml, DEFAULT_SIGNATURE_DATA } from "../src/components/campanhas-premium/templates/templates-data.ts";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  OFFICIAL_EMAIL_TEMPLATES,
+  OFFICIAL_CORPORATE_SIGNATURES,
+  interpolateVariables,
+  renderSignatureHtml,
+  DEFAULT_SIGNATURE_DATA,
+} from "../src/components/campanhas-premium/templates/templates-data.ts";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let passed = 0;
 let failed = 0;
@@ -21,7 +33,10 @@ console.log("\n🧪 EXECUTANDO BATERIA DE TESTES — BIBLIOTECA DE TEMPLATES (PR
 
 // TESTE 1: Quantidade exata de templates oficiais
 console.log("1. Validação do Catálogo de Templates:");
-assert(OFFICIAL_EMAIL_TEMPLATES.length === 12, `Deve conter exatamente 12 templates oficiais (encontrados: ${OFFICIAL_EMAIL_TEMPLATES.length})`);
+assert(
+  OFFICIAL_EMAIL_TEMPLATES.length === 12,
+  `Deve conter exatamente 12 templates oficiais (encontrados: ${OFFICIAL_EMAIL_TEMPLATES.length})`,
+);
 
 const expectedTemplateIds = [
   "apresentacao-comercial",
@@ -42,16 +57,25 @@ for (const id of expectedTemplateIds) {
   const found = OFFICIAL_EMAIL_TEMPLATES.find((t) => t.id === id);
   assert(!!found, `Template "${id}" deve existir no catálogo oficial`);
   if (found) {
-    assert(found.conteudoHtml.includes("<html") && found.conteudoHtml.includes("</html>"), `Template "${id}" deve conter estrutura HTML válida`);
+    assert(
+      found.conteudoHtml.includes("<html") && found.conteudoHtml.includes("</html>"),
+      `Template "${id}" deve conter estrutura HTML válida`,
+    );
     assert(found.assuntoPadrao.length > 0, `Template "${id}" deve possuir assunto padrão`);
     assert(found.ctaTexto.length > 0, `Template "${id}" deve possuir CTA definido`);
-    assert(!found.conteudoHtml.includes("<script"), `Template "${id}" não pode conter scripts executáveis`);
+    assert(
+      !found.conteudoHtml.includes("<script"),
+      `Template "${id}" não pode conter scripts executáveis`,
+    );
   }
 }
 
 // TESTE 2: Quantidade e estrutura das 10 Assinaturas Corporativas
 console.log("\n2. Validação das Assinaturas Corporativas:");
-assert(OFFICIAL_CORPORATE_SIGNATURES.length === 10, `Deve conter exatamente 10 assinaturas corporativas (encontradas: ${OFFICIAL_CORPORATE_SIGNATURES.length})`);
+assert(
+  OFFICIAL_CORPORATE_SIGNATURES.length === 10,
+  `Deve conter exatamente 10 assinaturas corporativas (encontradas: ${OFFICIAL_CORPORATE_SIGNATURES.length})`,
+);
 
 const expectedSignatures = [
   "executiva-classica",
@@ -73,23 +97,34 @@ for (const id of expectedSignatures) {
     assert(!found.htmlTemplate.includes("<script"), `Assinatura "${id}" não pode conter scripts`);
     assert(!found.htmlTemplate.includes("<form"), `Assinatura "${id}" não pode conter formulários`);
     const rendered = renderSignatureHtml(found.htmlTemplate, DEFAULT_SIGNATURE_DATA);
-    assert(rendered.includes(DEFAULT_SIGNATURE_DATA.nome), `Assinatura "${id}" deve interpolar o nome do usuário`);
+    assert(
+      rendered.includes(DEFAULT_SIGNATURE_DATA.nome),
+      `Assinatura "${id}" deve interpolar o nome do usuário`,
+    );
   }
 }
 
 // TESTE 3: Interpolação de variáveis e Fallbacks
 console.log("\n3. Validação do Mecanismo de Interpolação e Fallbacks:");
-const rawTemplate = "Olá {{nome}}, convidamos a {{empresa}} de {{cidade}} para falar com {{nome_remetente}}.";
+const rawTemplate =
+  "Olá {{nome}}, convidamos a {{empresa}} de {{cidade}} para falar com {{nome_remetente}}.";
 const interpolated = interpolateVariables(rawTemplate, {
   nome: "Carlos",
   empresa: "Acme Corp",
   cidade: "Curitiba",
   nome_remetente: "Ana Silva",
 });
-assert(interpolated === "Olá Carlos, convidamos a Acme Corp de Curitiba para falar com Ana Silva.", "Deve substituir variáveis fornecidas com exatidão");
+assert(
+  interpolated === "Olá Carlos, convidamos a Acme Corp de Curitiba para falar com Ana Silva.",
+  "Deve substituir variáveis fornecidas com exatidão",
+);
 
 const fallbackResult = interpolateVariables(rawTemplate, {});
-assert(fallbackResult === "Olá Cliente, convidamos a sua empresa de sua região para falar com Equipe Comercial.", "Deve aplicar fallbacks inteligentes quando campos estiverem vazios");
+assert(
+  fallbackResult ===
+    "Olá Cliente, convidamos a sua empresa de sua região para falar com Equipe Comercial.",
+  "Deve aplicar fallbacks inteligentes quando campos estiverem vazios",
+);
 
 // TESTE 4: Isolamento Multi-Tenant e Contrato do Estúdio
 console.log("\n4. Validação de Isolamento Multi-Tenant e Contrato:");
@@ -100,13 +135,34 @@ const contract = {
   versao: "1.0",
   assunto: "Apresentação executiva",
   preheader: "Detalhes",
-  htmlRenderizado: "<table role=\"presentation\">...</table>",
+  htmlRenderizado: '<table role="presentation">...</table>',
   variaveisUtilizadas: { nome: "João" },
   orgId: "org-12345",
   timestamp: new Date().toISOString(),
 };
 assert(contract.orgId === "org-12345", "Contrato deve ser isolado pela org ativa");
 assert(contract.templateTipo === "email", "Tipo de contrato deve ser 'email'");
+
+// TESTE 5: Validação dos Assets de Imagem dos Templates
+console.log("\n5. Validação dos Assets de Imagem dos Templates:");
+const imageDir = path.resolve(__dirname, "../public/images/templates");
+const expectedImages = [
+  ...OFFICIAL_EMAIL_TEMPLATES.map((t) => `${t.id}.png`),
+  "meu-template-institucional.png",
+  "avatar-marcos.png",
+  "thumb-equipe-comercial.png",
+  "thumb-suporte.png",
+];
+
+for (const imgName of expectedImages) {
+  const fullPath = path.join(imageDir, imgName);
+  const exists = fs.existsSync(fullPath);
+  assert(exists, `Imagem "${imgName}" deve existir no diretório public/images/templates/`);
+  if (exists) {
+    const size = fs.statSync(fullPath).size;
+    assert(size > 500, `Imagem "${imgName}" deve ter tamanho válido (>500B, atual: ${size}B)`);
+  }
+}
 
 console.log(`\n========================================`);
 console.log(`RESULTADO DOS TESTES: ${passed} passaram, ${failed} falharam.`);

@@ -817,12 +817,12 @@ export function BibliotecaTemplatesView({
               {/* Card visual da assinatura corporativa */}
               <div className="rounded-xl border border-zinc-200 bg-white p-3.5 text-zinc-900 shadow-sm">
                 <div className="flex items-center gap-3">
-                  <div className="size-11 shrink-0 overflow-hidden rounded-full border border-zinc-300 bg-zinc-800 flex items-center justify-center text-white text-xs font-bold">
-                    {assinaturaPadrao.data.nome
-                      .split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")}
+                  <div className="size-11 shrink-0 overflow-hidden rounded-full border border-zinc-300 bg-zinc-800">
+                    <img
+                      src="/images/templates/avatar-marcos.png"
+                      alt={assinaturaPadrao.data.nome}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="min-w-0 flex-1 leading-tight">
                     <div className="text-xs font-bold text-zinc-900 truncate">
@@ -831,9 +831,9 @@ export function BibliotecaTemplatesView({
                     <div className="text-[11px] text-zinc-500 truncate">
                       {assinaturaPadrao.data.cargo}
                     </div>
-                    <div className="text-[11px] font-bold text-zinc-800 mt-0.5 flex items-center gap-1">
-                      <span>⚡</span>
-                      <span>{assinaturaPadrao.data.empresa}</span>
+                    <div className="text-[11px] font-bold text-zinc-800 mt-0.5 flex items-center gap-1.5">
+                      <span className="text-[#ff6200] font-black text-xs">⚡</span>
+                      <span className="font-extrabold tracking-tight">Flow Business</span>
                     </div>
                   </div>
                 </div>
@@ -915,8 +915,12 @@ export function BibliotecaTemplatesView({
               <div className="space-y-2">
                 <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-[#141824] p-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="size-8 rounded-lg bg-white border border-zinc-300 flex items-center justify-center text-[9px] font-bold text-zinc-900 shrink-0">
-                      EC
+                    <div className="w-11 h-7 rounded-md overflow-hidden border border-zinc-700/60 bg-white shrink-0 shadow-sm">
+                      <img
+                        src="/images/templates/thumb-equipe-comercial.png"
+                        alt="Equipe Comercial"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-white truncate">Equipe Comercial</div>
@@ -940,8 +944,12 @@ export function BibliotecaTemplatesView({
 
                 <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-[#141824] p-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="size-8 rounded-lg bg-white border border-zinc-300 flex items-center justify-center text-[9px] font-bold text-zinc-900 shrink-0">
-                      SP
+                    <div className="w-11 h-7 rounded-md overflow-hidden border border-zinc-700/60 bg-white shrink-0 shadow-sm">
+                      <img
+                        src="/images/templates/thumb-suporte.png"
+                        alt="Suporte"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-white truncate">Suporte</div>
