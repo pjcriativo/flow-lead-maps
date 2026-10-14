@@ -155,7 +155,7 @@ export function GoogleMapsRunningView({
           <button
             type="button"
             onClick={() => (running ? setModalVoltarAberto(true) : onVoltarConfiguracao())}
-            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-home-surface/60 px-3.5 text-xs font-semibold text-home-muted transition-colors hover:bg-home-surface hover:text-white"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border/90 bg-home-surface px-3.5 text-xs font-semibold text-white shadow-sm transition-colors hover:border-home-orange/50 hover:bg-home-surface/80"
           >
             <span className="text-xs font-medium">←</span>
             <span>Voltar à configuração</span>
@@ -166,9 +166,9 @@ export function GoogleMapsRunningView({
             <button
               type="button"
               onClick={() => setModalDetalhesAberto(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-home-surface/60 px-3.5 text-xs font-semibold text-home-muted transition-colors hover:bg-home-surface hover:text-white"
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border/90 bg-home-surface px-3.5 text-xs font-semibold text-white shadow-sm transition-colors hover:border-home-orange/50 hover:bg-home-surface/80"
             >
-              <Eye className="size-3.5 text-home-muted" />
+              <Eye className="size-3.5 text-home-orange" />
               <span>Ver detalhes da busca</span>
             </button>
 
@@ -185,10 +185,9 @@ export function GoogleMapsRunningView({
               <button
                 type="button"
                 onClick={onVerResultados}
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-home-orange px-4 text-xs font-bold text-home-muted shadow-md shadow-home-orange/20 hover:bg-home-orange-hover transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="inline-flex h-9 items-center rounded-xl bg-home-orange px-4 text-xs font-bold text-white shadow-md shadow-home-orange/20 transition-colors hover:bg-home-orange-hover cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <span>Ver resultados da busca</span>
-                <span className="text-home-muted/80">→</span>
               </button>
             ) : null}
           </div>

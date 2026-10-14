@@ -454,7 +454,7 @@ export function GoogleMapsSearchResultsView({
   }, [modalMapaAberto, selectedLeadIds, leads]);
 
   return (
-    <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
+    <div className="min-h-screen overflow-x-hidden bg-home-background text-home-foreground pb-12 select-text">
       {/* 1. Topbar Oficial Flow Business */}
       <GoogleMapsTopbar
         user={user}
@@ -464,7 +464,7 @@ export function GoogleMapsSearchResultsView({
       />
 
       {/* Conteúdo Principal */}
-      <main className="px-4 sm:px-6 lg:px-8 pt-5 space-y-5 max-w-[1680px] mx-auto">
+      <main className="mx-auto min-w-0 max-w-[1680px] space-y-5 px-4 pt-5 sm:px-6 lg:px-8">
         {/* 2. Cabeçalho Oficial: Breadcrumb, Título e Ações Superiores */}
         <GoogleMapsResultsHeader
           nicho={nicho}
@@ -491,9 +491,9 @@ export function GoogleMapsSearchResultsView({
         />
 
         {/* 4. Grid de Informações da Pesquisa (Esquerda) e Filtros (Direita) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        <div className="grid min-w-0 grid-cols-1 items-stretch gap-5 lg:grid-cols-12">
           {/* Card Esquerdo: Informações da pesquisa (4 cols) */}
-          <div className="lg:col-span-4 flex flex-col">
+          <div className="flex min-w-0 flex-col lg:col-span-4">
             <GoogleMapsResultsInfo
               nicho={nicho}
               categoria={categoria}
@@ -511,7 +511,7 @@ export function GoogleMapsSearchResultsView({
           </div>
 
           {/* Card Direito: Filtros de resultados (8 cols) */}
-          <div className="lg:col-span-8 flex flex-col">
+          <div className="flex min-w-0 flex-col lg:col-span-8">
             <GoogleMapsResultsFilters
               busca={busca}
               onChangeBusca={(v) => {
@@ -551,7 +551,7 @@ export function GoogleMapsSearchResultsView({
         </div>
 
         {/* 5. Composição Inferior: Barra de Ações em Lote + Tabela e Painel Lateral */}
-        <div className="space-y-3">
+        <div className="min-w-0 space-y-3">
           {/* Barra de Ações em Lote */}
           <GoogleMapsResultsBulkActions
             selectedCount={selectedLeadIds.size}
@@ -573,9 +573,9 @@ export function GoogleMapsSearchResultsView({
           />
 
           {/* Tabela de Empresas com Painel Lateral de Detalhes */}
-          <div className="flex flex-col lg:flex-row gap-5 items-start">
+          <div className="flex flex-col lg:flex-row min-w-0 items-start gap-5">
             {/* Tabela Central (flex-1) */}
-            <div className="flex-1 w-full space-y-2">
+            <div className="min-w-0 w-full space-y-2 lg:w-0 lg:flex-1">
               <GoogleMapsResultsTable
                 leads={paginatedLeads}
                 selectedLeadIds={selectedLeadIds}
@@ -589,17 +589,15 @@ export function GoogleMapsSearchResultsView({
               />
 
               {/* Paginação */}
-              {true && (
-                <div className="rounded-2xl border border-home-border bg-[#101720]/90">
-                  <GoogleMapsResultsPagination
-                    totalItens={filteredLeads.length}
-                    paginaAtual={paginaAtual}
-                    itensPorPagina={itensPorPagina}
-                    onMudarPagina={setPaginaAtual}
-                    onMudarItensPorPagina={setItensPorPagina}
-                  />
-                </div>
-              )}
+              <div className="rounded-2xl border border-home-border bg-[#101720]/90">
+                <GoogleMapsResultsPagination
+                  totalItens={filteredLeads.length}
+                  paginaAtual={paginaAtual}
+                  itensPorPagina={itensPorPagina}
+                  onMudarPagina={setPaginaAtual}
+                  onMudarItensPorPagina={setItensPorPagina}
+                />
+              </div>
             </div>
 
             {/* Painel Lateral Direito de Detalhes da Empresa (se houver empresa selecionada) */}

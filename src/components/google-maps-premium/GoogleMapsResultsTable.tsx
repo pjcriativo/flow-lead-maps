@@ -86,8 +86,8 @@ export function GoogleMapsResultsTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-home-border bg-[#101720]/90 shadow-sm">
-      <table className="w-full text-left border-collapse">
+    <div className="max-w-full overflow-x-auto rounded-2xl border border-home-border bg-[#101720]/90 shadow-sm">
+      <table className="min-w-[1180px] w-full border-collapse text-left">
         {/* Cabeçalho da Tabela */}
         <thead>
           <tr className="border-b border-home-border/80 bg-home-surface/40 text-[11px] font-bold uppercase tracking-wider text-home-muted select-none">

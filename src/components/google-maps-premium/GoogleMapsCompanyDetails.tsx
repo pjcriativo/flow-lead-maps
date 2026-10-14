@@ -119,7 +119,7 @@ export function GoogleMapsCompanyDetails({
   const cleanPhone = (lead.phone || lead.whatsapp || "").replace(/\D/g, "");
 
   return (
-    <div className="w-full md:w-[380px] lg:w-[400px] shrink-0 rounded-2xl border border-home-border bg-[#101720] shadow-xl flex flex-col overflow-hidden self-start sticky top-20">
+    <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] w-full md:w-[380px] lg:w-[400px] max-w-full shrink-0 self-start flex-col overflow-hidden rounded-2xl border border-home-border bg-[#101720] shadow-xl">
       {/* 1. Header do Painel com Banner/Placeholder e Botão Fechar */}
       <div className="relative h-32 bg-gradient-to-br from-home-surface to-[#162232] border-b border-home-border flex items-center justify-center p-4">
         {/* Placeholder Profissional Visualmente Alinhado */}
