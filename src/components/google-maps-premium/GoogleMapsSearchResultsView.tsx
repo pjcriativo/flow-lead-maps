@@ -50,6 +50,8 @@ export interface GoogleMapsSearchResultsViewProps {
   isParcial?: boolean;
   listaCriadaId?: string;
   // Navegação e Ações
+  onVoltarConfiguracao: () => void;
+  onVoltarProspeccao: () => void;
   onNovaBusca: () => void;
   onEditarPesquisa: () => void;
   onVerMinhasListas?: () => void;
@@ -87,6 +89,8 @@ export function GoogleMapsSearchResultsView({
   duplicatasCount = 0,
   isParcial = false,
   listaCriadaId,
+  onVoltarConfiguracao,
+  onVoltarProspeccao,
   onNovaBusca,
   onEditarPesquisa,
   onVerMinhasListas,
@@ -107,6 +111,8 @@ export function GoogleMapsSearchResultsView({
   const [minAvaliacao, setMinAvaliacao] = useState("qualquer");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroContato, setFiltroContato] = useState("todos");
+  const [filtroScore, setFiltroScore] = useState("todos");
+  const [ordenacaoScore, setOrdenacaoScore] = useState("nenhuma");
   const [activeTab, setActiveTab] = useState<FilterTab>("todos");
 
   // Estados de Paginação
@@ -176,7 +182,7 @@ export function GoogleMapsSearchResultsView({
 
   // Filtragem dos leads em memória com memoização de alta performance
   const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
+    const filtrados = leads.filter((lead) => {
       // 1. Aba Rápida
       if (activeTab === "duplicatas") {
         // Se for a aba duplicatas e não houver linhas de duplicatas individuais
@@ -209,6 +215,10 @@ export function GoogleMapsSearchResultsView({
         if (nota < minNota) return false;
       }
 
+      if (filtroStatus !== "todos" && lead.status !== filtroStatus) return false;
+
+      if (filtroScore !== "todos" && Number(lead.score ?? 0) < Number(filtroScore)) return false;
+
       // 5. Dropdown Com Contato
       if (filtroContato === "telefone" && !lead.phone && !lead.whatsapp) return false;
       if (filtroContato === "email" && !lead.email) return false;
@@ -217,7 +227,21 @@ export function GoogleMapsSearchResultsView({
 
       return true;
     });
-  }, [leads, activeTab, busca, categoriaFiltro, minAvaliacao, filtroContato]);
+
+    if (ordenacaoScore === "nenhuma") return filtrados;
+    const direcao = ordenacaoScore === "asc" ? 1 : -1;
+    return [...filtrados].sort((a, b) => (Number(a.score ?? 0) - Number(b.score ?? 0)) * direcao);
+  }, [
+    leads,
+    activeTab,
+    busca,
+    categoriaFiltro,
+    minAvaliacao,
+    filtroStatus,
+    filtroContato,
+    filtroScore,
+    ordenacaoScore,
+  ]);
 
   // Paginação dos resultados filtrados
   const paginatedLeads = useMemo(() => {
@@ -258,6 +282,8 @@ export function GoogleMapsSearchResultsView({
     setMinAvaliacao("qualquer");
     setFiltroStatus("todos");
     setFiltroContato("todos");
+    setFiltroScore("todos");
+    setOrdenacaoScore("nenhuma");
     setActiveTab("todos");
     setPaginaAtual(1);
     toast.info("Filtros restaurados.");
@@ -475,6 +501,8 @@ export function GoogleMapsSearchResultsView({
           nomeLista={nomeLista}
           dataBusca={dataBuscaFormatada}
           selectedCount={selectedLeadIds.size}
+          onVoltarConfiguracao={onVoltarConfiguracao}
+          onVoltarProspeccao={onVoltarProspeccao}
           onNovaBusca={onNovaBusca}
           onAdicionarSelecionados={handleAbrirModalLista}
           onEditarPesquisa={onEditarPesquisa}
@@ -537,6 +565,16 @@ export function GoogleMapsSearchResultsView({
               filtroContato={filtroContato}
               onChangeFiltroContato={(v) => {
                 setFiltroContato(v);
+                setPaginaAtual(1);
+              }}
+              filtroScore={filtroScore}
+              onChangeFiltroScore={(v) => {
+                setFiltroScore(v);
+                setPaginaAtual(1);
+              }}
+              ordenacaoScore={ordenacaoScore}
+              onChangeOrdenacaoScore={(v) => {
+                setOrdenacaoScore(v);
                 setPaginaAtual(1);
               }}
               activeTab={activeTab}

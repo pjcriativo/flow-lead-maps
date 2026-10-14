@@ -414,6 +414,22 @@ export function GoogleMapsPremiumView({
     toast.info("Busca interrompida. Os leads já capturados foram preservados.");
   };
 
+  const handleVoltarProspeccao = () => {
+    setActiveView("running");
+  };
+
+  const handleNovaBusca = () => {
+    setLeads([]);
+    setLogs([]);
+    setDuplicatasCount(0);
+    setIsParcial(false);
+    setDataUltimaBusca("");
+    setProgress({ found: 0, target: limite });
+    setListaCriadaId(undefined);
+    insertedIdsRef.current = [];
+    setActiveView("config");
+  };
+
   // Renderização da Tela 02: Prospecção em Andamento
   if (activeView === "running") {
     return (
@@ -466,7 +482,9 @@ export function GoogleMapsPremiumView({
         duplicatasCount={duplicatasCount}
         isParcial={isParcial}
         listaCriadaId={listaCriadaId}
-        onNovaBusca={() => setActiveView("config")}
+        onVoltarConfiguracao={() => setActiveView("config")}
+        onVoltarProspeccao={handleVoltarProspeccao}
+        onNovaBusca={handleNovaBusca}
         onEditarPesquisa={() => setActiveView("config")}
         onVerMinhasListas={onOpenMinhasListas}
         onOpenLeads={onOpenLeads}

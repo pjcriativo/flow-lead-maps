@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { Lead } from "@/lib/leads-api";
+import { STATUS_LABELS, type Lead } from "@/lib/leads-api";
 
 export interface GoogleMapsResultsTableProps {
   leads: Lead[];
@@ -130,6 +130,9 @@ export function GoogleMapsResultsTable({
 
             {/* Status */}
             <th className="py-3 px-3 min-w-[100px] text-right pr-4">Status</th>
+
+            {/* Score */}
+            <th className="py-3 px-3 min-w-[80px] text-right pr-4">Score</th>
           </tr>
         </thead>
 
@@ -298,8 +301,13 @@ export function GoogleMapsResultsTable({
                 {/* Status */}
                 <td className="py-3 px-3 text-right pr-4">
                   <span className="inline-block rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
-                    Novo lead
+                    {STATUS_LABELS[lead.status ?? "new"] ?? lead.status ?? "Não informado"}
                   </span>
+                </td>
+
+                {/* Score */}
+                <td className="py-3 px-3 text-right pr-4 font-bold text-home-orange">
+                  {Number(lead.score ?? 0)}
                 </td>
               </tr>
             );

@@ -10,6 +10,8 @@ export interface GoogleMapsResultsHeaderProps {
   nomeLista: string;
   dataBusca: string;
   selectedCount: number;
+  onVoltarConfiguracao: () => void;
+  onVoltarProspeccao: () => void;
   onNovaBusca: () => void;
   onAdicionarSelecionados: () => void;
   onEditarPesquisa: () => void;
@@ -24,6 +26,8 @@ export function GoogleMapsResultsHeader({
   nomeLista,
   dataBusca,
   selectedCount,
+  onVoltarConfiguracao,
+  onVoltarProspeccao,
   onNovaBusca,
   onAdicionarSelecionados,
   onEditarPesquisa,
@@ -37,12 +41,13 @@ export function GoogleMapsResultsHeader({
         <div className="space-y-1">
           {/* Breadcrumb Oficial - Tornado interativo */}
           <div className="flex items-center gap-1.5 text-xs text-home-muted font-medium">
-            <span
-              onClick={onNovaBusca}
-              className="cursor-pointer hover:text-home-orange transition-colors"
+            <button
+              type="button"
+              onClick={onVoltarConfiguracao}
+              className="cursor-pointer transition-colors hover:text-home-orange"
             >
               Google Maps
-            </span>
+            </button>
             <span className="text-home-muted/50">›</span>
             <span className="text-white font-semibold">Resultados da Busca</span>
           </div>
@@ -71,11 +76,20 @@ export function GoogleMapsResultsHeader({
           {/* Botão 1: Voltar à prospecção */}
           <button
             type="button"
-            onClick={onEditarPesquisa}
+            onClick={onVoltarProspeccao}
             className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white hover:border-home-border/80 hover:bg-home-surface transition-colors cursor-pointer"
           >
             <span className="text-xs font-medium">←</span>
             <span>Voltar à prospecção</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onEditarPesquisa}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-home-border bg-[#101720] px-3.5 text-xs font-semibold text-white transition-colors hover:border-home-border/80 hover:bg-home-surface"
+          >
+            <Plus className="size-3.5 text-home-muted" />
+            <span>Editar pesquisa</span>
           </button>
 
           {/* Botão 2: Ver detalhes da pesquisa */}

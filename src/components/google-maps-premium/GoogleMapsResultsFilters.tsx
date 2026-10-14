@@ -1,5 +1,6 @@
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LEAD_STATUSES, STATUS_LABELS } from "@/lib/leads-api";
 
 export type FilterTab =
   "todos" | "ineditos" | "duplicatas" | "telefone" | "email" | "site" | "instagram";
@@ -16,6 +17,10 @@ export interface GoogleMapsResultsFiltersProps {
   onChangeFiltroStatus: (v: string) => void;
   filtroContato: string;
   onChangeFiltroContato: (v: string) => void;
+  filtroScore: string;
+  onChangeFiltroScore: (v: string) => void;
+  ordenacaoScore: string;
+  onChangeOrdenacaoScore: (v: string) => void;
   activeTab: FilterTab;
   onChangeActiveTab: (tab: FilterTab) => void;
   onLimparFiltros: () => void;
@@ -42,6 +47,10 @@ export function GoogleMapsResultsFilters({
   onChangeFiltroStatus,
   filtroContato,
   onChangeFiltroContato,
+  filtroScore,
+  onChangeFiltroScore,
+  ordenacaoScore,
+  onChangeOrdenacaoScore,
   activeTab,
   onChangeActiveTab,
   onLimparFiltros,
@@ -53,6 +62,8 @@ export function GoogleMapsResultsFilters({
     minAvaliacao !== "qualquer" ||
     filtroStatus !== "todos" ||
     filtroContato !== "todos" ||
+    filtroScore !== "todos" ||
+    ordenacaoScore !== "nenhuma" ||
     activeTab !== "todos";
 
   const tabs: { id: FilterTab; label: string; count: number }[] = [
@@ -107,8 +118,8 @@ export function GoogleMapsResultsFilters({
         )}
       </div>
 
-      {/* Grid de 4 Filtros Dropdown */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+      {/* Filtros e ordenação dos resultados reais */}
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6">
         {/* Dropdown 1: Categoria */}
         <div className="space-y-1">
           <label className="text-[10px] font-semibold uppercase tracking-wider text-home-muted">
@@ -158,9 +169,11 @@ export function GoogleMapsResultsFilters({
             className="w-full h-9 rounded-xl border border-home-border bg-home-surface/80 px-2.5 text-xs text-white focus:border-home-orange focus:outline-none cursor-pointer"
           >
             <option value="todos">Todos</option>
-            <option value="novo">Novo lead</option>
-            <option value="duplicata">Duplicata</option>
-            <option value="processando">Processando</option>
+            {LEAD_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -179,6 +192,37 @@ export function GoogleMapsResultsFilters({
             <option value="email">Com e-mail</option>
             <option value="site">Com site</option>
             <option value="instagram">Com Instagram</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-home-muted">
+            Score mínimo
+          </label>
+          <select
+            value={filtroScore}
+            onChange={(e) => onChangeFiltroScore(e.target.value)}
+            className="h-9 w-full cursor-pointer rounded-xl border border-home-border bg-home-surface/80 px-2.5 text-xs text-white focus:border-home-orange focus:outline-none"
+          >
+            <option value="todos">Qualquer</option>
+            <option value="25">25+</option>
+            <option value="50">50+</option>
+            <option value="75">75+</option>
+          </select>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-home-muted">
+            Ordenar por score
+          </label>
+          <select
+            value={ordenacaoScore}
+            onChange={(e) => onChangeOrdenacaoScore(e.target.value)}
+            className="h-9 w-full cursor-pointer rounded-xl border border-home-border bg-home-surface/80 px-2.5 text-xs text-white focus:border-home-orange focus:outline-none"
+          >
+            <option value="nenhuma">Padrão</option>
+            <option value="desc">Maior primeiro</option>
+            <option value="asc">Menor primeiro</option>
           </select>
         </div>
       </div>
