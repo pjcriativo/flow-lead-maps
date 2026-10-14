@@ -5,6 +5,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { Lead } from "@/lib/leads-api";
+import { getLeadWorkspaceContext } from "@/lib/leads-api";
 import { nomeAutoLista } from "@/lib/list-naming";
 
 export { nomeAutoLista } from "@/lib/list-naming";
@@ -91,9 +92,13 @@ export async function criarListaComLeads(params: {
 
 /** Lista as listas do usuário com contagens ao vivo (nº de leads, cliente-ouro, enriquecidos). */
 export async function listarListas(): Promise<LeadListComStats[]> {
+  // Get the current organization context
+  const context = await getLeadWorkspaceContext();
+
+  // Fetch lists and leads for the current organization only
   const [{ data: listas, error: e1 }, { data: leads, error: e2 }] = await Promise.all([
-    supabase.from("lead_lists").select("*").order("created_at", { ascending: false }),
-    supabase.from("leads").select("list_id, status, score_breakdown"),
+    supabase.from("lead_lists").select("*").eq("org_id", context.orgId).order("created_at", { ascending: false }),
+    supabase.from("leads").select("list_id, status, score_breakdown").eq("org_id", context.orgId),
   ]);
   if (e1) throw e1;
   if (e2) throw e2;
