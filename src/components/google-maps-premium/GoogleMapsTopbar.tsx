@@ -1,5 +1,6 @@
-import { Bell, Command, Moon, Search } from "lucide-react";
+import { Bell, ChevronDown, Command, Moon, Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProfileAccessMenu } from "@/components/perfil/ProfileAccessMenu";
 
 interface GoogleMapsTopbarProps {
   user?: {
@@ -10,9 +11,16 @@ interface GoogleMapsTopbarProps {
     role?: string;
   };
   unreadNotifications?: number;
+  isSuperAdmin?: boolean;
+  onOpenProfile?: () => void;
 }
 
-export function GoogleMapsTopbar({ user = {}, unreadNotifications = 3 }: GoogleMapsTopbarProps) {
+export function GoogleMapsTopbar({
+  user = {},
+  unreadNotifications = 3,
+  isSuperAdmin = false,
+  onOpenProfile,
+}: GoogleMapsTopbarProps) {
   const name = user.name || "Marcos Gonçalves";
   const avatarUrl = user.avatarUrl || "";
   const initials = user.initials || "MG";
@@ -59,23 +67,29 @@ export function GoogleMapsTopbar({ user = {}, unreadNotifications = 3 }: GoogleM
         </button>
 
         {/* Perfil do Usuário */}
-        <div className="flex items-center gap-2.5 rounded-xl border border-home-border/80 bg-home-surface/90 px-2.5 py-1.5 transition-colors">
-          <Avatar className="size-8.5 border border-home-orange/40 bg-[#1e1509]">
-            <AvatarImage src={avatarUrl} alt={name} />
-            <AvatarFallback className="bg-[#1e1509] text-[11px] font-bold text-home-orange">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+        <ProfileAccessMenu
+          isSuperAdmin={isSuperAdmin}
+          onOpenClientAccount={() => onOpenProfile?.()}
+        >
+          <button
+            type="button"
+            aria-label="Abrir opções da conta"
+            className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-home-border/80 bg-home-surface/90 px-2.5 py-1.5 transition-colors hover:bg-home-surface-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange"
+          >
+            <Avatar className="size-8.5 border border-home-orange/40 bg-home-orange/10">
+              <AvatarImage src={avatarUrl} alt={name} />
+              <AvatarFallback className="bg-home-orange/10 text-[11px] font-bold text-home-orange">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
 
-          <div className="hidden flex-col text-left sm:flex leading-tight">
-            <span className="text-xs font-bold text-white line-clamp-1">
-              {name}
-            </span>
-            <span className="text-[10px] font-medium text-home-muted">
-              {role}
-            </span>
-          </div>
-        </div>
+            <div className="hidden flex-col text-left leading-tight sm:flex">
+              <span className="line-clamp-1 text-xs font-bold text-home-foreground">{name}</span>
+              <span className="text-[10px] font-medium text-home-muted">{role}</span>
+            </div>
+            <ChevronDown className="hidden size-3.5 text-home-muted sm:block" aria-hidden="true" />
+          </button>
+        </ProfileAccessMenu>
       </div>
     </header>
   );

@@ -8,6 +8,7 @@ import {
   ChartNoAxesCombined,
   ChevronDown,
   ChevronRight,
+  ChevronsUpDown,
   Clapperboard,
   FileText,
   Filter,
@@ -29,7 +30,6 @@ import {
   Plug,
   ScrollText,
   Share2,
-  ShieldCheck,
   Sliders,
   Sparkles,
   Users,
@@ -53,6 +53,7 @@ import type { IconType } from "react-icons";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FlowLeadsLogo } from "@/components/FlowLeadsLogo";
+import { ProfileAccessMenu } from "@/components/perfil/ProfileAccessMenu";
 import { cn } from "@/lib/utils";
 import type { DashboardSection } from "@/lib/dashboard-navigation";
 
@@ -921,8 +922,11 @@ function SidebarNavigation({
 function UserFooter({
   user,
   onNavigate,
+  isSuperAdmin,
   isCollapsed = false,
-}: Pick<DashboardSidebarProps, "user" | "onNavigate"> & { isCollapsed?: boolean }) {
+}: Pick<DashboardSidebarProps, "user" | "onNavigate" | "isSuperAdmin"> & {
+  isCollapsed?: boolean;
+}) {
   const displayName = user.name && user.name !== "Meu Perfil" ? user.name : "Marcos Gonçalves";
   const displayEmail =
     user.email && user.email !== "Configurar perfil" ? user.email : "marcosgflow@gmail.com";
@@ -932,61 +936,60 @@ function UserFooter({
 
   if (isCollapsed) {
     return (
+      <ProfileAccessMenu
+        isSuperAdmin={isSuperAdmin}
+        onOpenClientAccount={() => onNavigate("settings", "Meu perfil")}
+        align="start"
+        side="right"
+      >
+        <button
+          type="button"
+          title={`${displayName} (${displayEmail})`}
+          aria-label="Abrir opções da conta"
+          className={cn(
+            "flex w-full items-center justify-center border-t border-home-border/60 py-3 text-center",
+            "cursor-pointer transition-colors hover:bg-home-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
+          )}
+        >
+          <Avatar className="size-8.5 shrink-0 border border-home-border">
+            <AvatarImage src={avatarSrc} alt={displayName} />
+            <AvatarFallback className="bg-home-surface-strong text-xs font-semibold text-home-foreground">
+              MG
+            </AvatarFallback>
+          </Avatar>
+        </button>
+      </ProfileAccessMenu>
+    );
+  }
+
+  return (
+    <ProfileAccessMenu
+      isSuperAdmin={isSuperAdmin}
+      onOpenClientAccount={() => onNavigate("settings", "Meu perfil")}
+      align="start"
+      side="right"
+    >
       <button
         type="button"
-        onClick={() => onNavigate("settings", "Meu perfil")}
-        title={`${displayName} (${displayEmail})`}
+        aria-label="Abrir opções da conta"
         className={cn(
-          "flex w-full items-center justify-center border-t border-home-border/60 py-3 text-center",
-          "transition-colors hover:bg-home-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange cursor-pointer",
+          "flex w-full items-center gap-3 border-t border-home-border/60 px-4 py-3.5 text-left",
+          "cursor-pointer transition-colors hover:bg-home-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
         )}
       >
-        <Avatar className="size-8.5 border border-home-border shrink-0">
+        <Avatar className="size-9 shrink-0 border border-home-border">
           <AvatarImage src={avatarSrc} alt={displayName} />
           <AvatarFallback className="bg-home-surface-strong text-xs font-semibold text-home-foreground">
             MG
           </AvatarFallback>
         </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-semibold text-home-foreground">{displayName}</p>
+          <p className="truncate text-[10px] text-home-muted">{displayEmail}</p>
+        </div>
+        <ChevronsUpDown className="size-3.5 shrink-0 text-home-muted" aria-hidden="true" />
       </button>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => onNavigate("settings", "Meu perfil")}
-      className={cn(
-        "flex w-full items-center gap-3 border-t border-home-border/60 px-4 py-3.5 text-left",
-        "transition-colors hover:bg-home-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange cursor-pointer",
-      )}
-    >
-      <Avatar className="size-9 border border-home-border shrink-0">
-        <AvatarImage src={avatarSrc} alt={displayName} />
-        <AvatarFallback className="bg-home-surface-strong text-xs font-semibold text-home-foreground">
-          MG
-        </AvatarFallback>
-      </Avatar>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold text-home-foreground">{displayName}</p>
-        <p className="truncate text-[10px] text-home-muted">{displayEmail}</p>
-      </div>
-    </button>
-  );
-}
-
-function SuperAdminLink({ isCollapsed = false }: { isCollapsed?: boolean }) {
-  return (
-    <Link
-      to="/admin"
-      title={isCollapsed ? "Painel Admin" : undefined}
-      className={cn(
-        "mx-3 mb-2 flex h-9 items-center rounded-lg border border-home-orange/30 bg-home-orange/10 text-[13px] font-semibold text-home-orange transition-colors hover:bg-home-orange/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange",
-        isCollapsed ? "justify-center px-0" : "gap-3 px-3",
-      )}
-    >
-      <ShieldCheck aria-hidden="true" className="size-4.5 shrink-0" />
-      {isCollapsed ? null : <span>Painel Admin</span>}
-    </Link>
+    </ProfileAccessMenu>
   );
 }
 
@@ -1059,8 +1062,12 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
           unreadNotifications={props.unreadNotifications}
           isCollapsed={isCollapsed}
         />
-        {isSuperAdmin ? <SuperAdminLink isCollapsed={isCollapsed} /> : null}
-        <UserFooter user={props.user} onNavigate={props.onNavigate} isCollapsed={isCollapsed} />
+        <UserFooter
+          user={props.user}
+          onNavigate={props.onNavigate}
+          isSuperAdmin={isSuperAdmin}
+          isCollapsed={isCollapsed}
+        />
       </aside>
 
       <div className="fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between border-b border-home-border bg-home-background px-4 lg:hidden">
@@ -1107,8 +1114,11 @@ export function DashboardSidebar(props: DashboardSidebarProps) {
               unreadNotifications={props.unreadNotifications}
               onClose={() => setMobileOpen(false)}
             />
-            {isSuperAdmin ? <SuperAdminLink /> : null}
-            <UserFooter user={props.user} onNavigate={props.onNavigate} />
+            <UserFooter
+              user={props.user}
+              onNavigate={props.onNavigate}
+              isSuperAdmin={isSuperAdmin}
+            />
           </aside>
         </div>
       ) : null}

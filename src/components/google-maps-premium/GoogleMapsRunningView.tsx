@@ -19,6 +19,8 @@ export interface GoogleMapsRunningViewProps {
     role?: string;
   };
   unreadNotifications?: number;
+  isSuperAdmin?: boolean;
+  onOpenProfile?: () => void;
   // Parâmetros da busca passados pela Tela 01
   nicho: string;
   categoria?: string;
@@ -47,6 +49,8 @@ export interface GoogleMapsRunningViewProps {
 export function GoogleMapsRunningView({
   user,
   unreadNotifications = 3,
+  isSuperAdmin = false,
+  onOpenProfile,
   nicho,
   categoria,
   cidade,
@@ -106,7 +110,12 @@ export function GoogleMapsRunningView({
   return (
     <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
       {/* 1. Topbar Oficial Flow Business */}
-      <GoogleMapsTopbar user={user} unreadNotifications={unreadNotifications} />
+      <GoogleMapsTopbar
+        user={user}
+        unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
+      />
 
       {/* Conteúdo Principal */}
       <main className="px-4 sm:px-6 lg:px-8 pt-5 space-y-5 max-w-[1680px] mx-auto">

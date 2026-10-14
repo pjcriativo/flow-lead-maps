@@ -9,6 +9,12 @@ import test from "node:test";
 
 const dashboard = readFileSync("src/routes/_authenticated/dashboard.tsx", "utf8");
 const sidebar = readFileSync("src/components/home-premium/DashboardSidebar.tsx", "utf8");
+const topbar = readFileSync("src/components/google-maps-premium/GoogleMapsTopbar.tsx", "utf8");
+const mapsView = readFileSync(
+  "src/components/google-maps-premium/GoogleMapsPremiumView.tsx",
+  "utf8",
+);
+const accessMenu = readFileSync("src/components/perfil/ProfileAccessMenu.tsx", "utf8");
 const adminRoute = readFileSync("src/routes/_authenticated/admin.tsx", "utf8");
 
 test("propaga o papel global do perfil até a sidebar premium", () => {
@@ -23,12 +29,21 @@ test("propaga o papel global do perfil até a sidebar premium", () => {
     "o dashboard deve passar somente o booleano validado para a sidebar",
   );
   assert.match(sidebar, /isSuperAdmin: boolean;/);
+  assert.match(
+    dashboard,
+    /<GoogleMapsPremiumView[\s\S]*?isSuperAdmin=\{userProfile\?\.is_super_admin === true\}/,
+  );
+  assert.match(dashboard, /onOpenProfile=\{\(\) => selectSection\("settings"\)\}/);
 });
 
-test("exibe o painel original somente quando a prop autorizada é verdadeira", () => {
-  assert.match(sidebar, /\{isSuperAdmin \? <SuperAdminLink/);
-  assert.match(sidebar, /<Link[\s\S]*?to="\/admin"[\s\S]*?Painel Admin[\s\S]*?<\/Link>/);
-  assert.match(sidebar, /\) : null\}/);
+test("o clique no perfil oferece conta do cliente e painel geral somente ao Super Admin", () => {
+  assert.match(accessMenu, /Conta do cliente/);
+  assert.match(accessMenu, /\{isSuperAdmin \? \(/);
+  assert.match(accessMenu, /to="\/admin"/);
+  assert.match(accessMenu, /Painel Super Admin/);
+  assert.match(sidebar, /<ProfileAccessMenu[\s\S]*?isSuperAdmin=\{isSuperAdmin\}/);
+  assert.match(topbar, /<ProfileAccessMenu[\s\S]*?isSuperAdmin=\{isSuperAdmin\}/);
+  assert.match(mapsView, /<GoogleMapsTopbar[\s\S]*?isSuperAdmin=\{isSuperAdmin\}/);
 });
 
 test("a rota administrativa continua validando o papel pelo ID autenticado", () => {

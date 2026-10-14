@@ -20,6 +20,8 @@ export interface GoogleMapsHistoryViewProps {
     role?: string;
   };
   unreadNotifications?: number;
+  isSuperAdmin?: boolean;
+  onOpenProfile?: () => void;
   onNovaBusca: () => void;
   onVoltarParaConfig: () => void;
   onNovaBuscaComCriterios: (criterios: {
@@ -40,6 +42,8 @@ export interface GoogleMapsHistoryViewProps {
 export function GoogleMapsHistoryView({
   user,
   unreadNotifications = 3,
+  isSuperAdmin = false,
+  onOpenProfile,
   onNovaBusca,
   onVoltarParaConfig,
   onNovaBuscaComCriterios,
@@ -137,7 +141,12 @@ export function GoogleMapsHistoryView({
   return (
     <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
       {/* 1. Topbar Oficial do Flow Business */}
-      <GoogleMapsTopbar user={user} unreadNotifications={unreadNotifications} />
+      <GoogleMapsTopbar
+        user={user}
+        unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
+      />
 
       {/* Conteúdo Principal com Máxima Fidelidade Visual */}
       <main className="px-4 sm:px-6 lg:px-8 pt-5 space-y-4.5 max-w-[1720px] mx-auto">

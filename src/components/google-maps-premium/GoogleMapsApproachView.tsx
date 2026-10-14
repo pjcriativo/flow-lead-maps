@@ -21,6 +21,8 @@ export interface GoogleMapsApproachViewProps {
     role?: string;
   };
   unreadNotifications?: number;
+  isSuperAdmin?: boolean;
+  onOpenProfile?: () => void;
   // Dados recebidos da Tela 03
   leads: Lead[];
   initialSelectedLeadIds?: Set<string>;
@@ -66,6 +68,8 @@ export function GoogleMapsApproachView({
     role: "Administrador",
   },
   unreadNotifications = 3,
+  isSuperAdmin = false,
+  onOpenProfile,
   leads,
   initialSelectedLeadIds,
   nicho,
@@ -216,7 +220,12 @@ export function GoogleMapsApproachView({
   return (
     <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
       {/* 1. Topbar Oficial Flow Business */}
-      <GoogleMapsTopbar user={topbarUser} unreadNotifications={unreadNotifications} />
+      <GoogleMapsTopbar
+        user={topbarUser}
+        unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
+      />
 
       {/* Conteúdo Principal */}
       <main className="px-4 sm:px-6 lg:px-8 pt-5 space-y-4 max-w-[1720px] mx-auto">

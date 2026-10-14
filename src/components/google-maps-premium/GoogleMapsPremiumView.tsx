@@ -37,6 +37,8 @@ export interface GoogleMapsPremiumViewProps {
     role?: string;
   };
   unreadNotifications?: number;
+  isSuperAdmin?: boolean;
+  onOpenProfile?: () => void;
   onOpenMinhasListas?: () => void;
   onOpenLeads?: (leadId?: string) => void;
   onOpenCampanhas?: () => void;
@@ -52,6 +54,8 @@ export function GoogleMapsPremiumView({
     role: "Administrador",
   },
   unreadNotifications = 3,
+  isSuperAdmin = false,
+  onOpenProfile,
   onOpenMinhasListas,
   onOpenLeads,
   onOpenCampanhas,
@@ -412,6 +416,8 @@ export function GoogleMapsPremiumView({
       <GoogleMapsRunningView
         user={user}
         unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
         nicho={nicho}
         categoria={categoriaAtiva}
         cidade={cidade}
@@ -442,6 +448,8 @@ export function GoogleMapsPremiumView({
       <GoogleMapsSearchResultsView
         user={user}
         unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
         nicho={nicho}
         categoria={categoriaAtiva}
         cidade={cidade}
@@ -473,6 +481,8 @@ export function GoogleMapsPremiumView({
       <GoogleMapsApproachView
         user={user}
         unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
         leads={leads}
         initialSelectedLeadIds={approachSelectedIds}
         nicho={nicho}
@@ -494,6 +504,8 @@ export function GoogleMapsPremiumView({
       <GoogleMapsHistoryView
         user={user}
         unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
         onNovaBusca={() => setActiveView("config")}
         onVoltarParaConfig={() => setActiveView("config")}
         onNovaBuscaComCriterios={(criterios) => {
@@ -544,7 +556,12 @@ export function GoogleMapsPremiumView({
   return (
     <div className="min-h-screen bg-home-background text-home-foreground pb-12 select-text">
       {/* 1. Topbar Oficial */}
-      <GoogleMapsTopbar user={user} unreadNotifications={unreadNotifications} />
+      <GoogleMapsTopbar
+        user={user}
+        unreadNotifications={unreadNotifications}
+        isSuperAdmin={isSuperAdmin}
+        onOpenProfile={onOpenProfile}
+      />
 
       {/* Conteúdo Principal com espaçamentos da referência */}
       <main className="px-4 sm:px-6 lg:px-8 pt-5 space-y-5 max-w-[1680px] mx-auto">

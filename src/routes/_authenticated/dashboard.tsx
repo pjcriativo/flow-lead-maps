@@ -302,6 +302,8 @@ function Dashboard() {
         )}
         {section === "buscar" && (
           <GoogleMapsPremiumView
+            isSuperAdmin={userProfile?.is_super_admin === true}
+            onOpenProfile={() => selectSection("settings")}
             user={{
               name: userProfile?.full_name || "Marcos Gonçalves",
               email: userProfile?.email || "marcos@flowbusiness.com",
