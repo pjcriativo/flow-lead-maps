@@ -210,6 +210,9 @@ function Dashboard() {
     if (sub === "templates" || sub === "biblioteca") {
       selectSection("campanhas");
       setCampanhasSubView("templates");
+    } else if (sub === "estudio" || sub === "studio" || sub === "editor") {
+      selectSection("campanhas");
+      setCampanhasSubView("estudio");
     }
     const secao = params.get("secao");
     if (secao === "configuracoes" || secao === "perfil") selectSection("settings");
@@ -217,6 +220,9 @@ function Dashboard() {
     else if (secao === "templates" || secao === "biblioteca") {
       selectSection("campanhas");
       setCampanhasSubView("templates");
+    } else if (secao === "estudio" || secao === "studio") {
+      selectSection("campanhas");
+      setCampanhasSubView("estudio");
     } else if (isDashboardSection(secao)) selectSection(secao);
   }, [selectSection]);
 
@@ -355,6 +361,7 @@ function Dashboard() {
             onOpenCampaignsWithList={(listId) => {
               setPreselectedListId(listId);
               selectSection("campanhas");
+              setCampanhasSubView("estudio");
             }}
             onBack={() => selectSection("home")}
           />

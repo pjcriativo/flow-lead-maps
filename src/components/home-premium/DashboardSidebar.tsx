@@ -33,6 +33,7 @@ import {
   Share2,
   Sliders,
   Sparkles,
+  SquarePen,
   Users,
   UserPlus,
   Video,
@@ -58,7 +59,7 @@ import { ProfileAccessMenu } from "@/components/perfil/ProfileAccessMenu";
 import { cn } from "@/lib/utils";
 import type { DashboardSection } from "@/lib/dashboard-navigation";
 
-export type CampanhasSubView = "central" | "gestao" | "resultados" | "templates";
+export type CampanhasSubView = "central" | "estudio" | "gestao" | "resultados" | "templates";
 
 export type MarketingSubView =
   "produtos" | "agentes" | "campanhas_conteudo" | "calendario" | "resultados_roi";
@@ -176,6 +177,7 @@ const MANAGEMENT_SECTION_IDS = new Set<DashboardSection>(
 
 const CAMPANHAS_SUBITEMS = [
   { id: "central" as const, label: "Campanhas", icon: MessagesSquare },
+  { id: "estudio" as const, label: "Estúdio de Campanhas", icon: SquarePen },
   { id: "templates" as const, label: "Biblioteca de Templates", icon: LayoutTemplate },
   { id: "gestao" as const, label: "Gestão e Produção", icon: Sliders },
   { id: "resultados" as const, label: "Resultados e Métricas", icon: BarChart3 },

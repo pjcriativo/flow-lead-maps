@@ -4,6 +4,7 @@ import { DashboardHeader } from "@/components/home-premium/DashboardHeader";
 import { GestaoProducaoView } from "./GestaoProducaoView";
 import { ResultadosCampanhaView } from "./ResultadosCampanhaView";
 import { BibliotecaTemplatesView } from "./templates/BibliotecaTemplatesView";
+import { EstudioCampanhasView } from "./estudio/EstudioCampanhasView";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -24,7 +25,7 @@ import { CriarCampanhaModal } from "./CriarCampanhaModal";
 import { SelecionarCampanhaModal } from "./SelecionarCampanhaModal";
 import { CampanhaConfiguracaoWizard } from "./CampanhaConfiguracaoWizard";
 
-export type CampanhasSubView = "central" | "gestao" | "resultados" | "templates";
+export type CampanhasSubView = "central" | "estudio" | "gestao" | "resultados" | "templates";
 
 export interface CampanhasPremiumViewProps {
   user?: {
@@ -282,6 +283,26 @@ export function CampanhasPremiumView({
     }
   };
 
+  // Subview Estúdio de Campanhas (Tela 02 - Prompt 51)
+  if (currentSubView === "estudio") {
+    return (
+      <EstudioCampanhasView
+        user={user}
+        unreadNotifications={unreadNotifications}
+        preselectedListId={preselectedListId}
+        onBack={() => {
+          onClearPreselectedList?.();
+          handleSubViewChange("central");
+        }}
+        onCampaignCreated={() => {
+          onClearPreselectedList?.();
+          handleSubViewChange("central");
+          carregarDadosReais();
+        }}
+      />
+    );
+  }
+
   // Subview Biblioteca de Templates (Tela 01 - Prompt 50)
   if (currentSubView === "templates") {
     return (
@@ -290,7 +311,7 @@ export function CampanhasPremiumView({
         unreadNotifications={unreadNotifications}
         onBackToCampanhas={() => handleSubViewChange("central")}
         onSelectTemplateForCampaign={(templateId) => {
-          // Contrato preparado para integração com o futuro Estúdio de Campanhas (Prompt 51)
+          handleSubViewChange("estudio");
         }}
       />
     );
@@ -471,7 +492,7 @@ export function CampanhasPremiumView({
       <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
         {/* Cabeçalho da página: Título + Botão Modelos + Botão Nova Campanha */}
         <CampanhasHeader
-          onNewCampaign={() => setIsCreateModalOpen(true)}
+          onNewCampaign={() => handleSubViewChange("estudio")}
           onOpenTemplates={() => handleSubViewChange("templates")}
         />
 
