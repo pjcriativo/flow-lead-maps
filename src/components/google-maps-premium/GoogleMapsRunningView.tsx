@@ -248,6 +248,7 @@ export function GoogleMapsRunningView({
           <section className="lg:col-span-3">
             <GoogleMapsRunningLiveStatus
               status={status}
+              logs={logs}
               running={running}
               lastUpdate={lastUpdate}
             />

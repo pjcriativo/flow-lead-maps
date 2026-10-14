@@ -26,6 +26,7 @@ export function GoogleMapsResultsHeader({
   selectedCount,
   onNovaBusca,
   onAdicionarSelecionados,
+  onEditarPesquisa,
 }: GoogleMapsResultsHeaderProps) {
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
 

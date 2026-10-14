@@ -352,3 +352,11 @@ test("40. Layout restringe overflow global e mantem scroll somente na tabela", (
   assert.match(table, /overflow-x-auto/);
   assert.match(detailsPanel, /max-h-\[calc\(100dvh/);
 });
+
+test("41. Cabecalho de resultados recebe o callback de edicao sem ReferenceError", () => {
+  assert.match(
+    header,
+    /export function GoogleMapsResultsHeader\(\{[\s\S]*onAdicionarSelecionados,\s*onEditarPesquisa,[\s\S]*\}: GoogleMapsResultsHeaderProps\)/,
+  );
+  assert.match(header, /onClick=\{onEditarPesquisa\}/);
+});

@@ -185,14 +185,17 @@ test("21. Marcadores de empresas reais: o mapa da Tela 02 plota pinos para empre
 test("22. Painel de status em tempo real: exibe apenas estados públicos seguros", () => {
   assert.match(liveStatus, /Status em tempo real/);
   assert.match(liveStatus, /Pesquisa em andamento|Pesquisa concluída/);
-  assert.doesNotMatch(liveStatus, /logs\.map|US\$|USD|BRL|custo\s|saldo\s|RUNNING|SUCCEEDED/);
+  assert.match(liveStatus, /logs: string\[\]/);
+  assert.match(liveStatus, /logs\.slice\(-8\)\.map/);
+  assert.match(liveStatus, /Aguardando resultados da pesquisa/);
+  assert.doesNotMatch(liveStatus, /US\$|USD|BRL|custo\s|saldo\s|RUNNING|SUCCEEDED/);
 });
 
 // 23. Categorização de logs
 test("23. Categorização de logs: marcadores coloridos diferenciam requisição, leads, duplicatas e erros", () => {
   assert.match(liveStatus, /A busca continua em segundo plano/);
   assert.match(liveStatus, /emerald-400/);
-  assert.doesNotMatch(liveStatus, /message|log\.match/);
+  assert.match(runningView, /logs=\{logs\}/);
 });
 
 // 24. Tabela de empresas encontradas
