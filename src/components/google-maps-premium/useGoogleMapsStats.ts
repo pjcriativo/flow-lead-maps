@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 
 export interface GoogleMapsStats {
   leadsDisponiveisFormatado: string;
@@ -35,54 +36,25 @@ export function useGoogleMapsStats(): GoogleMapsStats {
 
     async function carregar() {
       try {
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user || cancel) {
-          setStats((prev) => ({ ...prev, loading: false }));
-          return;
-        }
-
-        const userId = userData.user.id;
-
-        // 1. Dados do perfil / plano
-        const { data: perfil } = await supabase
-          .from("profiles")
-          .select("plan, monthly_lead_limit, leads_used_monthly")
-          .eq("id", userId)
-          .maybeSingle();
-
-        const planRaw = (perfil?.plan ?? "pro").toLowerCase();
-        let planNome = "Plano Profissional";
-        let defaultLimit = 3000;
-
-        if (
-          planRaw.includes("basic") ||
-          planRaw.includes("basico") ||
-          planRaw.includes("starter")
-        ) {
-          planNome = "Plano Básico";
-          defaultLimit = 1000;
-        } else if (planRaw.includes("agencia") || planRaw.includes("enterprise")) {
-          planNome = "Plano Enterprise";
-          defaultLimit = 10000;
-        } else if (planRaw.includes("growth")) {
-          planNome = "Plano Growth";
-          defaultLimit = 5000;
-        }
-
-        const limite = perfil?.monthly_lead_limit ?? defaultLimit;
-        const usado = perfil?.leads_used_monthly ?? 0;
-        const restante = Math.max(0, limite - usado);
-        const leadsDisponiveisFormatado = `${restante.toLocaleString("pt-BR")} / ${limite.toLocaleString("pt-BR")}`;
+        const activeOrganization = await getActiveOrganizationContext();
+        const { data: usageRows } = await supabase.rpc("google_maps_plan_usage", {
+          p_org: activeOrganization.orgId,
+        });
+        const usage = usageRows?.[0];
+        const planNome = usage?.plan_name ? `Plano ${usage.plan_name}` : "Plano da organização";
+        const leadsDisponiveisFormatado =
+          usage?.lead_limit == null
+            ? "Ilimitado"
+            : `${(usage.remaining ?? 0).toLocaleString("pt-BR")} / ${usage.lead_limit.toLocaleString("pt-BR")}`;
 
         // 2. Listas criadas e buscas do mês corrente
         const inicioMes = new Date();
         inicioMes.setDate(1);
         inicioMes.setHours(0, 0, 0, 0);
-        const inicioMesIso = inicioMes.toISOString();
-
         const { data: listas } = await supabase
           .from("lead_lists")
           .select("id, name, niche, city, uf, created_at")
+          .eq("org_id", activeOrganization.orgId)
           .order("created_at", { ascending: false })
           .limit(100);
 
@@ -114,9 +86,10 @@ export function useGoogleMapsStats(): GoogleMapsStats {
         const { data: leadsAmostra } = await supabase
           .from("leads")
           .select("phone, website, email, instagram_url")
+          .eq("org_id", activeOrganization.orgId)
           .limit(100);
 
-        let taxaContatosFormatada = "68%";
+        let taxaContatosFormatada = "—";
         if (leadsAmostra && leadsAmostra.length > 0) {
           const comContato = leadsAmostra.filter(
             (l) =>
@@ -133,15 +106,14 @@ export function useGoogleMapsStats(): GoogleMapsStats {
           setStats({
             leadsDisponiveisFormatado,
             leadsDisponiveisSub: planNome,
-            buscasRealizadas: buscasCount > 0 ? buscasCount : 12,
+            buscasRealizadas: buscasCount,
             buscasRealizadasSub: "este mês",
-            listasCriadas: listasCount > 0 ? listasCount : 8,
+            listasCriadas: listasCount,
             listasCriadasSub: "neste mês",
             taxaContatosFormatada,
             taxaContatosSub: "com telefone, site ou e-mail",
-            ultimaProspeccaoData: ultData !== "—" ? ultData : "15/01/2025",
-            ultimaProspeccaoSub:
-              ultSub !== "Nenhuma busca realizada" ? ultSub : "Advogados — Curitiba/PR",
+            ultimaProspeccaoData: ultData,
+            ultimaProspeccaoSub: ultSub,
             loading: false,
           });
         }

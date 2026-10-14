@@ -5237,6 +5237,28 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      google_maps_search_history: {
+        Args: { p_org: string; p_limit?: number };
+        Returns: {
+          id: string;
+          created_at: string;
+          quantity: number;
+          niche: string;
+          city: string;
+          state: string;
+          radius_km: number | null;
+          run_status: string;
+        }[];
+      };
+      google_maps_plan_usage: {
+        Args: { p_org: string };
+        Returns: {
+          plan_name: string;
+          lead_limit: number | null;
+          used: number;
+          remaining: number | null;
+        }[];
+      };
       _col_consumo: { Args: { p_recurso: string }; Returns: string };
       _col_limite: { Args: { p_recurso: string }; Returns: string };
       acesso_ferramenta_liberado: { Args: never; Returns: boolean };

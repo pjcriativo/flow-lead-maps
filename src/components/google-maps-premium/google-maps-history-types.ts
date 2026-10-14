@@ -10,7 +10,6 @@ export type SearchHistoryStatus =
 export interface SearchHistoryItem {
   id: string;
   listId: string | null;
-  externalRunId: string | null;
   dataHora: string; // ISO date string
   timestamp: number;
   nicho: string;
@@ -32,11 +31,6 @@ export interface SearchHistoryItem {
   instagramCount: number;
   leads?: Lead[];
   hasRecoverableResults: boolean;
-  rawConfig?: {
-    buscarEmails?: boolean;
-    filtrosCaptura?: string[];
-    [key: string]: unknown;
-  };
 }
 
 export interface SearchHistoryIndicators {

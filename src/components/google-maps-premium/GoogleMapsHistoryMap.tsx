@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { MAP_CONFIG } from "@/lib/map-config";
+import { createLeafletTextContent } from "@/lib/leaflet-safe-content";
 import type { Lead } from "@/lib/leads-api";
 import "leaflet/dist/leaflet.css";
 
@@ -53,7 +54,6 @@ export function GoogleMapsHistoryMap({
 
       const map = L.map(divRef.current, {
         zoomControl: false,
-        attributionControl: false,
         dragging: true,
         scrollWheelZoom: false,
       }).setView(centerCoord, 12);
@@ -62,6 +62,7 @@ export function GoogleMapsHistoryMap({
         maxZoom: MAP_CONFIG.maxZoom,
         subdomains: MAP_CONFIG.subdomains,
         className: MAP_CONFIG.darkTilesClass,
+        attribution: MAP_CONFIG.attribution,
       }).addTo(map);
 
       refs.current.tileLayer = tileLayer;
@@ -152,7 +153,7 @@ export function GoogleMapsHistoryMap({
         icon: leadIcon,
       }).addTo(map);
 
-      lm.bindTooltip(lead.business_name || "Lead", {
+      lm.bindTooltip(createLeafletTextContent(lead.business_name, "Lead"), {
         direction: "top",
         className: "leaflet-dark-tooltip",
       });

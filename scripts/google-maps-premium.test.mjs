@@ -259,7 +259,8 @@ test("21. Deduplicação preservada: a interface exibe aviso de desconsideraçã
 
 // 22. Indicadores reais
 test("22. Indicadores reais: o hook useGoogleMapsStats consulta limites reais e dados da organização", () => {
-  assert.match(statsHook, /monthly_lead_limit/);
+  assert.match(statsHook, /google_maps_plan_usage/);
+  assert.match(statsHook, /activeOrganization\.orgId/);
   assert.match(statsHook, /lead_lists/);
   assert.match(statsHook, /from\("leads"\)/);
 });

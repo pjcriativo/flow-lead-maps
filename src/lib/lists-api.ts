@@ -38,6 +38,7 @@ export async function criarListaComLeads(params: {
   fonte: string;
   radius: number;
   leadIds: string[];
+  orgId: string;
 }): Promise<LeadList> {
   if (params.leadIds.length === 0) {
     throw new Error("Não é possível criar uma lista vazia.");
@@ -49,6 +50,7 @@ export async function criarListaComLeads(params: {
     .from("lead_lists")
     .insert({
       user_id,
+      org_id: params.orgId,
       name: params.name.trim() || nomeAutoLista(params.niche, params.city, params.uf),
       niche: params.niche || "—",
       city: params.city || "—",
@@ -64,6 +66,7 @@ export async function criarListaComLeads(params: {
   const { error: upErr } = await supabase
     .from("leads")
     .update({ list_id: lista.id })
+    .eq("org_id", params.orgId)
     .in("id", uniqueLeadIds);
   if (upErr) {
     throw new Error(`Lista ${lista.id} criada, mas falhou ao vincular os leads: ${upErr.message}`);
@@ -75,6 +78,7 @@ export async function criarListaComLeads(params: {
     .from("leads")
     .select("id")
     .eq("list_id", lista.id)
+    .eq("org_id", params.orgId)
     .in("id", uniqueLeadIds);
   if (verifyErr || vinculados?.length !== uniqueLeadIds.length) {
     throw new Error(

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { posthog } from "@/lib/posthog";
 import { streamSearchLeads, type Lead, type SearchEvent } from "@/lib/leads-api";
 import { criarListaComLeads } from "@/lib/lists-api";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { resolveListName } from "@/lib/list-naming";
 import { geocodeCidade } from "@/lib/geo";
 import { NICHOS_POR_CATEGORIA } from "@/lib/niches";
@@ -244,6 +245,7 @@ export function GoogleMapsPremiumView({
     let doneRecebido = false;
 
     try {
+      const activeOrganization = await getActiveOrganizationContext();
       let centro = pin;
       let raio = raioKm;
 
@@ -273,6 +275,7 @@ export function GoogleMapsPremiumView({
       // Executa o motor real de prospecção.
       await streamSearchLeads(
         {
+          orgId: activeOrganization.orgId,
           nicho,
           cidade,
           uf,
@@ -343,6 +346,7 @@ export function GoogleMapsPremiumView({
             fonte: "apify",
             radius: raio,
             leadIds: ids,
+            orgId: activeOrganization.orgId,
           });
 
           setListaCriadaId(lista.id);

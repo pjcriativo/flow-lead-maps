@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Lead } from "@/lib/leads-api";
 import { NICHOS_POR_CATEGORIA } from "@/lib/niches";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 import type {
   SearchHistoryFilters,
   SearchHistoryIndicators,
@@ -103,10 +104,12 @@ export function useGoogleMapsHistory() {
   const carregarHistorico = useCallback(async () => {
     setLoading(true);
     try {
+      const activeOrganization = await getActiveOrganizationContext();
       // 1. Obter listas salvas pelo usuário / organização
       const { data: listas, error: errListas } = await supabase
         .from("lead_lists")
         .select("*")
+        .eq("org_id", activeOrganization.orgId)
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -114,16 +117,14 @@ export function useGoogleMapsHistory() {
         console.warn("[GoogleMapsHistory] Erro ao buscar listas:", errListas);
       }
 
-      // 2. Obter logs de consumo da Apify para mapear runs, status e custos reais
-      const { data: logsApify, error: errLogs } = await supabase
-        .from("api_consumption_logs")
-        .select("*")
-        .eq("service", "apify_maps")
-        .order("created_at", { ascending: false })
-        .limit(200);
+      // 2. RPC expõe apenas o histórico comercial seguro; custos, provider IDs e metadata ficam no servidor.
+      const { data: safeHistory, error: errLogs } = await supabase.rpc(
+        "google_maps_search_history",
+        { p_org: activeOrganization.orgId, p_limit: 200 },
+      );
 
       if (errLogs) {
-        console.warn("[GoogleMapsHistory] Erro ao buscar api_consumption_logs:", errLogs);
+        console.warn("[GoogleMapsHistory] Não foi possível carregar o histórico de execuções.");
       }
 
       // 3. Obter leads agregados por lista para métricas de contato e coordenadas
@@ -134,6 +135,7 @@ export function useGoogleMapsHistory() {
         const { data: leadsData, error: errLeads } = await supabase
           .from("leads")
           .select("*")
+          .eq("org_id", activeOrganization.orgId)
           .in("list_id", listIds)
           .limit(2000);
 
@@ -185,7 +187,6 @@ export function useGoogleMapsHistory() {
         itensConstruidos.push({
           id: lista.id,
           listId: lista.id,
-          externalRunId: null,
           dataHora: lista.created_at,
           timestamp: new Date(lista.created_at).getTime(),
           nicho,
@@ -210,14 +211,11 @@ export function useGoogleMapsHistory() {
         });
       }
 
-      // Adicionar logs da Apify que não possuem lista vinculada (ex: execuções canceladas ou parciais)
-      for (const log of logsApify ?? []) {
-        const metadata = (log.metadata as Record<string, unknown>) || {};
-        const nicho = String(metadata.nicho || "Geral");
-        const cidade = String(metadata.cidade || "Brasil");
-        const uf = String(metadata.uf || "");
-        const queryKey = String(metadata.query_key || "");
-        const runStatus = String(metadata.run_status || "").toUpperCase();
+      // Execuções sem lista são retornadas pela RPC já sanitizadas e sem campos privilegiados.
+      for (const log of safeHistory ?? []) {
+        const nicho = log.niche || "Geral";
+        const cidade = log.city || "Brasil";
+        const uf = log.state || "";
 
         // Evitar duplicar se já foi representado por uma lista no mesmo minuto
         const logTime = new Date(log.created_at).getTime();
@@ -228,22 +226,20 @@ export function useGoogleMapsHistory() {
         );
 
         if (!jaExiste) {
-          const isError =
-            runStatus === "FAILED" || runStatus === "ABORTED" || runStatus === "TIMED-OUT";
+          const isError = log.run_status === "erro";
           const status: SearchHistoryStatus = isError ? "erro" : "parcial";
           const statusLabel = isError ? "Erro" : "Parcial";
 
           itensConstruidos.push({
             id: log.id,
             listId: null,
-            externalRunId: log.external_id || null,
             dataHora: log.created_at,
             timestamp: logTime,
             nicho,
             categoria: resolverCategoriaPorNicho(nicho),
             cidade,
             uf: uf || "—",
-            raioKm: Number(metadata.raio_km) || 10,
+            raioKm: Number(log.radius_km) || 10,
             solicitado: Number(log.quantity) || 50,
             encontrados: Number(log.quantity) || 0,
             ineditos: Number(log.quantity) || 0,
@@ -258,7 +254,6 @@ export function useGoogleMapsHistory() {
             instagramCount: 0,
             leads: [],
             hasRecoverableResults: false,
-            rawConfig: metadata,
           });
         }
       }
@@ -307,9 +302,11 @@ export function useGoogleMapsHistory() {
     async function fetchLeads() {
       setLoadingLeads(true);
       try {
+        const activeOrganization = await getActiveOrganizationContext();
         const { data, error } = await supabase
           .from("leads")
           .select("*")
+          .eq("org_id", activeOrganization.orgId)
           .eq("list_id", listId as string)
           .limit(500);
 

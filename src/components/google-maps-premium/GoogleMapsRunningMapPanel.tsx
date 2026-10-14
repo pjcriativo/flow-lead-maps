@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Crosshair, Layers, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MAP_CONFIG, MAP_LAYERS } from "@/lib/map-config";
+import { createLeafletPopupContent, createLeafletTextContent } from "@/lib/leaflet-safe-content";
 import type { Lead } from "@/lib/leads-api";
 import "leaflet/dist/leaflet.css";
 
@@ -60,7 +61,6 @@ export function GoogleMapsRunningMapPanel({
 
       const map = L.map(divRef.current, {
         zoomControl: false,
-        attributionControl: false,
       }).setView(centerCoord, 12);
 
       // Camada centralizada OpenStreetMap com tema escuro via CSS
@@ -68,6 +68,7 @@ export function GoogleMapsRunningMapPanel({
       const tileLayer = L.tileLayer(currentLayer.url, {
         maxZoom: currentLayer.maxZoom,
         subdomains: currentLayer.subdomains,
+        attribution: currentLayer.attribution,
       }).addTo(map);
 
       refs.current.tileLayer = tileLayer;
@@ -95,6 +96,7 @@ export function GoogleMapsRunningMapPanel({
     refs.current.tileLayer = L.tileLayer(currentLayer.url, {
       maxZoom: currentLayer.maxZoom,
       subdomains: currentLayer.subdomains,
+      attribution: currentLayer.attribution,
     }).addTo(map);
   }, [mapStyle]);
 
@@ -115,14 +117,7 @@ export function GoogleMapsRunningMapPanel({
     if (pin) {
       const centerIcon = L.divIcon({
         className: "custom-map-center",
-        html: `
-          <div style="display:flex; flex-direction:column; align-items:center; transform: translate(-50%, -100%);">
-            <div style="background:#ff6200; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold; box-shadow:0 2px 8px rgba(0,0,0,0.6); white-space:nowrap; border:1px solid rgba(255,255,255,0.3);">
-              ${cidade || "Centro"}
-            </div>
-            <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #ff6200;"></div>
-          </div>
-        `,
+        html: createLeafletTextContent(cidade, "Centro"),
         iconSize: [0, 0],
       });
 
@@ -172,14 +167,15 @@ export function GoogleMapsRunningMapPanel({
 
       const marker = L.marker([lead.latitude!, lead.longitude!], { icon: dotIcon }).addTo(map);
 
-      marker.bindPopup(`
-        <div style="font-family:sans-serif; font-size:11px; color:#111;">
-          <strong style="display:block; font-size:12px; margin-bottom:2px;">${lead.business_name}</strong>
-          <div>${lead.address || "Sem endereço cadastrado"}</div>
-          ${lead.phone ? `<div style="color:#059669; font-weight:bold; margin-top:3px;">${lead.phone}</div>` : ""}
-          <div style="margin-top:4px; font-size:10px; color:#6b7280;">Score: <strong>${lead.score ?? 0} pts</strong></div>
-        </div>
-      `);
+      marker.bindPopup(
+        createLeafletPopupContent({
+          businessName: lead.business_name,
+          address: lead.address,
+          phone: lead.phone,
+          website: lead.website,
+          score: lead.score ?? 0,
+        }),
+      );
 
       refs.current.leadMarkers.push(marker);
     });
@@ -262,12 +258,11 @@ export function GoogleMapsRunningMapPanel({
         </div>
       </div>
 
-      {/* Atribuição no Canto Inferior Direito */}
+      {/* Indicador de raio; a atribuição legal é renderizada pelo controle nativo do Leaflet. */}
       <div className="absolute bottom-2 right-3 z-[400] flex items-center gap-2 text-[9px] text-home-muted/70 select-none">
         <span className="rounded bg-[#101720]/80 px-1.5 py-0.5 border border-home-border/40 font-semibold text-home-orange">
           Raio da busca: {raioKm} km
         </span>
-        <span className="hidden sm:inline">{MAP_CONFIG.attribution}</span>
       </div>
     </div>
   );

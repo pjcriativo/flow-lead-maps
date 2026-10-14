@@ -2,7 +2,8 @@
 // A chave da Google Places NUNCA passa por aqui — fica no secret da Edge Function.
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import type { CaptureFilter } from "@/lib/google-maps-capture";
+import { toGoogleMapsPublicErrorMessage, type CaptureFilter } from "@/lib/google-maps-capture";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 
 export type Lead = Database["public"]["Tables"]["leads"]["Row"];
 export type LeadInsert = Database["public"]["Tables"]["leads"]["Insert"];
@@ -99,6 +100,7 @@ export const FONTE_LABELS: Record<FonteBusca, string> = {
 export const FONTES_DESATIVADAS: FonteBusca[] = ["places"];
 
 export type SearchParams = {
+  orgId: string;
   nicho: string;
   cidade: string;
   uf: string;
@@ -147,6 +149,7 @@ export async function streamSearchLeads(
       apikey: ANON_KEY,
     },
     body: JSON.stringify({
+      org_id: params.orgId,
       nicho: params.nicho,
       cidade: params.cidade,
       uf: params.uf,
@@ -186,7 +189,7 @@ export async function streamSearchLeads(
     } catch {
       /* corpo não-JSON */
     }
-    throw new Error(msg);
+    throw new Error(toGoogleMapsPublicErrorMessage(msg));
   }
 
   const reader = res.body.getReader();
@@ -341,22 +344,12 @@ export async function fetchLeadMetrics(): Promise<LeadMetrics> {
 }
 
 export async function getLeadWorkspaceContext(): Promise<LeadWorkspaceContext> {
-  const { data: auth, error: authError } = await supabase.auth.getUser();
-  if (authError || !auth.user) throw authError ?? new Error("Usuário não autenticado.");
-  const { data: membership, error } = await supabase
-    .from("memberships")
-    .select("org_id, papel")
-    .eq("user_id", auth.user.id)
-    .order("criada_em", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!membership) throw new Error("Workspace não encontrado para o usuário atual.");
+  const active = await getActiveOrganizationContext();
   return {
-    userId: auth.user.id,
-    orgId: membership.org_id,
-    role: membership.papel,
-    canDelete: membership.papel === "admin" || membership.papel === "gerente",
+    userId: active.userId,
+    orgId: active.orgId,
+    role: active.role,
+    canDelete: active.isSuperAdmin || active.role === "admin" || active.role === "gerente",
   };
 }
 

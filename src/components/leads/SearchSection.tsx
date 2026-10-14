@@ -52,6 +52,7 @@ import {
 } from "@/lib/fontes-prospeccao";
 import { geocodeCidade } from "@/lib/geo";
 import { criarListaComLeads, nomeAutoLista } from "@/lib/lists-api";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { resolveListName } from "@/lib/list-naming";
 import {
   ScoreBadge,
@@ -227,8 +228,10 @@ export function SearchSection({
       );
       posthog.capture("search_leads_started", { nicho, cidade, uf, limite, fonte, usarMapa });
 
+      const activeOrganization = await getActiveOrganizationContext();
       await streamSearchLeads(
         {
+          orgId: activeOrganization.orgId,
           nicho,
           cidade,
           uf,
@@ -281,6 +284,7 @@ export function SearchSection({
             fonte,
             radius: raio,
             leadIds: ids,
+            orgId: activeOrganization.orgId,
           });
           pushLog(
             `🗂️ Lista salva: "${lista.name}" (${ids.length} leads). Veja em "Minhas Listas".`,

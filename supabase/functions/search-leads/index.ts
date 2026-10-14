@@ -19,7 +19,8 @@ import { computeScore } from "../_shared/score.ts";
 import { firstBrWhatsapp } from "../_shared/phone.ts";
 import { extrairBairro } from "../../../src/lib/bairro.ts";
 import { geocodeCidade } from "../_shared/geocode.ts";
-import { orgDoUsuario, estadoConsumo, consumir } from "../_shared/limite.ts";
+import { estadoConsumo, consumir } from "../_shared/limite.ts";
+import { validateOrganizationAccess } from "../_shared/organization-access.ts";
 import { resolverChave } from "../_shared/chaves.ts";
 import { lerConfigPlataforma } from "../_shared/config.ts";
 import type { ProviderUsage } from "../_shared/providers/types.ts";
@@ -28,6 +29,7 @@ import {
   matchesCaptureFilters,
   normalizeCaptureFilters,
   sanitizeGoogleMapsUserMessage,
+  toGoogleMapsPublicErrorMessage,
 } from "../../../src/lib/google-maps-capture.ts";
 
 // Registrar fonte nova (ex.: Apify) = adicionar uma linha aqui.
@@ -39,6 +41,7 @@ const PROVIDERS: Record<Fonte, ProviderSearch> = {
 };
 
 type Body = {
+  org_id?: string;
   nicho?: string;
   cidade?: string;
   uf?: string;
@@ -69,6 +72,13 @@ Deno.serve(async (req) => {
     return json({ error: "Acesso aguardando liberação do administrador" }, 403);
   const userId = userData.user.id;
 
+  let body: Body;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "Requisição inválida." }, 400);
+  }
+
   // service role para medir o consumo do plano (funções SECURITY DEFINER; resolvem a org)
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -80,15 +90,11 @@ Deno.serve(async (req) => {
   // 🔑 Pool de chaves Apify (rodízio por esgotamento): o provider resolve/rotaciona sozinho
   // com o admin client; sem pool configurado ele cai na chave única do cofre/secret.
   setApifyPoolContext(admin);
-  const orgId = await orgDoUsuario(admin, userId);
-  if (!orgId) return json({ error: "Sua conta ainda não possui uma organização válida." }, 409);
-
-  let body: Body;
-  try {
-    body = await req.json();
-  } catch {
-    return json({ error: "Body inválido" }, 400);
+  const organizationAccess = await validateOrganizationAccess(admin, userId, body.org_id);
+  if (!organizationAccess) {
+    return json({ error: "Você não tem permissão para usar esta organização." }, 403);
   }
+  const orgId = organizationAccess.orgId;
 
   const nicho = (body.nicho ?? "").trim();
   const cidade = (body.cidade ?? "").trim();
@@ -373,9 +379,10 @@ Deno.serve(async (req) => {
         send({ type: "done", inserted, total: inserted, fonte });
         controller.close();
       } catch (e) {
+        console.error("[search-leads] Falha técnica na execução", { userId, orgId, error: e });
         send({
           type: "error",
-          message: sanitizeGoogleMapsUserMessage(e instanceof Error ? e.message : String(e)),
+          message: toGoogleMapsPublicErrorMessage(e),
         });
         controller.close();
       }

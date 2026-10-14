@@ -3,6 +3,7 @@ import { Crosshair, Layers, MapPin, Minus, Plus, Radar, Search } from "lucide-re
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { MAP_CONFIG, MAP_LAYERS } from "@/lib/map-config";
+import { createLeafletTextContent } from "@/lib/leaflet-safe-content";
 import "leaflet/dist/leaflet.css";
 
 type LatLng = { lat: number; lng: number };
@@ -57,7 +58,6 @@ export function GoogleMapsMapPanel({
 
       const map = L.map(divRef.current, {
         zoomControl: false, // controles customizados no design
-        attributionControl: false,
       }).setView(pin ? [pin.lat, pin.lng] : CENTRO_PADRAO, 12);
 
       // Configuração centralizada OpenStreetMap com tema escuro via CSS (elimina marca d'água de cartocdn.com/dark_all)
@@ -65,6 +65,7 @@ export function GoogleMapsMapPanel({
       const tileLayer = L.tileLayer(currentLayer.url, {
         maxZoom: currentLayer.maxZoom,
         subdomains: currentLayer.subdomains,
+        attribution: currentLayer.attribution,
       }).addTo(map);
 
       refs.current.tileLayer = tileLayer;
@@ -98,6 +99,7 @@ export function GoogleMapsMapPanel({
     refs.current.tileLayer = L.tileLayer(currentLayer.url, {
       maxZoom: currentLayer.maxZoom,
       subdomains: currentLayer.subdomains,
+      attribution: currentLayer.attribution,
     }).addTo(map);
   }, [mapStyle]);
 
@@ -119,14 +121,7 @@ export function GoogleMapsMapPanel({
       // Marcador com ícone de pin no centro
       const pinIcon = L.divIcon({
         className: "custom-map-pin",
-        html: `
-          <div style="display:flex; flex-direction:column; align-items:center; transform: translate(-50%, -100%);">
-            <div style="background:#ff6200; color:white; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold; box-shadow:0 2px 8px rgba(0,0,0,0.6); white-space:nowrap; border:1px solid rgba(255,255,255,0.3);">
-              ${cidade || "Centro"}
-            </div>
-            <div style="width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:8px solid #ff6200;"></div>
-          </div>
-        `,
+        html: createLeafletTextContent(cidade, "Centro"),
         iconSize: [0, 0],
       });
 
@@ -247,11 +242,6 @@ export function GoogleMapsMapPanel({
             <span className="size-2 rounded-full border border-home-orange" />
             <span className="text-home-muted">Raio da busca ({raioKm} km)</span>
           </div>
-        </div>
-
-        {/* Atribuição no Canto Inferior Direito */}
-        <div className="absolute bottom-1 right-2 z-[400] text-[9px] text-home-muted/60 select-none">
-          © Dados cartográficos
         </div>
       </div>
 

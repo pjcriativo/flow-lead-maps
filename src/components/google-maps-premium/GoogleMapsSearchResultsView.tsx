@@ -10,6 +10,7 @@ import {
   type LeadListComStats,
 } from "@/lib/lists-api";
 import { MAP_CONFIG, MAP_LAYERS } from "@/lib/map-config";
+import { createLeafletPopupContent } from "@/lib/leaflet-safe-content";
 
 import { GoogleMapsTopbar } from "./GoogleMapsTopbar";
 import { GoogleMapsResultsHeader } from "./GoogleMapsResultsHeader";
@@ -398,13 +399,13 @@ export function GoogleMapsSearchResultsView({
 
       const map = L.map(mapModalRef.current, {
         zoomControl: true,
-        attributionControl: false,
       }).setView(centerCoord, 12);
 
       const darkLayer = MAP_LAYERS.dark;
       L.tileLayer(darkLayer.url, {
         maxZoom: darkLayer.maxZoom,
         subdomains: darkLayer.subdomains,
+        attribution: darkLayer.attribution,
       }).addTo(map);
 
       const bounds: [number, number][] = [];
@@ -424,14 +425,15 @@ export function GoogleMapsSearchResultsView({
         });
 
         const marker = L.marker([lat, lng], { icon: markerIcon }).addTo(map);
-        marker.bindPopup(`
-          <div style="font-family: inherit; font-size: 12px; color: #111;">
-            <strong>${l.business_name}</strong><br/>
-            ${l.category || ""}<br/>
-            ${l.phone || ""}<br/>
-            <small>${l.address || ""}</small>
-          </div>
-        `);
+        marker.bindPopup(
+          createLeafletPopupContent({
+            businessName: l.business_name,
+            category: l.category,
+            phone: l.phone,
+            address: l.address,
+            website: l.website,
+          }),
+        );
       }
 
       if (bounds.length > 1) {

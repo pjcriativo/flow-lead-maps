@@ -10,8 +10,28 @@ import {
   matchesCaptureFilters,
   normalizeCaptureFilters,
   sanitizeGoogleMapsUserMessage,
+  toGoogleMapsPublicErrorMessage,
   toggleCaptureFilter,
 } from "../src/lib/google-maps-capture.ts";
+
+test("erros públicos não expõem SQL, tabelas, constraints, providers ou UUIDs", () => {
+  const technical =
+    "Postgres SQLSTATE constraint api_consumption_logs provider apify id 123e4567-e89b-12d3-a456-426614174000";
+  const message = toGoogleMapsPublicErrorMessage(technical);
+  assert.equal(
+    message,
+    "Não foi possível concluir a pesquisa. Tente novamente ou consulte o suporte.",
+  );
+  assert.doesNotMatch(message, /postgres|sqlstate|constraint|api_consumption|apify|123e4567/i);
+});
+
+test("mensagens públicas de validação e permissão continuam acionáveis", () => {
+  assert.match(toGoogleMapsPublicErrorMessage("Informe o nicho e a cidade."), /Informe o nicho/);
+  assert.match(
+    toGoogleMapsPublicErrorMessage("Você não tem permissão para usar esta organização."),
+    /não tem permissão/,
+  );
+});
 
 test("ativa e desativa Telefone, Site e Instagram sem alterar os demais filtros", () => {
   let active = [];

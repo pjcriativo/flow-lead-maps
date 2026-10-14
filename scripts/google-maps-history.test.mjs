@@ -20,12 +20,16 @@ function read(rel) {
 
 const historyView = read("src/components/google-maps-premium/GoogleMapsHistoryView.tsx");
 const historyHeader = read("src/components/google-maps-premium/GoogleMapsHistoryHeader.tsx");
-const historyIndicators = read("src/components/google-maps-premium/GoogleMapsHistoryIndicators.tsx");
+const historyIndicators = read(
+  "src/components/google-maps-premium/GoogleMapsHistoryIndicators.tsx",
+);
 const historyFilters = read("src/components/google-maps-premium/GoogleMapsHistoryFilters.tsx");
 const historyTable = read("src/components/google-maps-premium/GoogleMapsHistoryTable.tsx");
 const historyDetails = read("src/components/google-maps-premium/GoogleMapsHistoryDetails.tsx");
 const historyMap = read("src/components/google-maps-premium/GoogleMapsHistoryMap.tsx");
-const historyPagination = read("src/components/google-maps-premium/GoogleMapsHistoryPagination.tsx");
+const historyPagination = read(
+  "src/components/google-maps-premium/GoogleMapsHistoryPagination.tsx",
+);
 const historyHook = read("src/components/google-maps-premium/useGoogleMapsHistory.ts");
 const historyTypes = read("src/components/google-maps-premium/google-maps-history-types.ts");
 const categoryIcon = read("src/components/google-maps-premium/GoogleMapsCategoryIcon.tsx");
@@ -63,9 +67,10 @@ test("3. Navegação para Histórico: acessível a partir do Google Maps e geren
 });
 
 // 4. Carregamento de dados reais
-test("4. Carregamento de dados reais: hook useGoogleMapsHistory consome tabelas reais", () => {
+test("4. Carregamento de dados reais: hook usa RPC segura e tabelas comerciais", () => {
   assert.match(historyHook, /lead_lists/);
-  assert.match(historyHook, /api_consumption_logs/);
+  assert.match(historyHook, /google_maps_search_history/);
+  assert.doesNotMatch(historyHook, /from\("api_consumption_logs"\)/);
   assert.match(historyHook, /leads/);
 });
 
@@ -80,6 +85,7 @@ test("5. Ausência de mocks: a interface não utiliza mocks fixos ou geradores s
 test("6. Isolamento multi-tenant: consultas respeitam RLS e sessões autenticadas do Supabase", () => {
   assert.match(historyHook, /supabase\s*\.\s*from\("lead_lists"\)/);
   assert.match(historyHook, /supabase\s*\.\s*from\("leads"\)/);
+  assert.match(historyHook, /activeOrganization\.orgId/);
 });
 
 // 7. Filtro por período

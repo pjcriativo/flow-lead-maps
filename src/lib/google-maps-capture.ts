@@ -48,5 +48,30 @@ export function sanitizeGoogleMapsUserMessage(message: string): string {
       "serviço de busca",
     )
     .replace(/\b(?:scraper|actor|dataset|run|backend|api)\b/gi, "processamento")
-    .replace(/HTTP\s+\d{3}/gi, "serviço indisponível");
+    .replace(/HTTP\s+\d{3}/gi, "serviço indisponível")
+    .replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi, "identificador protegido")
+    .replace(
+      /\b(?:api_consumption_logs|memberships|profiles|lead_lists|leads)\b/gi,
+      "dados internos",
+    )
+    .replace(
+      /\b(?:constraint|foreign key|postgres|sqlstate|select|insert|update|delete)\b/gi,
+      "operação interna",
+    )
+    .slice(0, 240);
+}
+
+const SAFE_PUBLIC_ERRORS = [
+  /^Informe o nicho e a cidade/i,
+  /^Você não tem permissão/i,
+  /^Acesso aguardando liberação/i,
+  /^Sua conta ainda não possui/i,
+  /^Limite mensal de leads atingido/i,
+];
+
+export function toGoogleMapsPublicErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const sanitized = sanitizeGoogleMapsUserMessage(message).trim();
+  if (SAFE_PUBLIC_ERRORS.some((pattern) => pattern.test(sanitized))) return sanitized;
+  return "Não foi possível concluir a pesquisa. Tente novamente ou consulte o suporte.";
 }

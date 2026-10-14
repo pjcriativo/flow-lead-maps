@@ -60,7 +60,6 @@ export function GoogleMapsCompanyDetails({
 
       const map = L.map(mapContainerRef.current, {
         zoomControl: false,
-        attributionControl: false,
         dragging: false,
         touchZoom: false,
         scrollWheelZoom: false,
@@ -71,6 +70,7 @@ export function GoogleMapsCompanyDetails({
       L.tileLayer(darkLayer.url, {
         maxZoom: darkLayer.maxZoom,
         subdomains: darkLayer.subdomains,
+        attribution: darkLayer.attribution,
       }).addTo(map);
 
       // Marcador com cor de destaque laranja
