@@ -13,6 +13,7 @@ import {
   duplicateEmailBlock,
   moveEmailBlock,
   removeEmailBlock,
+  sanitizeEmailHtml,
   sanitizeEmailUrl,
   updateEmailBlock,
 } from "../src/lib/campaign-email-editor.ts";
@@ -113,6 +114,34 @@ test("URLs perigosas sao recusadas e links apropriados sao preservados", () => {
     "https://cdn.example.com/banner.png",
   );
   assert.equal(sanitizeEmailUrl("mailto:contato@example.com", "image"), "");
+});
+
+test("sanitizacao remove atributos perigosos com ou sem aspas", () => {
+  const sanitized = sanitizeEmailHtml(
+    `<a href=javascript:alert(1) onclick=alert(1)>A</a><img src="https://example.com/a.png" onerror='alert(2)' style="background:url(javascript:alert(3))">`,
+  );
+
+  assert.doesNotMatch(sanitized, /javascript:/i);
+  assert.doesNotMatch(sanitized, /\son(?:click|error)\s*=/i);
+  assert.match(sanitized, /src="https:\/\/example\.com\/a\.png"/);
+});
+
+test("bloco de duas colunas preserva textos independentes no HTML", () => {
+  let document = createEditableEmail("<html><body></body></html>");
+  document = addEmailBlock(document, "duas_colunas", {
+    colunaEsquerdaTexto: "Oferta principal",
+    colunaDireitaTexto: "Beneficio complementar",
+  });
+  const block = document.blocks[0];
+
+  document = updateEmailBlock(document, block.id, {
+    colunaEsquerdaTexto: "Nova oferta",
+    colunaDireitaTexto: "Novo beneficio",
+  });
+
+  assert.match(document.html, />Nova oferta<\/td>/);
+  assert.match(document.html, />Novo beneficio<\/td>/);
+  assert.doesNotMatch(document.html, /Coluna 1|Coluna 2/);
 });
 
 test("assinatura substitui snapshot anterior e nunca e duplicada", () => {

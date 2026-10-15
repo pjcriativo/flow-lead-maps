@@ -51,6 +51,8 @@ export type EmailBlockPatch = Partial<
     | "imagemUrl"
     | "imagemAlt"
     | "imagemLargura"
+    | "colunaEsquerdaTexto"
+    | "colunaDireitaTexto"
     | "negrito"
     | "italico"
     | "alinhamento"
@@ -131,7 +133,8 @@ function applyFormatting(attributes: string, block: StudioEmailBlock): string {
   if (block.tamanhoFonte) style.set("font-size", `${block.tamanhoFonte}px`);
   if (block.corTexto) style.set("color", block.corTexto);
   if (block.corFundo) style.set("background-color", block.corFundo);
-  if (block.espacamento !== undefined) style.set("padding", `${block.espacamento}px`);
+  if (block.espacamento !== undefined && block.tipo !== "espacamento")
+    style.set("padding", `${block.espacamento}px`);
   if (block.ativo === false) style.set("display", "none");
   else if (style.get("display") === "none") style.delete("display");
   return writeStyle(attributes, style);
@@ -193,8 +196,15 @@ export function sanitizeEmailHtml(html: string): string {
   return html
     .replace(/<(script|iframe|object|embed|form|meta|base)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
     .replace(/<(script|iframe|object|embed|form|meta|base)\b[^>]*\/?>/gi, "")
-    .replace(/\s+on[a-z]+\s*=\s*(["']).*?\1/gi, "")
-    .replace(/\s+(href|src)\s*=\s*(["'])\s*(?:javascript|data|vbscript|file):[\s\S]*?\2/gi, "");
+    .replace(/\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(
+      /\s+(?:href|src)\s*=\s*(?:"\s*(?:javascript|data|vbscript|file):[^"]*"|'\s*(?:javascript|data|vbscript|file):[^']*'|(?:javascript|data|vbscript|file):[^\s>]+)/gi,
+      "",
+    )
+    .replace(
+      /\s+style\s*=\s*(?:"[^"]*(?:expression\s*\(|url\s*\(\s*['"]?\s*(?:javascript|data|vbscript|file):)[^"]*"|'[^']*(?:expression\s*\(|url\s*\(\s*["']?\s*(?:javascript|data|vbscript|file):)[^']*')/gi,
+      "",
+    );
 }
 
 export function renderEmailPreview(html: string): string {
@@ -291,8 +301,7 @@ function renderCustomBlock(block: StudioEmailBlock): string {
       content = `<div style="height:${Math.min(96, Math.max(8, block.espacamento ?? 24))}px;line-height:1px;">&nbsp;</div>`;
       break;
     case "duas_colunas":
-      content =
-        '<table role="presentation" width="100%"><tr><td width="50%" style="padding:8px;">Coluna 1</td><td width="50%" style="padding:8px;">Coluna 2</td></tr></table>';
+      content = `<table role="presentation" width="100%"><tr><td width="50%" style="padding:8px;">${escapeHtml(block.colunaEsquerdaTexto ?? "Coluna 1")}</td><td width="50%" style="padding:8px;">${escapeHtml(block.colunaDireitaTexto ?? "Coluna 2")}</td></tr></table>`;
       break;
     default:
       content = `<p style="margin:0;">${escapeHtml(block.conteudoTexto ?? "Novo texto")}</p>`;
@@ -383,6 +392,9 @@ export function addEmailBlock(
     alinhamento: "left",
     tamanhoFonte: tipo === "titulo" ? 24 : 14,
     espacamento: tipo === "espacamento" ? 24 : 16,
+    ...(tipo === "duas_colunas"
+      ? { colunaEsquerdaTexto: "Coluna 1", colunaDireitaTexto: "Coluna 2" }
+      : {}),
     ...initial,
   };
   return {

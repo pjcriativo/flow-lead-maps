@@ -334,6 +334,46 @@ export function EditorEmailCanvas({
             </div>
           )}
 
+          {selectedBlock.tipo === "duas_colunas" && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="text-[10px] text-zinc-400">
+                Coluna esquerda
+                <textarea
+                  rows={3}
+                  value={selectedBlock.colunaEsquerdaTexto ?? ""}
+                  onChange={(event) =>
+                    patchSelectedBlock({ colunaEsquerdaTexto: event.target.value })
+                  }
+                  className="mt-1 w-full resize-y rounded-lg border border-zinc-800 bg-[#141824] p-3 text-xs text-white outline-none focus:border-[#ff6200]"
+                />
+              </label>
+              <label className="text-[10px] text-zinc-400">
+                Coluna direita
+                <textarea
+                  rows={3}
+                  value={selectedBlock.colunaDireitaTexto ?? ""}
+                  onChange={(event) =>
+                    patchSelectedBlock({ colunaDireitaTexto: event.target.value })
+                  }
+                  className="mt-1 w-full resize-y rounded-lg border border-zinc-800 bg-[#141824] p-3 text-xs text-white outline-none focus:border-[#ff6200]"
+                />
+              </label>
+            </div>
+          )}
+
+          <label className="block text-[10px] text-zinc-400">
+            {selectedBlock.tipo === "espacamento" ? "Altura do espaco" : "Espacamento interno"}:{" "}
+            {selectedBlock.espacamento ?? (selectedBlock.tipo === "espacamento" ? 24 : 16)}px
+            <input
+              type="range"
+              min={selectedBlock.tipo === "espacamento" ? 8 : 0}
+              max={selectedBlock.tipo === "espacamento" ? 96 : 64}
+              value={selectedBlock.espacamento ?? (selectedBlock.tipo === "espacamento" ? 24 : 16)}
+              onChange={(event) => patchSelectedBlock({ espacamento: Number(event.target.value) })}
+              className="mt-2 w-full accent-[#ff6200]"
+            />
+          </label>
+
           <div className="flex flex-wrap items-center gap-1.5 border-t border-zinc-800 pt-2">
             <span className="mr-1 text-[10px] text-zinc-500">Inserir variavel:</span>
             {CAMPAIGN_VARIABLES.map((variable) => (

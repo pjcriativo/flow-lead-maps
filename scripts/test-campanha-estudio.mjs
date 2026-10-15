@@ -62,15 +62,15 @@ const typesContent = fs.readFileSync(typesFile, "utf-8");
 
 assert.ok(typesContent.includes("StudioCampaignDraft"), "Tipo StudioCampaignDraft deve existir");
 assert.ok(typesContent.includes("StudioStepId"), "Tipo StudioStepId deve existir");
-assert.ok(typesContent.includes("StudioValidationResult"), "Tipo StudioValidationResult deve existir");
+assert.ok(
+  typesContent.includes("StudioValidationResult"),
+  "Tipo StudioValidationResult deve existir",
+);
 assert.ok(typesContent.includes("StudioProgramacao"), "Tipo StudioProgramacao deve existir");
 console.log("✅ [Tipagem TypeScript]: Interfaces do Estúdio validadas com sucesso.");
 
 // 4. Verificação da Subview no Sidebar e no Router do Dashboard
-const sidebarFile = path.resolve(
-  process.cwd(),
-  "src/components/home-premium/DashboardSidebar.tsx",
-);
+const sidebarFile = path.resolve(process.cwd(), "src/components/home-premium/DashboardSidebar.tsx");
 const sidebarContent = fs.readFileSync(sidebarFile, "utf-8");
 assert.ok(
   sidebarContent.includes('id: "estudio" as const'),
@@ -81,10 +81,7 @@ assert.ok(
   "Sidebar deve exibir o label 'Estúdio de Campanhas'",
 );
 
-const dashboardFile = path.resolve(
-  process.cwd(),
-  "src/routes/_authenticated/dashboard.tsx",
-);
+const dashboardFile = path.resolve(process.cwd(), "src/routes/_authenticated/dashboard.tsx");
 const dashboardContent = fs.readFileSync(dashboardFile, "utf-8");
 assert.ok(
   dashboardContent.includes('setCampanhasSubView("estudio")'),
@@ -112,10 +109,7 @@ assert.ok(!revisaoContent.includes("Ativar campanha"));
 console.log("✅ [Segurança & Bloqueios]: disparos e agendamentos reais permanecem ausentes.");
 
 // 6. Verificação do isolamento multi-tenant e persistência no Supabase
-const studioServiceFile = path.resolve(
-  process.cwd(),
-  "src/services/campaign-studio-service.ts",
-);
+const studioServiceFile = path.resolve(process.cwd(), "src/services/campaign-studio-service.ts");
 const serviceContent = fs.readFileSync(studioServiceFile, "utf-8");
 assert.ok(
   serviceContent.includes('supabase.rpc("salvar_rascunho_estudio"'),

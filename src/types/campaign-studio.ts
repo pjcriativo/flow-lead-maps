@@ -50,6 +50,8 @@ export interface StudioEmailBlock {
   imagemUrl?: string;
   imagemAlt?: string;
   imagemLargura?: number;
+  colunaEsquerdaTexto?: string;
+  colunaDireitaTexto?: string;
   negrito?: boolean;
   italico?: boolean;
   alinhamento?: StudioBlockAlignment;
