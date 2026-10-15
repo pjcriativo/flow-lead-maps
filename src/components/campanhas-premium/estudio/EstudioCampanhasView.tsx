@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { z } from "zod";
 import {
   ArrowLeft,
   Search,
@@ -17,11 +18,14 @@ import { cn } from "@/lib/utils";
 import type { StudioCampaignDraft, StudioStepId } from "@/types/campaign-studio";
 import {
   carregarListasEstudio,
+  carregarDestinatariosLista,
   criarRascunhoInicial,
-  obterUltimoRascunhoEstudio,
+  listarIdsSelecionaveis,
+  obterRascunhoEstudio,
   salvarRascunhoEstudio,
   validarRascunhoCampanha,
   type SimpleListaItem,
+  type StudioLeadOption,
 } from "@/services/campaign-studio-service";
 import { obterContextoOrgAtiva } from "@/services/templates-service";
 import { OFFICIAL_EMAIL_TEMPLATES } from "../templates/templates-data";
@@ -30,9 +34,43 @@ import { ConfiguracaoCampanhaPanel } from "./ConfiguracaoCampanhaPanel";
 import { EditorEmailCanvas } from "./EditorEmailCanvas";
 import { PreviaAgendamentoPanel } from "./PreviaAgendamentoPanel";
 import { ModalSelecionarLista } from "./ModalSelecionarLista";
+import { ModalSelecionarDestinatarios } from "./ModalSelecionarDestinatarios";
 import { ModalSelecionarTemplate } from "./ModalSelecionarTemplate";
 import { ModalRevisaoCampanha } from "./ModalRevisaoCampanha";
-import type { EmailTemplateItem } from "@/types/templates";
+import type { CampaignTemplateContract, EmailTemplateItem } from "@/types/templates";
+
+const campaignTemplateContractSchema = z.object({
+  templateId: z.string(),
+  templateNome: z.string(),
+  templateTipo: z.literal("email"),
+  categoria: z.string(),
+  versao: z.string(),
+  assunto: z.string(),
+  preheader: z.string(),
+  htmlRenderizado: z.string(),
+  variaveisUtilizadas: z.record(z.string()),
+  assinaturaId: z.string().optional(),
+  assinaturaHtml: z.string().optional(),
+  orgId: z.string(),
+  timestamp: z.string(),
+});
+
+function applyTemplateContract(
+  draft: StudioCampaignDraft,
+  contract: CampaignTemplateContract,
+): StudioCampaignDraft {
+  return {
+    ...draft,
+    templateId: contract.templateId,
+    templateVersao: contract.versao,
+    templateNome: contract.templateNome,
+    templateHtmlSnapshot: contract.htmlRenderizado,
+    assunto: contract.assunto,
+    preCabecalho: contract.preheader,
+    assinaturaId: contract.assinaturaId ?? draft.assinaturaId,
+    assinaturaHtmlSnapshot: contract.assinaturaHtml ?? draft.assinaturaHtmlSnapshot,
+  };
+}
 
 export interface EstudioCampanhasViewProps {
   user?: {
@@ -43,6 +81,7 @@ export interface EstudioCampanhasViewProps {
   };
   unreadNotifications?: number;
   preselectedListId?: string | null;
+  campaignId?: string | null;
   onBack: () => void;
   onCampaignCreated?: () => void;
 }
@@ -56,10 +95,12 @@ export function EstudioCampanhasView({
   },
   unreadNotifications = 3,
   preselectedListId = null,
+  campaignId = null,
   onBack,
   onCampaignCreated,
 }: EstudioCampanhasViewProps) {
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [orgId, setOrgId] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -67,10 +108,14 @@ export function EstudioCampanhasView({
 
   // Estado do Rascunho da Campanha
   const [draft, setDraft] = useState<StudioCampaignDraft | null>(null);
+  const [pendingTemplateContract, setPendingTemplateContract] =
+    useState<CampaignTemplateContract | null>(null);
   const [listas, setListas] = useState<SimpleListaItem[]>([]);
+  const [leadOptions, setLeadOptions] = useState<StudioLeadOption[]>([]);
 
   // Modais
   const [isAlterarListaOpen, setIsAlterarListaOpen] = useState(false);
+  const [isDestinatariosOpen, setIsDestinatariosOpen] = useState(false);
   const [isAlterarTemplateOpen, setIsAlterarTemplateOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isRevisaoModalOpen, setIsRevisaoModalOpen] = useState(false);
@@ -90,36 +135,36 @@ export function EstudioCampanhasView({
         setListas(loadedListas);
 
         // Verifica se há contrato vindo do Prompt 50 (Biblioteca de Templates)
-        let templateVindoDaBiblioteca: EmailTemplateItem | null = null;
+        let templateVindoDaBiblioteca: CampaignTemplateContract | null = null;
         try {
           const rawContrato = sessionStorage.getItem("flow_campanha_contrato");
           if (rawContrato) {
-            const parsed = JSON.parse(rawContrato);
-            const found = OFFICIAL_EMAIL_TEMPLATES.find((t) => t.id === parsed.templateId);
-            if (found) {
-              templateVindoDaBiblioteca = found;
-              sessionStorage.removeItem("flow_campanha_contrato"); // consumido
+            const parsed = campaignTemplateContractSchema.safeParse(JSON.parse(rawContrato));
+            if (parsed.success && parsed.data.orgId === ctx.orgId) {
+              templateVindoDaBiblioteca = parsed.data;
+              setPendingTemplateContract(parsed.data);
             }
           }
         } catch (error) {
           console.error("Falha ao ler o contrato local da biblioteca:", error);
         }
 
-        // Tenta recuperar rascunho anterior ou cria um novo
-        const saved = obterUltimoRascunhoEstudio(ctx.orgId);
-        const savedListIsAvailable =
-          saved?.orgId === ctx.orgId && loadedListas.some((list) => list.id === saved.listaId);
-        if (saved && savedListIsAvailable && !preselectedListId && !templateVindoDaBiblioteca) {
-          setDraft(saved);
-        } else {
+        if (campaignId) {
+          const persisted = await obterRascunhoEstudio(campaignId, ctx.orgId);
+          setDraft(persisted.draft);
+        } else if (preselectedListId) {
           const novo = await criarRascunhoInicial(ctx.orgId, preselectedListId);
           if (templateVindoDaBiblioteca) {
-            novo.templateId = templateVindoDaBiblioteca.id;
-            novo.templateNome = templateVindoDaBiblioteca.nome;
-            novo.assunto = templateVindoDaBiblioteca.assuntoPadrao;
-            novo.preCabecalho = templateVindoDaBiblioteca.preheaderPadrao;
+            setDraft(applyTemplateContract(novo, templateVindoDaBiblioteca));
+            sessionStorage.removeItem("flow_campanha_contrato");
+            setPendingTemplateContract(null);
+          } else {
+            setDraft(novo);
           }
-          setDraft(novo);
+        } else {
+          setDraft(null);
+          setLoadError("Selecione uma lista para iniciar a campanha.");
+          setIsAlterarListaOpen(true);
         }
       } catch (err) {
         console.error("Falha ao inicializar Estúdio de Campanhas:", err);
@@ -140,7 +185,27 @@ export function EstudioCampanhasView({
     return () => {
       isMounted = false;
     };
-  }, [preselectedListId, reloadToken]);
+  }, [campaignId, preselectedListId, reloadToken]);
+
+  useEffect(() => {
+    let active = true;
+    if (!orgId || !draft?.listaId) {
+      return () => {
+        active = false;
+      };
+    }
+    void carregarDestinatariosLista(orgId, draft.listaId)
+      .then((options) => {
+        if (active) setLeadOptions(options);
+      })
+      .catch((error: unknown) => {
+        if (active)
+          toast.error(error instanceof Error ? error.message : "Falha ao carregar destinatários.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [draft?.listaId, orgId]);
 
   if (loading) {
     return (
@@ -168,6 +233,35 @@ export function EstudioCampanhasView({
           >
             <RefreshCw className="size-3.5" /> Tentar novamente
           </button>
+          <ModalSelecionarLista
+            isOpen={isAlterarListaOpen}
+            listas={listas}
+            selectedListaId={null}
+            onClose={onBack}
+            onSelectLista={(list) => {
+              setLoading(true);
+              void criarRascunhoInicial(orgId, list.id)
+                .then((created) => {
+                  setDraft(
+                    pendingTemplateContract
+                      ? applyTemplateContract(created, pendingTemplateContract)
+                      : created,
+                  );
+                  if (pendingTemplateContract) {
+                    sessionStorage.removeItem("flow_campanha_contrato");
+                    setPendingTemplateContract(null);
+                  }
+                  setIsAlterarListaOpen(false);
+                  setLoadError(null);
+                })
+                .catch((error: unknown) =>
+                  setLoadError(
+                    error instanceof Error ? error.message : "Falha ao iniciar campanha.",
+                  ),
+                )
+                .finally(() => setLoading(false));
+            }}
+          />
         </div>
       </div>
     );
@@ -179,14 +273,17 @@ export function EstudioCampanhasView({
   };
 
   // Manipuladores de Ação
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     try {
-      const saved = salvarRascunhoEstudio(draft);
+      setSaving(true);
+      const saved = await salvarRascunhoEstudio(draft);
       setDraft(saved);
-      toast.success("Rascunho salvo neste navegador.");
+      toast.success("Rascunho salvo no Supabase.");
     } catch (error) {
       console.error("Falha ao salvar rascunho:", error);
-      toast.error("Não foi possível salvar o rascunho neste navegador.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o rascunho.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -196,7 +293,9 @@ export function EstudioCampanhasView({
       return {
         ...prev,
         templateId: template.id,
+        templateVersao: template.versao ?? "1.0",
         templateNome: template.nome,
+        templateHtmlSnapshot: template.conteudoHtml,
         assunto: template.assuntoPadrao,
         preCabecalho: template.preheaderPadrao,
       };
@@ -219,11 +318,13 @@ export function EstudioCampanhasView({
     setIsRevisaoModalOpen(true);
   };
 
-  const handleSaveDraftAndExit = () => {
+  const handleSaveDraftAndExit = async () => {
     try {
-      salvarRascunhoEstudio(draft);
+      setSaving(true);
+      const saved = await salvarRascunhoEstudio({ ...draft, status: "em_revisao" });
+      setDraft(saved);
       setIsRevisaoModalOpen(false);
-      toast.success("Rascunho validado e salvo neste navegador.");
+      toast.success("Rascunho validado e salvo no Supabase.");
       if (onCampaignCreated) {
         onCampaignCreated();
       } else {
@@ -231,7 +332,9 @@ export function EstudioCampanhasView({
       }
     } catch (error) {
       console.error("Falha ao salvar rascunho:", error);
-      toast.error("Não foi possível salvar o rascunho; ele não foi concluído.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o rascunho.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -473,6 +576,7 @@ export function EstudioCampanhasView({
               listasDisponiveis={listas}
               onChangeDraft={updateDraft}
               onOpenAlterarLista={() => setIsAlterarListaOpen(true)}
+              onOpenDestinatarios={() => setIsDestinatariosOpen(true)}
               onInsertVariable={handleInsertVariable}
             />
           </div>
@@ -516,10 +620,11 @@ export function EstudioCampanhasView({
           <button
             type="button"
             onClick={handleSaveDraft}
+            disabled={saving}
             className="flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800/60 px-5 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
           >
             <Save className="size-3.5" />
-            <span>Salvar rascunho</span>
+            <span>{saving ? "Salvando..." : "Salvar rascunho"}</span>
           </button>
 
           <button
@@ -542,18 +647,27 @@ export function EstudioCampanhasView({
         selectedListaId={draft.listaId}
         onClose={() => setIsAlterarListaOpen(false)}
         onSelectLista={(lista) => {
-          setDraft((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              listaId: lista.id,
-              listaNome: lista.nome,
-              totalLeads: lista.totalLeads,
-              leadsComEmail: lista.leadsComEmail,
-              leadsQualificados: lista.leadsQualificados,
-              quantidadeSelecionada: lista.leadsQualificados,
-            };
-          });
+          void listarIdsSelecionaveis(orgId, lista.id)
+            .then((selectedIds) =>
+              setDraft((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  listaId: lista.id,
+                  listaNome: lista.nome,
+                  totalLeads: lista.totalLeads,
+                  leadsComEmail: lista.leadsComEmail,
+                  leadsQualificados: lista.leadsQualificados,
+                  quantidadeSelecionada: selectedIds.length,
+                  leadsIdsSelecionados: selectedIds,
+                };
+              }),
+            )
+            .catch((error: unknown) =>
+              toast.error(
+                error instanceof Error ? error.message : "Falha ao carregar destinatários.",
+              ),
+            );
           toast.success(`Lista "${lista.nome}" conectada ao Estúdio.`);
         }}
       />
@@ -563,6 +677,25 @@ export function EstudioCampanhasView({
         selectedTemplateId={draft.templateId}
         onClose={() => setIsAlterarTemplateOpen(false)}
         onSelectTemplate={handleSelectTemplate}
+      />
+
+      <ModalSelecionarDestinatarios
+        key={`${isDestinatariosOpen}:${draft.listaId}:${draft.leadsIdsSelecionados.join(",")}`}
+        isOpen={isDestinatariosOpen}
+        leads={leadOptions}
+        selectedIds={draft.leadsIdsSelecionados}
+        onClose={() => setIsDestinatariosOpen(false)}
+        onConfirm={(selectedIds) =>
+          setDraft((current) =>
+            current
+              ? {
+                  ...current,
+                  leadsIdsSelecionados: selectedIds,
+                  quantidadeSelecionada: selectedIds.length,
+                }
+              : current,
+          )
+        }
       />
 
       <TemplatePreviewModal

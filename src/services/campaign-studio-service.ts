@@ -1,14 +1,20 @@
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import type {
   StudioCampaignDraft,
-  StudioFiltrosEnvio,
+  StudioEmailBlock,
+  StudioRecipient,
   StudioValidationResult,
 } from "@/types/campaign-studio";
 import {
+  DEFAULT_SIGNATURE_DATA,
   OFFICIAL_CORPORATE_SIGNATURES,
   OFFICIAL_EMAIL_TEMPLATES,
+  renderSignatureHtml,
 } from "@/components/campanhas-premium/templates/templates-data";
 import { getActiveOrganizationContext } from "@/lib/active-organization";
+import { throwPersistenceError } from "@/lib/persistence-errors";
 import {
   loadStudioLists,
   type SimpleStudioListItem,
@@ -17,21 +23,46 @@ import {
 import { obterAssinaturaPadraoOrg, obterContextoOrgAtiva } from "./templates-service";
 
 export type SimpleListaItem = SimpleStudioListItem;
+export interface StudioLeadOption {
+  id: string;
+  nome: string;
+  email: string | null;
+  elegibilidade: "sem_email" | "nao_validado" | "descadastro";
+}
 
-// Chave isolada por organização para salvar rascunho do estúdio
-const STORAGE_ESTUDIO_CURRENT_KEY = (orgId: string) =>
-  `flow_business_estudio_draft_current_${orgId}`;
-const STORAGE_ESTUDIO_LIST_KEY = (orgId: string) => `flow_business_estudio_drafts_list_${orgId}`;
+const blockSchema = z.object({
+  id: z.string(),
+  tipo: z.enum(["cabecalho", "mensagem", "cta", "rodape", "texto", "botao", "imagem", "separador"]),
+  titulo: z.string(),
+  subtitulo: z.string(),
+  conteudoHtml: z.string().nullable().optional(),
+  conteudoTexto: z.string().nullable().optional(),
+  ctaTexto: z.string().nullable().optional(),
+  ctaUrl: z.string().nullable().optional(),
+  imagemUrl: z.string().nullable().optional(),
+  ativo: z.boolean(),
+});
+const filtersSchema = z.object({
+  comEmail: z.boolean(),
+  qualificados: z.boolean(),
+  novosLeads: z.boolean(),
+});
+const scheduleSchema = z.object({
+  modo: z.enum(["imediato", "agendar"]),
+  dataEnvio: z.string(),
+  horarioEnvio: z.string(),
+  fusoHorario: z.string(),
+});
+const saveResultSchema = z.object({
+  campaignId: z.string().uuid(),
+  revision: z.number().int().positive(),
+  updatedAt: z.string(),
+});
 
-/**
- * Carrega somente listas e contagens reais da organização ativa.
- */
 export async function carregarListasEstudio(orgId: string): Promise<SimpleListaItem[]> {
   const activeOrganization = await getActiveOrganizationContext();
-  if (activeOrganization.orgId !== orgId) {
+  if (activeOrganization.orgId !== orgId)
     throw new Error("A organização solicitada não é a organização ativa.");
-  }
-
   const repository: StudioListRepository = {
     async listLists(scopedOrgId) {
       const { data, error } = await supabase
@@ -52,62 +83,102 @@ export async function carregarListasEstudio(orgId: string): Promise<SimpleListaI
       return data ?? [];
     },
   };
-
   return loadStudioLists(repository, orgId);
 }
 
-/**
- * Cria o rascunho padrão inicial com os dados idênticos ao layout aprovado do Estúdio.
- */
+export async function listarIdsSelecionaveis(orgId: string, listId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id, email, email_opt_out")
+    .eq("org_id", orgId)
+    .eq("list_id", listId);
+  if (error) throw error;
+  return (data ?? [])
+    .filter((lead) => Boolean(lead.email?.trim()) && !lead.email_opt_out)
+    .map((lead) => lead.id);
+}
+
+export async function carregarDestinatariosLista(
+  orgId: string,
+  listId: string,
+): Promise<StudioLeadOption[]> {
+  const active = await getActiveOrganizationContext();
+  if (active.orgId !== orgId)
+    throw new Error("A organização solicitada não é a organização ativa.");
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id,business_name,email,email_opt_out")
+    .eq("org_id", orgId)
+    .eq("list_id", listId)
+    .order("business_name");
+  if (error) throw error;
+  return (data ?? []).map((lead) => ({
+    id: lead.id,
+    nome: lead.business_name,
+    email: lead.email?.trim() || null,
+    elegibilidade: !lead.email?.trim()
+      ? "sem_email"
+      : lead.email_opt_out
+        ? "descadastro"
+        : "nao_validado",
+  }));
+}
+
 export async function criarRascunhoInicial(
   orgId: string,
   preselectedListId?: string | null,
 ): Promise<StudioCampaignDraft> {
-  const ctx = await obterContextoOrgAtiva();
-  if (ctx.orgId !== orgId) throw new Error("A organização solicitada não é a organização ativa.");
-  const listas = await carregarListasEstudio(orgId);
-
-  const listaAtiva = preselectedListId
-    ? listas.find((list) => list.id === preselectedListId)
-    : listas[0];
-  if (!listaAtiva) {
-    throw new Error(
-      preselectedListId
-        ? "A lista selecionada não existe ou não pertence à organização ativa."
-        : "Nenhuma lista de leads está disponível para esta organização.",
-    );
-  }
-
-  const templateBase = OFFICIAL_EMAIL_TEMPLATES[0]; // Apresentação Comercial
-  const sigPadrao = obterAssinaturaPadraoOrg(orgId);
-
+  const context = await obterContextoOrgAtiva();
+  if (context.orgId !== orgId)
+    throw new Error("A organização solicitada não é a organização ativa.");
+  const lists = await carregarListasEstudio(orgId);
+  const selectedList = preselectedListId
+    ? lists.find((list) => list.id === preselectedListId)
+    : undefined;
+  if (preselectedListId && !selectedList)
+    throw new Error("A lista selecionada não existe ou não pertence à organização ativa.");
+  if (!selectedList) throw new Error("Selecione uma lista real para iniciar a campanha.");
+  const [defaultSignature, selectedLeadIds] = await Promise.all([
+    obterAssinaturaPadraoOrg(orgId),
+    listarIdsSelecionaveis(orgId, selectedList.id),
+  ]);
+  const template = OFFICIAL_EMAIL_TEMPLATES[0];
+  const officialSignature = OFFICIAL_CORPORATE_SIGNATURES.find(
+    (signature) => signature.id === defaultSignature.id,
+  );
+  const now = new Date().toISOString();
   return {
-    id: `draft_${Date.now()}`,
+    id: null,
+    revisao: 0,
     orgId,
-    userId: ctx.userId,
-    nome: `Nova campanha — ${listaAtiva.nome}`,
-    listaId: listaAtiva.id,
-    listaNome: listaAtiva.nome,
-    totalLeads: listaAtiva.totalLeads,
-    leadsComEmail: listaAtiva.leadsComEmail,
-    leadsQualificados: listaAtiva.leadsQualificados,
-    quantidadeSelecionada: listaAtiva.leadsQualificados,
-    filtrosEnvio: {
-      comEmail: true,
-      qualificados: true,
-      novosLeads: true,
-    },
-    leadsIdsSelecionados: [],
-    remetenteNome: ctx.userName,
-    remetenteEmail: ctx.userEmail,
-    responderPara: ctx.replyToEmail,
-    assinaturaId: sigPadrao.id,
+    userId: context.userId,
+    nome: `Nova campanha — ${selectedList.nome}`,
+    listaId: selectedList.id,
+    listaNome: selectedList.nome,
+    totalLeads: selectedList.totalLeads,
+    leadsComEmail: selectedList.leadsComEmail,
+    leadsQualificados: selectedList.leadsQualificados,
+    quantidadeSelecionada: selectedLeadIds.length,
+    filtrosEnvio: { comEmail: true, qualificados: true, novosLeads: true },
+    leadsIdsSelecionados: selectedLeadIds,
+    remetenteNome: context.userName,
+    remetenteEmail: context.userEmail,
+    responderPara: context.replyToEmail,
+    assinaturaId: defaultSignature.id,
     assinaturaNome:
-      OFFICIAL_CORPORATE_SIGNATURES.find((signature) => signature.id === sigPadrao.id)?.nome ?? "",
-    templateId: templateBase.id,
-    templateNome: templateBase.nome,
-    assunto: "Uma ideia para aumentar seus resultados em Curitiba",
-    preCabecalho: "Oportunidades exclusivas para expandir a captação de clientes.",
+      officialSignature?.nome ?? defaultSignature.nomeModelo ?? defaultSignature.data.nome,
+    assinaturaHtmlSnapshot:
+      defaultSignature.htmlSeguro ??
+      (officialSignature
+        ? renderSignatureHtml(officialSignature.htmlTemplate, defaultSignature.data)
+        : ""),
+    templateId: template.id,
+    templateVersao: template.versao ?? "1.0",
+    templateNome: template.nome,
+    templateHtmlSnapshot: template.conteudoHtml,
+    templateConfigSnapshot: {},
+    assunto: template.assuntoPadrao,
+    preCabecalho: template.preheaderPadrao,
     blocos: [
       {
         id: "bloco-cabecalho",
@@ -123,13 +194,7 @@ export async function criarRascunhoInicial(
         subtitulo: "Texto e conteúdo do e-mail",
         ativo: true,
       },
-      {
-        id: "bloco-cta",
-        tipo: "cta",
-        titulo: "CTA",
-        subtitulo: "Botão de ação",
-        ativo: true,
-      },
+      { id: "bloco-cta", tipo: "cta", titulo: "CTA", subtitulo: "Botão de ação", ativo: true },
       {
         id: "bloco-rodape",
         tipo: "rodape",
@@ -145,100 +210,208 @@ export async function criarRascunhoInicial(
       fusoHorario: "America/Sao_Paulo",
     },
     status: "rascunho",
-    criadoEm: new Date().toISOString(),
-    atualizadoEm: new Date().toISOString(),
+    criadoEm: now,
+    atualizadoEm: now,
   };
 }
 
-/**
- * Salva rascunho com isolamento multi-tenant por orgId.
- */
-export function salvarRascunhoEstudio(draft: StudioCampaignDraft): StudioCampaignDraft {
-  if (typeof window === "undefined") {
-    throw new Error("O armazenamento local não está disponível.");
+function blocksToJson(blocks: StudioEmailBlock[]): Json {
+  return blocks.map((block) => ({
+    id: block.id,
+    tipo: block.tipo,
+    titulo: block.titulo,
+    subtitulo: block.subtitulo,
+    conteudoHtml: block.conteudoHtml ?? null,
+    conteudoTexto: block.conteudoTexto ?? null,
+    ctaTexto: block.ctaTexto ?? null,
+    ctaUrl: block.ctaUrl ?? null,
+    imagemUrl: block.imagemUrl ?? null,
+    ativo: block.ativo,
+  }));
+}
+
+export async function salvarRascunhoEstudio(
+  draft: StudioCampaignDraft,
+): Promise<StudioCampaignDraft> {
+  if (!draft.listaId) throw new Error("Selecione uma lista antes de salvar.");
+  const active = await getActiveOrganizationContext();
+  if (active.orgId !== draft.orgId || active.userId !== draft.userId) {
+    throw new Error("O rascunho não pertence ao contexto ativo.");
   }
-  if (!draft.orgId) throw new Error("O rascunho não possui uma organização válida.");
-  const orgId = draft.orgId;
-  const updated = {
-    ...draft,
-    atualizadoEm: new Date().toISOString(),
+  const payload: Json = {
+    nome: draft.nome,
+    listaId: draft.listaId,
+    status: draft.status,
+    templateId: draft.templateId,
+    templateVersao: draft.templateVersao,
+    templateNome: draft.templateNome,
+    templateHtmlSnapshot: draft.templateHtmlSnapshot,
+    templateConfigSnapshot: draft.templateConfigSnapshot,
+    blocos: blocksToJson(draft.blocos),
+    assinaturaId: draft.assinaturaId,
+    assinaturaNome: draft.assinaturaNome,
+    assinaturaHtmlSnapshot: draft.assinaturaHtmlSnapshot,
+    assunto: draft.assunto,
+    preCabecalho: draft.preCabecalho,
+    remetenteNome: draft.remetenteNome,
+    remetenteEmail: draft.remetenteEmail,
+    responderPara: draft.responderPara,
+    filtrosEnvio: {
+      comEmail: draft.filtrosEnvio.comEmail,
+      qualificados: draft.filtrosEnvio.qualificados,
+      novosLeads: draft.filtrosEnvio.novosLeads,
+    },
+    programacao: {
+      modo: draft.programacao.modo,
+      dataEnvio: draft.programacao.dataEnvio,
+      horarioEnvio: draft.programacao.horarioEnvio,
+      fusoHorario: draft.programacao.fusoHorario,
+    },
+    leadsIdsSelecionados: draft.leadsIdsSelecionados,
   };
-
-  localStorage.setItem(STORAGE_ESTUDIO_CURRENT_KEY(orgId), JSON.stringify(updated));
-
-  const listRaw = localStorage.getItem(STORAGE_ESTUDIO_LIST_KEY(orgId));
-  const list: StudioCampaignDraft[] = listRaw ? JSON.parse(listRaw) : [];
-  const idx = list.findIndex((item) => item.id === draft.id);
-  if (idx >= 0) {
-    list[idx] = updated;
-  } else {
-    list.unshift(updated);
-  }
-  localStorage.setItem(STORAGE_ESTUDIO_LIST_KEY(orgId), JSON.stringify(list.slice(0, 20)));
-  return updated;
+  const { data, error } = await supabase.rpc("salvar_rascunho_estudio", {
+    p_org_id: draft.orgId,
+    p_campanha_id: draft.id,
+    p_revisao_esperada: draft.revisao,
+    p_draft: payload,
+  });
+  if (error) throwPersistenceError(error);
+  const saved = saveResultSchema.parse(data);
+  return { ...draft, id: saved.campaignId, revisao: saved.revision, atualizadoEm: saved.updatedAt };
 }
 
-/**
- * Recupera o último rascunho salvo da organização ativa.
- */
-export function obterUltimoRascunhoEstudio(orgId: string): StudioCampaignDraft | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_ESTUDIO_CURRENT_KEY(orgId));
-    if (raw) {
-      return JSON.parse(raw);
-    }
-  } catch (error) {
-    console.error("Falha ao recuperar o rascunho local:", error);
-  }
-  return null;
+export async function obterRascunhoEstudio(
+  campaignId: string,
+  orgId: string,
+): Promise<{
+  draft: StudioCampaignDraft;
+  recipients: StudioRecipient[];
+}> {
+  const context = await obterContextoOrgAtiva();
+  if (context.orgId !== orgId)
+    throw new Error("A organização solicitada não é a organização ativa.");
+  const [
+    { data: campaign, error: campaignError },
+    { data: emailDraft, error: draftError },
+    { data: recipients, error: recipientsError },
+  ] = await Promise.all([
+    supabase
+      .from("campanhas")
+      .select("id,org_id,user_id,list_id,nome,status,criada_em,atualizado_em,revisao")
+      .eq("id", campaignId)
+      .eq("org_id", orgId)
+      .single(),
+    supabase
+      .from("campanha_email_drafts")
+      .select("*")
+      .eq("campanha_id", campaignId)
+      .eq("org_id", orgId)
+      .single(),
+    supabase
+      .from("campanha_email_destinatarios")
+      .select("lead_id,email_snapshot,selecionado,estado_elegibilidade,motivo_exclusao")
+      .eq("campanha_id", campaignId)
+      .eq("org_id", orgId),
+  ]);
+  if (campaignError) throwPersistenceError(campaignError);
+  if (draftError) throwPersistenceError(draftError);
+  if (recipientsError) throwPersistenceError(recipientsError);
+  const lists = await carregarListasEstudio(orgId);
+  const list = lists.find((item) => item.id === campaign.list_id);
+  if (!list) throw new Error("A lista vinculada à campanha não está disponível nesta organização.");
+  const blocks = blockSchema
+    .array()
+    .parse(emailDraft.blocos)
+    .map((block) => ({
+      ...block,
+      conteudoHtml: block.conteudoHtml ?? undefined,
+      conteudoTexto: block.conteudoTexto ?? undefined,
+      ctaTexto: block.ctaTexto ?? undefined,
+      ctaUrl: block.ctaUrl ?? undefined,
+      imagemUrl: block.imagemUrl ?? undefined,
+    }));
+  const selectedIds = (recipients ?? [])
+    .filter((recipient) => recipient.selecionado)
+    .map((recipient) => recipient.lead_id);
+  const draft: StudioCampaignDraft = {
+    id: campaign.id,
+    revisao: campaign.revisao,
+    orgId,
+    userId: campaign.user_id,
+    nome: campaign.nome,
+    listaId: campaign.list_id,
+    listaNome: list.nome,
+    totalLeads: list.totalLeads,
+    leadsComEmail: list.leadsComEmail,
+    leadsQualificados: list.leadsQualificados,
+    quantidadeSelecionada: selectedIds.length,
+    filtrosEnvio: filtersSchema.parse(emailDraft.filtros_envio),
+    leadsIdsSelecionados: selectedIds,
+    remetenteNome: emailDraft.remetente_nome,
+    remetenteEmail: emailDraft.remetente_email,
+    responderPara: emailDraft.responder_para,
+    assinaturaId: emailDraft.assinatura_id ?? "",
+    assinaturaNome: emailDraft.assinatura_nome ?? "",
+    assinaturaHtmlSnapshot: emailDraft.assinatura_html_snapshot,
+    templateId: emailDraft.template_id,
+    templateVersao: emailDraft.template_versao,
+    templateNome: emailDraft.template_nome,
+    templateHtmlSnapshot: emailDraft.template_html_snapshot,
+    templateConfigSnapshot: z
+      .record(z.union([z.string(), z.number(), z.boolean(), z.null()]))
+      .parse(emailDraft.template_config_snapshot),
+    assunto: emailDraft.assunto,
+    preCabecalho: emailDraft.pre_cabecalho,
+    blocos: blocks,
+    programacao: scheduleSchema.parse(emailDraft.programacao),
+    status: campaign.status === "em_revisao" ? "em_revisao" : "rascunho",
+    criadoEm: campaign.criada_em,
+    atualizadoEm: campaign.atualizado_em,
+  };
+  const parsedRecipients: StudioRecipient[] = (recipients ?? []).map((recipient) => ({
+    leadId: recipient.lead_id,
+    email: recipient.email_snapshot,
+    selecionado: recipient.selecionado,
+    elegibilidade: z
+      .enum([
+        "sem_email",
+        "nao_validado",
+        "elegivel_confirmado",
+        "bloqueado",
+        "descadastro",
+        "reclamacao",
+      ])
+      .parse(recipient.estado_elegibilidade),
+    motivoExclusao: recipient.motivo_exclusao,
+  }));
+  return { draft, recipients: parsedRecipients };
 }
 
-/**
- * Validação rigorosa dos pré-requisitos antes de avançar para a revisão.
- */
 export function validarRascunhoCampanha(draft: StudioCampaignDraft): StudioValidationResult {
-  const avisos: string[] = [];
+  const avisos: string[] = [
+    "Os destinatários sem elegibilidade comprovada não poderão ser enviados.",
+    "Disparos reais permanecem desativados nesta etapa.",
+  ];
   const bloqueios: string[] = [];
-
   const assuntoPreenchido = draft.assunto.trim().length > 0;
-  if (!assuntoPreenchido) {
-    bloqueios.push("O assunto do e-mail é obrigatório.");
-  }
-
-  const templateAplicado = Boolean(draft.templateId && draft.templateNome);
-  if (!templateAplicado) {
-    bloqueios.push("Selecione um template de e-mail.");
-  }
-
+  if (!assuntoPreenchido) bloqueios.push("O assunto do e-mail é obrigatório.");
+  const templateAplicado = Boolean(
+    draft.templateId && draft.templateNome && draft.templateHtmlSnapshot,
+  );
+  if (!templateAplicado) bloqueios.push("Selecione um template de e-mail.");
   const assinaturaDefinida = Boolean(draft.assinaturaId);
-  if (!assinaturaDefinida) {
-    avisos.push("Nenhuma assinatura corporativa selecionada.");
-  }
-
-  const destinatariosValidos = draft.quantidadeSelecionada;
-  if (destinatariosValidos <= 0) {
-    bloqueios.push("Selecione uma lista com pelo menos 1 lead elegível com e-mail.");
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const remetenteValido = emailRegex.test(draft.remetenteEmail);
-  if (!remetenteValido) {
-    bloqueios.push("O e-mail do remetente é inválido.");
-  }
-
-  // Aviso explícito sobre integração Resend (Prompt 52)
-  avisos.push("Disparos reais e homologação de domínio Resend serão ativados no Prompt 52.");
-
-  const podeAvancar = bloqueios.length === 0;
-
+  if (!assinaturaDefinida) avisos.push("Nenhuma assinatura corporativa selecionada.");
+  const destinatariosValidos = draft.leadsIdsSelecionados.length;
+  if (destinatariosValidos <= 0) bloqueios.push("Selecione pelo menos um destinatário.");
+  const remetenteValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.remetenteEmail);
+  if (!remetenteValido) bloqueios.push("O e-mail do remetente é inválido.");
   return {
     assuntoPreenchido,
     templateAplicado,
     assinaturaDefinida,
     destinatariosValidos,
     remetenteValido,
-    podeAvancar,
+    podeAvancar: bloqueios.length === 0,
     avisos,
     bloqueios,
   };

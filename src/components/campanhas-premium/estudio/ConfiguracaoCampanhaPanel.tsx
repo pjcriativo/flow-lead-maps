@@ -10,6 +10,7 @@ interface ConfiguracaoCampanhaPanelProps {
   listasDisponiveis: SimpleListaItem[];
   onChangeDraft: (updater: (prev: StudioCampaignDraft) => StudioCampaignDraft) => void;
   onOpenAlterarLista: () => void;
+  onOpenDestinatarios: () => void;
   onInsertVariable: (varName: string) => void;
 }
 
@@ -18,6 +19,7 @@ export function ConfiguracaoCampanhaPanel({
   listasDisponiveis,
   onChangeDraft,
   onOpenAlterarLista,
+  onOpenDestinatarios,
   onInsertVariable,
 }: ConfiguracaoCampanhaPanelProps) {
   const handleToggleFiltro = (filtro: keyof StudioCampaignDraft["filtrosEnvio"]) => {
@@ -27,20 +29,9 @@ export function ConfiguracaoCampanhaPanel({
         [filtro]: !prev.filtrosEnvio[filtro],
       };
 
-      // Recalcula contagem selecionada baseada nos filtros
-      let baseCount = prev.totalLeads;
-      if (novoFiltros.qualificados && novoFiltros.comEmail) {
-        baseCount = prev.leadsQualificados;
-      } else if (novoFiltros.comEmail) {
-        baseCount = prev.leadsComEmail;
-      } else {
-        baseCount = prev.totalLeads;
-      }
-
       return {
         ...prev,
         filtrosEnvio: novoFiltros,
-        quantidadeSelecionada: baseCount,
       };
     });
   };
@@ -91,7 +82,8 @@ export function ConfiguracaoCampanhaPanel({
                     totalLeads: sel.totalLeads,
                     leadsComEmail: sel.leadsComEmail,
                     leadsQualificados: sel.leadsQualificados,
-                    quantidadeSelecionada: sel.leadsQualificados,
+                    quantidadeSelecionada: 0,
+                    leadsIdsSelecionados: [],
                   }));
                 }
               }}
@@ -114,6 +106,13 @@ export function ConfiguracaoCampanhaPanel({
           <div className="mt-0.5 text-sm font-extrabold text-white">
             {draft.quantidadeSelecionada} leads
           </div>
+          <button
+            type="button"
+            onClick={onOpenDestinatarios}
+            className="mt-1 text-[11px] font-semibold text-[#ff6200] hover:text-[#ff7d2b]"
+          >
+            Selecionar individualmente
+          </button>
         </div>
 
         <div>

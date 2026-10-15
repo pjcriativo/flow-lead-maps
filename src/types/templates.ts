@@ -28,6 +28,8 @@ export interface TemplateVariables {
 
 export interface EmailTemplateItem {
   id: string;
+  versao?: string;
+  templateOrigemId?: string;
   nome: string;
   descricao: string;
   categoria: TemplateCategory;
@@ -75,12 +77,12 @@ export interface CorporateSignatureItem {
   dadosExemplo: SignatureData;
   criadoEm?: string;
   atualizadoEm?: string;
+  versao?: string;
 }
 
 export interface CustomTemplateItem extends EmailTemplateItem {
   orgId: string;
   userId: string;
-  templateOrigemId?: string;
   criadoEm: string;
   atualizadoEm: string;
 }

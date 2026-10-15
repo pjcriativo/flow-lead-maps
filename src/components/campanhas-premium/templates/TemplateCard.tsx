@@ -1,7 +1,13 @@
-import { Eye, Star } from "lucide-react";
+import { Copy, Eye, MoreVertical, Pencil, Star, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { EmailTemplateItem } from "@/types/templates";
 import { TemplateMiniature } from "./TemplateMiniature";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface TemplateCardProps {
   template: EmailTemplateItem;
@@ -9,6 +15,9 @@ interface TemplateCardProps {
   onToggleFavorito: (id: string) => void;
   onPreview: (template: EmailTemplateItem) => void;
   onUseTemplate: (template: EmailTemplateItem) => void;
+  onEdit?: (template: EmailTemplateItem) => void;
+  onDuplicate?: (template: EmailTemplateItem) => void;
+  onDelete?: (template: EmailTemplateItem) => void;
 }
 
 export function TemplateCard({
@@ -17,6 +26,9 @@ export function TemplateCard({
   onToggleFavorito,
   onPreview,
   onUseTemplate,
+  onEdit,
+  onDuplicate,
+  onDelete,
 }: TemplateCardProps) {
   const getBadgeStyle = (variant: EmailTemplateItem["badgeVariant"]) => {
     switch (variant) {
@@ -67,25 +79,54 @@ export function TemplateCard({
             </span>
           </div>
 
-          <button
-            type="button"
-            aria-label={isFavorito ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorito(template.id);
-            }}
-            className={cn(
-              "shrink-0 p-1 text-zinc-500 transition-colors hover:text-amber-400",
-              isFavorito && "text-amber-400",
-            )}
-          >
-            <Star
+          <div className="flex items-center">
+            <button
+              type="button"
+              aria-label={isFavorito ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorito(template.id);
+              }}
               className={cn(
-                "size-4",
-                isFavorito ? "fill-amber-400 text-amber-400" : "text-zinc-500",
+                "shrink-0 p-1 text-zinc-500 transition-colors hover:text-amber-400",
+                isFavorito && "text-amber-400",
               )}
-            />
-          </button>
+            >
+              <Star
+                className={cn(
+                  "size-4",
+                  isFavorito ? "fill-amber-400 text-amber-400" : "text-zinc-500",
+                )}
+              />
+            </button>
+            {template.isPersonalizado && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Ações do template"
+                    className="p-1 text-zinc-500 hover:text-white"
+                  >
+                    <MoreVertical className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit?.(template)}>
+                    <Pencil className="mr-2 size-3.5" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDuplicate?.(template)}>
+                    <Copy className="mr-2 size-3.5" />
+                    Duplicar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDelete?.(template)} className="text-rose-400">
+                    <Trash2 className="mr-2 size-3.5" />
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
 
         {/* Descrição curta */}

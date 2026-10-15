@@ -84,6 +84,7 @@ export function CampanhasPremiumView({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [studioCampaignId, setStudioCampaignId] = useState<string | null>(null);
 
   // Carrega campanhas reais do Supabase e consolida métricas reais
   const carregarDadosReais = useCallback(async () => {
@@ -107,7 +108,7 @@ export function CampanhasPremiumView({
       const mapped: CampanhaPremiumItem[] = camps.map((c) => ({
         id: c.id,
         name: c.nome,
-        niche: "Não informado",
+        niche: c.list_name ?? "Lista não informada",
         channel: "email",
         channelLabel: "E-mail",
         leadsCount: c.total,
@@ -119,14 +120,19 @@ export function CampanhasPremiumView({
               : c.rascunho > 0
                 ? "site_gerado"
                 : "preparacao",
-        status: c.status === "concluida" ? "concluida" : "em_producao",
+        status:
+          c.status === "rascunho" || c.status === "em_revisao"
+            ? c.status
+            : c.status === "concluida"
+              ? "concluida"
+              : "em_producao",
         stepperStep: c.enviado > 0 ? 5 : c.aprovado > 0 ? 4 : c.rascunho > 0 ? 2 : 1,
         responsible: {
           name: user.name || "Usuário",
           initials: user.initials || "U",
           avatarUrl: user.avatarUrl,
         },
-        lastAction: new Date(c.criada_em).toLocaleDateString("pt-BR", {
+        lastAction: new Date(c.atualizado_em ?? c.criada_em).toLocaleDateString("pt-BR", {
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
@@ -209,7 +215,13 @@ export function CampanhasPremiumView({
       return;
     }
     handleSetCampanha(realCamp);
-    handleSubViewChange("gestao");
+    if (realCamp.status === "rascunho" || realCamp.status === "em_revisao") {
+      setStudioCampaignId(realCamp.id);
+      handleSubViewChange("estudio");
+    } else {
+      setStudioCampaignId(null);
+      handleSubViewChange("gestao");
+    }
   };
 
   // Renomear campanha
@@ -290,6 +302,7 @@ export function CampanhasPremiumView({
         user={user}
         unreadNotifications={unreadNotifications}
         preselectedListId={preselectedListId}
+        campaignId={studioCampaignId}
         onBack={() => {
           onClearPreselectedList?.();
           handleSubViewChange("central");
@@ -311,6 +324,7 @@ export function CampanhasPremiumView({
         unreadNotifications={unreadNotifications}
         onBackToCampanhas={() => handleSubViewChange("central")}
         onSelectTemplateForCampaign={(templateId) => {
+          setStudioCampaignId(null);
           handleSubViewChange("estudio");
         }}
       />
@@ -488,7 +502,10 @@ export function CampanhasPremiumView({
       <main className="mx-auto max-w-[1720px] space-y-4 px-4 py-5 sm:px-6 lg:px-7">
         {/* Cabeçalho da página: Título + Botão Modelos + Botão Nova Campanha */}
         <CampanhasHeader
-          onNewCampaign={() => handleSubViewChange("estudio")}
+          onNewCampaign={() => {
+            setStudioCampaignId(null);
+            handleSubViewChange("estudio");
+          }}
           onOpenTemplates={() => handleSubViewChange("templates")}
         />
 

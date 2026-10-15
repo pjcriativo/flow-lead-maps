@@ -8,6 +8,117 @@ export type Database = {
   };
   public: {
     Tables: {
+      assinatura_versoes: {
+        Row: {
+          alterado_em: string;
+          alterado_por: string | null;
+          assinatura_id: string;
+          id: number;
+          org_id: string;
+          snapshot: Json;
+          versao: number;
+        };
+        Insert: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          assinatura_id: string;
+          id?: never;
+          org_id: string;
+          snapshot: Json;
+          versao: number;
+        };
+        Update: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          assinatura_id?: string;
+          id?: never;
+          org_id?: string;
+          snapshot?: Json;
+          versao?: number;
+        };
+        Relationships: [];
+      };
+      assinaturas_corporativas: {
+        Row: {
+          atualizado_em: string;
+          badge_label: string | null;
+          cargo: string | null;
+          created_by: string | null;
+          criado_em: string;
+          dados: Json;
+          email: string | null;
+          empresa: string | null;
+          endereco: string | null;
+          html_template: string;
+          id: string;
+          instagram: string | null;
+          is_global: boolean;
+          is_padrao: boolean;
+          linkedin: string | null;
+          logo_url: string | null;
+          modelo_origem_id: string | null;
+          modelo_origem_versao: string | null;
+          nome: string;
+          org_id: string | null;
+          site: string | null;
+          telefone: string | null;
+          versao: number;
+          whatsapp: string | null;
+        };
+        Insert: {
+          atualizado_em?: string;
+          badge_label?: string | null;
+          cargo?: string | null;
+          created_by?: string | null;
+          criado_em?: string;
+          dados?: Json;
+          email?: string | null;
+          empresa?: string | null;
+          endereco?: string | null;
+          html_template: string;
+          id?: string;
+          instagram?: string | null;
+          is_global?: boolean;
+          is_padrao?: boolean;
+          linkedin?: string | null;
+          logo_url?: string | null;
+          modelo_origem_id?: string | null;
+          modelo_origem_versao?: string | null;
+          nome: string;
+          org_id?: string | null;
+          site?: string | null;
+          telefone?: string | null;
+          versao?: number;
+          whatsapp?: string | null;
+        };
+        Update: {
+          atualizado_em?: string;
+          badge_label?: string | null;
+          cargo?: string | null;
+          created_by?: string | null;
+          criado_em?: string;
+          dados?: Json;
+          email?: string | null;
+          empresa?: string | null;
+          endereco?: string | null;
+          html_template?: string;
+          id?: string;
+          instagram?: string | null;
+          is_global?: boolean;
+          is_padrao?: boolean;
+          linkedin?: string | null;
+          logo_url?: string | null;
+          modelo_origem_id?: string | null;
+          modelo_origem_versao?: string | null;
+          nome?: string;
+          org_id?: string | null;
+          site?: string | null;
+          telefone?: string | null;
+          versao?: number;
+          whatsapp?: string | null;
+        };
+        Relationships: [];
+      };
       activity_log: {
         Row: {
           action: string;
@@ -482,6 +593,7 @@ export type Database = {
       };
       campanhas: {
         Row: {
+          atualizado_em: string;
           canal: string;
           criada_em: string;
           id: string;
@@ -489,11 +601,13 @@ export type Database = {
           list_id: string | null;
           nome: string;
           org_id: string | null;
+          revisao: number;
           status: string;
           user_id: string;
           wa_config: Json | null;
         };
         Insert: {
+          atualizado_em?: string;
           canal?: string;
           criada_em?: string;
           id?: string;
@@ -501,11 +615,13 @@ export type Database = {
           list_id?: string | null;
           nome: string;
           org_id?: string | null;
+          revisao?: number;
           status?: string;
           user_id: string;
           wa_config?: Json | null;
         };
         Update: {
+          atualizado_em?: string;
           canal?: string;
           criada_em?: string;
           id?: string;
@@ -513,6 +629,7 @@ export type Database = {
           list_id?: string | null;
           nome?: string;
           org_id?: string | null;
+          revisao?: number;
           status?: string;
           user_id?: string;
           wa_config?: Json | null;
@@ -533,6 +650,114 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      campanha_email_destinatarios: {
+        Row: {
+          atualizado_em: string;
+          campanha_id: string;
+          criado_em: string;
+          email_snapshot: string | null;
+          estado_elegibilidade: string;
+          id: string;
+          lead_id: string;
+          motivo_exclusao: string | null;
+          org_id: string;
+          selecionado: boolean;
+        };
+        Insert: {
+          atualizado_em?: string;
+          campanha_id: string;
+          criado_em?: string;
+          email_snapshot?: string | null;
+          estado_elegibilidade: string;
+          id?: string;
+          lead_id: string;
+          motivo_exclusao?: string | null;
+          org_id: string;
+          selecionado?: boolean;
+        };
+        Update: {
+          atualizado_em?: string;
+          campanha_id?: string;
+          criado_em?: string;
+          email_snapshot?: string | null;
+          estado_elegibilidade?: string;
+          id?: string;
+          lead_id?: string;
+          motivo_exclusao?: string | null;
+          org_id?: string;
+          selecionado?: boolean;
+        };
+        Relationships: [];
+      };
+      campanha_email_drafts: {
+        Row: {
+          assinatura_html_snapshot: string;
+          assinatura_id: string | null;
+          assinatura_nome: string | null;
+          assunto: string;
+          atualizado_em: string;
+          blocos: Json;
+          campanha_id: string;
+          criado_em: string;
+          filtros_envio: Json;
+          org_id: string;
+          pre_cabecalho: string;
+          programacao: Json;
+          remetente_email: string;
+          remetente_nome: string;
+          responder_para: string;
+          template_config_snapshot: Json;
+          template_html_snapshot: string;
+          template_id: string;
+          template_nome: string;
+          template_versao: string;
+        };
+        Insert: {
+          assinatura_html_snapshot?: string;
+          assinatura_id?: string | null;
+          assinatura_nome?: string | null;
+          assunto: string;
+          atualizado_em?: string;
+          blocos?: Json;
+          campanha_id: string;
+          criado_em?: string;
+          filtros_envio?: Json;
+          org_id: string;
+          pre_cabecalho?: string;
+          programacao?: Json;
+          remetente_email: string;
+          remetente_nome: string;
+          responder_para: string;
+          template_config_snapshot?: Json;
+          template_html_snapshot: string;
+          template_id: string;
+          template_nome: string;
+          template_versao: string;
+        };
+        Update: {
+          assinatura_html_snapshot?: string;
+          assinatura_id?: string | null;
+          assinatura_nome?: string | null;
+          assunto?: string;
+          atualizado_em?: string;
+          blocos?: Json;
+          campanha_id?: string;
+          criado_em?: string;
+          filtros_envio?: Json;
+          org_id?: string;
+          pre_cabecalho?: string;
+          programacao?: Json;
+          remetente_email?: string;
+          remetente_nome?: string;
+          responder_para?: string;
+          template_config_snapshot?: Json;
+          template_html_snapshot?: string;
+          template_id?: string;
+          template_nome?: string;
+          template_versao?: string;
+        };
+        Relationships: [];
       };
       config_chaves: {
         Row: {
@@ -722,6 +947,111 @@ export type Database = {
           },
         ];
       };
+      email_template_versoes: {
+        Row: {
+          alterado_em: string;
+          alterado_por: string | null;
+          id: number;
+          org_id: string;
+          snapshot: Json;
+          template_id: string;
+          versao: number;
+        };
+        Insert: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          id?: never;
+          org_id: string;
+          snapshot: Json;
+          template_id: string;
+          versao: number;
+        };
+        Update: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          id?: never;
+          org_id?: string;
+          snapshot?: Json;
+          template_id?: string;
+          versao?: number;
+        };
+        Relationships: [];
+      };
+      email_templates: {
+        Row: {
+          assunto_padrao: string;
+          atualizado_em: string;
+          categoria: string;
+          categoria_label: string;
+          configuracoes: Json;
+          conteudo_html: string;
+          created_by: string | null;
+          criado_em: string;
+          cta_texto: string | null;
+          cta_url: string | null;
+          descricao: string | null;
+          id: string;
+          is_global: boolean;
+          nome: string;
+          org_id: string | null;
+          preheader_padrao: string | null;
+          slug: string | null;
+          tema_escuro: boolean;
+          template_origem_id: string | null;
+          template_origem_versao: string | null;
+          variaveis_suportadas: string[];
+          versao: number;
+        };
+        Insert: {
+          assunto_padrao: string;
+          atualizado_em?: string;
+          categoria: string;
+          categoria_label: string;
+          configuracoes?: Json;
+          conteudo_html: string;
+          created_by?: string | null;
+          criado_em?: string;
+          cta_texto?: string | null;
+          cta_url?: string | null;
+          descricao?: string | null;
+          id?: string;
+          is_global?: boolean;
+          nome: string;
+          org_id?: string | null;
+          preheader_padrao?: string | null;
+          slug?: string | null;
+          tema_escuro?: boolean;
+          template_origem_id?: string | null;
+          template_origem_versao?: string | null;
+          variaveis_suportadas?: string[];
+          versao?: number;
+        };
+        Update: {
+          assunto_padrao?: string;
+          atualizado_em?: string;
+          categoria?: string;
+          categoria_label?: string;
+          configuracoes?: Json;
+          conteudo_html?: string;
+          created_by?: string | null;
+          criado_em?: string;
+          cta_texto?: string | null;
+          cta_url?: string | null;
+          descricao?: string | null;
+          id?: string;
+          is_global?: boolean;
+          nome?: string;
+          org_id?: string | null;
+          preheader_padrao?: string | null;
+          slug?: string | null;
+          tema_escuro?: boolean;
+          template_origem_id?: string | null;
+          template_origem_versao?: string | null;
+          variaveis_suportadas?: string[];
+          versao?: number;
+        };
+        Relationships: [];
+      };
       email_config: {
         Row: {
           org_id: string | null;
@@ -756,6 +1086,33 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      template_favoritos: {
+        Row: {
+          criado_em: string;
+          id: string;
+          org_id: string;
+          template_id: string;
+          tipo: string;
+          user_id: string;
+        };
+        Insert: {
+          criado_em?: string;
+          id?: string;
+          org_id: string;
+          template_id: string;
+          tipo: string;
+          user_id: string;
+        };
+        Update: {
+          criado_em?: string;
+          id?: string;
+          org_id?: string;
+          template_id?: string;
+          tipo?: string;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       ia_uso: {
         Row: {
@@ -5237,6 +5594,19 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      definir_assinatura_padrao: {
+        Args: { p_assinatura_id: string; p_org_id: string };
+        Returns: undefined;
+      };
+      salvar_rascunho_estudio: {
+        Args: {
+          p_campanha_id: string | null;
+          p_draft: Json;
+          p_org_id: string;
+          p_revisao_esperada: number;
+        };
+        Returns: Json;
+      };
       google_maps_search_history: {
         Args: { p_org: string; p_limit?: number };
         Returns: {

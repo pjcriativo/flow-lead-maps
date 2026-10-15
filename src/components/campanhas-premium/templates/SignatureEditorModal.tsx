@@ -9,7 +9,7 @@ interface SignatureEditorModalProps {
   signature: CorporateSignatureItem | null;
   currentData: SignatureData;
   onClose: () => void;
-  onSave: (data: SignatureData, setAsDefault: boolean) => boolean;
+  onSave: (data: SignatureData, setAsDefault: boolean) => Promise<boolean>;
 }
 
 export function SignatureEditorModal({
@@ -26,13 +26,13 @@ export function SignatureEditorModal({
 
   const previewHtml = renderSignatureHtml(signature.htmlTemplate, data);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!data.nome.trim()) {
       toast.error("O nome na assinatura não pode ficar vazio.");
       return;
     }
 
-    if (onSave(data, isDefault)) onClose();
+    if (await onSave(data, isDefault)) onClose();
   };
 
   return (

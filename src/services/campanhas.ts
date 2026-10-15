@@ -16,6 +16,7 @@ import {
 } from "@/services/propostas";
 import { publicarSite } from "@/services/publicacao";
 import { gerarRedesign } from "@/services/redesign";
+import { throwPersistenceError } from "@/lib/persistence-errors";
 
 type CampanhaRow = {
   id: string;
@@ -23,6 +24,9 @@ type CampanhaRow = {
   nome: string;
   status: Campanha["status"];
   criada_em: string;
+  atualizado_em: string;
+  revisao: number;
+  lead_lists: { name: string } | null;
 };
 
 const CONTAGEM_VAZIA = {
@@ -39,19 +43,33 @@ const CONTAGEM_VAZIA = {
  * lead aprovado cuja proposta já saiu (proposta.status='enviada'). Filtra por CANAL
  * (default 'email' — preserva a tela de e-mail; a tela de WhatsApp passa 'whatsapp'). */
 export async function listarCampanhas(canal: "email" | "whatsapp" = "email"): Promise<Campanha[]> {
-  const [{ data: camps, error: cErr }, { data: cls, error: clErr }, { data: props, error: pErr }] =
-    await Promise.all([
-      supabase
-        .from("campanhas")
-        .select("id, list_id, nome, status, criada_em")
-        .eq("canal", canal)
-        .order("criada_em", { ascending: false }),
-      supabase.from("campanha_leads").select("campanha_id, estado, proposta_id"),
-      supabase.from("propostas").select("id, status").not("campanha_id", "is", null),
-    ]);
-  if (cErr) throw cErr;
-  if (clErr) throw clErr;
-  if (pErr) throw pErr;
+  const [
+    { data: camps, error: cErr },
+    { data: cls, error: clErr },
+    { data: props, error: pErr },
+    { data: emailRecipients, error: recipientsError },
+  ] = await Promise.all([
+    supabase
+      .from("campanhas")
+      .select("id, list_id, nome, status, criada_em, atualizado_em, revisao, lead_lists(name)")
+      .eq("canal", canal)
+      .order("criada_em", { ascending: false }),
+    supabase.from("campanha_leads").select("campanha_id, estado, proposta_id"),
+    supabase.from("propostas").select("id, status").not("campanha_id", "is", null),
+    supabase.from("campanha_email_destinatarios").select("campanha_id").eq("selecionado", true),
+  ]);
+  if (cErr) throwPersistenceError(cErr);
+  if (clErr) throwPersistenceError(clErr);
+  if (pErr) throwPersistenceError(pErr);
+  if (recipientsError) throwPersistenceError(recipientsError);
+
+  const emailRecipientCounts = new Map<string, number>();
+  for (const recipient of emailRecipients ?? []) {
+    emailRecipientCounts.set(
+      recipient.campanha_id,
+      (emailRecipientCounts.get(recipient.campanha_id) ?? 0) + 1,
+    );
+  }
 
   const statusProposta = new Map(
     (props ?? []).map((p) => [(p as { id: string }).id, (p as { status: string }).status]),
@@ -79,10 +97,17 @@ export async function listarCampanhas(canal: "email" | "whatsapp" = "email"): Pr
   return ((camps ?? []) as CampanhaRow[]).map((c) => ({
     id: c.id,
     list_id: c.list_id,
+    list_name: c.lead_lists?.name ?? "Lista removida",
     nome: c.nome,
     status: c.status,
     criada_em: c.criada_em,
-    ...(contagem.get(c.id) ?? { ...CONTAGEM_VAZIA }),
+    atualizado_em: c.atualizado_em,
+    revisao: c.revisao,
+    ...(contagem.get(c.id) ?? {
+      ...CONTAGEM_VAZIA,
+      total: emailRecipientCounts.get(c.id) ?? 0,
+      pendente: emailRecipientCounts.get(c.id) ?? 0,
+    }),
   }));
 }
 

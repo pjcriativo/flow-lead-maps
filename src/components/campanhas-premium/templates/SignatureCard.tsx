@@ -1,7 +1,13 @@
-import { Check, Eye, Star } from "lucide-react";
+import { Check, Copy, Eye, MoreVertical, Pencil, Star, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CorporateSignatureItem, SignatureData } from "@/types/templates";
 import { renderSignatureHtml } from "./templates-data";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SignatureCardProps {
   signature: CorporateSignatureItem;
@@ -11,6 +17,9 @@ interface SignatureCardProps {
   onToggleFavorito: (id: string) => void;
   onPreview: (signature: CorporateSignatureItem) => void;
   onSetDefault: (signature: CorporateSignatureItem) => void;
+  onEdit?: (signature: CorporateSignatureItem) => void;
+  onDuplicate?: (signature: CorporateSignatureItem) => void;
+  onDelete?: (signature: CorporateSignatureItem) => void;
 }
 
 export function SignatureCard({
@@ -21,6 +30,9 @@ export function SignatureCard({
   onToggleFavorito,
   onPreview,
   onSetDefault,
+  onEdit,
+  onDuplicate,
+  onDelete,
 }: SignatureCardProps) {
   const renderedHtml = renderSignatureHtml(signature.htmlTemplate, signatureData);
 
@@ -55,25 +67,54 @@ export function SignatureCard({
             </span>
           </div>
 
-          <button
-            type="button"
-            aria-label={isFavorito ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorito(signature.id);
-            }}
-            className={cn(
-              "shrink-0 p-1 text-zinc-500 transition-colors hover:text-amber-400",
-              isFavorito && "text-amber-400",
-            )}
-          >
-            <Star
+          <div className="flex items-center">
+            <button
+              type="button"
+              aria-label={isFavorito ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorito(signature.id);
+              }}
               className={cn(
-                "size-4",
-                isFavorito ? "fill-amber-400 text-amber-400" : "text-zinc-500",
+                "shrink-0 p-1 text-zinc-500 transition-colors hover:text-amber-400",
+                isFavorito && "text-amber-400",
               )}
-            />
-          </button>
+            >
+              <Star
+                className={cn(
+                  "size-4",
+                  isFavorito ? "fill-amber-400 text-amber-400" : "text-zinc-500",
+                )}
+              />
+            </button>
+            {signature.isPersonalizado && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Ações da assinatura"
+                    className="p-1 text-zinc-500 hover:text-white"
+                  >
+                    <MoreVertical className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit?.(signature)}>
+                    <Pencil className="mr-2 size-3.5" />
+                    Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDuplicate?.(signature)}>
+                    <Copy className="mr-2 size-3.5" />
+                    Duplicar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onDelete?.(signature)} className="text-rose-400">
+                    <Trash2 className="mr-2 size-3.5" />
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
 
         <p className="mt-1.5 h-9 line-clamp-2 text-xs leading-relaxed text-zinc-400">

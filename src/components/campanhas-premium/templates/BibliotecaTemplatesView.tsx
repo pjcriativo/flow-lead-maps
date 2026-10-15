@@ -40,6 +40,7 @@ import {
   OFFICIAL_CORPORATE_SIGNATURES,
   OFFICIAL_EMAIL_TEMPLATES,
   interpolateVariables,
+  renderSignatureHtml,
 } from "./templates-data";
 import { TemplateCard } from "./TemplateCard";
 import { SignatureCard } from "./SignatureCard";
@@ -50,13 +51,17 @@ import { SignatureEditorModal } from "./SignatureEditorModal";
 import {
   alternarFavoritoOrg,
   carregarVariaveisOrganizacao,
-  definirAssinaturaPadraoOrg,
+  duplicarModeloPersonalizadoOrg,
+  excluirAssinaturaOrg,
+  excluirModeloPersonalizadoOrg,
   listarFavoritosOrg,
+  listarAssinaturasOrg,
   listarModelosPersonalizadosOrg,
   obterAssinaturaPadraoOrg,
   obterContextoOrgAtiva,
   prepararContratoEstudio,
   salvarModeloPersonalizadoOrg,
+  salvarAssinaturaOrg,
 } from "@/services/templates-service";
 
 interface BibliotecaTemplatesViewProps {
@@ -109,6 +114,7 @@ export function BibliotecaTemplatesView({
   // Estado de favoritos e modelos personalizados persistidos na organização
   const [favoritosIds, setFavoritosIds] = useState<string[]>([]);
   const [meusModelos, setMeusModelos] = useState<CustomTemplateItem[]>([]);
+  const [minhasAssinaturas, setMinhasAssinaturas] = useState<CorporateSignatureItem[]>([]);
   const [assinaturaPadrao, setAssinaturaPadrao] = useState<{
     id: string;
     data: SignatureData;
@@ -141,12 +147,16 @@ export function BibliotecaTemplatesView({
         if (!active) return;
         setVariables(vars);
 
-        const favs = listarFavoritosOrg(ctx.orgId);
-        const custom = listarModelosPersonalizadosOrg(ctx.orgId);
-        const defaultSig = obterAssinaturaPadraoOrg(ctx.orgId);
+        const [favs, custom, signatures, defaultSig] = await Promise.all([
+          listarFavoritosOrg(ctx.orgId),
+          listarModelosPersonalizadosOrg(ctx.orgId),
+          listarAssinaturasOrg(ctx.orgId),
+          obterAssinaturaPadraoOrg(ctx.orgId),
+        ]);
 
         setFavoritosIds(favs);
         setMeusModelos(custom);
+        setMinhasAssinaturas(signatures);
         setAssinaturaPadrao(defaultSig);
       } catch (error) {
         console.error("Falha ao carregar a biblioteca da organização ativa:", error);
@@ -160,13 +170,17 @@ export function BibliotecaTemplatesView({
   }, []);
 
   // Alternar favorito com persistência na organização
-  const handleToggleFavorito = (id: string) => {
-    const isNowFav = alternarFavoritoOrg(orgId, id);
-    setFavoritosIds(listarFavoritosOrg(orgId));
-    if (isNowFav) {
-      toast.success("Modelo adicionado aos favoritos!");
-    } else {
-      toast.info("Modelo removido dos favoritos.");
+  const handleToggleFavorito = async (id: string, tipo: "email" | "assinatura" = "email") => {
+    try {
+      const isNowFav = await alternarFavoritoOrg(orgId, id, tipo);
+      setFavoritosIds(await listarFavoritosOrg(orgId));
+      toast[isNowFav ? "success" : "info"](
+        isNowFav ? "Modelo adicionado aos favoritos!" : "Modelo removido dos favoritos.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível atualizar o favorito.",
+      );
     }
   };
 
@@ -182,14 +196,68 @@ export function BibliotecaTemplatesView({
     setIsEditorOpen(true);
   };
 
+  const handleDuplicateTemplate = async (template: EmailTemplateItem) => {
+    const custom = meusModelos.find((item) => item.id === template.id);
+    if (!custom) return;
+    try {
+      await duplicarModeloPersonalizadoOrg(orgId, userId, custom);
+      setMeusModelos(await listarModelosPersonalizadosOrg(orgId));
+      toast.success("Template duplicado no Supabase.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível duplicar o template.");
+    }
+  };
+
+  const handleDeleteTemplate = async (template: EmailTemplateItem) => {
+    if (!confirm(`Excluir o modelo "${template.nome}"? Campanhas antigas manterão o snapshot.`))
+      return;
+    try {
+      await excluirModeloPersonalizadoOrg(orgId, template.id);
+      setMeusModelos(await listarModelosPersonalizadosOrg(orgId));
+      toast.success("Template excluído. Os snapshots das campanhas foram preservados.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o template.");
+    }
+  };
+
+  const handleDuplicateSignature = async (signature: CorporateSignatureItem) => {
+    try {
+      await salvarAssinaturaOrg({
+        orgId,
+        data: signature.dadosExemplo,
+        htmlSeguro: signature.htmlTemplate,
+        padrao: false,
+      });
+      setMinhasAssinaturas(await listarAssinaturasOrg(orgId));
+      toast.success("Assinatura duplicada no Supabase.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível duplicar a assinatura.",
+      );
+    }
+  };
+
+  const handleDeleteSignature = async (signature: CorporateSignatureItem) => {
+    if (!confirm(`Excluir a assinatura "${signature.nome}"?`)) return;
+    try {
+      await excluirAssinaturaOrg(orgId, signature.id);
+      setMinhasAssinaturas(await listarAssinaturasOrg(orgId));
+      toast.success("Assinatura excluída.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível excluir a assinatura.",
+      );
+    }
+  };
+
   // Salvar modelo personalizado
-  const handleSaveCustomTemplate = (
+  const handleSaveCustomTemplate = async (
     data: Partial<CustomTemplateItem> & { nome: string; categoria: EmailTemplateItem["categoria"] },
   ) => {
     try {
-      const saved = salvarModeloPersonalizadoOrg(orgId, userId, data);
-      setMeusModelos(listarModelosPersonalizadosOrg(orgId));
-      toast.success(`Modelo "${saved.nome}" salvo neste navegador.`);
+      const saved = await salvarModeloPersonalizadoOrg(orgId, userId, data);
+      setMeusModelos(await listarModelosPersonalizadosOrg(orgId));
+      toast.success(`Modelo "${saved.nome}" salvo no Supabase.`);
       return true;
     } catch (error) {
       console.error("Falha ao salvar modelo personalizado:", error);
@@ -199,19 +267,27 @@ export function BibliotecaTemplatesView({
   };
 
   // Definir assinatura padrão
-  const handleSetDefaultSignature = (sig: CorporateSignatureItem) => {
+  const handleSetDefaultSignature = async (sig: CorporateSignatureItem) => {
     if (!orgId) {
       toast.error("Selecione uma organização ativa antes de definir a assinatura.");
       return;
     }
     try {
-      definirAssinaturaPadraoOrg(orgId, sig.id, assinaturaPadrao.data);
+      const persistedId = await salvarAssinaturaOrg({
+        orgId,
+        modeloOrigemId: sig.id,
+        modeloOrigemVersao: sig.versao ?? "1.0",
+        data: assinaturaPadrao.data,
+        htmlSeguro: renderSignatureHtml(sig.htmlTemplate, assinaturaPadrao.data),
+        padrao: true,
+      });
+      setMinhasAssinaturas(await listarAssinaturasOrg(orgId));
       setAssinaturaPadrao({
-        id: sig.id,
+        id: persistedId,
         data: assinaturaPadrao.data,
         definida: true,
       });
-      toast.success(`Assinatura "${sig.nome}" definida neste navegador.`);
+      toast.success(`Assinatura "${sig.nome}" definida no Supabase.`);
     } catch (error) {
       console.error("Falha ao definir assinatura padrão:", error);
       toast.error("Não foi possível definir a assinatura neste navegador.");
@@ -219,20 +295,28 @@ export function BibliotecaTemplatesView({
   };
 
   // Salvar edição da assinatura padrão
-  const handleSaveSignature = (sigData: SignatureData, setAsDef: boolean) => {
+  const handleSaveSignature = async (sigData: SignatureData, setAsDef: boolean) => {
     try {
-      const currentSigId = signatureToEdit?.id || assinaturaPadrao.id;
+      if (!orgId || !signatureToEdit) throw new Error("Contexto da assinatura indisponível.");
+      const persistedId = await salvarAssinaturaOrg({
+        orgId,
+        id: signatureToEdit.isPersonalizado ? signatureToEdit.id : undefined,
+        modeloOrigemId: signatureToEdit.isPersonalizado ? undefined : signatureToEdit.id,
+        modeloOrigemVersao: signatureToEdit.versao ?? "1.0",
+        data: sigData,
+        htmlSeguro: renderSignatureHtml(signatureToEdit.htmlTemplate, sigData),
+        padrao: setAsDef,
+      });
+      setMinhasAssinaturas(await listarAssinaturasOrg(orgId));
       if (setAsDef) {
-        if (!orgId) throw new Error("Contexto da organização ativa indisponível.");
-        definirAssinaturaPadraoOrg(orgId, currentSigId, sigData);
         setAssinaturaPadrao({
-          id: currentSigId,
+          id: persistedId,
           data: sigData,
           definida: true,
         });
-        toast.success("Dados da assinatura salvos neste navegador.");
+        toast.success("Dados da assinatura salvos no Supabase.");
       } else {
-        toast.info("Alterações usadas apenas na prévia; a assinatura padrão não foi alterada.");
+        toast.success("Assinatura salva no Supabase sem alterar o padrão.");
       }
       return true;
     } catch (error) {
@@ -308,7 +392,7 @@ export function BibliotecaTemplatesView({
 
   // Filtragem das assinaturas
   const filteredSignatures = useMemo(() => {
-    let list = OFFICIAL_CORPORATE_SIGNATURES;
+    let list = [...OFFICIAL_CORPORATE_SIGNATURES, ...minhasAssinaturas];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
@@ -322,7 +406,7 @@ export function BibliotecaTemplatesView({
       list = list.filter((s) => favoritosIds.includes(s.id));
     }
     return list;
-  }, [searchQuery, filterFavoritos, favoritosIds]);
+  }, [searchQuery, filterFavoritos, favoritosIds, minhasAssinaturas]);
 
   // Limpar todos os filtros
   const handleClearFilters = () => {
@@ -696,6 +780,9 @@ export function BibliotecaTemplatesView({
                       onToggleFavorito={handleToggleFavorito}
                       onPreview={handleOpenPreview}
                       onUseTemplate={handleUseTemplate}
+                      onEdit={handleOpenEditor}
+                      onDuplicate={handleDuplicateTemplate}
+                      onDelete={handleDeleteTemplate}
                     />
                   ))}
                 </div>
@@ -723,15 +810,21 @@ export function BibliotecaTemplatesView({
                   <SignatureCard
                     key={sig.id}
                     signature={sig}
-                    signatureData={assinaturaPadrao.data}
+                    signatureData={sig.isPersonalizado ? sig.dadosExemplo : assinaturaPadrao.data}
                     isPadrao={assinaturaPadrao.id === sig.id}
                     isFavorito={favoritosIds.includes(sig.id)}
-                    onToggleFavorito={handleToggleFavorito}
+                    onToggleFavorito={(id) => handleToggleFavorito(id, "assinatura")}
                     onPreview={(s) => {
                       setSignatureToEdit(s);
                       setIsSignatureEditorOpen(true);
                     }}
                     onSetDefault={handleSetDefaultSignature}
+                    onEdit={(signature) => {
+                      setSignatureToEdit(signature);
+                      setIsSignatureEditorOpen(true);
+                    }}
+                    onDuplicate={handleDuplicateSignature}
+                    onDelete={handleDeleteSignature}
                   />
                 ))}
               </div>
@@ -1034,6 +1127,7 @@ export function BibliotecaTemplatesView({
       />
 
       <TemplateEditorModal
+        key={`${isEditorOpen}:${editorTemplate?.id ?? "none"}`}
         isOpen={isEditorOpen}
         template={editorTemplate}
         initialVariables={variables}
@@ -1042,9 +1136,10 @@ export function BibliotecaTemplatesView({
       />
 
       <SignatureEditorModal
+        key={`${isSignatureEditorOpen}:${signatureToEdit?.id ?? "none"}`}
         isOpen={isSignatureEditorOpen}
         signature={signatureToEdit}
-        currentData={assinaturaPadrao.data}
+        currentData={signatureToEdit?.dadosExemplo ?? assinaturaPadrao.data}
         onClose={() => setIsSignatureEditorOpen(false)}
         onSave={handleSaveSignature}
       />

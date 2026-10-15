@@ -4,7 +4,13 @@ export type ChannelType =
 export type EtapaType = "proposta" | "site_gerado" | "preparacao" | "aprovacao" | "envio";
 
 export type StatusType =
-  "em_producao" | "aguardando_aprovacao" | "em_envio" | "concluida" | "pausada";
+  | "rascunho"
+  | "em_revisao"
+  | "em_producao"
+  | "aguardando_aprovacao"
+  | "em_envio"
+  | "concluida"
+  | "pausada";
 
 export interface CampanhaPremiumItem {
   id: string;

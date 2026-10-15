@@ -90,6 +90,14 @@ const ETAPA_BADGES: Record<EtapaType, { label: string; icon: typeof FileText; cl
   };
 
 const STATUS_BADGES: Record<StatusType, { label: string; className: string }> = {
+  rascunho: {
+    label: "Rascunho",
+    className: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30",
+  },
+  em_revisao: {
+    label: "Em revisão",
+    className: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  },
   em_producao: {
     label: "Em produção",
     className: "bg-blue-500/15 text-blue-400 border-blue-500/30",
@@ -310,6 +318,8 @@ export function CampanhasTable({
           className="h-9 rounded-xl border border-home-border bg-home-background px-3 text-xs font-medium text-home-foreground outline-none transition-colors hover:border-home-border/80 focus:border-home-blue"
         >
           <option value="all">Todos os status</option>
+          <option value="rascunho">Rascunho</option>
+          <option value="em_revisao">Em revisão</option>
           <option value="em_producao">Em produção</option>
           <option value="aguardando_aprovacao">Aguardando aprovação</option>
           <option value="em_envio">Em envio</option>

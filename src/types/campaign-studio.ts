@@ -2,12 +2,7 @@
 // Suporta a seleção de listas, templates, assinaturas, editor visual e agendamento.
 
 export type StudioStepId =
-  | "destinatarios"
-  | "template"
-  | "conteudo"
-  | "assinatura"
-  | "teste_revisao"
-  | "agendamento";
+  "destinatarios" | "template" | "conteudo" | "assinatura" | "teste_revisao" | "agendamento";
 
 export interface StudioStep {
   id: StudioStepId;
@@ -29,14 +24,7 @@ export interface StudioProgramacao {
 }
 
 export type BlockType =
-  | "cabecalho"
-  | "mensagem"
-  | "cta"
-  | "rodape"
-  | "texto"
-  | "botao"
-  | "imagem"
-  | "separador";
+  "cabecalho" | "mensagem" | "cta" | "rodape" | "texto" | "botao" | "imagem" | "separador";
 
 export interface StudioEmailBlock {
   id: string;
@@ -52,7 +40,8 @@ export interface StudioEmailBlock {
 }
 
 export interface StudioCampaignDraft {
-  id: string;
+  id: string | null;
+  revisao: number;
   orgId: string;
   userId: string;
   nome: string;
@@ -70,14 +59,29 @@ export interface StudioCampaignDraft {
   assinaturaId: string;
   assinaturaNome: string;
   templateId: string;
+  templateVersao: string;
   templateNome: string;
+  templateHtmlSnapshot: string;
+  templateConfigSnapshot: Record<string, string | number | boolean | null>;
+  assinaturaHtmlSnapshot: string;
   assunto: string;
   preCabecalho: string;
   blocos: StudioEmailBlock[];
   programacao: StudioProgramacao;
-  status: "rascunho" | "em_revisao" | "agendada";
+  status: "rascunho" | "em_revisao";
   criadoEm: string;
   atualizadoEm: string;
+}
+
+export type RecipientEligibility =
+  "sem_email" | "nao_validado" | "elegivel_confirmado" | "bloqueado" | "descadastro" | "reclamacao";
+
+export interface StudioRecipient {
+  leadId: string;
+  email: string | null;
+  selecionado: boolean;
+  elegibilidade: RecipientEligibility;
+  motivoExclusao: string | null;
 }
 
 export interface StudioValidationResult {
