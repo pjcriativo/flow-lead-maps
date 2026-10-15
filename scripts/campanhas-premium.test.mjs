@@ -220,13 +220,18 @@ test("Tela 3: os 6 cards superiores de KPIs e dados do funil e canais correspond
   );
 });
 
-test("Submenu Campanhas: DashboardSidebar implementa submenu expansível com os 3 itens obrigatórios", () => {
+test("Submenu Campanhas: DashboardSidebar implementa submenu expansível com os 5 itens obrigatórios", () => {
   const file = fs.readFileSync(
     path.join(root, "src/components/home-premium/DashboardSidebar.tsx"),
     "utf8",
   );
   assert.ok(file.includes("CAMPANHAS_SUBITEMS"), "Deveria definir CAMPANHAS_SUBITEMS");
-  assert.ok(file.includes("Central de Campanhas"), "Deveria ter o subitem Central de Campanhas");
+  assert.ok(file.includes('label: "Campanhas"'), "Deveria ter o subitem Campanhas");
+  assert.ok(file.includes("Estúdio de Campanhas"), "Deveria ter o subitem Estúdio de Campanhas");
+  assert.ok(
+    file.includes("Biblioteca de Templates"),
+    "Deveria ter o subitem Biblioteca de Templates",
+  );
   assert.ok(file.includes("Gestão e Produção"), "Deveria ter o subitem Gestão e Produção");
   assert.ok(file.includes("Resultados e Métricas"), "Deveria ter o subitem Resultados e Métricas");
   assert.ok(
