@@ -25,7 +25,7 @@ test("a Gestão aparece logo após Home e reúne os oito destinos comerciais na 
     ['label: "Leads", section: "leads"', "Leads"],
     ['label: "Minhas Listas", section: "listas"', "Minhas Listas"],
     ['label: "Pipeline", section: "pipeline"', "Pipeline"],
-    ['label: "Conversas e WhatsApp", section: "whatsapp"', "Conversas e WhatsApp"],
+    ['label: "WhatsApp", section: "whatsapp"', "WhatsApp"],
     ['label: "Automações", section: "automacao"', "Automações"],
     ['label: "Propostas", section: "propostas"', "Propostas"],
     ['label: "Contratos", section: "contratos"', "Contratos"],
@@ -43,17 +43,17 @@ test("a Gestão aparece logo após Home e reúne os oito destinos comerciais na 
   assert.match(sidebar, /aria-expanded=\{isManagementExpanded\}/);
 });
 
-test("WhatsApp continua disponível em Canais de Aquisição sem recriar sua rota", () => {
+test("WhatsApp está unificado sob Gestão sem duplicidade em Canais de Aquisição", () => {
   assert.match(sidebar, /label: "WhatsApp",\s*section: "whatsapp",\s*icon: SiWhatsapp/);
   assert.equal(
-    [...sidebar.matchAll(/label: "Conversas e WhatsApp"/g)].length,
+    [...sidebar.matchAll(/label: "WhatsApp"/g)].length,
     1,
-    "Gestão deve reutilizar uma única definição de destino para Conversas e WhatsApp",
+    "Sidebar deve ter exatamente 1 entrada para WhatsApp, sob Gestão",
   );
   assert.doesNotMatch(
     sidebar,
-    /label: "Conversas",\s*section: "whatsapp"/,
-    "Conversas não deve permanecer como entrada principal independente",
+    /label: "Conversas e WhatsApp"/,
+    "Rótulo antigo 'Conversas e WhatsApp' foi unificado para 'WhatsApp'",
   );
 });
 

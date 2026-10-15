@@ -245,7 +245,8 @@ function Dashboard() {
           section === "pipeline" ||
           section === "campanhas" ||
           section === "marketing" ||
-          section === "influencers"
+          section === "influencers" ||
+          section === "whatsapp"
           ? "bg-home-background text-home-foreground"
           : "bg-background text-foreground",
       )}
@@ -289,7 +290,8 @@ function Dashboard() {
             section === "campanhas" ||
             section === "marketing" ||
             section === "influencers" ||
-            section === "buscar") &&
+            section === "buscar" ||
+            section === "whatsapp") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
@@ -300,6 +302,7 @@ function Dashboard() {
             section !== "influencers" &&
             section !== "instagram" &&
             section !== "buscar" &&
+            section !== "whatsapp" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
       >
@@ -570,7 +573,18 @@ function Dashboard() {
               }}
             />
           )}
-        {section === "whatsapp" && <WhatsAppSection />}
+        {section === "whatsapp" && (
+          <WhatsAppSection
+            user={{
+              name: userProfile?.full_name || "Marcos Gonçalves",
+              email: userProfile?.email || "marcosgt.pereira@gmail.com",
+              avatarUrl: userProfile?.avatar_url || "",
+              initials: userIniciais,
+            }}
+            unreadNotifications={naoLidas}
+            onNavigateSection={(sec, label) => handleNavClick(sec, label)}
+          />
+        )}
         {section === "automacao" && (
           <AutomacaoSection onRevisar={() => selectSection("campanhas")} />
         )}

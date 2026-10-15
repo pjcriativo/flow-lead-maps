@@ -135,12 +135,6 @@ const NAVIGATION_GROUPS: NavigationGroup[] = [
       { label: "LinkedIn", icon: SiLinkedin, iconClassName: "text-home-blue" },
       { label: "YouTube", icon: SiYoutube, iconClassName: "text-home-red" },
       { label: "TikTok", icon: SiTiktok, iconClassName: "text-home-foreground" },
-      {
-        label: "WhatsApp",
-        section: "whatsapp",
-        icon: SiWhatsapp,
-        iconClassName: "text-home-green",
-      },
       { label: "Business B&B", brandMark: "b&b", badge: "Novo" },
     ],
   },
@@ -160,7 +154,7 @@ const MANAGEMENT_SUBITEMS = [
   { label: "Leads", section: "leads", icon: Share2 },
   { label: "Minhas Listas", section: "listas", icon: ListChecks },
   { label: "Pipeline", section: "pipeline", icon: Filter },
-  { label: "Conversas e WhatsApp", section: "whatsapp", icon: MessagesSquare },
+  { label: "WhatsApp", section: "whatsapp", icon: SiWhatsapp },
   { label: "Automações", section: "automacao", icon: Workflow },
   { label: "Propostas", section: "propostas", icon: FileText },
   { label: "Contratos", section: "contratos", icon: ScrollText },
@@ -168,7 +162,7 @@ const MANAGEMENT_SUBITEMS = [
 ] as const satisfies ReadonlyArray<{
   label: string;
   section: DashboardSection;
-  icon: LucideIcon;
+  icon: LucideIcon | IconType;
 }>;
 
 const MANAGEMENT_SECTION_IDS = new Set<DashboardSection>(
