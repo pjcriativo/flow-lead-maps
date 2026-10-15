@@ -4,121 +4,10 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17";
+    PostgrestVersion: "14.5";
   };
   public: {
     Tables: {
-      assinatura_versoes: {
-        Row: {
-          alterado_em: string;
-          alterado_por: string | null;
-          assinatura_id: string;
-          id: number;
-          org_id: string;
-          snapshot: Json;
-          versao: number;
-        };
-        Insert: {
-          alterado_em?: string;
-          alterado_por?: string | null;
-          assinatura_id: string;
-          id?: never;
-          org_id: string;
-          snapshot: Json;
-          versao: number;
-        };
-        Update: {
-          alterado_em?: string;
-          alterado_por?: string | null;
-          assinatura_id?: string;
-          id?: never;
-          org_id?: string;
-          snapshot?: Json;
-          versao?: number;
-        };
-        Relationships: [];
-      };
-      assinaturas_corporativas: {
-        Row: {
-          atualizado_em: string;
-          badge_label: string | null;
-          cargo: string | null;
-          created_by: string | null;
-          criado_em: string;
-          dados: Json;
-          email: string | null;
-          empresa: string | null;
-          endereco: string | null;
-          html_template: string;
-          id: string;
-          instagram: string | null;
-          is_global: boolean;
-          is_padrao: boolean;
-          linkedin: string | null;
-          logo_url: string | null;
-          modelo_origem_id: string | null;
-          modelo_origem_versao: string | null;
-          nome: string;
-          org_id: string | null;
-          site: string | null;
-          telefone: string | null;
-          versao: number;
-          whatsapp: string | null;
-        };
-        Insert: {
-          atualizado_em?: string;
-          badge_label?: string | null;
-          cargo?: string | null;
-          created_by?: string | null;
-          criado_em?: string;
-          dados?: Json;
-          email?: string | null;
-          empresa?: string | null;
-          endereco?: string | null;
-          html_template: string;
-          id?: string;
-          instagram?: string | null;
-          is_global?: boolean;
-          is_padrao?: boolean;
-          linkedin?: string | null;
-          logo_url?: string | null;
-          modelo_origem_id?: string | null;
-          modelo_origem_versao?: string | null;
-          nome: string;
-          org_id?: string | null;
-          site?: string | null;
-          telefone?: string | null;
-          versao?: number;
-          whatsapp?: string | null;
-        };
-        Update: {
-          atualizado_em?: string;
-          badge_label?: string | null;
-          cargo?: string | null;
-          created_by?: string | null;
-          criado_em?: string;
-          dados?: Json;
-          email?: string | null;
-          empresa?: string | null;
-          endereco?: string | null;
-          html_template?: string;
-          id?: string;
-          instagram?: string | null;
-          is_global?: boolean;
-          is_padrao?: boolean;
-          linkedin?: string | null;
-          logo_url?: string | null;
-          modelo_origem_id?: string | null;
-          modelo_origem_versao?: string | null;
-          nome?: string;
-          org_id?: string | null;
-          site?: string | null;
-          telefone?: string | null;
-          versao?: number;
-          whatsapp?: string | null;
-        };
-        Relationships: [];
-      };
       activity_log: {
         Row: {
           action: string;
@@ -352,6 +241,133 @@ export type Database = {
         };
         Relationships: [];
       };
+      assinatura_versoes: {
+        Row: {
+          alterado_em: string;
+          alterado_por: string | null;
+          assinatura_id: string;
+          id: number;
+          org_id: string;
+          snapshot: Json;
+          versao: number;
+        };
+        Insert: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          assinatura_id: string;
+          id?: never;
+          org_id: string;
+          snapshot: Json;
+          versao: number;
+        };
+        Update: {
+          alterado_em?: string;
+          alterado_por?: string | null;
+          assinatura_id?: string;
+          id?: never;
+          org_id?: string;
+          snapshot?: Json;
+          versao?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "assinatura_versoes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      assinaturas_corporativas: {
+        Row: {
+          atualizado_em: string;
+          badge_label: string | null;
+          cargo: string | null;
+          created_by: string | null;
+          criado_em: string;
+          dados: Json;
+          email: string | null;
+          empresa: string | null;
+          endereco: string | null;
+          html_template: string;
+          id: string;
+          instagram: string | null;
+          is_global: boolean;
+          is_padrao: boolean;
+          linkedin: string | null;
+          logo_url: string | null;
+          modelo_origem_id: string | null;
+          modelo_origem_versao: string | null;
+          nome: string;
+          org_id: string | null;
+          site: string | null;
+          telefone: string | null;
+          versao: number;
+          whatsapp: string | null;
+        };
+        Insert: {
+          atualizado_em?: string;
+          badge_label?: string | null;
+          cargo?: string | null;
+          created_by?: string | null;
+          criado_em?: string;
+          dados?: Json;
+          email?: string | null;
+          empresa?: string | null;
+          endereco?: string | null;
+          html_template: string;
+          id?: string;
+          instagram?: string | null;
+          is_global?: boolean;
+          is_padrao?: boolean;
+          linkedin?: string | null;
+          logo_url?: string | null;
+          modelo_origem_id?: string | null;
+          modelo_origem_versao?: string | null;
+          nome: string;
+          org_id?: string | null;
+          site?: string | null;
+          telefone?: string | null;
+          versao?: number;
+          whatsapp?: string | null;
+        };
+        Update: {
+          atualizado_em?: string;
+          badge_label?: string | null;
+          cargo?: string | null;
+          created_by?: string | null;
+          criado_em?: string;
+          dados?: Json;
+          email?: string | null;
+          empresa?: string | null;
+          endereco?: string | null;
+          html_template?: string;
+          id?: string;
+          instagram?: string | null;
+          is_global?: boolean;
+          is_padrao?: boolean;
+          linkedin?: string | null;
+          logo_url?: string | null;
+          modelo_origem_id?: string | null;
+          modelo_origem_versao?: string | null;
+          nome?: string;
+          org_id?: string | null;
+          site?: string | null;
+          telefone?: string | null;
+          versao?: number;
+          whatsapp?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_corporativas_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       automacao_receitas: {
         Row: {
           ativa: boolean;
@@ -510,6 +526,172 @@ export type Database = {
           },
         ];
       };
+      campanha_email_destinatarios: {
+        Row: {
+          atualizado_em: string;
+          campanha_id: string;
+          criado_em: string;
+          email_snapshot: string | null;
+          estado_elegibilidade: string;
+          id: string;
+          lead_id: string;
+          motivo_exclusao: string | null;
+          org_id: string;
+          selecionado: boolean;
+        };
+        Insert: {
+          atualizado_em?: string;
+          campanha_id: string;
+          criado_em?: string;
+          email_snapshot?: string | null;
+          estado_elegibilidade: string;
+          id?: string;
+          lead_id: string;
+          motivo_exclusao?: string | null;
+          org_id: string;
+          selecionado?: boolean;
+        };
+        Update: {
+          atualizado_em?: string;
+          campanha_id?: string;
+          criado_em?: string;
+          email_snapshot?: string | null;
+          estado_elegibilidade?: string;
+          id?: string;
+          lead_id?: string;
+          motivo_exclusao?: string | null;
+          org_id?: string;
+          selecionado?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "campanha_email_destinatarios_campanha_id_fkey";
+            columns: ["campanha_id"];
+            isOneToOne: false;
+            referencedRelation: "campanhas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campanha_email_destinatarios_campanha_tenant_fkey";
+            columns: ["campanha_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "campanhas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "campanha_email_destinatarios_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campanha_email_destinatarios_lead_tenant_fkey";
+            columns: ["lead_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "campanha_email_destinatarios_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      campanha_email_drafts: {
+        Row: {
+          assinatura_html_snapshot: string;
+          assinatura_id: string | null;
+          assinatura_nome: string | null;
+          assunto: string;
+          atualizado_em: string;
+          blocos: Json;
+          campanha_id: string;
+          criado_em: string;
+          filtros_envio: Json;
+          org_id: string;
+          pre_cabecalho: string;
+          programacao: Json;
+          remetente_email: string;
+          remetente_nome: string;
+          responder_para: string;
+          template_config_snapshot: Json;
+          template_html_snapshot: string;
+          template_id: string;
+          template_nome: string;
+          template_versao: string;
+        };
+        Insert: {
+          assinatura_html_snapshot?: string;
+          assinatura_id?: string | null;
+          assinatura_nome?: string | null;
+          assunto: string;
+          atualizado_em?: string;
+          blocos?: Json;
+          campanha_id: string;
+          criado_em?: string;
+          filtros_envio?: Json;
+          org_id: string;
+          pre_cabecalho?: string;
+          programacao?: Json;
+          remetente_email: string;
+          remetente_nome: string;
+          responder_para: string;
+          template_config_snapshot?: Json;
+          template_html_snapshot: string;
+          template_id: string;
+          template_nome: string;
+          template_versao: string;
+        };
+        Update: {
+          assinatura_html_snapshot?: string;
+          assinatura_id?: string | null;
+          assinatura_nome?: string | null;
+          assunto?: string;
+          atualizado_em?: string;
+          blocos?: Json;
+          campanha_id?: string;
+          criado_em?: string;
+          filtros_envio?: Json;
+          org_id?: string;
+          pre_cabecalho?: string;
+          programacao?: Json;
+          remetente_email?: string;
+          remetente_nome?: string;
+          responder_para?: string;
+          template_config_snapshot?: Json;
+          template_html_snapshot?: string;
+          template_id?: string;
+          template_nome?: string;
+          template_versao?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "campanha_email_drafts_campanha_id_fkey";
+            columns: ["campanha_id"];
+            isOneToOne: true;
+            referencedRelation: "campanhas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campanha_email_drafts_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campanha_email_drafts_tenant_fkey";
+            columns: ["campanha_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "campanhas";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
       campanha_leads: {
         Row: {
           atualizado_em: string;
@@ -651,114 +833,6 @@ export type Database = {
           },
         ];
       };
-      campanha_email_destinatarios: {
-        Row: {
-          atualizado_em: string;
-          campanha_id: string;
-          criado_em: string;
-          email_snapshot: string | null;
-          estado_elegibilidade: string;
-          id: string;
-          lead_id: string;
-          motivo_exclusao: string | null;
-          org_id: string;
-          selecionado: boolean;
-        };
-        Insert: {
-          atualizado_em?: string;
-          campanha_id: string;
-          criado_em?: string;
-          email_snapshot?: string | null;
-          estado_elegibilidade: string;
-          id?: string;
-          lead_id: string;
-          motivo_exclusao?: string | null;
-          org_id: string;
-          selecionado?: boolean;
-        };
-        Update: {
-          atualizado_em?: string;
-          campanha_id?: string;
-          criado_em?: string;
-          email_snapshot?: string | null;
-          estado_elegibilidade?: string;
-          id?: string;
-          lead_id?: string;
-          motivo_exclusao?: string | null;
-          org_id?: string;
-          selecionado?: boolean;
-        };
-        Relationships: [];
-      };
-      campanha_email_drafts: {
-        Row: {
-          assinatura_html_snapshot: string;
-          assinatura_id: string | null;
-          assinatura_nome: string | null;
-          assunto: string;
-          atualizado_em: string;
-          blocos: Json;
-          campanha_id: string;
-          criado_em: string;
-          filtros_envio: Json;
-          org_id: string;
-          pre_cabecalho: string;
-          programacao: Json;
-          remetente_email: string;
-          remetente_nome: string;
-          responder_para: string;
-          template_config_snapshot: Json;
-          template_html_snapshot: string;
-          template_id: string;
-          template_nome: string;
-          template_versao: string;
-        };
-        Insert: {
-          assinatura_html_snapshot?: string;
-          assinatura_id?: string | null;
-          assinatura_nome?: string | null;
-          assunto: string;
-          atualizado_em?: string;
-          blocos?: Json;
-          campanha_id: string;
-          criado_em?: string;
-          filtros_envio?: Json;
-          org_id: string;
-          pre_cabecalho?: string;
-          programacao?: Json;
-          remetente_email: string;
-          remetente_nome: string;
-          responder_para: string;
-          template_config_snapshot?: Json;
-          template_html_snapshot: string;
-          template_id: string;
-          template_nome: string;
-          template_versao: string;
-        };
-        Update: {
-          assinatura_html_snapshot?: string;
-          assinatura_id?: string | null;
-          assinatura_nome?: string | null;
-          assunto?: string;
-          atualizado_em?: string;
-          blocos?: Json;
-          campanha_id?: string;
-          criado_em?: string;
-          filtros_envio?: Json;
-          org_id?: string;
-          pre_cabecalho?: string;
-          programacao?: Json;
-          remetente_email?: string;
-          remetente_nome?: string;
-          responder_para?: string;
-          template_config_snapshot?: Json;
-          template_html_snapshot?: string;
-          template_id?: string;
-          template_nome?: string;
-          template_versao?: string;
-        };
-        Relationships: [];
-      };
       config_chaves: {
         Row: {
           atualizado_em: string;
@@ -820,9 +894,9 @@ export type Database = {
           fuso_horario: string | null;
           gdpr_texto: string | null;
           id: boolean;
+          instagram_oauth_ativo: boolean;
           intervalo_disparo_max_seg: number | null;
           intervalo_disparo_min_seg: number | null;
-          instagram_oauth_ativo: boolean;
           logo_url: string | null;
           max_leads_busca: number | null;
           modelo_ia: string | null;
@@ -853,9 +927,9 @@ export type Database = {
           fuso_horario?: string | null;
           gdpr_texto?: string | null;
           id?: boolean;
+          instagram_oauth_ativo?: boolean;
           intervalo_disparo_max_seg?: number | null;
           intervalo_disparo_min_seg?: number | null;
-          instagram_oauth_ativo?: boolean;
           logo_url?: string | null;
           max_leads_busca?: number | null;
           modelo_ia?: string | null;
@@ -886,9 +960,9 @@ export type Database = {
           fuso_horario?: string | null;
           gdpr_texto?: string | null;
           id?: boolean;
+          instagram_oauth_ativo?: boolean;
           intervalo_disparo_max_seg?: number | null;
           intervalo_disparo_min_seg?: number | null;
-          instagram_oauth_ativo?: boolean;
           logo_url?: string | null;
           max_leads_busca?: number | null;
           modelo_ia?: string | null;
@@ -947,6 +1021,41 @@ export type Database = {
           },
         ];
       };
+      email_config: {
+        Row: {
+          org_id: string | null;
+          ramp_max: number;
+          ramp_start: string | null;
+          ramp_tiers: Json;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          org_id?: string | null;
+          ramp_max?: number;
+          ramp_start?: string | null;
+          ramp_tiers?: Json;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          org_id?: string | null;
+          ramp_max?: number;
+          ramp_start?: string | null;
+          ramp_tiers?: Json;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "email_config_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       email_template_versoes: {
         Row: {
           alterado_em: string;
@@ -975,7 +1084,15 @@ export type Database = {
           template_id?: string;
           versao?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "email_template_versoes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       email_templates: {
         Row: {
@@ -1050,69 +1167,15 @@ export type Database = {
           variaveis_suportadas?: string[];
           versao?: number;
         };
-        Relationships: [];
-      };
-      email_config: {
-        Row: {
-          org_id: string | null;
-          ramp_max: number;
-          ramp_start: string | null;
-          ramp_tiers: Json;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          org_id?: string | null;
-          ramp_max?: number;
-          ramp_start?: string | null;
-          ramp_tiers?: Json;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          org_id?: string | null;
-          ramp_max?: number;
-          ramp_start?: string | null;
-          ramp_tiers?: Json;
-          updated_at?: string;
-          user_id?: string;
-        };
         Relationships: [
           {
-            foreignKeyName: "email_config_org_id_fkey";
+            foreignKeyName: "email_templates_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "orgs";
             referencedColumns: ["id"];
           },
         ];
-      };
-      template_favoritos: {
-        Row: {
-          criado_em: string;
-          id: string;
-          org_id: string;
-          template_id: string;
-          tipo: string;
-          user_id: string;
-        };
-        Insert: {
-          criado_em?: string;
-          id?: string;
-          org_id: string;
-          template_id: string;
-          tipo: string;
-          user_id: string;
-        };
-        Update: {
-          criado_em?: string;
-          id?: string;
-          org_id?: string;
-          template_id?: string;
-          tipo?: string;
-          user_id?: string;
-        };
-        Relationships: [];
       };
       ia_uso: {
         Row: {
@@ -1343,6 +1406,7 @@ export type Database = {
           meta_ig_user_id: string | null;
           nome: string;
           org_id: string;
+          pending_challenge_mode: string | null;
           permissions: string[];
           profile_picture_url: string | null;
           provider: string;
@@ -1363,6 +1427,7 @@ export type Database = {
           meta_ig_user_id?: string | null;
           nome: string;
           org_id: string;
+          pending_challenge_mode?: string | null;
           permissions?: string[];
           profile_picture_url?: string | null;
           provider?: string;
@@ -1383,6 +1448,7 @@ export type Database = {
           meta_ig_user_id?: string | null;
           nome?: string;
           org_id?: string;
+          pending_challenge_mode?: string | null;
           permissions?: string[];
           profile_picture_url?: string | null;
           provider?: string;
@@ -1498,6 +1564,304 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "instagram_profile_catalog";
             referencedColumns: ["identity_key"];
+          },
+        ];
+      };
+      instagram_automation_accounts: {
+        Row: {
+          consecutive_failures: number;
+          created_at: string;
+          enabled: boolean;
+          instance_id: string;
+          last_polled_at: string | null;
+          last_success_at: string | null;
+          lease_owner: string | null;
+          lease_until: string | null;
+          next_poll_at: string;
+          org_id: string;
+          paused_reason: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          consecutive_failures?: number;
+          created_at?: string;
+          enabled?: boolean;
+          instance_id: string;
+          last_polled_at?: string | null;
+          last_success_at?: string | null;
+          lease_owner?: string | null;
+          lease_until?: string | null;
+          next_poll_at?: string;
+          org_id: string;
+          paused_reason?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          consecutive_failures?: number;
+          created_at?: string;
+          enabled?: boolean;
+          instance_id?: string;
+          last_polled_at?: string | null;
+          last_success_at?: string | null;
+          lease_owner?: string | null;
+          lease_until?: string | null;
+          next_poll_at?: string;
+          org_id?: string;
+          paused_reason?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instagram_automation_accounts_instance_id_fkey";
+            columns: ["instance_id"];
+            isOneToOne: true;
+            referencedRelation: "ig_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_accounts_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_accounts_org_id_instance_id_fkey";
+            columns: ["org_id", "instance_id"];
+            isOneToOne: false;
+            referencedRelation: "ig_instancias";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      instagram_automation_events: {
+        Row: {
+          card_id: string | null;
+          comment_text: string;
+          commenter_name: string | null;
+          commenter_username: string;
+          conversation_id: string | null;
+          created_at: string;
+          error_code: string | null;
+          external_comment_id: string;
+          external_commenter_id: string;
+          external_media_id: string;
+          flow_id: string | null;
+          id: string;
+          instance_id: string;
+          matched_keyword: string | null;
+          occurred_at: string;
+          org_id: string;
+          processed_at: string | null;
+          raw_payload: Json;
+          status: string;
+        };
+        Insert: {
+          card_id?: string | null;
+          comment_text: string;
+          commenter_name?: string | null;
+          commenter_username: string;
+          conversation_id?: string | null;
+          created_at?: string;
+          error_code?: string | null;
+          external_comment_id: string;
+          external_commenter_id: string;
+          external_media_id: string;
+          flow_id?: string | null;
+          id?: string;
+          instance_id: string;
+          matched_keyword?: string | null;
+          occurred_at: string;
+          org_id: string;
+          processed_at?: string | null;
+          raw_payload?: Json;
+          status?: string;
+        };
+        Update: {
+          card_id?: string | null;
+          comment_text?: string;
+          commenter_name?: string | null;
+          commenter_username?: string;
+          conversation_id?: string | null;
+          created_at?: string;
+          error_code?: string | null;
+          external_comment_id?: string;
+          external_commenter_id?: string;
+          external_media_id?: string;
+          flow_id?: string | null;
+          id?: string;
+          instance_id?: string;
+          matched_keyword?: string | null;
+          occurred_at?: string;
+          org_id?: string;
+          processed_at?: string | null;
+          raw_payload?: Json;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instagram_automation_events_card_id_fkey";
+            columns: ["card_id"];
+            isOneToOne: false;
+            referencedRelation: "instagram_crm_cards";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_events_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "ig_conversas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_events_flow_id_fkey";
+            columns: ["flow_id"];
+            isOneToOne: false;
+            referencedRelation: "instagram_flows";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_events_instance_id_fkey";
+            columns: ["instance_id"];
+            isOneToOne: false;
+            referencedRelation: "ig_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_events_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_events_org_id_instance_id_fkey";
+            columns: ["org_id", "instance_id"];
+            isOneToOne: false;
+            referencedRelation: "ig_instancias";
+            referencedColumns: ["org_id", "id"];
+          },
+        ];
+      };
+      instagram_automation_jobs: {
+        Row: {
+          action_type: string;
+          attempts: number;
+          available_at: string;
+          card_id: string | null;
+          conversation_id: string | null;
+          created_at: string;
+          error_code: string | null;
+          event_id: string;
+          external_result_id: string | null;
+          flow_id: string;
+          flow_run_id: string;
+          id: string;
+          idempotency_key: string;
+          instance_id: string;
+          locked_at: string | null;
+          locked_by: string | null;
+          org_id: string;
+          payload: Json;
+          sent_at: string | null;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          action_type?: string;
+          attempts?: number;
+          available_at?: string;
+          card_id?: string | null;
+          conversation_id?: string | null;
+          created_at?: string;
+          error_code?: string | null;
+          event_id: string;
+          external_result_id?: string | null;
+          flow_id: string;
+          flow_run_id: string;
+          id?: string;
+          idempotency_key: string;
+          instance_id: string;
+          locked_at?: string | null;
+          locked_by?: string | null;
+          org_id: string;
+          payload?: Json;
+          sent_at?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          action_type?: string;
+          attempts?: number;
+          available_at?: string;
+          card_id?: string | null;
+          conversation_id?: string | null;
+          created_at?: string;
+          error_code?: string | null;
+          event_id?: string;
+          external_result_id?: string | null;
+          flow_id?: string;
+          flow_run_id?: string;
+          id?: string;
+          idempotency_key?: string;
+          instance_id?: string;
+          locked_at?: string | null;
+          locked_by?: string | null;
+          org_id?: string;
+          payload?: Json;
+          sent_at?: string | null;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instagram_automation_jobs_card_id_fkey";
+            columns: ["card_id"];
+            isOneToOne: false;
+            referencedRelation: "instagram_crm_cards";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_jobs_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "ig_conversas";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_jobs_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: true;
+            referencedRelation: "instagram_automation_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_jobs_flow_id_fkey";
+            columns: ["flow_id"];
+            isOneToOne: false;
+            referencedRelation: "instagram_flows";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_jobs_flow_run_id_fkey";
+            columns: ["flow_run_id"];
+            isOneToOne: false;
+            referencedRelation: "instagram_flow_runs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_jobs_instance_id_fkey";
+            columns: ["instance_id"];
+            isOneToOne: false;
+            referencedRelation: "ig_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "instagram_automation_jobs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -2008,6 +2372,44 @@ export type Database = {
             columns: ["source_id"];
             isOneToOne: false;
             referencedRelation: "instagram_sources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      instagram_connector_sessions: {
+        Row: {
+          created_at: string;
+          encrypted_settings: string;
+          instance_id: string;
+          last_error_code: string | null;
+          last_verified_at: string | null;
+          settings_version: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          encrypted_settings: string;
+          instance_id: string;
+          last_error_code?: string | null;
+          last_verified_at?: string | null;
+          settings_version?: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          encrypted_settings?: string;
+          instance_id?: string;
+          last_error_code?: string | null;
+          last_verified_at?: string | null;
+          settings_version?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "instagram_connector_sessions_instance_id_fkey";
+            columns: ["instance_id"];
+            isOneToOne: true;
+            referencedRelation: "ig_instancias";
             referencedColumns: ["id"];
           },
         ];
@@ -4513,10 +4915,13 @@ export type Database = {
           has_whatsapp: boolean | null;
           id: string;
           instagram_nivel: string;
+          intervalo_flow_business_monitor_minutos: number;
           limite_campanhas: number | null;
           limite_flow_business_cadencias: number;
           limite_flow_business_contas: number;
           limite_flow_business_crm: number;
+          limite_flow_business_dms_dia: number;
+          limite_flow_business_dms_mes: number;
           limite_flow_business_fluxos: number;
           limite_instagram_audiencia: number;
           limite_instagram_cacadas: number;
@@ -4552,10 +4957,13 @@ export type Database = {
           has_whatsapp?: boolean | null;
           id?: string;
           instagram_nivel?: string;
+          intervalo_flow_business_monitor_minutos?: number;
           limite_campanhas?: number | null;
           limite_flow_business_cadencias?: number;
           limite_flow_business_contas?: number;
           limite_flow_business_crm?: number;
+          limite_flow_business_dms_dia?: number;
+          limite_flow_business_dms_mes?: number;
           limite_flow_business_fluxos?: number;
           limite_instagram_audiencia?: number;
           limite_instagram_cacadas?: number;
@@ -4591,10 +4999,13 @@ export type Database = {
           has_whatsapp?: boolean | null;
           id?: string;
           instagram_nivel?: string;
+          intervalo_flow_business_monitor_minutos?: number;
           limite_campanhas?: number | null;
           limite_flow_business_cadencias?: number;
           limite_flow_business_contas?: number;
           limite_flow_business_crm?: number;
+          limite_flow_business_dms_dia?: number;
+          limite_flow_business_dms_mes?: number;
           limite_flow_business_fluxos?: number;
           limite_instagram_audiencia?: number;
           limite_instagram_cacadas?: number;
@@ -5221,6 +5632,41 @@ export type Database = {
           },
         ];
       };
+      template_favoritos: {
+        Row: {
+          criado_em: string;
+          id: string;
+          org_id: string;
+          template_id: string;
+          tipo: string;
+          user_id: string;
+        };
+        Insert: {
+          criado_em?: string;
+          id?: string;
+          org_id: string;
+          template_id: string;
+          tipo: string;
+          user_id: string;
+        };
+        Update: {
+          criado_em?: string;
+          id?: string;
+          org_id?: string;
+          template_id?: string;
+          tipo?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "template_favoritos_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       ticket_respostas: {
         Row: {
           autor_user_id: string;
@@ -5594,41 +6040,6 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      definir_assinatura_padrao: {
-        Args: { p_assinatura_id: string; p_org_id: string };
-        Returns: undefined;
-      };
-      salvar_rascunho_estudio: {
-        Args: {
-          p_campanha_id: string | null;
-          p_draft: Json;
-          p_org_id: string;
-          p_revisao_esperada: number;
-        };
-        Returns: Json;
-      };
-      google_maps_search_history: {
-        Args: { p_org: string; p_limit?: number };
-        Returns: {
-          id: string;
-          created_at: string;
-          quantity: number;
-          niche: string;
-          city: string;
-          state: string;
-          radius_km: number | null;
-          run_status: string;
-        }[];
-      };
-      google_maps_plan_usage: {
-        Args: { p_org: string };
-        Returns: {
-          plan_name: string;
-          lead_limit: number | null;
-          used: number;
-          remaining: number | null;
-        }[];
-      };
       _col_consumo: { Args: { p_recurso: string }; Returns: string };
       _col_limite: { Args: { p_recurso: string }; Returns: string };
       acesso_ferramenta_liberado: { Args: never; Returns: boolean };
@@ -5688,6 +6099,10 @@ export type Database = {
         Args: { p_n?: number; p_org: string; p_recurso: string };
         Returns: Json;
       };
+      definir_assinatura_padrao: {
+        Args: { p_assinatura_id: string; p_org_id: string };
+        Returns: undefined;
+      };
       eh_super_admin: { Args: never; Returns: boolean };
       email_rampa_status: {
         Args: { p_user_id?: string };
@@ -5707,14 +6122,59 @@ export type Database = {
         Args: { p_lead_id: string };
         Returns: string;
       };
+      flow_business_automation_snapshot: { Args: never; Returns: Json };
+      flow_business_claim_automation_accounts: {
+        Args: { p_limit?: number; p_worker_id: string };
+        Returns: {
+          comments_limit: number;
+          instance_id: string;
+          media_limit: number;
+          since_at: string;
+          username: string;
+        }[];
+      };
+      flow_business_claim_automation_job: {
+        Args: { p_instance_id: string; p_worker_id: string };
+        Returns: Json;
+      };
+      flow_business_comment_matches_keyword: {
+        Args: { p_comment: string; p_keyword: string };
+        Returns: boolean;
+      };
       flow_business_complete_task: {
         Args: { p_outcome?: string; p_task_id: string };
         Returns: Json;
       };
-      flow_business_automation_snapshot: { Args: never; Returns: Json };
       flow_business_create_cadence: {
         Args: { p_description: string; p_name: string; p_steps: Json };
         Returns: string;
+      };
+      flow_business_delete_instagram_instance: {
+        Args: { p_instance_id: string; p_org: string };
+        Returns: boolean;
+      };
+      flow_business_disconnect_instagram_instance: {
+        Args: { p_instance_id: string; p_org: string };
+        Returns: boolean;
+      };
+      flow_business_finish_automation_account: {
+        Args: {
+          p_error_code?: string;
+          p_instance_id: string;
+          p_success: boolean;
+          p_worker_id: string;
+        };
+        Returns: undefined;
+      };
+      flow_business_finish_automation_job: {
+        Args: {
+          p_error_code?: string;
+          p_external_result_id?: string;
+          p_job_id: string;
+          p_success: boolean;
+          p_worker_id: string;
+        };
+        Returns: undefined;
       };
       flow_business_ingest_meta_event: {
         Args: {
@@ -5749,14 +6209,37 @@ export type Database = {
         Args: { p_card_id: string; p_reason?: string; p_stage: string };
         Returns: undefined;
       };
+      flow_business_normalize_match_text: {
+        Args: { p_value: string };
+        Returns: string;
+      };
       flow_business_plan_snapshot: { Args: { p_org: string }; Returns: Json };
       flow_business_publish_flow: {
         Args: { p_flow_id: string };
         Returns: undefined;
       };
-      flow_business_set_session_automation: {
-        Args: { p_enabled: boolean; p_instance_id: string };
+      flow_business_record_session_comment: {
+        Args: {
+          p_comment_text: string;
+          p_commenter_name: string;
+          p_commenter_username: string;
+          p_external_comment_id: string;
+          p_external_commenter_id: string;
+          p_external_media_id: string;
+          p_instance_id: string;
+          p_occurred_at: string;
+          p_raw_payload?: Json;
+        };
         Returns: Json;
+      };
+      flow_business_reserve_instagram_oauth_state: {
+        Args: {
+          p_org: string;
+          p_provider: string;
+          p_state: string;
+          p_user: string;
+        };
+        Returns: boolean;
       };
       flow_business_save_flow: {
         Args: {
@@ -5782,6 +6265,10 @@ export type Database = {
         };
         Returns: string;
       };
+      flow_business_set_session_automation: {
+        Args: { p_enabled: boolean; p_instance_id: string };
+        Returns: undefined;
+      };
       flow_business_start_cadence: {
         Args: { p_cadence_id: string; p_card_id: string };
         Returns: string;
@@ -5790,6 +6277,7 @@ export type Database = {
         Args: { p_card_limit?: number };
         Returns: Json;
       };
+      html_email_seguro: { Args: { p_html: string }; Returns: boolean };
       instagram_dashboard_advanced_v1: {
         Args: { p_days?: number };
         Returns: Json;
@@ -5849,6 +6337,7 @@ export type Database = {
       };
       normalize_search_term: { Args: { p_value: string }; Returns: string };
       org_do_usuario: { Args: { p_user: string }; Returns: string };
+      org_dono_eh_super_admin: { Args: { p_org: string }; Returns: boolean };
       papel_do_usuario: { Args: { p_org: string }; Returns: string };
       pertence_a_org: { Args: { p_org: string }; Returns: boolean };
       plano_id_por_slug: { Args: { p_plan: string }; Returns: string };
@@ -5872,6 +6361,15 @@ export type Database = {
       release_apify_search_cache: {
         Args: { p_query_key: string };
         Returns: undefined;
+      };
+      salvar_rascunho_estudio: {
+        Args: {
+          p_campanha_id: string | null;
+          p_draft: Json;
+          p_org_id: string;
+          p_revisao_esperada: number;
+        };
+        Returns: Json;
       };
       search_shared_lead_catalog: {
         Args: {
