@@ -1,8 +1,7 @@
 // Tipos oficiais do Estúdio de Campanhas (Prompt 51 - Flow Business)
 // Suporta a seleção de listas, templates, assinaturas, editor visual e agendamento.
 
-export type StudioStepId =
-  "destinatarios" | "template" | "conteudo" | "assinatura" | "teste_revisao" | "agendamento";
+export type StudioStepId = "destinatarios" | "conteudo" | "revisao";
 
 export interface StudioStep {
   id: StudioStepId;
@@ -24,7 +23,20 @@ export interface StudioProgramacao {
 }
 
 export type BlockType =
-  "cabecalho" | "mensagem" | "cta" | "rodape" | "texto" | "botao" | "imagem" | "separador";
+  | "cabecalho"
+  | "mensagem"
+  | "cta"
+  | "rodape"
+  | "titulo"
+  | "texto"
+  | "botao"
+  | "imagem"
+  | "separador"
+  | "espacamento"
+  | "duas_colunas"
+  | "assinatura";
+
+export type StudioBlockAlignment = "left" | "center" | "right";
 
 export interface StudioEmailBlock {
   id: string;
@@ -36,6 +48,17 @@ export interface StudioEmailBlock {
   ctaTexto?: string;
   ctaUrl?: string;
   imagemUrl?: string;
+  imagemAlt?: string;
+  imagemLargura?: number;
+  negrito?: boolean;
+  italico?: boolean;
+  alinhamento?: StudioBlockAlignment;
+  tamanhoFonte?: number;
+  corTexto?: string;
+  corFundo?: string;
+  espacamento?: number;
+  origem?: "template" | "personalizado" | "assinatura";
+  tagHtml?: string;
   ativo: boolean;
 }
 

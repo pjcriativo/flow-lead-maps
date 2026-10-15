@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
   ArrowLeft,
@@ -8,7 +8,6 @@ import {
   LayoutTemplate,
   Mail,
   Star,
-  Check,
   Save,
   ArrowRight,
   RefreshCw,
@@ -27,9 +26,8 @@ import {
   type SimpleListaItem,
   type StudioLeadOption,
 } from "@/services/campaign-studio-service";
-import { obterContextoOrgAtiva } from "@/services/templates-service";
-import { OFFICIAL_EMAIL_TEMPLATES } from "../templates/templates-data";
-import { TemplatePreviewModal } from "../templates/TemplatePreviewModal";
+import { listarAssinaturasOrg, obterContextoOrgAtiva } from "@/services/templates-service";
+import { applySignatureToEmail, createEditableEmail } from "@/lib/campaign-email-editor";
 import { ConfiguracaoCampanhaPanel } from "./ConfiguracaoCampanhaPanel";
 import { EditorEmailCanvas } from "./EditorEmailCanvas";
 import { PreviaAgendamentoPanel } from "./PreviaAgendamentoPanel";
@@ -37,7 +35,11 @@ import { ModalSelecionarLista } from "./ModalSelecionarLista";
 import { ModalSelecionarDestinatarios } from "./ModalSelecionarDestinatarios";
 import { ModalSelecionarTemplate } from "./ModalSelecionarTemplate";
 import { ModalRevisaoCampanha } from "./ModalRevisaoCampanha";
-import type { CampaignTemplateContract, EmailTemplateItem } from "@/types/templates";
+import type {
+  CampaignTemplateContract,
+  CorporateSignatureItem,
+  EmailTemplateItem,
+} from "@/types/templates";
 
 const campaignTemplateContractSchema = z.object({
   templateId: z.string(),
@@ -59,16 +61,19 @@ function applyTemplateContract(
   draft: StudioCampaignDraft,
   contract: CampaignTemplateContract,
 ): StudioCampaignDraft {
+  const editable = createEditableEmail(contract.htmlRenderizado);
+  const signatureHtml = contract.assinaturaHtml ?? draft.assinaturaHtmlSnapshot;
   return {
     ...draft,
     templateId: contract.templateId,
     templateVersao: contract.versao,
     templateNome: contract.templateNome,
-    templateHtmlSnapshot: contract.htmlRenderizado,
+    templateHtmlSnapshot: applySignatureToEmail(editable.html, signatureHtml),
+    blocos: editable.blocks,
     assunto: contract.assunto,
     preCabecalho: contract.preheader,
     assinaturaId: contract.assinaturaId ?? draft.assinaturaId,
-    assinaturaHtmlSnapshot: contract.assinaturaHtml ?? draft.assinaturaHtmlSnapshot,
+    assinaturaHtmlSnapshot: signatureHtml,
   };
 }
 
@@ -105,6 +110,12 @@ export function EstudioCampanhasView({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [activeStep, setActiveStep] = useState<StudioStepId>("conteudo");
+  const [saveState, setSaveState] = useState<
+    "idle" | "dirty" | "saving" | "saved" | "error" | "conflict"
+  >("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const savedFingerprintRef = useRef("");
 
   // Estado do Rascunho da Campanha
   const [draft, setDraft] = useState<StudioCampaignDraft | null>(null);
@@ -112,12 +123,12 @@ export function EstudioCampanhasView({
     useState<CampaignTemplateContract | null>(null);
   const [listas, setListas] = useState<SimpleListaItem[]>([]);
   const [leadOptions, setLeadOptions] = useState<StudioLeadOption[]>([]);
+  const [signatures, setSignatures] = useState<CorporateSignatureItem[]>([]);
 
   // Modais
   const [isAlterarListaOpen, setIsAlterarListaOpen] = useState(false);
   const [isDestinatariosOpen, setIsDestinatariosOpen] = useState(false);
   const [isAlterarTemplateOpen, setIsAlterarTemplateOpen] = useState(false);
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isRevisaoModalOpen, setIsRevisaoModalOpen] = useState(false);
 
   // Inicialização e carregamento de contexto real
@@ -131,8 +142,12 @@ export function EstudioCampanhasView({
         if (!isMounted) return;
         setOrgId(ctx.orgId);
 
-        const loadedListas = await carregarListasEstudio(ctx.orgId);
+        const [loadedListas, customSignatures] = await Promise.all([
+          carregarListasEstudio(ctx.orgId),
+          listarAssinaturasOrg(ctx.orgId),
+        ]);
         setListas(loadedListas);
+        setSignatures(customSignatures);
 
         // Verifica se há contrato vindo do Prompt 50 (Biblioteca de Templates)
         let templateVindoDaBiblioteca: CampaignTemplateContract | null = null;
@@ -151,7 +166,23 @@ export function EstudioCampanhasView({
 
         if (campaignId) {
           const persisted = await obterRascunhoEstudio(campaignId, ctx.orgId);
-          setDraft(persisted.draft);
+          const needsEditableRegions =
+            !persisted.draft.templateHtmlSnapshot.includes("data-flow-block-id");
+          const editable = needsEditableRegions
+            ? createEditableEmail(persisted.draft.templateHtmlSnapshot)
+            : null;
+          const reopened = {
+            ...persisted.draft,
+            templateHtmlSnapshot: applySignatureToEmail(
+              editable?.html ?? persisted.draft.templateHtmlSnapshot,
+              persisted.draft.assinaturaHtmlSnapshot,
+            ),
+            blocos: editable?.blocks ?? persisted.draft.blocos,
+          };
+          savedFingerprintRef.current = JSON.stringify(reopened);
+          setDraft(reopened);
+          setLastSavedAt(reopened.atualizadoEm);
+          setSaveState("saved");
         } else if (preselectedListId) {
           const novo = await criarRascunhoInicial(ctx.orgId, preselectedListId);
           if (templateVindoDaBiblioteca) {
@@ -161,6 +192,7 @@ export function EstudioCampanhasView({
           } else {
             setDraft(novo);
           }
+          savedFingerprintRef.current = JSON.stringify(novo);
         } else {
           setDraft(null);
           setLoadError("Selecione uma lista para iniciar a campanha.");
@@ -207,6 +239,32 @@ export function EstudioCampanhasView({
     };
   }, [draft?.listaId, orgId]);
 
+  useEffect(() => {
+    if (!draft?.id || saving) return;
+    const fingerprint = JSON.stringify(draft);
+    if (fingerprint === savedFingerprintRef.current) return;
+    setSaveState("dirty");
+    setSaveError(null);
+    const workspaceAtSchedule = draft.orgId;
+    const timer = window.setTimeout(() => {
+      setSaveState("saving");
+      void salvarRascunhoEstudio(draft)
+        .then((saved) => {
+          if (saved.orgId !== workspaceAtSchedule) return;
+          savedFingerprintRef.current = JSON.stringify(saved);
+          setDraft(saved);
+          setLastSavedAt(saved.atualizadoEm);
+          setSaveState("saved");
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : "Falha ao salvar rascunho.";
+          setSaveError(message);
+          setSaveState(/conflito de revis/i.test(message) ? "conflict" : "error");
+        });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [draft, saving]);
+
   if (loading) {
     return (
       <div className="flex min-h-[600px] w-full items-center justify-center bg-[#090b10] text-white">
@@ -247,6 +305,7 @@ export function EstudioCampanhasView({
                       ? applyTemplateContract(created, pendingTemplateContract)
                       : created,
                   );
+                  setActiveStep("destinatarios");
                   if (pendingTemplateContract) {
                     sessionStorage.removeItem("flow_campanha_contrato");
                     setPendingTemplateContract(null);
@@ -268,8 +327,17 @@ export function EstudioCampanhasView({
   }
 
   const validation = validarRascunhoCampanha(draft);
+  const recipientMetrics = {
+    elegiveis: leadOptions.filter((lead) => lead.elegibilidade === "elegivel_confirmado").length,
+    naoValidados: leadOptions.filter((lead) => lead.elegibilidade === "nao_validado").length,
+    bloqueados: leadOptions.filter(
+      (lead) => lead.elegibilidade === "sem_email" || lead.elegibilidade === "descadastro",
+    ).length,
+  };
   const updateDraft = (updater: (current: StudioCampaignDraft) => StudioCampaignDraft) => {
     setDraft((current) => (current ? updater(current) : current));
+    setSaveState("dirty");
+    setSaveError(null);
   };
 
   // Manipuladores de Ação
@@ -277,11 +345,18 @@ export function EstudioCampanhasView({
     try {
       setSaving(true);
       const saved = await salvarRascunhoEstudio(draft);
+      savedFingerprintRef.current = JSON.stringify(saved);
       setDraft(saved);
+      setLastSavedAt(saved.atualizadoEm);
+      setSaveState("saved");
       toast.success("Rascunho salvo no Supabase.");
     } catch (error) {
       console.error("Falha ao salvar rascunho:", error);
-      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o rascunho.");
+      const message =
+        error instanceof Error ? error.message : "Não foi possível salvar o rascunho.";
+      setSaveError(message);
+      setSaveState(/conflito de revis/i.test(message) ? "conflict" : "error");
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -290,12 +365,14 @@ export function EstudioCampanhasView({
   const handleSelectTemplate = (template: EmailTemplateItem) => {
     setDraft((prev) => {
       if (!prev) return prev;
+      const editable = createEditableEmail(template.conteudoHtml);
       return {
         ...prev,
         templateId: template.id,
         templateVersao: template.versao ?? "1.0",
         templateNome: template.nome,
-        templateHtmlSnapshot: template.conteudoHtml,
+        templateHtmlSnapshot: applySignatureToEmail(editable.html, prev.assinaturaHtmlSnapshot),
+        blocos: editable.blocks,
         assunto: template.assuntoPadrao,
         preCabecalho: template.preheaderPadrao,
       };
@@ -303,26 +380,27 @@ export function EstudioCampanhasView({
     toast.success(`Template "${template.nome}" aplicado ao editor.`);
   };
 
-  const handleInsertVariable = (varName: string) => {
-    setDraft((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        assunto: `${prev.assunto} ${varName}`,
-      };
-    });
-    toast.info(`Variável ${varName} inserida no assunto do e-mail.`);
+  const handleAvancarRevisao = () => {
+    setActiveStep("revisao");
+    setIsRevisaoModalOpen(true);
   };
 
-  const handleAvancarRevisao = () => {
-    setIsRevisaoModalOpen(true);
+  const handleContinue = () => {
+    if (activeStep === "destinatarios") {
+      setActiveStep("conteudo");
+      return;
+    }
+    handleAvancarRevisao();
   };
 
   const handleSaveDraftAndExit = async () => {
     try {
       setSaving(true);
-      const saved = await salvarRascunhoEstudio({ ...draft, status: "em_revisao" });
+      const saved = await salvarRascunhoEstudio({ ...draft, status: "rascunho" });
+      savedFingerprintRef.current = JSON.stringify(saved);
       setDraft(saved);
+      setLastSavedAt(saved.atualizadoEm);
+      setSaveState("saved");
       setIsRevisaoModalOpen(false);
       toast.success("Rascunho validado e salvo no Supabase.");
       if (onCampaignCreated) {
@@ -338,9 +416,6 @@ export function EstudioCampanhasView({
     }
   };
 
-  const activeTemplateItem =
-    OFFICIAL_EMAIL_TEMPLATES.find((t) => t.id === draft.templateId) || OFFICIAL_EMAIL_TEMPLATES[0];
-
   return (
     <div className="min-h-svh w-full bg-[#08090d] text-white flex flex-col font-sans select-none">
       {/* =========================================================================
@@ -349,6 +424,40 @@ export function EstudioCampanhasView({
       <header className="sticky top-0 z-40 flex h-14 w-full items-center justify-between border-b border-zinc-800/80 bg-[#0c0e14]/90 px-4 sm:px-6 backdrop-blur-md">
         {/* Lado Esquerdo: Breadcrumb e Voltar */}
         <div className="flex items-center gap-3">
+          <div className="hidden text-right sm:block">
+            <div
+              className={cn(
+                "text-[10px] font-semibold",
+                saveState === "error" || saveState === "conflict"
+                  ? "text-rose-400"
+                  : "text-zinc-400",
+              )}
+            >
+              {saveState === "saving" || saving
+                ? "Salvando..."
+                : saveState === "saved"
+                  ? "Salvo"
+                  : saveState === "conflict"
+                    ? "Conflito de revisao"
+                    : saveState === "error"
+                      ? "Erro ao salvar"
+                      : saveState === "dirty"
+                        ? "Alteracoes nao salvas"
+                        : "Novo rascunho"}
+            </div>
+            {lastSavedAt ? (
+              <div className="text-[9px] text-zinc-600">
+                Ultima gravacao{" "}
+                {new Date(lastSavedAt).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </div>
+            ) : null}
+            {saveError ? (
+              <div className="max-w-52 truncate text-[9px] text-rose-400">{saveError}</div>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={onBack}
@@ -418,8 +527,7 @@ export function EstudioCampanhasView({
               Estúdio de Campanhas
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-zinc-400 max-w-2xl">
-              Configure destinatários, conteúdo, assinatura, testes e agendamento da sua campanha de
-              e-mail.
+              Escolha os destinatários, personalize o conteúdo e salve um rascunho profissional.
             </p>
           </div>
 
@@ -442,8 +550,12 @@ export function EstudioCampanhasView({
               <div className="text-xs sm:text-sm font-bold text-white truncate">
                 {draft.listaNome}
               </div>
-              <span className="text-[10.5px] text-zinc-500">
-                {draft.leadsQualificados} leads qualificados
+              <span className="block text-[10px] text-zinc-500">
+                {draft.leadsComEmail} com e-mail · {recipientMetrics.elegiveis} elegiveis
+              </span>
+              <span className="block text-[9px] text-amber-500/80">
+                {recipientMetrics.naoValidados} nao validados · {recipientMetrics.bloqueados}{" "}
+                bloqueados
               </span>
             </div>
           </div>
@@ -496,76 +608,47 @@ export function EstudioCampanhasView({
           </div>
         </div>
 
-        {/* 3. STEPPER / STEP WIZARD HORIZONTAL (6 ETAPAS CONECTADAS) */}
-        <div className="relative py-2 px-4 rounded-2xl border border-zinc-800/80 bg-[#10131b]">
-          {/* Linha de Progresso Contínua de Fundo */}
-          <div className="absolute left-8 right-8 top-1/2 -translate-y-2 h-[2px] bg-zinc-800/90 z-0" />
-
-          <div className="relative z-10 flex items-center justify-between">
-            {/* Etapa 1 */}
-            <div
-              onClick={() => setIsAlterarListaOpen(true)}
-              className="flex flex-col items-center gap-1.5 cursor-pointer group"
-            >
-              <div className="flex size-6 sm:size-7 items-center justify-center rounded-full bg-[#ff6200] text-white text-[11px] font-bold shadow-sm">
-                1
-              </div>
-              <span className="text-[10px] sm:text-xs font-semibold text-zinc-300 group-hover:text-white">
-                Destinatários
-              </span>
-            </div>
-
-            {/* Etapa 2 */}
-            <div
-              onClick={() => setIsAlterarTemplateOpen(true)}
-              className="flex flex-col items-center gap-1.5 cursor-pointer group"
-            >
-              <div className="flex size-6 sm:size-7 items-center justify-center rounded-full bg-[#ff6200] text-white text-[11px] font-bold shadow-sm">
-                2
-              </div>
-              <span className="text-[10px] sm:text-xs font-semibold text-zinc-300 group-hover:text-white">
-                Template
-              </span>
-            </div>
-
-            {/* Etapa 3 (ATIVA - CONTEÚDO) */}
-            <div className="flex flex-col items-center gap-1.5 cursor-pointer">
-              <div className="flex size-6 sm:size-7 items-center justify-center rounded-full bg-[#ff6200] text-white text-[11px] font-bold shadow-lg shadow-[#ff6200]/30 ring-4 ring-[#ff6200]/20">
-                3
-              </div>
-              <span className="text-[10px] sm:text-xs font-extrabold text-[#ff6200]">Conteúdo</span>
-            </div>
-
-            {/* Etapa 4 */}
-            <div className="flex flex-col items-center gap-1.5 opacity-70 hover:opacity-100 cursor-pointer">
-              <div className="flex size-6 sm:size-7 items-center justify-center rounded-full border border-zinc-700 bg-[#161922] text-zinc-400 text-[11px] font-medium">
-                4
-              </div>
-              <span className="text-[10px] sm:text-xs font-medium text-zinc-400">Assinatura</span>
-            </div>
-
-            {/* Etapa 5 */}
-            <div
-              onClick={handleAvancarRevisao}
-              className="flex flex-col items-center gap-1.5 opacity-70 hover:opacity-100 cursor-pointer"
-            >
-              <div className="flex size-6 sm:size-7 items-center justify-center rounded-full border border-zinc-700 bg-[#161922] text-zinc-400 text-[11px] font-medium">
-                5
-              </div>
-              <span className="text-[10px] sm:text-xs font-medium text-zinc-400">
-                Teste &amp; Revisão
-              </span>
-            </div>
-
-            {/* Etapa 6 */}
-            <div className="flex flex-col items-center gap-1.5 opacity-70 hover:opacity-100 cursor-pointer">
-              <div className="flex size-6 sm:size-7 items-center justify-center rounded-full border border-zinc-700 bg-[#161922] text-zinc-400 text-[11px] font-medium">
-                6
-              </div>
-              <span className="text-[10px] sm:text-xs font-medium text-zinc-400">Agendamento</span>
-            </div>
-          </div>
-        </div>
+        {/* 3. FLUXO PRINCIPAL EM TRES ETAPAS */}
+        <nav
+          aria-label="Etapas da campanha"
+          className="rounded-2xl border border-zinc-800/80 bg-[#10131b] px-4 py-3"
+        >
+          <ol className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["destinatarios", "Destinatarios"],
+                ["conteudo", "Conteudo"],
+                ["revisao", "Revisao"],
+              ] as const
+            ).map(([step, label], index) => (
+              <li key={step}>
+                <button
+                  type="button"
+                  onClick={() => setActiveStep(step)}
+                  aria-current={activeStep === step ? "step" : undefined}
+                  className={cn(
+                    "flex w-full items-center justify-center gap-2 rounded-xl px-2 py-2 text-[11px] font-semibold transition-colors sm:text-xs",
+                    activeStep === step
+                      ? "bg-[#ff6200]/15 text-[#ff6200]"
+                      : "text-zinc-400 hover:bg-zinc-800/60 hover:text-white",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex size-6 items-center justify-center rounded-full border text-[10px]",
+                      activeStep === step
+                        ? "border-[#ff6200] bg-[#ff6200] text-white"
+                        : "border-zinc-700",
+                    )}
+                  >
+                    {index + 1}
+                  </span>
+                  {label}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
 
         {/* 4. ÁREA DE TRABALHO PRINCIPAL EM 3 COLUNAS */}
         <div className="flex flex-col xl:flex-row gap-5 items-start">
@@ -573,11 +656,11 @@ export function EstudioCampanhasView({
           <div className="w-full xl:w-[320px] shrink-0">
             <ConfiguracaoCampanhaPanel
               draft={draft}
-              listasDisponiveis={listas}
+              signatures={signatures}
               onChangeDraft={updateDraft}
               onOpenAlterarLista={() => setIsAlterarListaOpen(true)}
               onOpenDestinatarios={() => setIsDestinatariosOpen(true)}
-              onInsertVariable={handleInsertVariable}
+              onOpenTemplate={() => setIsAlterarTemplateOpen(true)}
             />
           </div>
 
@@ -586,8 +669,6 @@ export function EstudioCampanhasView({
             <EditorEmailCanvas
               draft={draft}
               onChangeDraft={updateDraft}
-              onSaveDraft={handleSaveDraft}
-              onOpenPreview={() => setIsPreviewModalOpen(true)}
               onChangeTemplate={() => setIsAlterarTemplateOpen(true)}
             />
           </div>
@@ -597,7 +678,6 @@ export function EstudioCampanhasView({
             <PreviaAgendamentoPanel
               draft={draft}
               validation={validation}
-              onChangeDraft={updateDraft}
               onAvancarRevisao={handleAvancarRevisao}
             />
           </div>
@@ -629,10 +709,10 @@ export function EstudioCampanhasView({
 
           <button
             type="button"
-            onClick={handleAvancarRevisao}
+            onClick={handleContinue}
             className="flex items-center gap-1.5 rounded-xl bg-[#ff6200] px-6 py-2 text-xs font-bold text-white shadow-md shadow-[#ff6200]/25 hover:bg-[#e65800] active:scale-[0.98] transition-all"
           >
-            <span>Continuar</span>
+            <span>{activeStep === "revisao" ? "Revisar campanha" : "Continuar"}</span>
             <ArrowRight className="size-4" />
           </button>
         </div>
@@ -696,21 +776,6 @@ export function EstudioCampanhasView({
               : current,
           )
         }
-      />
-
-      <TemplatePreviewModal
-        isOpen={isPreviewModalOpen}
-        template={activeTemplateItem}
-        variables={{
-          nome: "Dra. Camila Santos",
-          empresa: "Clínica Sorriso Curitiba",
-          cidade: "Curitiba",
-          nome_remetente: draft.remetenteNome,
-          empresa_remetente: "Flow Business",
-        }}
-        onClose={() => setIsPreviewModalOpen(false)}
-        onPersonalizar={() => setIsPreviewModalOpen(false)}
-        onUseTemplate={() => setIsPreviewModalOpen(false)}
       />
 
       <ModalRevisaoCampanha

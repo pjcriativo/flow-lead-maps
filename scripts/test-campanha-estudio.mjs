@@ -92,38 +92,36 @@ assert.ok(
 );
 console.log("✅ [Navegação & Sidebar]: Subview 'estudio' conectada e roteada no Dashboard.");
 
-// 5. Verificação da Proteção Contra Envios Reais Não Homologados (Prompt 51)
+// 5. Verificação da proteção contra envios e agendamentos reais
 const previaPanelFile = path.resolve(
   process.cwd(),
   "src/components/campanhas-premium/estudio/PreviaAgendamentoPanel.tsx",
 );
 const previaContent = fs.readFileSync(previaPanelFile, "utf-8");
-assert.ok(
-  previaContent.includes("Prompt 52"),
-  "Aviso de homologação futura de envio com Resend no Prompt 52 deve estar presente",
-);
+assert.ok(previaContent.includes("Envio e agendamento permanecem desativados"));
+assert.ok(!previaContent.includes("Enviar teste"));
 
 const revisaoModalFile = path.resolve(
   process.cwd(),
   "src/components/campanhas-premium/estudio/ModalRevisaoCampanha.tsx",
 );
 const revisaoContent = fs.readFileSync(revisaoModalFile, "utf-8");
-assert.ok(
-  revisaoContent.includes("Prompt 52"),
-  "Modal de revisão deve bloquear ativação de envio em massa antes do Prompt 52",
-);
-console.log("✅ [Segurança & Bloqueios]: Disparos reais bloqueados com segurança até o Prompt 52.");
+assert.ok(revisaoContent.includes("agendamento"));
+assert.ok(revisaoContent.includes("desativados"));
+assert.ok(!revisaoContent.includes("Ativar campanha"));
+console.log("✅ [Segurança & Bloqueios]: disparos e agendamentos reais permanecem ausentes.");
 
-// 6. Verificação do Isolamento Multi-tenant (Salvar rascunho por orgId)
+// 6. Verificação do isolamento multi-tenant e persistência no Supabase
 const studioServiceFile = path.resolve(
   process.cwd(),
   "src/services/campaign-studio-service.ts",
 );
 const serviceContent = fs.readFileSync(studioServiceFile, "utf-8");
 assert.ok(
-  serviceContent.includes("STORAGE_ESTUDIO_CURRENT_KEY"),
-  "Chave de persistência de rascunho deve ser parametrizada por orgId",
+  serviceContent.includes('supabase.rpc("salvar_rascunho_estudio"'),
+  "Rascunhos devem usar a RPC transacional do Supabase",
 );
+assert.ok(serviceContent.includes("p_org_id: draft.orgId"));
 assert.ok(
   serviceContent.includes("validarRascunhoCampanha"),
   "Função validarRascunhoCampanha deve existir",

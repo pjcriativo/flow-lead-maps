@@ -1,260 +1,132 @@
-import React from "react";
-import { Settings, Users, Mail, PenTool, RotateCcw, Check, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { ChevronDown, LayoutTemplate, Mail, PenTool, Settings, Users } from "lucide-react";
+import { applySignatureToEmail } from "@/lib/campaign-email-editor";
 import type { StudioCampaignDraft } from "@/types/campaign-studio";
-import { OFFICIAL_CORPORATE_SIGNATURES } from "../templates/templates-data";
-import type { SimpleListaItem } from "@/services/campaign-studio-service";
+import type { CorporateSignatureItem } from "@/types/templates";
+import { renderSignatureHtml } from "../templates/templates-data";
 
 interface ConfiguracaoCampanhaPanelProps {
   draft: StudioCampaignDraft;
-  listasDisponiveis: SimpleListaItem[];
+  signatures: CorporateSignatureItem[];
   onChangeDraft: (updater: (prev: StudioCampaignDraft) => StudioCampaignDraft) => void;
   onOpenAlterarLista: () => void;
   onOpenDestinatarios: () => void;
-  onInsertVariable: (varName: string) => void;
+  onOpenTemplate: () => void;
 }
 
 export function ConfiguracaoCampanhaPanel({
   draft,
-  listasDisponiveis,
+  signatures,
   onChangeDraft,
   onOpenAlterarLista,
   onOpenDestinatarios,
-  onInsertVariable,
+  onOpenTemplate,
 }: ConfiguracaoCampanhaPanelProps) {
-  const handleToggleFiltro = (filtro: keyof StudioCampaignDraft["filtrosEnvio"]) => {
-    onChangeDraft((prev) => {
-      const novoFiltros = {
-        ...prev.filtrosEnvio,
-        [filtro]: !prev.filtrosEnvio[filtro],
-      };
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-      return {
-        ...prev,
-        filtrosEnvio: novoFiltros,
-      };
-    });
+  const changeSignature = (signatureId: string) => {
+    const signature = signatures.find((item) => item.id === signatureId);
+    const signatureHtml = signature
+      ? renderSignatureHtml(signature.htmlTemplate, signature.dadosExemplo)
+      : "";
+    onChangeDraft((current) => ({
+      ...current,
+      assinaturaId: signature?.id ?? "",
+      assinaturaNome: signature?.nome ?? "",
+      assinaturaHtmlSnapshot: signatureHtml,
+      templateHtmlSnapshot: applySignatureToEmail(current.templateHtmlSnapshot, signatureHtml),
+    }));
   };
 
   return (
-    <div className="flex flex-col rounded-2xl border border-zinc-800/80 bg-[#10131b] p-4 text-white shadow-sm space-y-4">
-      {/* Título da Coluna */}
+    <aside className="flex flex-col space-y-4 rounded-2xl border border-zinc-800/80 bg-[#10131b] p-4 text-white shadow-sm">
       <div className="flex items-center gap-2 border-b border-zinc-800/70 pb-3">
         <div className="flex size-7 items-center justify-center rounded-lg bg-[#ff6200]/10 text-[#ff6200]">
           <Settings className="size-4" />
         </div>
-        <h3 className="text-sm font-bold text-white tracking-wide">Configuração da campanha</h3>
+        <h3 className="text-sm font-bold tracking-wide">Configuracao da campanha</h3>
       </div>
 
-      {/* 1. Nome da campanha */}
-      <div>
-        <label className="block text-[11.5px] font-semibold text-zinc-300 mb-1.5">
-          Nome da campanha
-        </label>
+      <label className="text-[11px] font-semibold text-zinc-300">
+        Campanha
         <input
-          type="text"
           value={draft.nome}
-          onChange={(e) => onChangeDraft((prev) => ({ ...prev, nome: e.target.value }))}
-          placeholder="Ex: Reativação Outubro — Dentistas Curitiba"
-          className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 text-xs text-white placeholder-zinc-500 focus:border-[#ff6200] focus:outline-none transition-colors"
+          onChange={(event) =>
+            onChangeDraft((current) => ({ ...current, nome: event.target.value }))
+          }
+          className="mt-1.5 h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 text-xs text-white outline-none focus:border-[#ff6200]"
         />
+      </label>
+
+      <div className="space-y-2 border-t border-zinc-800/60 pt-3">
+        <div className="flex items-center gap-1.5 text-xs font-bold">
+          <Users className="size-3.5 text-[#ff6200]" /> Lista
+        </div>
+        <div className="rounded-xl border border-zinc-800 bg-[#0d1017] p-3">
+          <div className="truncate text-xs font-bold">{draft.listaNome}</div>
+          <div className="mt-1 text-[10px] text-zinc-500">
+            {draft.quantidadeSelecionada} selecionados de {draft.totalLeads} contatos
+          </div>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={onOpenDestinatarios}
+              className="text-[10px] font-semibold text-[#ff6200] hover:text-[#ff7d2b]"
+            >
+              Selecionar contatos
+            </button>
+            <button
+              type="button"
+              onClick={onOpenAlterarLista}
+              className="text-[10px] font-semibold text-zinc-400 hover:text-white"
+            >
+              Trocar lista
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* 2. Destinatários */}
-      <div className="space-y-3 pt-1 border-t border-zinc-800/60">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-          <Users className="size-3.5 text-[#ff6200]" />
-          <span>Destinatários</span>
+      <div className="space-y-2 border-t border-zinc-800/60 pt-3">
+        <div className="flex items-center gap-1.5 text-xs font-bold">
+          <LayoutTemplate className="size-3.5 text-[#ff6200]" /> Template
         </div>
-
-        <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Lista de leads</label>
-          <div className="relative">
-            <select
-              value={draft.listaId || ""}
-              onChange={(e) => {
-                const sel = listasDisponiveis.find((l) => l.id === e.target.value);
-                if (sel) {
-                  onChangeDraft((prev) => ({
-                    ...prev,
-                    listaId: sel.id,
-                    listaNome: sel.nome,
-                    totalLeads: sel.totalLeads,
-                    leadsComEmail: sel.leadsComEmail,
-                    leadsQualificados: sel.leadsQualificados,
-                    quantidadeSelecionada: 0,
-                    leadsIdsSelecionados: [],
-                  }));
-                }
-              }}
-              className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 pr-8 text-xs font-medium text-zinc-200 focus:border-[#ff6200] focus:outline-none cursor-pointer appearance-none"
-            >
-              {listasDisponiveis.map((l) => (
-                <option key={l.id} value={l.id} className="bg-[#10131b] text-white">
-                  {l.nome} ({l.totalLeads} leads)
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />
-          </div>
-        </div>
-
-        <div>
-          <span className="block text-[11px] font-medium text-zinc-400">
-            Quantidade selecionada
-          </span>
-          <div className="mt-0.5 text-sm font-extrabold text-white">
-            {draft.quantidadeSelecionada} leads
-          </div>
-          <button
-            type="button"
-            onClick={onOpenDestinatarios}
-            className="mt-1 text-[11px] font-semibold text-[#ff6200] hover:text-[#ff7d2b]"
-          >
-            Selecionar individualmente
-          </button>
-        </div>
-
-        <div>
-          <span className="block text-[11px] font-medium text-zinc-400 mb-1.5">
-            Filtro de envio
-          </span>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleToggleFiltro("comEmail")}
-              className={cn(
-                "rounded-lg px-2.5 py-1 text-[10.5px] font-semibold border transition-all flex items-center gap-1",
-                draft.filtrosEnvio.comEmail
-                  ? "bg-blue-950/60 text-blue-300 border-blue-700/60"
-                  : "bg-[#0d1017] text-zinc-500 border-zinc-800 hover:text-zinc-300",
-              )}
-            >
-              {draft.filtrosEnvio.comEmail && <Check className="size-3 stroke-[3]" />}
-              <span>Com e-mail</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleToggleFiltro("qualificados")}
-              className={cn(
-                "rounded-lg px-2.5 py-1 text-[10.5px] font-semibold border transition-all flex items-center gap-1",
-                draft.filtrosEnvio.qualificados
-                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-700/60"
-                  : "bg-[#0d1017] text-zinc-500 border-zinc-800 hover:text-zinc-300",
-              )}
-            >
-              {draft.filtrosEnvio.qualificados && <Check className="size-3 stroke-[3]" />}
-              <span>Qualificados</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleToggleFiltro("novosLeads")}
-              className={cn(
-                "rounded-lg px-2.5 py-1 text-[10.5px] font-semibold border transition-all flex items-center gap-1",
-                draft.filtrosEnvio.novosLeads
-                  ? "bg-purple-950/60 text-purple-300 border-purple-700/60"
-                  : "bg-[#0d1017] text-zinc-500 border-zinc-800 hover:text-zinc-300",
-              )}
-            >
-              {draft.filtrosEnvio.novosLeads && <Check className="size-3 stroke-[3]" />}
-              <span>Novos leads</span>
-            </button>
-          </div>
-        </div>
-
         <button
           type="button"
-          onClick={onOpenAlterarLista}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#ff6200]/60 bg-transparent py-2 px-3 text-xs font-bold text-[#ff6200] hover:bg-[#ff6200]/10 transition-colors"
+          onClick={onOpenTemplate}
+          className="flex w-full items-center justify-between rounded-xl border border-zinc-800 bg-[#0d1017] p-3 text-left hover:border-[#ff6200]"
         >
-          <RotateCcw className="size-3.5" />
-          <span>Alterar lista</span>
+          <span className="truncate text-xs font-semibold">{draft.templateNome}</span>
+          <span className="text-[10px] text-[#ff6200]">Alterar</span>
         </button>
       </div>
 
-      {/* 3. Remetente */}
-      <div className="space-y-3 pt-1 border-t border-zinc-800/60">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-          <Mail className="size-3.5 text-[#ff6200]" />
-          <span>Remetente</span>
-        </div>
+      <label className="border-t border-zinc-800/60 pt-3 text-[11px] font-semibold text-zinc-300">
+        Assunto
+        <input
+          value={draft.assunto}
+          onChange={(event) =>
+            onChangeDraft((current) => ({ ...current, assunto: event.target.value }))
+          }
+          className="mt-1.5 h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 text-xs text-white outline-none focus:border-[#ff6200]"
+        />
+      </label>
 
-        <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-            Nome do remetente
-          </label>
-          <input
-            type="text"
-            value={draft.remetenteNome}
-            onChange={(e) => onChangeDraft((prev) => ({ ...prev, remetenteNome: e.target.value }))}
-            className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 text-xs text-white placeholder-zinc-500 focus:border-[#ff6200] focus:outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1">
-            E-mail do remetente
-          </label>
-          <div className="relative">
-            <select
-              value={draft.remetenteEmail}
-              onChange={(e) =>
-                onChangeDraft((prev) => ({ ...prev, remetenteEmail: e.target.value }))
-              }
-              className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 pr-8 text-xs font-medium text-zinc-200 focus:border-[#ff6200] focus:outline-none cursor-pointer appearance-none"
-            >
-              <option value={draft.remetenteEmail} className="bg-[#10131b]">
-                {draft.remetenteEmail || "E-mail não configurado"}
-              </option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-[11px] font-medium text-zinc-400 mb-1">Responder para</label>
-          <div className="relative">
-            <select
-              value={draft.responderPara}
-              onChange={(e) =>
-                onChangeDraft((prev) => ({ ...prev, responderPara: e.target.value }))
-              }
-              className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 pr-8 text-xs font-medium text-zinc-200 focus:border-[#ff6200] focus:outline-none cursor-pointer appearance-none"
-            >
-              <option value={draft.responderPara} className="bg-[#10131b]">
-                {draft.responderPara || "E-mail não configurado"}
-              </option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-zinc-500" />
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Assinatura */}
-      <div className="space-y-2 pt-1 border-t border-zinc-800/60">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-          <PenTool className="size-3.5 text-[#ff6200]" />
-          <span>Assinatura</span>
-        </div>
-
+      <div className="space-y-2 border-t border-zinc-800/60 pt-3">
+        <label className="flex items-center gap-1.5 text-xs font-bold" htmlFor="campaign-signature">
+          <PenTool className="size-3.5 text-[#ff6200]" /> Assinatura
+        </label>
         <div className="relative">
           <select
+            id="campaign-signature"
             value={draft.assinaturaId}
-            onChange={(e) => {
-              const sig = OFFICIAL_CORPORATE_SIGNATURES.find((s) => s.id === e.target.value);
-              onChangeDraft((prev) => ({
-                ...prev,
-                assinaturaId: e.target.value,
-                assinaturaNome: sig ? sig.nome : prev.assinaturaNome,
-              }));
-            }}
-            className="h-9 w-full rounded-xl border border-zinc-800 bg-[#0d1017] px-3 pr-8 text-xs font-medium text-zinc-200 focus:border-[#ff6200] focus:outline-none cursor-pointer appearance-none"
+            onChange={(event) => changeSignature(event.target.value)}
+            className="h-9 w-full appearance-none rounded-xl border border-zinc-800 bg-[#0d1017] px-3 pr-8 text-xs text-zinc-200 outline-none focus:border-[#ff6200]"
           >
-            {OFFICIAL_CORPORATE_SIGNATURES.map((sig) => (
-              <option key={sig.id} value={sig.id} className="bg-[#10131b]">
-                {sig.nome}
+            <option value="">Sem assinatura</option>
+            {signatures.map((signature) => (
+              <option key={signature.id} value={signature.id}>
+                {signature.nome}
+                {signature.isPadrao ? " (padrao)" : ""}
               </option>
             ))}
           </select>
@@ -262,26 +134,59 @@ export function ConfiguracaoCampanhaPanel({
         </div>
       </div>
 
-      {/* 5. Variáveis disponíveis */}
-      <div className="space-y-2 pt-1 border-t border-zinc-800/60">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-          <span className="font-mono text-sm text-[#ff6200] font-bold">{"{ }"}</span>
-          <span>Variáveis disponíveis</span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-          {["{{nome}}", "{{empresa}}", "{{cidade}}", "{{segmento}}"].map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => onInsertVariable(v)}
-              className="rounded-lg border border-zinc-800 bg-[#0d1017] px-2.5 py-1 text-[10.5px] font-mono text-zinc-300 hover:border-[#ff6200] hover:text-white transition-colors"
-            >
-              {v}
-            </button>
-          ))}
-        </div>
+      <div className="border-t border-zinc-800/60 pt-3">
+        <button
+          type="button"
+          aria-expanded={advancedOpen}
+          onClick={() => setAdvancedOpen((open) => !open)}
+          className="flex w-full items-center justify-between text-xs font-bold text-zinc-300"
+        >
+          Configuracoes avancadas
+          <ChevronDown
+            className={`size-4 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+        {advancedOpen ? (
+          <div className="mt-3 space-y-3">
+            <div className="rounded-xl border border-zinc-800 bg-[#0d1017] p-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold">
+                <Mail className="size-3 text-[#ff6200]" /> Remetente
+              </div>
+              {draft.remetenteEmail ? (
+                <p className="mt-1 text-[10px] text-zinc-400">
+                  {draft.remetenteNome} &lt;{draft.remetenteEmail}&gt;
+                </p>
+              ) : (
+                <p className="mt-1 text-[10px] text-amber-400">
+                  Nenhuma identidade de envio verificada. O rascunho pode ser salvo, mas nao
+                  enviado.
+                </p>
+              )}
+            </div>
+            <label className="block text-[10px] text-zinc-400">
+              Reply-to
+              <input
+                value={draft.responderPara}
+                onChange={(event) =>
+                  onChangeDraft((current) => ({ ...current, responderPara: event.target.value }))
+                }
+                className="mt-1 h-9 w-full rounded-lg border border-zinc-800 bg-[#0d1017] px-3 text-xs text-white outline-none focus:border-[#ff6200]"
+              />
+            </label>
+            <label className="block text-[10px] text-zinc-400">
+              Pre-cabecalho
+              <textarea
+                rows={3}
+                value={draft.preCabecalho}
+                onChange={(event) =>
+                  onChangeDraft((current) => ({ ...current, preCabecalho: event.target.value }))
+                }
+                className="mt-1 w-full rounded-lg border border-zinc-800 bg-[#0d1017] p-3 text-xs text-white outline-none focus:border-[#ff6200]"
+              />
+            </label>
+          </div>
+        ) : null}
       </div>
-    </div>
+    </aside>
   );
 }

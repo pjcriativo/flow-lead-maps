@@ -7,14 +7,10 @@ import type {
   StudioRecipient,
   StudioValidationResult,
 } from "@/types/campaign-studio";
-import {
-  DEFAULT_SIGNATURE_DATA,
-  OFFICIAL_CORPORATE_SIGNATURES,
-  OFFICIAL_EMAIL_TEMPLATES,
-  renderSignatureHtml,
-} from "@/components/campanhas-premium/templates/templates-data";
+import { OFFICIAL_EMAIL_TEMPLATES } from "@/components/campanhas-premium/templates/templates-data";
 import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { throwPersistenceError } from "@/lib/persistence-errors";
+import { applySignatureToEmail, createEditableEmail } from "@/lib/campaign-email-editor";
 import {
   loadStudioLists,
   type SimpleStudioListItem,
@@ -27,12 +23,25 @@ export interface StudioLeadOption {
   id: string;
   nome: string;
   email: string | null;
-  elegibilidade: "sem_email" | "nao_validado" | "descadastro";
+  elegibilidade: "sem_email" | "nao_validado" | "elegivel_confirmado" | "descadastro";
 }
 
 const blockSchema = z.object({
   id: z.string(),
-  tipo: z.enum(["cabecalho", "mensagem", "cta", "rodape", "texto", "botao", "imagem", "separador"]),
+  tipo: z.enum([
+    "cabecalho",
+    "mensagem",
+    "cta",
+    "rodape",
+    "titulo",
+    "texto",
+    "botao",
+    "imagem",
+    "separador",
+    "espacamento",
+    "duas_colunas",
+    "assinatura",
+  ]),
   titulo: z.string(),
   subtitulo: z.string(),
   conteudoHtml: z.string().nullable().optional(),
@@ -40,6 +49,17 @@ const blockSchema = z.object({
   ctaTexto: z.string().nullable().optional(),
   ctaUrl: z.string().nullable().optional(),
   imagemUrl: z.string().nullable().optional(),
+  imagemAlt: z.string().nullable().optional(),
+  imagemLargura: z.number().nullable().optional(),
+  negrito: z.boolean().nullable().optional(),
+  italico: z.boolean().nullable().optional(),
+  alinhamento: z.enum(["left", "center", "right"]).nullable().optional(),
+  tamanhoFonte: z.number().nullable().optional(),
+  corTexto: z.string().nullable().optional(),
+  corFundo: z.string().nullable().optional(),
+  espacamento: z.number().nullable().optional(),
+  origem: z.enum(["template", "personalizado", "assinatura"]).nullable().optional(),
+  tagHtml: z.string().nullable().optional(),
   ativo: z.boolean(),
 });
 const filtersSchema = z.object({
@@ -87,14 +107,9 @@ export async function carregarListasEstudio(orgId: string): Promise<SimpleListaI
 }
 
 export async function listarIdsSelecionaveis(orgId: string, listId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("leads")
-    .select("id, email, email_opt_out")
-    .eq("org_id", orgId)
-    .eq("list_id", listId);
-  if (error) throw error;
-  return (data ?? [])
-    .filter((lead) => Boolean(lead.email?.trim()) && !lead.email_opt_out)
+  const candidates = await carregarDestinatariosLista(orgId, listId);
+  return candidates
+    .filter((lead) => lead.elegibilidade === "elegivel_confirmado")
     .map((lead) => lead.id);
 }
 
@@ -143,9 +158,8 @@ export async function criarRascunhoInicial(
     listarIdsSelecionaveis(orgId, selectedList.id),
   ]);
   const template = OFFICIAL_EMAIL_TEMPLATES[0];
-  const officialSignature = OFFICIAL_CORPORATE_SIGNATURES.find(
-    (signature) => signature.id === defaultSignature.id,
-  );
+  const signatureHtml = defaultSignature.definida ? (defaultSignature.htmlSeguro ?? "") : "";
+  const editableEmail = createEditableEmail(template.conteudoHtml);
   const now = new Date().toISOString();
   return {
     id: null,
@@ -162,47 +176,19 @@ export async function criarRascunhoInicial(
     filtrosEnvio: { comEmail: true, qualificados: true, novosLeads: true },
     leadsIdsSelecionados: selectedLeadIds,
     remetenteNome: context.userName,
-    remetenteEmail: context.userEmail,
+    remetenteEmail: "",
     responderPara: context.replyToEmail,
-    assinaturaId: defaultSignature.id,
-    assinaturaNome:
-      officialSignature?.nome ?? defaultSignature.nomeModelo ?? defaultSignature.data.nome,
-    assinaturaHtmlSnapshot:
-      defaultSignature.htmlSeguro ??
-      (officialSignature
-        ? renderSignatureHtml(officialSignature.htmlTemplate, defaultSignature.data)
-        : ""),
+    assinaturaId: defaultSignature.definida ? defaultSignature.id : "",
+    assinaturaNome: defaultSignature.definida ? (defaultSignature.nomeModelo ?? "") : "",
+    assinaturaHtmlSnapshot: signatureHtml,
     templateId: template.id,
     templateVersao: template.versao ?? "1.0",
     templateNome: template.nome,
-    templateHtmlSnapshot: template.conteudoHtml,
+    templateHtmlSnapshot: applySignatureToEmail(editableEmail.html, signatureHtml),
     templateConfigSnapshot: {},
     assunto: template.assuntoPadrao,
     preCabecalho: template.preheaderPadrao,
-    blocos: [
-      {
-        id: "bloco-cabecalho",
-        tipo: "cabecalho",
-        titulo: "Cabeçalho",
-        subtitulo: "Logo, banner e introdução",
-        ativo: true,
-      },
-      {
-        id: "bloco-mensagem",
-        tipo: "mensagem",
-        titulo: "Mensagem principal",
-        subtitulo: "Texto e conteúdo do e-mail",
-        ativo: true,
-      },
-      { id: "bloco-cta", tipo: "cta", titulo: "CTA", subtitulo: "Botão de ação", ativo: true },
-      {
-        id: "bloco-rodape",
-        tipo: "rodape",
-        titulo: "Rodapé",
-        subtitulo: "Informações e contato",
-        ativo: true,
-      },
-    ],
+    blocos: editableEmail.blocks,
     programacao: {
       modo: "imediato",
       dataEnvio: "",
@@ -226,6 +212,17 @@ function blocksToJson(blocks: StudioEmailBlock[]): Json {
     ctaTexto: block.ctaTexto ?? null,
     ctaUrl: block.ctaUrl ?? null,
     imagemUrl: block.imagemUrl ?? null,
+    imagemAlt: block.imagemAlt ?? null,
+    imagemLargura: block.imagemLargura ?? null,
+    negrito: block.negrito ?? null,
+    italico: block.italico ?? null,
+    alinhamento: block.alinhamento ?? null,
+    tamanhoFonte: block.tamanhoFonte ?? null,
+    corTexto: block.corTexto ?? null,
+    corFundo: block.corFundo ?? null,
+    espacamento: block.espacamento ?? null,
+    origem: block.origem ?? null,
+    tagHtml: block.tagHtml ?? null,
     ativo: block.ativo,
   }));
 }
@@ -329,6 +326,17 @@ export async function obterRascunhoEstudio(
       ctaTexto: block.ctaTexto ?? undefined,
       ctaUrl: block.ctaUrl ?? undefined,
       imagemUrl: block.imagemUrl ?? undefined,
+      imagemAlt: block.imagemAlt ?? undefined,
+      imagemLargura: block.imagemLargura ?? undefined,
+      negrito: block.negrito ?? undefined,
+      italico: block.italico ?? undefined,
+      alinhamento: block.alinhamento ?? undefined,
+      tamanhoFonte: block.tamanhoFonte ?? undefined,
+      corTexto: block.corTexto ?? undefined,
+      corFundo: block.corFundo ?? undefined,
+      espacamento: block.espacamento ?? undefined,
+      origem: block.origem ?? undefined,
+      tagHtml: block.tagHtml ?? undefined,
     }));
   const selectedIds = (recipients ?? [])
     .filter((recipient) => recipient.selecionado)
@@ -402,9 +410,11 @@ export function validarRascunhoCampanha(draft: StudioCampaignDraft): StudioValid
   const assinaturaDefinida = Boolean(draft.assinaturaId);
   if (!assinaturaDefinida) avisos.push("Nenhuma assinatura corporativa selecionada.");
   const destinatariosValidos = draft.leadsIdsSelecionados.length;
-  if (destinatariosValidos <= 0) bloqueios.push("Selecione pelo menos um destinatário.");
+  if (destinatariosValidos <= 0)
+    avisos.push("Nenhum destinatário foi selecionado; o rascunho ainda pode ser salvo.");
   const remetenteValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.remetenteEmail);
-  if (!remetenteValido) bloqueios.push("O e-mail do remetente é inválido.");
+  if (!remetenteValido)
+    avisos.push("Nenhuma identidade de remetente verificada; o envio futuro ficará bloqueado.");
   return {
     assuntoPreenchido,
     templateAplicado,
