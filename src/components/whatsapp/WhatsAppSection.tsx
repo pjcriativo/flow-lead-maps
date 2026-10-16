@@ -39,9 +39,10 @@ import { WaPainel } from "./WaPainel";
 import { WaConversas } from "./WaConversas";
 import { WaScripts } from "./WaScripts";
 import { WaNumeros } from "./WaNumeros";
+import { WaAutomacao } from "./WaAutomacao";
 
 export type AbaWhatsApp =
-  "painel" | "conversas" | "campanhas" | "automacao" | "scripts" | "numeros";
+  | "painel" | "conversas" | "campanhas" | "automacao" | "scripts" | "numeros";
 
 export interface WhatsAppSectionProps {
   user?: {
@@ -138,7 +139,9 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
                   ? "Campanhas — dispare mensagens, acompanhe resultados e gere mais vendas"
                   : aba === "numeros"
                     ? "Números e Conexões — gerencie seus chips, monitore a conexão e mantenha sua operação sempre ativa"
-                    : "Seu centro de comunicação e vendas em um só lugar"}
+                    : aba === "automacao"
+                      ? "Automações — responda, qualifique e gerencie seus leads automaticamente"
+                      : "Seu centro de comunicação e vendas em um só lugar"}
               </p>
             </div>
           </div>
@@ -242,7 +245,13 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
         )}
         {aba === "conversas" && <WaConversas />}
         {aba === "campanhas" && <WaCampanhas onConectar={() => setAba("numeros")} />}
-        {aba === "automacao" && <AutomacaoSection onRevisar={() => setAba("campanhas")} />}
+        {aba === "automacao" && (
+          <WaAutomacao
+            onIrParaCampanhas={() => setAba("campanhas")}
+            onIrParaScripts={() => setAba("scripts")}
+            onIrParaNumeros={() => setAba("numeros")}
+          />
+        )}
         {aba === "scripts" && <WaScripts />}
         {aba === "numeros" && <WaNumeros onMudou={checarConexao} />}
       </div>
