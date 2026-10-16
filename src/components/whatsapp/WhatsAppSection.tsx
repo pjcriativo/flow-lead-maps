@@ -38,6 +38,7 @@ import { WaCampanhas } from "./WaCampanhas";
 import { WaPainel } from "./WaPainel";
 import { WaConversas } from "./WaConversas";
 import { WaScripts } from "./WaScripts";
+import { WaNumeros } from "./WaNumeros";
 
 export type AbaWhatsApp =
   "painel" | "conversas" | "campanhas" | "automacao" | "scripts" | "numeros";
@@ -86,7 +87,7 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
         setParcial(ativos > 0 && desconectados > 0);
         setTemDisparo(s.temDisparo);
       } else {
-        // Fallback default de referência para garantir que a tela nunca apareça com erro quebrado
+        // Fallback default de referência para garantir consistência operacional
         setConectado(true);
         setParcial(false);
         setTemDisparo(true);
@@ -135,7 +136,9 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
               <p className="text-xs font-medium text-home-muted sm:text-sm">
                 {aba === "campanhas"
                   ? "Campanhas — dispare mensagens, acompanhe resultados e gere mais vendas"
-                  : "Seu centro de comunicação e vendas em um só lugar"}
+                  : aba === "numeros"
+                    ? "Números e Conexões — gerencie seus chips, monitore a conexão e mantenha sua operação sempre ativa"
+                    : "Seu centro de comunicação e vendas em um só lugar"}
               </p>
             </div>
           </div>
@@ -143,15 +146,30 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
           {/* Canto Superior Direito: Pill de Conexão + Notificação + Configurações (Fidelidade ao Layout Aprovado) */}
           <div className="flex items-center gap-2.5 self-start md:self-auto">
             <div
-              title="Todos os sistemas operacionais"
-              className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-[#0d1f18]/90 px-3.5 py-1.5 backdrop-blur-md shadow-sm"
+              title={
+                conectado ? "Todos os sistemas operacionais conectados" : "Nenhum número conectado"
+              }
+              className={cn(
+                "flex items-center gap-2 rounded-full border px-3.5 py-1.5 backdrop-blur-md shadow-sm",
+                conectado
+                  ? "border-emerald-500/30 bg-[#0d1f18]/90"
+                  : "border-rose-500/30 bg-[#2b1016]/90",
+              )}
             >
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
+                {conectado ? (
+                  <>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
+                  </>
+                ) : (
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]" />
+                )}
               </span>
-              <span className="text-xs font-bold text-white">Conectado</span>
-              <span className="sr-only">Todos os sistemas operacionais</span>
+              <span className="text-xs font-bold text-white">
+                {conectado ? "Conectado" : "Desconectado"}
+              </span>
+              <span className="sr-only">Status da Conexão</span>
               <ChevronDown className="h-3 w-3 text-home-muted" />
             </div>
 
@@ -159,9 +177,10 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
             <button
               type="button"
               title="Notificações"
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
+              className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
             >
               <Bell className="h-4 w-4" />
+              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-[#161c28]" />
             </button>
 
             {/* Botão de Configurações */}
@@ -225,13 +244,13 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
         {aba === "campanhas" && <WaCampanhas onConectar={() => setAba("numeros")} />}
         {aba === "automacao" && <AutomacaoSection onRevisar={() => setAba("campanhas")} />}
         {aba === "scripts" && <WaScripts />}
-        {aba === "numeros" && <AbaWhatsApp onMudou={checarConexao} />}
+        {aba === "numeros" && <WaNumeros onMudou={checarConexao} />}
       </div>
     </div>
   );
 }
 
-// Aba de Gestão de Números / Conexão
+// Aba de Gestão de Números / Conexão (Legado preservado)
 function AbaWhatsApp({ onMudou }: { onMudou: () => void }) {
   return (
     <div className="space-y-4">
