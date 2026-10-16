@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   BarChart3,
   Bell,
+  Calendar,
   ChevronDown,
   Loader2,
   Megaphone,
@@ -40,9 +41,10 @@ import { WaConversas } from "./WaConversas";
 import { WaScripts } from "./WaScripts";
 import { WaNumeros } from "./WaNumeros";
 import { WaAutomacao } from "./WaAutomacao";
+import { WaRelatorios } from "./WaRelatorios";
 
 export type AbaWhatsApp =
-  | "painel" | "conversas" | "campanhas" | "automacao" | "scripts" | "numeros";
+  | "painel" | "conversas" | "campanhas" | "automacao" | "scripts" | "numeros" | "relatorios";
 
 export interface WhatsAppSectionProps {
   user?: {
@@ -63,6 +65,7 @@ const ABAS: { key: AbaWhatsApp; label: string; icon: ReactNode }[] = [
   { key: "automacao", label: "Automação", icon: <Workflow className="h-4 w-4" /> },
   { key: "scripts", label: "Scripts", icon: <Zap className="h-4 w-4" /> },
   { key: "numeros", label: "Números", icon: <Phone className="h-4 w-4" /> },
+  { key: "relatorios", label: "Relatórios", icon: <BarChart3 className="h-4 w-4" /> },
 ];
 
 export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionProps) {
@@ -143,64 +146,75 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
                       ? "Automações — responda, qualifique e gerencie seus leads automaticamente"
                       : aba === "scripts"
                         ? "Scripts — crie, organize e use mensagens prontas para agilizar seu atendimento"
-                        : "Seu centro de comunicação e vendas em um só lugar"}
+                        : aba === "relatorios"
+                          ? "Relatórios e Inteligência — acompanhe resultados, identifique oportunidades e otimize sua operação"
+                          : "Seu centro de comunicação e vendas em um só lugar"}
               </p>
             </div>
           </div>
 
-          {/* Canto Superior Direito: Pill de Conexão + Notificação + Configurações (Fidelidade ao Layout Aprovado) */}
-          <div className="flex items-center gap-2.5 self-start md:self-auto">
-            <div
-              title={
-                conectado ? "Todos os sistemas operacionais conectados" : "Nenhum número conectado"
-              }
-              className={cn(
-                "flex items-center gap-2 rounded-full border px-3.5 py-1.5 backdrop-blur-md shadow-sm",
-                conectado
-                  ? "border-emerald-500/30 bg-[#0d1f18]/90"
-                  : "border-rose-500/30 bg-[#2b1016]/90",
-              )}
-            >
-              <span className="relative flex h-2 w-2">
-                {conectado ? (
-                  <>
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
-                  </>
-                ) : (
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]" />
+          {/* Canto Superior Direito: Pill de Conexão + Notificação + Configurações + Data (Fidelidade ao Layout Aprovado) */}
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2.5 self-start md:self-auto">
+            <div className="flex items-center gap-2.5">
+              <div
+                title={
+                  conectado ? "Todos os sistemas operacionais conectados" : "Nenhum número conectado"
+                }
+                className={cn(
+                  "flex items-center gap-2 rounded-full border px-3.5 py-1.5 backdrop-blur-md shadow-sm",
+                  conectado
+                    ? "border-emerald-500/30 bg-[#0d1f18]/90"
+                    : "border-rose-500/30 bg-[#2b1016]/90",
                 )}
-              </span>
-              <span className="text-xs font-bold text-white">
-                {conectado ? "Conectado" : "Desconectado"}
-              </span>
-              <span className="sr-only">Status da Conexão</span>
-              <ChevronDown className="h-3 w-3 text-home-muted" />
+              >
+                <span className="relative flex h-2 w-2">
+                  {conectado ? (
+                    <>
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
+                    </>
+                  ) : (
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]" />
+                  )}
+                </span>
+                <span className="text-xs font-bold text-white">
+                  {conectado ? "Conectado" : "Desconectado"}
+                </span>
+                <span className="sr-only">Status da Conexão</span>
+                <ChevronDown className="h-3 w-3 text-home-muted" />
+              </div>
+
+              {/* Botão de Notificação */}
+              <button
+                type="button"
+                title="Notificações"
+                className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
+              >
+                <Bell className="h-4 w-4" />
+                <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-[#161c28]" />
+              </button>
+
+              {/* Botão de Configurações */}
+              <button
+                type="button"
+                onClick={() => setAba("numeros")}
+                title="Configurações do WhatsApp"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Botão de Notificação */}
-            <button
-              type="button"
-              title="Notificações"
-              className="relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-rose-500 ring-2 ring-[#161c28]" />
-            </button>
-
-            {/* Botão de Configurações */}
-            <button
-              type="button"
-              onClick={() => setAba("numeros")}
-              title="Configurações do WhatsApp"
-              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
+            {/* Seletor de Período do Cabeçalho (Fidelidade ao Layout Aprovado) */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#161c28]/90 px-3 py-1.5 text-xs font-semibold text-slate-300 shadow-sm">
+              <Calendar className="h-3.5 w-3.5 text-slate-400 mr-0.5" />
+              <span>01/03/2024 - 30/03/2024</span>
+              <ChevronDown className="h-3 w-3 text-slate-400 ml-0.5" />
+            </div>
           </div>
         </div>
 
-        {/* NAVEGAÇÃO INTERNA HORIZONTAL COM AS 6 ABAS (ETAPA 3 — LAYOUT APROVADO) */}
+        {/* NAVEGAÇÃO INTERNA HORIZONTAL COM AS 7 ABAS (ETAPA 3 — LAYOUT APROVADO) */}
         <div className="mt-7 flex items-center gap-2 border-t border-white/5 pt-3 overflow-x-auto scrollbar-none">
           {ABAS.map((a) => {
             const ativa = aba === a.key;
@@ -256,6 +270,14 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
         )}
         {aba === "scripts" && <WaScripts />}
         {aba === "numeros" && <WaNumeros onMudou={checarConexao} />}
+        {aba === "relatorios" && (
+          <WaRelatorios
+            onIrParaNumeros={() => setAba("numeros")}
+            onIrParaCampanhas={() => setAba("campanhas")}
+            onIrParaConversas={() => setAba("conversas")}
+            onIrParaAutomacao={() => setAba("automacao")}
+          />
+        )}
       </div>
     </div>
   );
