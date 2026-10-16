@@ -133,7 +133,9 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
                 WhatsApp
               </h1>
               <p className="text-xs font-medium text-home-muted sm:text-sm">
-                Seu centro de comunicação e vendas em um só lugar
+                {aba === "campanhas"
+                  ? "Campanhas — dispare mensagens, acompanhe resultados e gere mais vendas"
+                  : "Seu centro de comunicação e vendas em um só lugar"}
               </p>
             </div>
           </div>
