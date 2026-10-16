@@ -141,7 +141,9 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
                     ? "Números e Conexões — gerencie seus chips, monitore a conexão e mantenha sua operação sempre ativa"
                     : aba === "automacao"
                       ? "Automações — responda, qualifique e gerencie seus leads automaticamente"
-                      : "Seu centro de comunicação e vendas em um só lugar"}
+                      : aba === "scripts"
+                        ? "Scripts — crie, organize e use mensagens prontas para agilizar seu atendimento"
+                        : "Seu centro de comunicação e vendas em um só lugar"}
               </p>
             </div>
           </div>
