@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   BarChart3,
+  Bell,
+  ChevronDown,
   Loader2,
   Megaphone,
   MessageCircle,
@@ -9,6 +11,7 @@ import {
   MoreVertical,
   Phone,
   Send,
+  Settings,
   Smartphone,
   Trash2,
   Workflow,
@@ -60,7 +63,7 @@ const ABAS: { key: AbaWhatsApp; label: string; icon: ReactNode }[] = [
   { key: "numeros", label: "Números", icon: <Phone className="h-4 w-4" /> },
 ];
 
-export function WhatsAppSection({ initialTab = "painel" }: WhatsAppSectionProps) {
+export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionProps) {
   const [aba, setAba] = useState<AbaWhatsApp>(initialTab);
   const [conectado, setConectado] = useState<boolean>(true);
   const [parcial, setParcial] = useState<boolean>(false);
@@ -103,7 +106,7 @@ export function WhatsAppSection({ initialTab = "painel" }: WhatsAppSectionProps)
 
   return (
     <div className="w-full space-y-4 px-4 sm:px-6 lg:px-8 pt-2 pb-12 text-home-foreground animate-in fade-in duration-200">
-      {/* CABEÇALHO / HERO BANNER (ETAPA 3 — REPRODUÇÃO FIEL) */}
+      {/* CABEÇALHO / HERO BANNER (ETAPA 3 — REPRODUÇÃO FIEL AO LAYOUT APROVADO) */}
       <div className="relative overflow-hidden rounded-2xl border border-[#1b2334] bg-[#0c101a] p-6 shadow-2xl transition-all">
         {/* Glow verde sutil atmosférico no canto superior direito */}
         <div className="pointer-events-none absolute -right-10 -top-10 h-80 w-80 rounded-full bg-emerald-500/15 blur-3xl" />
@@ -135,35 +138,44 @@ export function WhatsAppSection({ initialTab = "painel" }: WhatsAppSectionProps)
             </div>
           </div>
 
-          {/* Canto Superior Direito: Pill de Conexão + 3 Pontos */}
-          <div className="flex items-center gap-2 self-start md:self-auto">
-            <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-[#0d1f18]/80 px-3.5 py-1.5 backdrop-blur-md shadow-sm">
+          {/* Canto Superior Direito: Pill de Conexão + Notificação + Configurações (Fidelidade ao Layout Aprovado) */}
+          <div className="flex items-center gap-2.5 self-start md:self-auto">
+            <div
+              title="Todos os sistemas operacionais"
+              className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-[#0d1f18]/90 px-3.5 py-1.5 backdrop-blur-md shadow-sm"
+            >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.9)]" />
               </span>
-              <div className="text-left leading-tight">
-                <div className="text-xs font-bold text-white">Conectado</div>
-                <div className="text-[10px] text-home-muted font-normal">
-                  Todos os sistemas operacionais
-                </div>
-              </div>
+              <span className="text-xs font-bold text-white">Conectado</span>
+              <span className="sr-only">Todos os sistemas operacionais</span>
+              <ChevronDown className="h-3 w-3 text-home-muted" />
             </div>
 
-            {/* Botão de Menu 3 Pontos */}
+            {/* Botão de Notificação */}
+            <button
+              type="button"
+              title="Notificações"
+              className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
+            >
+              <Bell className="h-4 w-4" />
+            </button>
+
+            {/* Botão de Configurações */}
             <button
               type="button"
               onClick={() => setAba("numeros")}
               title="Configurações do WhatsApp"
               className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-[#161c28]/90 text-home-muted transition-all hover:border-white/20 hover:text-white"
             >
-              <MoreVertical className="h-4 w-4" />
+              <Settings className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* NAVEGAÇÃO INTERNA HORIZONTAL COM AS 6 ABAS (ETAPA 4) */}
-        <div className="mt-7 flex items-center gap-2 border-b border-white/10 overflow-x-auto scrollbar-none pt-1">
+        {/* NAVEGAÇÃO INTERNA HORIZONTAL COM AS 6 ABAS (ETAPA 3 — LAYOUT APROVADO) */}
+        <div className="mt-7 flex items-center gap-2 border-t border-white/5 pt-3 overflow-x-auto scrollbar-none">
           {ABAS.map((a) => {
             const ativa = aba === a.key;
             return (
@@ -173,10 +185,10 @@ export function WhatsAppSection({ initialTab = "painel" }: WhatsAppSectionProps)
                 data-aba={a.key}
                 onClick={() => setAba(a.key)}
                 className={cn(
-                  "group relative flex cursor-pointer items-center gap-2 border-b-2 px-3.5 py-2.5 text-xs font-semibold transition-all whitespace-nowrap",
+                  "group relative flex cursor-pointer items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all whitespace-nowrap",
                   ativa
-                    ? "border-home-orange text-white font-bold"
-                    : "border-transparent text-home-muted hover:text-white",
+                    ? "border border-home-orange bg-home-orange/10 text-white font-bold shadow-[0_0_15px_rgba(255,98,0,0.15)]"
+                    : "border border-transparent text-home-muted hover:text-white hover:bg-white/[0.03]",
                 )}
               >
                 <span
@@ -190,9 +202,6 @@ export function WhatsAppSection({ initialTab = "painel" }: WhatsAppSectionProps)
                 <span className={ativa ? "text-white" : "text-home-muted group-hover:text-white"}>
                   {a.label}
                 </span>
-                {ativa && (
-                  <span className="absolute -bottom-[1px] left-0 right-0 h-0.5 bg-home-orange shadow-[0_0_12px_rgba(255,98,0,0.9)]" />
-                )}
               </button>
             );
           })}
