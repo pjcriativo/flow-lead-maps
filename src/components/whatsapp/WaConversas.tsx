@@ -45,6 +45,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { supabase } from "@/integrations/supabase/client";
 import {
   atualizarLeadCrm,
@@ -65,9 +66,12 @@ import {
 // TIPOS E MODELOS DE DADOS DA CENTRAL
 // ==========================================
 
-export type StatusAtendimento = "todas" | "nao_lidas" | "em_atendimento" | "aguardando" | "concluida" | "arquivada";
-export type StatusComercial = "Lead" | "Em qualificação" | "Proposta" | "Negociação" | "Cliente" | "Perdido";
-export type PipelineEtapa = "Prospecção" | "Qualificação" | "Proposta" | "Negociação" | "Fechamento";
+export type StatusAtendimento =
+  "todas" | "nao_lidas" | "em_atendimento" | "aguardando" | "concluida" | "arquivada";
+export type StatusComercial =
+  "Lead" | "Em qualificação" | "Proposta" | "Negociação" | "Cliente" | "Perdido";
+export type PipelineEtapa =
+  "Prospecção" | "Qualificação" | "Proposta" | "Negociação" | "Fechamento";
 
 export interface AnexoMsg {
   tipo: "pdf" | "imagem" | "documento" | "audio";
@@ -164,7 +168,8 @@ const CONTATOS_REFERENCIA: ContatoConversa[] = [
     notas: [
       {
         id: "n-1",
-        texto: "Interessada nos planos de marketing digital. Enviar cases do segmento e agendar call.",
+        texto:
+          "Interessada nos planos de marketing digital. Enviar cases do segmento e agendar call.",
         autor: "Marcos Gonçalves",
         horario: "10:24",
       },
@@ -199,13 +204,15 @@ const CONTATOS_REFERENCIA: ContatoConversa[] = [
       {
         id: "m-1",
         direcao: "in",
-        texto: "Olá! Vi o site de vocês e me interessei pelos serviços de marketing para meu restaurante. Vocês atendem em São Paulo?",
+        texto:
+          "Olá! Vi o site de vocês e me interessei pelos serviços de marketing para meu restaurante. Vocês atendem em São Paulo?",
         horario: "10:20",
       },
       {
         id: "m-2",
         direcao: "out",
-        texto: "Olá, Carla! 👋\nSim, atendemos em toda a região de São Paulo. Posso te mostrar alguns casos de sucesso no seu segmento.",
+        texto:
+          "Olá, Carla! 👋\nSim, atendemos em toda a região de São Paulo. Posso te mostrar alguns casos de sucesso no seu segmento.",
         horario: "10:21",
         statusEnvio: "lido",
       },
@@ -218,7 +225,8 @@ const CONTATOS_REFERENCIA: ContatoConversa[] = [
       {
         id: "m-4",
         direcao: "out",
-        texto: "Segue nossa apresentação com os planos e alguns cases de restaurantes. Qualquer dúvida estou à disposição!",
+        texto:
+          "Segue nossa apresentação com os planos e alguns cases de restaurantes. Qualquer dúvida estou à disposição!",
         horario: "10:23",
         statusEnvio: "lido",
         anexo: {
@@ -557,15 +565,15 @@ const CONTATOS_REFERENCIA: ContatoConversa[] = [
 
 export function WaConversas() {
   // Estado das conversas
-  const [contatos, setContatos] = useState<ContatoConversa[]>(CONTATOS_REFERENCIA);
-  const [contatoAtivoId, setContatoAtivoId] = useState<string>("contato-1");
+  const [contatos, setContatos] = useState<ContatoConversa[]>([]);
+  const [contatoAtivoId, setContatoAtivoId] = useState<string>("");
   const [kpis, setKpis] = useState<WaConversaKpis>({
-    conversasAtivas: 32,
-    naoLidas: 18,
-    aguardandoResposta: 5,
-    emAtendimento: 12,
-    novosContatos: 8,
-    fechamentosHoje: 3,
+    conversasAtivas: 0,
+    naoLidas: 0,
+    aguardandoResposta: 0,
+    emAtendimento: 0,
+    novosContatos: 0,
+    fechamentosHoje: 0,
   });
 
   // Filtros e busca
@@ -612,9 +620,10 @@ export function WaConversas() {
   // Carregar KPIs e scripts do banco
   const carregarDadosIniciais = useCallback(async () => {
     try {
-      const [kpisRes, scriptsRes] = await Promise.allSettled([
+      const [kpisRes, scriptsRes, conversationsRes] = await Promise.allSettled([
         obterKpisConversasWa(),
         listarScripts(),
+        listarConversas(),
       ]);
 
       if (kpisRes.status === "fulfilled") {
@@ -623,8 +632,54 @@ export function WaConversas() {
       if (scriptsRes.status === "fulfilled") {
         setScriptsDisponiveis(scriptsRes.value);
       }
-    } catch {
-      // Preserva baseline de alta fidelidade
+      if (conversationsRes.status === "fulfilled") {
+        const mapped = await Promise.all(
+          conversationsRes.value.map(async (conversation: WaConversa): Promise<ContatoConversa> => {
+            const messages = await listarMensagens(conversation.numero);
+            return {
+              id: conversation.id,
+              numero: conversation.numero,
+              nome: conversation.nome_contato || conversation.numero,
+              avatar: "/placeholder.svg",
+              ultimaMensagem: conversation.ultima || "",
+              horario: new Date(conversation.ultima_em).toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              naoLidas: conversation.nao_lidas,
+              statusAtendimento: conversation.nao_lidas > 0 ? "em_atendimento" : "todas",
+              statusComercial: "Lead",
+              pipelineEtapa: "Prospecção",
+              responsavel: { nome: "Equipe", avatar: "/placeholder.svg" },
+              tags: [],
+              favorito: false,
+              email: "",
+              empresa: "",
+              cargo: "",
+              origem: "WhatsApp",
+              dataCadastro: new Date(conversation.ultima_em).toLocaleDateString("pt-BR"),
+              online: false,
+              notas: [],
+              interacoes: [],
+              mensagens: messages.map((message: WaMensagem) => ({
+                id: message.id,
+                direcao: message.direcao === "out" ? "out" : "in",
+                texto: message.texto || "",
+                horario: new Date(message.criado_em).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+                statusEnvio: message.lida ? "lido" : "entregue",
+              })),
+              leadId: conversation.lead_id ?? undefined,
+            };
+          }),
+        );
+        setContatos(mapped);
+        setContatoAtivoId((current) => current || mapped[0]?.id || "");
+      }
+    } catch (error) {
+      console.error("Falha ao carregar conversas WhatsApp", error);
     }
   }, []);
 
@@ -639,84 +694,88 @@ export function WaConversas() {
 
   // Supabase Realtime Subscription para novas mensagens recebidas
   useEffect(() => {
-    const channel = supabase
-      .channel("wa_inbox_realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "wa_mensagens",
-        },
-        (payload) => {
-          const nova = payload.new as {
-            numero: string;
-            texto: string | null;
-            direcao: string;
-            nome_contato: string | null;
-            criado_em: string;
-          };
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+    void getActiveOrganizationContext().then((context) => {
+      if (cancelled) return;
+      channel = supabase
+        .channel(`wa_inbox_realtime:${context.orgId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "wa_mensagens",
+            filter: `org_id=eq.${context.orgId}`,
+          },
+          (payload) => {
+            const nova = payload.new as {
+              numero: string;
+              texto: string | null;
+              direcao: string;
+              nome_contato: string | null;
+              criado_em: string;
+            };
 
-          if (nova && nova.numero) {
-            setContatos((prev) => {
-              const idx = prev.findIndex(
-                (c) => c.numero.replace(/\D/g, "") === nova.numero.replace(/\D/g, ""),
-              );
+            if (nova && nova.numero) {
+              setContatos((prev) => {
+                const idx = prev.findIndex(
+                  (c) => c.numero.replace(/\D/g, "") === nova.numero.replace(/\D/g, ""),
+                );
 
-              const horaFormatada = new Date(nova.criado_em || Date.now()).toLocaleTimeString(
-                "pt-BR",
-                { hour: "2-digit", minute: "2-digit" },
-              );
+                const horaFormatada = new Date(nova.criado_em || Date.now()).toLocaleTimeString(
+                  "pt-BR",
+                  { hour: "2-digit", minute: "2-digit" },
+                );
 
-              if (idx >= 0) {
-                const copia = [...prev];
-                const target = { ...copia[idx] };
-                target.ultimaMensagem = nova.texto || "Mensagem recebida";
-                target.horario = horaFormatada;
-                if (nova.direcao === "in") {
-                  target.naoLidas += 1;
+                if (idx >= 0) {
+                  const copia = [...prev];
+                  const target = { ...copia[idx] };
+                  target.ultimaMensagem = nova.texto || "Mensagem recebida";
+                  target.horario = horaFormatada;
+                  if (nova.direcao === "in") {
+                    target.naoLidas += 1;
+                  }
+                  target.mensagens = [
+                    ...target.mensagens,
+                    {
+                      id: `rt-${Date.now()}`,
+                      direcao: nova.direcao === "out" ? "out" : "in",
+                      texto: nova.texto || "",
+                      horario: horaFormatada,
+                      statusEnvio: "lido",
+                    },
+                  ];
+                  copia[idx] = target;
+                  return copia;
                 }
-                target.mensagens = [
-                  ...target.mensagens,
-                  {
-                    id: `rt-${Date.now()}`,
-                    direcao: nova.direcao === "out" ? "out" : "in",
-                    texto: nova.texto || "",
-                    horario: horaFormatada,
-                    statusEnvio: "lido",
-                  },
-                ];
-                copia[idx] = target;
-                return copia;
-              }
-              return prev;
-            });
-          }
-        },
-      )
-      .subscribe();
+                return prev;
+              });
+            }
+          },
+        )
+        .subscribe();
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
   }, []);
 
   // Selecionar conversa
-  const selecionarContato = useCallback(
-    (c: ContatoConversa) => {
-      setContatoAtivoId(c.id);
-      setViewMobile("chat");
+  const selecionarContato = useCallback((c: ContatoConversa) => {
+    setContatoAtivoId(c.id);
+    setViewMobile("chat");
 
-      // Zera contador de não lidas localmente e no banco
-      if (c.naoLidas > 0) {
-        setContatos((prev) =>
-          prev.map((item) => (item.id === c.id ? { ...item, naoLidas: 0 } : item)),
-        );
-        marcarConversaLida(c.numero.replace(/\D/g, "")).catch(() => {});
-      }
-    },
-    [],
-  );
+    // Zera contador de não lidas localmente e no banco
+    if (c.naoLidas > 0) {
+      setContatos((prev) =>
+        prev.map((item) => (item.id === c.id ? { ...item, naoLidas: 0 } : item)),
+      );
+      marcarConversaLida(c.numero.replace(/\D/g, "")).catch(() => {});
+    }
+  }, []);
 
   // Enviar Mensagem
   const enviarMensagem = async () => {
@@ -758,7 +817,7 @@ export function WaConversas() {
     );
 
     try {
-      const resp = await responderConversa(numeroLimpo, texto);
+      const resp = await responderConversa(contatoAtivo.id, texto);
       if (!resp.ok) {
         toast.info(resp.error || "Mensagem registrada no histórico da conversa.");
       } else {
@@ -846,9 +905,7 @@ export function WaConversas() {
   const arquivarConversa = () => {
     if (!contatoAtivo) return;
     setContatos((prev) =>
-      prev.map((c) =>
-        c.id === contatoAtivo.id ? { ...c, statusAtendimento: "arquivada" } : c,
-      ),
+      prev.map((c) => (c.id === contatoAtivo.id ? { ...c, statusAtendimento: "arquivada" } : c)),
     );
     toast.success(`Conversa de ${contatoAtivo.nome} arquivada.`);
   };
@@ -953,9 +1010,7 @@ export function WaConversas() {
       return;
     }
     setContatos((prev) =>
-      prev.map((c) =>
-        c.id === contatoAtivo.id ? { ...c, tags: [...c.tags, tagFormatada] } : c,
-      ),
+      prev.map((c) => (c.id === contatoAtivo.id ? { ...c, tags: [...c.tags, tagFormatada] } : c)),
     );
     setNovaTagTexto("");
     setMostrarInputTag(false);
@@ -967,9 +1022,7 @@ export function WaConversas() {
     if (!contatoAtivo) return;
     setContatos((prev) =>
       prev.map((c) =>
-        c.id === contatoAtivo.id
-          ? { ...c, tags: c.tags.filter((t) => t !== tagParaRemover) }
-          : c,
+        c.id === contatoAtivo.id ? { ...c, tags: c.tags.filter((t) => t !== tagParaRemover) } : c,
       ),
     );
     toast.success(`Etiqueta "${tagParaRemover}" removida.`);
@@ -1079,7 +1132,9 @@ export function WaConversas() {
             <MessageCircle className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xl font-bold tracking-tight text-white">{kpis.conversasAtivas}</div>
+            <div className="text-xl font-bold tracking-tight text-white">
+              {kpis.conversasAtivas}
+            </div>
             <div className="truncate text-xs font-medium text-home-muted">Conversas ativas</div>
           </div>
         </div>
@@ -1101,7 +1156,9 @@ export function WaConversas() {
             <Clock className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xl font-bold tracking-tight text-white">{kpis.aguardandoResposta}</div>
+            <div className="text-xl font-bold tracking-tight text-white">
+              {kpis.aguardandoResposta}
+            </div>
             <div className="truncate text-xs font-medium text-home-muted">Aguardando resposta</div>
           </div>
         </div>
@@ -1134,7 +1191,9 @@ export function WaConversas() {
             <TrendingUp className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xl font-bold tracking-tight text-white">{kpis.fechamentosHoje}</div>
+            <div className="text-xl font-bold tracking-tight text-white">
+              {kpis.fechamentosHoje}
+            </div>
             <div className="truncate text-xs font-medium text-home-muted">Fechamentos hoje</div>
           </div>
         </div>
@@ -1201,7 +1260,9 @@ export function WaConversas() {
                       }}
                       className={cn(
                         "w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors",
-                        filtroTag === null ? "text-home-orange font-bold bg-white/5" : "text-white hover:bg-white/5",
+                        filtroTag === null
+                          ? "text-home-orange font-bold bg-white/5"
+                          : "text-white hover:bg-white/5",
                       )}
                     >
                       Todas as etiquetas
@@ -1215,7 +1276,9 @@ export function WaConversas() {
                         }}
                         className={cn(
                           "w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors",
-                          filtroTag === tag ? "text-home-orange font-bold bg-white/5" : "text-white hover:bg-white/5",
+                          filtroTag === tag
+                            ? "text-home-orange font-bold bg-white/5"
+                            : "text-white hover:bg-white/5",
                         )}
                       >
                         {tag}
@@ -1262,7 +1325,8 @@ export function WaConversas() {
                     : "border border-transparent bg-[#111723] text-home-muted hover:text-white",
                 )}
               >
-                Em atendimento ({contatos.filter((c) => c.statusAtendimento === "em_atendimento").length})
+                Em atendimento (
+                {contatos.filter((c) => c.statusAtendimento === "em_atendimento").length})
               </button>
             </div>
           </div>
@@ -1398,17 +1462,24 @@ export function WaConversas() {
                           <ChevronDown className="h-2.5 w-2.5 text-emerald-400/80" />
                         </button>
                         <div className="absolute left-0 top-6 z-50 hidden group-hover/status:block w-36 rounded-xl border border-[#1b2334] bg-[#111723] p-1.5 shadow-xl">
-                          {(["Lead", "Em qualificação", "Proposta", "Negociação", "Cliente", "Perdido"] as StatusComercial[]).map(
-                            (st) => (
-                              <button
-                                key={st}
-                                onClick={() => alterarStatusComercial(st)}
-                                className="w-full text-left px-2 py-1 text-xs text-white hover:bg-white/5 rounded-lg"
-                              >
-                                {st}
-                              </button>
-                            ),
-                          )}
+                          {(
+                            [
+                              "Lead",
+                              "Em qualificação",
+                              "Proposta",
+                              "Negociação",
+                              "Cliente",
+                              "Perdido",
+                            ] as StatusComercial[]
+                          ).map((st) => (
+                            <button
+                              key={st}
+                              onClick={() => alterarStatusComercial(st)}
+                              className="w-full text-left px-2 py-1 text-xs text-white hover:bg-white/5 rounded-lg"
+                            >
+                              {st}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -1424,7 +1495,9 @@ export function WaConversas() {
                     title={contatoAtivo.favorito ? "Remover dos favoritos" : "Favoritar"}
                     className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-[#141a26] transition-all hover:border-white/20",
-                      contatoAtivo.favorito ? "text-amber-400 border-amber-500/30" : "text-home-muted hover:text-white",
+                      contatoAtivo.favorito
+                        ? "text-amber-400 border-amber-500/30"
+                        : "text-home-muted hover:text-white",
                     )}
                   >
                     <Star className={cn("h-4 w-4", contatoAtivo.favorito && "fill-amber-400")} />
@@ -1494,7 +1567,11 @@ export function WaConversas() {
                     placeholder="Adicionar nova etiqueta (ex: Quente, Restaurante)..."
                     className="h-7 text-xs bg-[#161d2b] border-[#1b2334] text-white"
                   />
-                  <Button size="sm" onClick={adicionarTag} className="h-7 px-2.5 text-xs bg-home-orange text-white">
+                  <Button
+                    size="sm"
+                    onClick={adicionarTag}
+                    className="h-7 px-2.5 text-xs bg-home-orange text-white"
+                  >
                     Adicionar
                   </Button>
                 </div>
@@ -1605,7 +1682,9 @@ export function WaConversas() {
                 {composerTab === "resposta_rapida" && (
                   <div className="rounded-xl border border-[#1b2334] bg-[#111723] p-3 space-y-2 animate-in fade-in">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">Escolha um script autorizado</span>
+                      <span className="text-xs font-bold text-white">
+                        Escolha um script autorizado
+                      </span>
                       <Input
                         value={buscaScript}
                         onChange={(e) => setBuscaScript(e.target.value)}
@@ -1642,7 +1721,11 @@ export function WaConversas() {
                         },
                         ...scriptsDisponiveis,
                       ]
-                        .filter((s) => !buscaScript || s.nome.toLowerCase().includes(buscaScript.toLowerCase()))
+                        .filter(
+                          (s) =>
+                            !buscaScript ||
+                            s.nome.toLowerCase().includes(buscaScript.toLowerCase()),
+                        )
                         .map((s) => (
                           <button
                             key={s.id}
@@ -1651,9 +1734,7 @@ export function WaConversas() {
                             className="w-full text-left p-2 rounded-lg border border-white/5 bg-[#161d2b] hover:border-home-orange/40 hover:bg-[#1a2233] transition-all"
                           >
                             <div className="text-xs font-bold text-white">{s.nome}</div>
-                            <div className="truncate text-[11px] text-home-muted">
-                              {s.mensagem}
-                            </div>
+                            <div className="truncate text-[11px] text-home-muted">{s.mensagem}</div>
                           </button>
                         ))}
                     </div>
@@ -1795,9 +1876,7 @@ export function WaConversas() {
                     <div className="truncate text-sm font-extrabold text-white">
                       {contatoAtivo.nome}
                     </div>
-                    <div className="truncate text-xs text-home-muted">
-                      {contatoAtivo.numero}
-                    </div>
+                    <div className="truncate text-xs text-home-muted">{contatoAtivo.numero}</div>
                     <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                       <span>Online</span>

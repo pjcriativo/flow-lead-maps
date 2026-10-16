@@ -104,13 +104,7 @@ export function WaRelatorios({
   }, []);
 
   useEffect(() => {
-    carregarDados({
-      periodo,
-      numeroId,
-      tipoOrigem,
-      categoria,
-      statusConversa,
-    });
+    carregarDados();
   }, [carregarDados]);
 
   const aplicarFiltros = () => {
@@ -157,12 +151,12 @@ export function WaRelatorios({
               <MessageSquare className="h-5 w-5" />
             </div>
             <span className="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
-              {kpis?.enviadasTrend || "+22% ↗"}
+              {kpis?.enviadasTrend ?? "—"}
             </span>
           </div>
           <div className="mt-3.5">
             <h3 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              {kpis?.mensagensEnviadas ? kpis.mensagensEnviadas.toLocaleString("pt-BR") : "12.843"}
+              {(kpis?.mensagensEnviadas ?? 0).toLocaleString("pt-BR")}
             </h3>
             <p className="mt-0.5 text-xs font-medium text-slate-400">Mensagens enviadas</p>
           </div>
@@ -175,12 +169,12 @@ export function WaRelatorios({
               <CheckCheck className="h-5 w-5" />
             </div>
             <span className="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
-              {kpis?.taxaEntrega || "92,8% ↗"}
+              {kpis?.taxaEntrega ?? "Dados insuficientes"}
             </span>
           </div>
           <div className="mt-3.5">
             <h3 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              {kpis?.entregues ? kpis.entregues.toLocaleString("pt-BR") : "11.926"}
+              {(kpis?.entregues ?? 0).toLocaleString("pt-BR")}
             </h3>
             <p className="mt-0.5 text-xs font-medium text-slate-400">Entregues</p>
           </div>
@@ -193,15 +187,17 @@ export function WaRelatorios({
               <Inbox className="h-5 w-5" />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-400">{kpis?.taxaResposta || "17,9%"}</span>
+              <span className="text-[11px] font-bold text-slate-400">
+                {kpis?.taxaResposta ?? "0%"}
+              </span>
               <span className="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
-                {kpis?.respostasTrend || "+6% ↗"}
+                {kpis?.respostasTrend ?? "—"}
               </span>
             </div>
           </div>
           <div className="mt-3.5">
             <h3 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              {kpis?.respostas ? kpis.respostas.toLocaleString("pt-BR") : "2.184"}
+              {(kpis?.respostas ?? 0).toLocaleString("pt-BR")}
             </h3>
             <p className="mt-0.5 text-xs font-medium text-slate-400">Respostas</p>
           </div>
@@ -214,12 +210,12 @@ export function WaRelatorios({
               <UserCheck className="h-5 w-5" />
             </div>
             <span className="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
-              {kpis?.leadsTrend || "+28% ↗"}
+              {kpis?.leadsTrend ?? "—"}
             </span>
           </div>
           <div className="mt-3.5">
             <h3 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              {kpis?.leadsGerados ? kpis.leadsGerados.toLocaleString("pt-BR") : "674"}
+              {(kpis?.leadsGerados ?? 0).toLocaleString("pt-BR")}
             </h3>
             <p className="mt-0.5 text-xs font-medium text-slate-400">Leads gerados</p>
           </div>
@@ -232,12 +228,12 @@ export function WaRelatorios({
               <ShoppingCart className="h-5 w-5" />
             </div>
             <span className="flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400">
-              {kpis?.vendasTrend || "+34% ↗"}
+              {kpis?.vendasTrend ?? "—"}
             </span>
           </div>
           <div className="mt-3.5">
             <h3 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              R$ {kpis?.vendasAtribuidas ? kpis.vendasAtribuidas.toLocaleString("pt-BR") : "18.450"}
+              R$ {(kpis?.vendasAtribuidas ?? 0).toLocaleString("pt-BR")}
             </h3>
             <p className="mt-0.5 text-xs font-medium text-slate-400">Vendas atribuídas</p>
           </div>
@@ -302,7 +298,11 @@ export function WaRelatorios({
 
                   {/* SVG das 4 curvas vetoriais */}
                   <div className="absolute inset-0 pl-9">
-                    <svg className="h-full w-full overflow-visible" viewBox="0 0 700 160" preserveAspectRatio="none">
+                    <svg
+                      className="h-full w-full overflow-visible"
+                      viewBox="0 0 700 160"
+                      preserveAspectRatio="none"
+                    >
                       <defs>
                         <linearGradient id="grad-enviadas" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25" />
@@ -559,7 +559,11 @@ export function WaRelatorios({
 
                     {/* Texto Central */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                      <span className="text-xl font-black text-white">2.184</span>
+                      <span className="text-xl font-black text-white">
+                        {distribuicaoCanal
+                          .reduce((total, item) => total + item.quantidade, 0)
+                          .toLocaleString("pt-BR")}
+                      </span>
                       <span className="text-[10px] font-medium text-slate-400">respostas</span>
                     </div>
                   </div>
@@ -569,12 +573,17 @@ export function WaRelatorios({
                     {distribuicaoCanal.map((canal) => (
                       <div key={canal.canal} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: canal.cor }} />
+                          <span
+                            className="h-2.5 w-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: canal.cor }}
+                          />
                           <span className="font-medium text-slate-300">{canal.canal}</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-bold text-white">{canal.percentual}%</span>
-                          <span className="w-8 text-right font-medium text-slate-400">{canal.quantidade}</span>
+                          <span className="w-8 text-right font-medium text-slate-400">
+                            {canal.quantidade}
+                          </span>
                         </div>
                       </div>
                     ))}
@@ -600,7 +609,9 @@ export function WaRelatorios({
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-white">Desempenho por número</h3>
-                      <p className="text-xs text-slate-400">Compare o resultado de cada chip conectado</p>
+                      <p className="text-xs text-slate-400">
+                        Compare o resultado de cada chip conectado
+                      </p>
                     </div>
                   </div>
                   <button
@@ -637,15 +648,25 @@ export function WaRelatorios({
                                 <SiWhatsapp className="h-4 w-4" />
                               </div>
                               <div className="truncate">
-                                <p className="font-bold text-white truncate max-w-[110px]">{num.nome}</p>
+                                <p className="font-bold text-white truncate max-w-[110px]">
+                                  {num.nome}
+                                </p>
                                 <p className="text-[10px] text-slate-400">{num.numero}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="py-2.5 text-right font-medium text-slate-300">{num.enviadas.toLocaleString("pt-BR")}</td>
-                          <td className="py-2.5 text-right font-medium text-slate-300">{num.entregues.toLocaleString("pt-BR")}</td>
-                          <td className="py-2.5 text-right font-medium text-slate-300">{num.respostas.toLocaleString("pt-BR")}</td>
-                          <td className="py-2.5 text-right font-bold text-white">{num.leads.toLocaleString("pt-BR")}</td>
+                          <td className="py-2.5 text-right font-medium text-slate-300">
+                            {num.enviadas.toLocaleString("pt-BR")}
+                          </td>
+                          <td className="py-2.5 text-right font-medium text-slate-300">
+                            {num.entregues.toLocaleString("pt-BR")}
+                          </td>
+                          <td className="py-2.5 text-right font-medium text-slate-300">
+                            {num.respostas.toLocaleString("pt-BR")}
+                          </td>
+                          <td className="py-2.5 text-right font-bold text-white">
+                            {num.leads.toLocaleString("pt-BR")}
+                          </td>
                           <td className="py-2.5 text-right">
                             <div className="flex items-center justify-end gap-1.5">
                               <div className="h-1.5 w-12 rounded-full bg-slate-800 overflow-hidden">
@@ -695,12 +716,17 @@ export function WaRelatorios({
                     <div key={tipo.tipo} className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tipo.cor }} />
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: tipo.cor }}
+                          />
                           <span className="font-medium text-slate-300">{tipo.tipo}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-white">{tipo.percentual}%</span>
-                          <span className="text-[11px] text-slate-400">{tipo.quantidade.toLocaleString("pt-BR")}</span>
+                          <span className="text-[11px] text-slate-400">
+                            {tipo.quantidade.toLocaleString("pt-BR")}
+                          </span>
                         </div>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-slate-800/80 overflow-hidden">
@@ -792,7 +818,10 @@ export function WaRelatorios({
                     {statusConversas.map((st) => (
                       <div key={st.status} className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: st.cor }} />
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: st.cor }}
+                          />
                           <span className="text-slate-300 text-[11px]">{st.status}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -819,7 +848,9 @@ export function WaRelatorios({
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-white">Principais palavras-chave</h3>
-                      <p className="text-xs text-slate-400">Termos mais mencionados nas conversas</p>
+                      <p className="text-xs text-slate-400">
+                        Termos mais mencionados nas conversas
+                      </p>
                     </div>
                   </div>
                   <button
@@ -834,7 +865,10 @@ export function WaRelatorios({
                 {/* Ranking de 1 a 5 com badges laranja */}
                 <div className="mt-4 space-y-2.5">
                   {palavrasChave.map((palavra) => (
-                    <div key={palavra.ranking} className="flex items-center justify-between gap-2 text-xs">
+                    <div
+                      key={palavra.ranking}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
                       <div className="flex items-center gap-2 min-w-[90px]">
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#ff6200] text-[10px] font-black text-white shrink-0">
                           {palavra.ranking}
@@ -852,7 +886,9 @@ export function WaRelatorios({
 
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white">{palavra.frequencia}</span>
-                        <span className="w-7 text-right text-[11px] text-slate-400">{palavra.percentual}%</span>
+                        <span className="w-7 text-right text-[11px] text-slate-400">
+                          {palavra.percentual}%
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -967,7 +1003,9 @@ export function WaRelatorios({
                 {/* Header com Valor R$ 18.450 e Badge +34% */}
                 <div className="mt-2.5 flex items-baseline justify-between">
                   <div>
-                    <span className="text-lg font-black text-white">R$ 18.450</span>
+                    <span className="text-lg font-black text-white">
+                      R$ {(kpis?.vendasAtribuidas ?? 0).toLocaleString("pt-BR")}
+                    </span>
                     <span className="ml-1.5 text-[11px] text-slate-400">Vendas atribuídas</span>
                   </div>
                   <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
@@ -1190,7 +1228,9 @@ export function WaRelatorios({
                       <p className="text-[11px] text-slate-400">{atv.subtitulo}</p>
                     </div>
                   </div>
-                  <span className="shrink-0 text-[11px] font-medium text-slate-400">{atv.horario}</span>
+                  <span className="shrink-0 text-[11px] font-medium text-slate-400">
+                    {atv.horario}
+                  </span>
                 </div>
               ))}
             </div>
@@ -1227,7 +1267,10 @@ export function WaRelatorios({
               {modalAtivo === "distribuicao" && (
                 <div className="space-y-2">
                   {distribuicaoCanal.map((c) => (
-                    <div key={c.canal} className="flex justify-between items-center p-2 rounded-lg bg-white/[0.02]">
+                    <div
+                      key={c.canal}
+                      className="flex justify-between items-center p-2 rounded-lg bg-white/[0.02]"
+                    >
                       <span className="font-semibold text-white">{c.canal}</span>
                       <span>
                         {c.percentual}% ({c.quantidade} conversas)
@@ -1240,14 +1283,20 @@ export function WaRelatorios({
               {modalAtivo === "numeros" && (
                 <div className="space-y-2">
                   {desempenhoNumeros.map((n) => (
-                    <div key={n.id} className="p-3 rounded-lg bg-white/[0.02] flex justify-between items-center">
+                    <div
+                      key={n.id}
+                      className="p-3 rounded-lg bg-white/[0.02] flex justify-between items-center"
+                    >
                       <div>
                         <p className="font-bold text-white">{n.nome}</p>
                         <p className="text-slate-400 text-[11px]">{n.numero}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-emerald-400">{n.leads} leads gerados</p>
-                        <p className="text-slate-400 text-[11px]">{n.enviadas} enviadas | {n.respostas} respostas ({n.taxaResposta.toFixed(1)}%)</p>
+                        <p className="text-slate-400 text-[11px]">
+                          {n.enviadas} enviadas | {n.respostas} respostas (
+                          {n.taxaResposta.toFixed(1)}%)
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -1257,7 +1306,10 @@ export function WaRelatorios({
               {modalAtivo === "tipos" && (
                 <div className="space-y-2">
                   {tiposConversas.map((t) => (
-                    <div key={t.tipo} className="flex justify-between items-center p-2 rounded-lg bg-white/[0.02]">
+                    <div
+                      key={t.tipo}
+                      className="flex justify-between items-center p-2 rounded-lg bg-white/[0.02]"
+                    >
                       <span className="font-semibold text-white">{t.tipo}</span>
                       <span>
                         {t.percentual}% ({t.quantidade.toLocaleString("pt-BR")} conversas)
@@ -1270,7 +1322,10 @@ export function WaRelatorios({
               {modalAtivo === "palavras" && (
                 <div className="space-y-2">
                   {palavrasChave.map((p) => (
-                    <div key={p.ranking} className="flex justify-between items-center p-2 rounded-lg bg-white/[0.02]">
+                    <div
+                      key={p.ranking}
+                      className="flex justify-between items-center p-2 rounded-lg bg-white/[0.02]"
+                    >
                       <span className="font-bold text-white">
                         #{p.ranking} {p.palavra}
                       </span>
@@ -1285,7 +1340,10 @@ export function WaRelatorios({
               {modalAtivo === "leads" && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {leadsPorDia.map((l) => (
-                    <div key={l.data} className="p-2 rounded-lg bg-white/[0.02] flex justify-between items-center">
+                    <div
+                      key={l.data}
+                      className="p-2 rounded-lg bg-white/[0.02] flex justify-between items-center"
+                    >
                       <span className="text-slate-400">{l.label}</span>
                       <span className="font-bold text-emerald-400">+{l.leads} leads</span>
                     </div>
@@ -1296,7 +1354,10 @@ export function WaRelatorios({
               {modalAtivo === "vendas" && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {conversoesVendas.map((v) => (
-                    <div key={v.data} className="p-2 rounded-lg bg-white/[0.02] flex justify-between items-center">
+                    <div
+                      key={v.data}
+                      className="p-2 rounded-lg bg-white/[0.02] flex justify-between items-center"
+                    >
                       <span className="text-slate-400">{v.label}</span>
                       <span className="font-bold text-orange-400">R$ {v.valor}</span>
                     </div>
@@ -1307,7 +1368,10 @@ export function WaRelatorios({
               {modalAtivo === "atividades" && (
                 <div className="space-y-2">
                   {atividades.map((a) => (
-                    <div key={a.id} className="p-2.5 rounded-lg bg-white/[0.02] flex justify-between items-center">
+                    <div
+                      key={a.id}
+                      className="p-2.5 rounded-lg bg-white/[0.02] flex justify-between items-center"
+                    >
                       <div>
                         <p className="font-bold text-white">{a.titulo}</p>
                         <p className="text-[11px] text-slate-400">{a.subtitulo}</p>

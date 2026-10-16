@@ -54,11 +54,6 @@ import {
   excluirScriptWa,
   duplicarScriptWa,
   extrairVariaveis,
-  SCRIPTS_REFERENCIA_PREMIUM,
-  KPIS_SCRIPTS_REFERENCIA_PREMIUM,
-  DESEMPENHO_SCRIPTS_REFERENCIA_PREMIUM,
-  SCRIPTS_MAIS_USADOS_PREMIUM,
-  ATIVIDADES_SCRIPTS_PREMIUM,
 } from "@/services/whatsapp";
 import { resolverVariaveis, WaLeadDados } from "@/lib/wa-copy";
 
@@ -81,7 +76,11 @@ const VARIAVEIS_DISPONIVEIS = [
   { token: "categoria", label: "Nicho ou categoria", exemplo: "Marketing Digital" },
   { token: "telefone", label: "Telefone ou WhatsApp", exemplo: "(11) 98765-4321" },
   { token: "responsavel", label: "Atendente responsável", exemplo: "Ana Oliveira" },
-  { token: "link", label: "Link de agendamento ou proposta", exemplo: "https://flowbusiness.com.br/agenda" },
+  {
+    token: "link",
+    label: "Link de agendamento ou proposta",
+    exemplo: "https://flowbusiness.com.br/agenda",
+  },
 ];
 
 const EMOJIS_COMUNS = ["👋", "🚀", "💬", "📅", "⭐", "✅", "🔥", "🎯", "💼", "🤝"];
@@ -89,17 +88,32 @@ const EMOJIS_COMUNS = ["👋", "🚀", "💬", "📅", "⭐", "✅", "🔥", "�
 export function WaScripts() {
   // Estado dos dados
   const [carregando, setCarregando] = useState(true);
-  const [scripts, setScripts] = useState<WaScriptItem[]>(SCRIPTS_REFERENCIA_PREMIUM);
-  const [kpis, setKpis] = useState<WaScriptsKpis>(KPIS_SCRIPTS_REFERENCIA_PREMIUM);
-  const [desempenho, setDesempenho] = useState<WaScriptsDesempenho>(
-    DESEMPENHO_SCRIPTS_REFERENCIA_PREMIUM,
-  );
-  const [maisUsados, setMaisUsados] = useState<WaScriptMaisUsado[]>(
-    SCRIPTS_MAIS_USADOS_PREMIUM,
-  );
-  const [atividades, setAtividades] = useState<WaScriptAtividadeItem[]>(
-    ATIVIDADES_SCRIPTS_PREMIUM,
-  );
+  const [scripts, setScripts] = useState<WaScriptItem[]>([]);
+  const [kpis, setKpis] = useState<WaScriptsKpis>({
+    criados: 0,
+    criadosTrend: "—",
+    usosMes: 0,
+    usosMesTrend: "—",
+    atendimentos: 0,
+    atendimentosTrend: "—",
+    taxaUtilizacao: "0%",
+    taxaUtilizacaoTrend: "—",
+    avaliacao: "—",
+    avaliacaoTrend: "—",
+  });
+  const [desempenho, setDesempenho] = useState<WaScriptsDesempenho>({
+    usosMes: 0,
+    usosMesTrend: "—",
+    conversas: 0,
+    conversasTrend: "—",
+    taxaResposta: "0%",
+    taxaRespostaTrend: "—",
+    avaliacao: "—",
+    avaliacaoTrend: "—",
+    pontos: [],
+  });
+  const [maisUsados, setMaisUsados] = useState<WaScriptMaisUsado[]>([]);
+  const [atividades, setAtividades] = useState<WaScriptAtividadeItem[]>([]);
 
   // Filtros da biblioteca
   const [busca, setBusca] = useState("");
@@ -301,11 +315,7 @@ export function WaScripts() {
 
     try {
       await alternarStatusScriptWa(s.id, novoAtivo);
-      toast.success(
-        novoAtivo
-          ? `Script "${s.nome}" ativado.`
-          : `Script "${s.nome}" desativado.`,
-      );
+      toast.success(novoAtivo ? `Script "${s.nome}" ativado.` : `Script "${s.nome}" desativado.`);
     } catch {
       toast.error("Falha ao alterar status");
       carregarDados();
@@ -466,9 +476,7 @@ export function WaScripts() {
                 <SiWhatsapp className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white tracking-tight">
-                  Meus scripts
-                </h2>
+                <h2 className="text-base font-bold text-white tracking-tight">Meus scripts</h2>
                 <p className="text-xs text-home-muted mt-0.5">
                   Organize suas mensagens por categoria e use variáveis para personalizar
                 </p>
@@ -546,7 +554,11 @@ export function WaScripts() {
             {[
               { id: "todos", label: "Todos", count: contagensCategorias.todos },
               { id: "boas_vindas", label: "Boas-vindas", count: contagensCategorias.boas_vindas },
-              { id: "qualificacao", label: "Qualificação", count: contagensCategorias.qualificacao },
+              {
+                id: "qualificacao",
+                label: "Qualificação",
+                count: contagensCategorias.qualificacao,
+              },
               { id: "follow_up", label: "Follow-up", count: contagensCategorias.follow_up },
               { id: "agendamento", label: "Agendamento", count: contagensCategorias.agendamento },
               { id: "recuperacao", label: "Recuperação", count: contagensCategorias.recuperacao },
@@ -567,10 +579,7 @@ export function WaScripts() {
                 >
                   <span>{cat.label}</span>
                   <span
-                    className={cn(
-                      "text-[10px]",
-                      ativo ? "text-home-orange" : "text-home-muted",
-                    )}
+                    className={cn("text-[10px]", ativo ? "text-home-orange" : "text-home-muted")}
                   >
                     ({cat.count})
                   </span>
@@ -659,7 +668,8 @@ export function WaScripts() {
                             <div
                               className={cn(
                                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-sm",
-                                s.categoria === "boas_vindas" && "bg-emerald-500/15 text-emerald-400",
+                                s.categoria === "boas_vindas" &&
+                                  "bg-emerald-500/15 text-emerald-400",
                                 s.categoria === "qualificacao" && "bg-blue-500/15 text-blue-400",
                                 s.categoria === "agendamento" && "bg-purple-500/15 text-purple-400",
                                 s.categoria === "follow_up" && "bg-amber-500/15 text-amber-400",
@@ -667,12 +677,22 @@ export function WaScripts() {
                                 s.categoria === "atendimento" && "bg-cyan-500/15 text-cyan-400",
                               )}
                             >
-                              {s.categoria === "boas_vindas" && <SiWhatsapp className="h-3.5 w-3.5" />}
-                              {s.categoria === "qualificacao" && <MessageSquare className="h-3.5 w-3.5" />}
-                              {s.categoria === "agendamento" && <Calendar className="h-3.5 w-3.5" />}
+                              {s.categoria === "boas_vindas" && (
+                                <SiWhatsapp className="h-3.5 w-3.5" />
+                              )}
+                              {s.categoria === "qualificacao" && (
+                                <MessageSquare className="h-3.5 w-3.5" />
+                              )}
+                              {s.categoria === "agendamento" && (
+                                <Calendar className="h-3.5 w-3.5" />
+                              )}
                               {s.categoria === "follow_up" && <Clock className="h-3.5 w-3.5" />}
-                              {s.categoria === "recuperacao" && <RefreshCw className="h-3.5 w-3.5" />}
-                              {s.categoria === "atendimento" && <Headphones className="h-3.5 w-3.5" />}
+                              {s.categoria === "recuperacao" && (
+                                <RefreshCw className="h-3.5 w-3.5" />
+                              )}
+                              {s.categoria === "atendimento" && (
+                                <Headphones className="h-3.5 w-3.5" />
+                              )}
                             </div>
 
                             <div className="font-semibold text-white truncate max-w-[170px]">
@@ -751,9 +771,7 @@ export function WaScripts() {
                         >
                           <button
                             type="button"
-                            onClick={() =>
-                              setMenuAbertoId(menuAbertoId === s.id ? null : s.id)
-                            }
+                            onClick={() => setMenuAbertoId(menuAbertoId === s.id ? null : s.id)}
                             className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-home-muted hover:bg-white/10 hover:text-white transition-colors"
                           >
                             <MoreVertical className="h-4 w-4" />
@@ -824,9 +842,7 @@ export function WaScripts() {
                 <h2 className="text-base font-bold text-white tracking-tight">
                   {modoCriacao ? "Novo script" : "Editar script"}
                 </h2>
-                <p className="text-xs text-home-muted mt-0.5">
-                  Crie e personalize sua mensagem
-                </p>
+                <p className="text-xs text-home-muted mt-0.5">Crie e personalize sua mensagem</p>
               </div>
             </div>
 
@@ -843,9 +859,7 @@ export function WaScripts() {
           <div className="mt-4 space-y-4">
             {/* Campo 1: Nome do script */}
             <div>
-              <label className="text-xs font-semibold text-white/90">
-                Nome do script
-              </label>
+              <label className="text-xs font-semibold text-white/90">Nome do script</label>
               <input
                 type="text"
                 value={nomeForm}
@@ -859,9 +873,7 @@ export function WaScripts() {
             <div className="grid grid-cols-12 gap-3 items-center">
               {/* Dropdown Categoria */}
               <div className="col-span-8">
-                <label className="text-xs font-semibold text-white/90">
-                  Categoria
-                </label>
+                <label className="text-xs font-semibold text-white/90">Categoria</label>
                 <div className="relative mt-1.5">
                   <select
                     value={categoriaForm}
@@ -882,9 +894,7 @@ export function WaScripts() {
 
               {/* Status Toggle */}
               <div className="col-span-4 flex flex-col justify-end">
-                <label className="text-xs font-semibold text-white/90 mb-1.5">
-                  Status
-                </label>
+                <label className="text-xs font-semibold text-white/90 mb-1.5">Status</label>
                 <div className="flex items-center gap-2 h-[34px]">
                   <button
                     type="button"
@@ -911,9 +921,7 @@ export function WaScripts() {
             {/* Campo Mensagem com Barra de Ferramentas e Dropdown de Variáveis */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-white/90">
-                  Mensagem
-                </label>
+                <label className="text-xs font-semibold text-white/90">Mensagem</label>
 
                 {/* Dropdown de Variáveis (ETAPA 11) */}
                 <div className="relative">
@@ -941,9 +949,7 @@ export function WaScripts() {
                             }}
                             className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-xs text-left text-white/90 hover:bg-white/10 transition-colors"
                           >
-                            <span className="font-mono text-cyan-400">
-                              {`{{${v.token}}}`}
-                            </span>
+                            <span className="font-mono text-cyan-400">{`{{${v.token}}}`}</span>
                             <span className="text-[10px] text-home-muted truncate max-w-[110px]">
                               {v.exemplo}
                             </span>
@@ -1089,9 +1095,7 @@ export function WaScripts() {
 
               {/* Contador de Caracteres */}
               <div className="mt-1 flex justify-end">
-                <span className="text-[10px] text-home-muted">
-                  {mensagemForm.length}/1000
-                </span>
+                <span className="text-[10px] text-home-muted">{mensagemForm.length}/1000</span>
               </div>
             </div>
           </div>
@@ -1172,9 +1176,7 @@ export function WaScripts() {
                     {desempenho.taxaRespostaTrend}
                   </span>
                 </div>
-                <div className="text-sm font-bold text-white mt-1">
-                  {desempenho.taxaResposta}
-                </div>
+                <div className="text-sm font-bold text-white mt-1">{desempenho.taxaResposta}</div>
                 <div className="text-[9px] text-home-muted truncate">Taxa resposta</div>
               </div>
 
@@ -1185,9 +1187,7 @@ export function WaScripts() {
                     {desempenho.avaliacaoTrend}
                   </span>
                 </div>
-                <div className="text-sm font-bold text-white mt-1">
-                  {desempenho.avaliacao}
-                </div>
+                <div className="text-sm font-bold text-white mt-1">{desempenho.avaliacao}</div>
                 <div className="text-[9px] text-home-muted truncate">Avaliação</div>
               </div>
             </div>
@@ -1195,15 +1195,47 @@ export function WaScripts() {
             {/* Gráfico de Linhas SVG */}
             <div className="mt-5 relative h-36 w-full">
               <svg className="w-full h-full overflow-visible" viewBox="0 0 400 120">
-                <line x1="30" y1="20" x2="390" y2="20" stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="3 3" />
-                <line x1="30" y1="50" x2="390" y2="50" stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="3 3" />
-                <line x1="30" y1="80" x2="390" y2="80" stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="3 3" />
+                <line
+                  x1="30"
+                  y1="20"
+                  x2="390"
+                  y2="20"
+                  stroke="#ffffff"
+                  strokeOpacity="0.05"
+                  strokeDasharray="3 3"
+                />
+                <line
+                  x1="30"
+                  y1="50"
+                  x2="390"
+                  y2="50"
+                  stroke="#ffffff"
+                  strokeOpacity="0.05"
+                  strokeDasharray="3 3"
+                />
+                <line
+                  x1="30"
+                  y1="80"
+                  x2="390"
+                  y2="80"
+                  stroke="#ffffff"
+                  strokeOpacity="0.05"
+                  strokeDasharray="3 3"
+                />
                 <line x1="30" y1="105" x2="390" y2="105" stroke="#ffffff" strokeOpacity="0.1" />
 
-                <text x="5" y="23" fill="#64748b" fontSize="8">200</text>
-                <text x="5" y="53" fill="#64748b" fontSize="8">150</text>
-                <text x="5" y="83" fill="#64748b" fontSize="8">100</text>
-                <text x="10" y="107" fill="#64748b" fontSize="8">50</text>
+                <text x="5" y="23" fill="#64748b" fontSize="8">
+                  200
+                </text>
+                <text x="5" y="53" fill="#64748b" fontSize="8">
+                  150
+                </text>
+                <text x="5" y="83" fill="#64748b" fontSize="8">
+                  100
+                </text>
+                <text x="10" y="107" fill="#64748b" fontSize="8">
+                  50
+                </text>
 
                 {/* Curva 1: Usos (Verde/Cyan) */}
                 <path
@@ -1236,13 +1268,27 @@ export function WaScripts() {
                 <circle cx="390" cy="52" r="3.5" fill="#3b82f6" />
                 <circle cx="390" cy="82" r="3.5" fill="#a855f7" />
 
-                <text x="30" y="118" fill="#64748b" fontSize="8">01/03</text>
-                <text x="90" y="118" fill="#64748b" fontSize="8">05/03</text>
-                <text x="150" y="118" fill="#64748b" fontSize="8">10/03</text>
-                <text x="210" y="118" fill="#64748b" fontSize="8">15/03</text>
-                <text x="270" y="118" fill="#64748b" fontSize="8">20/03</text>
-                <text x="330" y="118" fill="#64748b" fontSize="8">25/03</text>
-                <text x="375" y="118" fill="#64748b" fontSize="8">30/03</text>
+                <text x="30" y="118" fill="#64748b" fontSize="8">
+                  01/03
+                </text>
+                <text x="90" y="118" fill="#64748b" fontSize="8">
+                  05/03
+                </text>
+                <text x="150" y="118" fill="#64748b" fontSize="8">
+                  10/03
+                </text>
+                <text x="210" y="118" fill="#64748b" fontSize="8">
+                  15/03
+                </text>
+                <text x="270" y="118" fill="#64748b" fontSize="8">
+                  20/03
+                </text>
+                <text x="330" y="118" fill="#64748b" fontSize="8">
+                  25/03
+                </text>
+                <text x="375" y="118" fill="#64748b" fontSize="8">
+                  30/03
+                </text>
               </svg>
             </div>
           </div>
@@ -1296,10 +1342,7 @@ export function WaScripts() {
             {/* Ranking 1 a 5 com Badges Coloridas */}
             <div className="mt-3 divide-y divide-white/[0.04]">
               {maisUsados.map((item) => (
-                <div
-                  key={item.rank}
-                  className="py-2.5 flex items-center justify-between gap-3"
-                >
+                <div key={item.rank} className="py-2.5 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 min-w-0">
                     {/* Número do Ranking */}
                     <div
@@ -1327,16 +1370,16 @@ export function WaScripts() {
                       )}
                     >
                       {item.categoria === "boas_vindas" && <SiWhatsapp className="h-3.5 w-3.5" />}
-                      {item.categoria === "qualificacao" && <MessageSquare className="h-3.5 w-3.5" />}
+                      {item.categoria === "qualificacao" && (
+                        <MessageSquare className="h-3.5 w-3.5" />
+                      )}
                       {item.categoria === "agendamento" && <Calendar className="h-3.5 w-3.5" />}
                       {item.categoria === "follow_up" && <Clock className="h-3.5 w-3.5" />}
                       {item.categoria === "recuperacao" && <RefreshCw className="h-3.5 w-3.5" />}
                     </div>
 
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">
-                        {item.nome}
-                      </div>
+                      <div className="text-xs font-semibold text-white truncate">{item.nome}</div>
                       <div className="text-[11px] text-home-muted truncate">
                         {item.categoriaLabel}
                       </div>
@@ -1344,9 +1387,7 @@ export function WaScripts() {
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="text-xs font-bold text-white">
-                      {item.usos}
-                    </span>
+                    <span className="text-xs font-bold text-white">{item.usos}</span>
                     <span className="text-[10px] text-home-muted ml-1">usos</span>
                   </div>
                 </div>
@@ -1366,12 +1407,8 @@ export function WaScripts() {
                   <Clock className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-tight">
-                    Atividade recente
-                  </h3>
-                  <p className="text-[11px] text-home-muted">
-                    Últimas ações nos scripts
-                  </p>
+                  <h3 className="text-sm font-bold text-white tracking-tight">Atividade recente</h3>
+                  <p className="text-[11px] text-home-muted">Últimas ações nos scripts</p>
                 </div>
               </div>
 
@@ -1387,10 +1424,7 @@ export function WaScripts() {
             {/* 6 Ações Recentes com Horários */}
             <div className="mt-3 divide-y divide-white/[0.04]">
               {atividades.map((act) => (
-                <div
-                  key={act.id}
-                  className="py-2.5 flex items-center justify-between gap-2.5"
-                >
+                <div key={act.id} className="py-2.5 flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
                       className={cn(
@@ -1411,12 +1445,8 @@ export function WaScripts() {
                     </div>
 
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">
-                        {act.titulo}
-                      </div>
-                      <div className="text-[11px] text-home-muted truncate">
-                        {act.scriptNome}
-                      </div>
+                      <div className="text-xs font-semibold text-white truncate">{act.titulo}</div>
+                      <div className="text-[11px] text-home-muted truncate">{act.scriptNome}</div>
                     </div>
                   </div>
 
@@ -1504,7 +1534,8 @@ export function WaScripts() {
                   Exemplo de lead aplicado:
                 </div>
                 <div className="text-white">
-                  Nome: <strong>Carlos Silva</strong> • Empresa: <strong>Acme Corp</strong> • Cidade: <strong>São Paulo</strong>
+                  Nome: <strong>Carlos Silva</strong> • Empresa: <strong>Acme Corp</strong> •
+                  Cidade: <strong>São Paulo</strong>
                 </div>
               </div>
 
@@ -1539,9 +1570,7 @@ export function WaScripts() {
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">
-                  Ranking de Utilização de Scripts
-                </h3>
+                <h3 className="text-base font-bold text-white">Ranking de Utilização de Scripts</h3>
               </div>
               <button
                 type="button"
@@ -1590,9 +1619,7 @@ export function WaScripts() {
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">
-                  Histórico de Ações nos Scripts
-                </h3>
+                <h3 className="text-base font-bold text-white">Histórico de Ações nos Scripts</h3>
               </div>
               <button
                 type="button"

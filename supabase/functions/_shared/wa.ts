@@ -7,7 +7,7 @@
 // INCIDENTE (corrigido aqui): antes havia UMA instância global ("flowleads") para todas as
 // orgs e as edges não checavam o dono → B via o número de A, enviava pelo WhatsApp de A e,
 // ao pedir código, derrubava a conexão de A (recriar global). Agora TUDO é escopado ao
-// user_id do caller, e o NOME da instância é ARMAZENADO (nunca derivado) — assim o legado
+// org_id validado no backend, e o NOME da instância é ARMAZENADO (nunca derivado) — assim o legado
 // "flowleads" convive com as novas sem caso especial.
 //
 // Rotas GO usadas:
@@ -23,6 +23,13 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any;
 import { resolverChave } from "./chaves.ts";
+import {
+  calculateOperationalHealth,
+  parseEvolutionGoStatus,
+  providerFailure,
+  type WaProviderObservation,
+  type WaProviderState,
+} from "./whatsapp-instance-health.ts";
 
 // 🔐 Cofre de chaves: cada edge que importa wa.ts chama inicializarCofreWa(admin) 1x no início
 // do handler — Deno.env.set não funciona no runtime das Edges, por isso o cache de módulo
@@ -45,12 +52,15 @@ export function waGlobalKey(): string {
 
 export type WaInstanciaOrg = {
   id: string;
+  orgId: string;
   nome: string;
   token: string;
   numero: string | null;
   status: string;
   funcao?: string;
 };
+
+export type WaTenantScope = { userId: string; orgId: string };
 
 /** Linha da instância (sem token) — para listar os chips da org na UI. */
 export type WaChip = {
@@ -60,6 +70,12 @@ export type WaChip = {
   status: string;
   funcao: string;
   ordem: number;
+  provider_status: WaProviderState;
+  operational_health: string;
+  last_health_check_at: string | null;
+  last_provider_success_at: string | null;
+  health_failure_count: number;
+  health_error_code: string | null;
 };
 
 /* ----------------------- gerência na Evolution (key global) ----------------------- */
@@ -100,10 +116,27 @@ async function criarNaEvolution(nome: string): Promise<string | null> {
   return cj.data?.token || token;
 }
 
+/** Remove uma instância remota e confirma o resultado antes de alterar o estado local. */
+async function excluirNaEvolution(id: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${waBase()}/instance/delete/${id}`, {
+      method: "DELETE",
+      headers: { apikey: waGlobalKey() },
+    });
+    return response.ok;
+  } catch (error) {
+    console.error(
+      "wa remote instance delete failed",
+      error instanceof Error ? error.name : "error",
+    );
+    return false;
+  }
+}
+
 /* --------------------------- resolução POR ORG (escopada) --------------------------- */
 
 /**
- * Devolve a instância DA ORG do userId — e SÓ dela. Nunca lista/retorna a de outra org.
+ * Devolve a instância DA ORGANIZAÇÃO autorizada — e SÓ dela.
  * - Org já tem linha: usa o NOME ARMAZENADO. Se o token ainda não foi gravado (caso do legado
  *   "flowleads", adotado pela migration 020), busca na Evolution POR NOME e grava — sem
  *   re-parear, a conexão viva é preservada.
@@ -127,6 +160,7 @@ async function garantirTokenDaLinha(
   if (tk?.token)
     return {
       id: row.id,
+      orgId: row.org_id,
       nome: row.nome,
       token: tk.token,
       numero: row.numero,
@@ -150,12 +184,20 @@ async function garantirTokenDaLinha(
   await admin
     .from("wa_instancia_tokens")
     .upsert({ instancia_id: row.id, token, atualizado_em: new Date().toISOString() });
-  return { id: row.id, nome: row.nome, token, numero, status, funcao: row.funcao };
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    nome: row.nome,
+    token,
+    numero,
+    status,
+    funcao: row.funcao,
+  };
 }
 
 export async function resolverInstanciaDaOrg(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
   criarSeFaltar = true,
 ): Promise<WaInstanciaOrg | null> {
   if (!waBase() || !waGlobalKey()) return null;
@@ -163,8 +205,8 @@ export async function resolverInstanciaDaOrg(
   // N chips por org: a resolução "genérica" (sem id) devolve a PRIMÁRIA (mais antiga).
   const { data: row } = await admin
     .from("wa_instancias")
-    .select("id, nome, numero, status, funcao")
-    .eq("user_id", userId)
+    .select("id, org_id, nome, numero, status, funcao")
+    .eq("org_id", scope.orgId)
     .order("criada_em", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -175,11 +217,11 @@ export async function resolverInstanciaDaOrg(
 
   // Reserva a linha primeiro: o trigger de plano serializa e bloqueia acima da cota
   // antes de criar uma instância externa na Evolution.
-  const nome = `org-${userId.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 4)}`;
+  const nome = `org-${scope.orgId.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 4)}`;
   const { data: nova, error } = await admin
     .from("wa_instancias")
-    .insert({ user_id: userId, nome, status: "desconectado" })
-    .select("id, nome, numero, status")
+    .insert({ user_id: scope.userId, org_id: scope.orgId, nome, status: "desconectado" })
+    .select("id, org_id, nome, numero, status")
     .single();
   if (error || !nova) return null;
   const token = await criarNaEvolution(nome);
@@ -188,7 +230,14 @@ export async function resolverInstanciaDaOrg(
     return null;
   }
   await admin.from("wa_instancia_tokens").insert({ instancia_id: nova.id, token });
-  return { id: nova.id, nome: nova.nome, token, numero: null, status: "desconectado" };
+  return {
+    id: nova.id,
+    orgId: nova.org_id,
+    nome: nova.nome,
+    token,
+    numero: null,
+    status: "desconectado",
+  };
 }
 
 /**
@@ -198,16 +247,12 @@ export async function resolverInstanciaDaOrg(
  */
 export async function recriarInstanciaDaOrg(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
 ): Promise<WaInstanciaOrg | null> {
-  const atual = await resolverInstanciaDaOrg(admin, userId, true);
+  const atual = await resolverInstanciaDaOrg(admin, scope, true);
   if (!atual) return null;
   const id = await idNaEvolution(atual.nome);
-  if (id)
-    await fetch(`${waBase()}/instance/delete/${id}`, {
-      method: "DELETE",
-      headers: { apikey: waGlobalKey() },
-    }).catch(() => {});
+  if (id && !(await excluirNaEvolution(id))) return null;
   const token = await criarNaEvolution(atual.nome);
   if (!token) return null;
   const agora = new Date().toISOString();
@@ -217,8 +262,16 @@ export async function recriarInstanciaDaOrg(
   await admin
     .from("wa_instancias")
     .update({ status: "aguardando", numero: null, atualizado_em: agora })
-    .eq("id", atual.id);
-  return { id: atual.id, nome: atual.nome, token, numero: null, status: "aguardando" };
+    .eq("id", atual.id)
+    .eq("org_id", scope.orgId);
+  return {
+    id: atual.id,
+    orgId: scope.orgId,
+    nome: atual.nome,
+    token,
+    numero: null,
+    status: "aguardando",
+  };
 }
 
 /**
@@ -232,56 +285,81 @@ export async function recriarInstanciaDaOrg(
  */
 export async function excluirInstanciaDaOrg(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
   instanciaId: string,
   confirmado: boolean,
 ): Promise<{ ok: boolean; motivo?: string; envios?: number; numero?: string | null }> {
   const { data: row } = await admin
     .from("wa_instancias")
-    .select("id, nome, numero, status")
+    .select("id, org_id, nome, numero, status")
     .eq("id", instanciaId)
-    .eq("user_id", userId)
+    .eq("org_id", scope.orgId)
     .maybeSingle();
   if (!row) return { ok: false, motivo: "nao_encontrado" };
 
   const { count } = await admin
     .from("wa_envios")
     .select("id", { count: "exact", head: true })
-    .eq("instancia_id", row.id);
+    .eq("instancia_id", row.id)
+    .eq("org_id", scope.orgId);
   if ((count ?? 0) > 0) return { ok: false, motivo: "tem_historico", envios: count ?? 0 };
 
   if (row.numero && !confirmado)
     return { ok: false, motivo: "pareado_precisa_confirmar", numero: row.numero };
 
   const evoId = await idNaEvolution(row.nome);
-  if (evoId)
-    await fetch(`${waBase()}/instance/delete/${evoId}`, {
-      method: "DELETE",
-      headers: { apikey: waGlobalKey() },
-    }).catch(() => {});
+  if (evoId && !(await excluirNaEvolution(evoId))) {
+    return { ok: false, motivo: "conflito" };
+  }
 
   const { error } = await admin
     .from("wa_instancias")
     .delete()
     .eq("id", row.id)
-    .eq("user_id", userId);
-  return error ? { ok: false, motivo: error.message } : { ok: true, numero: row.numero };
+    .eq("org_id", scope.orgId);
+  if (error) {
+    console.error("wa instance delete failed", error.code);
+    return { ok: false, motivo: "conflito" };
+  }
+  return { ok: true, numero: row.numero };
 }
 
 export type WaStatus = { connected: boolean; loggedIn: boolean; name: string; jid: string };
 
+/** Typed provider observation. Transport failures are never treated as disconnections. */
+export async function observarStatusInstancia(
+  token: string,
+  timeoutMs = 8_000,
+): Promise<WaProviderObservation> {
+  const observedAt = new Date().toISOString();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${waBase()}/instance/status`, {
+      headers: { apikey: token },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const kind =
+        response.status === 401 || response.status === 403 ? "authentication" : "provider";
+      return providerFailure(kind, observedAt, response.status);
+    }
+    const payload: unknown = await response.json().catch(() => null);
+    return parseEvolutionGoStatus(payload, observedAt);
+  } catch (error) {
+    return providerFailure(
+      error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network",
+      observedAt,
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /** Status da instância (GET /instance/status com o token DELA). loggedIn = pareada. */
 export async function statusInstancia(token: string): Promise<WaStatus | null> {
-  const r = await fetch(`${waBase()}/instance/status`, { headers: { apikey: token } });
-  if (!r.ok) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const j: any = await r.json().catch(() => ({}));
-  return {
-    connected: !!j.data?.Connected,
-    loggedIn: !!j.data?.LoggedIn,
-    name: j.data?.Name || "",
-    jid: j.data?.Jid || j.data?.jid || "",
-  };
+  const observation = await observarStatusInstancia(token);
+  return observation.ok ? observation : null;
 }
 
 /** Sincroniza numero/status da org na tabela a partir do estado real na Evolution. */
@@ -290,12 +368,14 @@ export async function sincronizarInstancia(
   inst: WaInstanciaOrg,
   st: WaStatus | null,
 ): Promise<string | null> {
+  if (!st) return inst.numero;
   const status = st?.loggedIn ? "conectado" : st?.connected ? "aguardando" : "desconectado";
   const numero = st?.loggedIn ? st.jid || inst.numero : null;
   await admin
     .from("wa_instancias")
     .update({ status, numero, atualizado_em: new Date().toISOString() })
-    .eq("id", inst.id);
+    .eq("id", inst.id)
+    .eq("org_id", inst.orgId);
   return numero;
 }
 
@@ -324,11 +404,13 @@ export async function qrInstancia(token: string): Promise<string | null> {
 /* ------------------------------ N CHIPS por org ------------------------------ */
 
 /** Lista os chips DA ORG (sem token) — para a UI. Ordena por função, ordem, idade. */
-export async function listarInstanciasDaOrg(admin: Admin, userId: string): Promise<WaChip[]> {
+export async function listarInstanciasDaOrg(admin: Admin, orgId: string): Promise<WaChip[]> {
   const { data } = await admin
     .from("wa_instancias")
-    .select("id, nome, numero, status, funcao, ordem")
-    .eq("user_id", userId)
+    .select(
+      "id, nome, numero, status, funcao, ordem, provider_status, operational_health, last_health_check_at, last_provider_success_at, health_failure_count, health_error_code",
+    )
+    .eq("org_id", orgId)
     .order("funcao", { ascending: true })
     .order("ordem", { ascending: true })
     .order("criada_em", { ascending: true });
@@ -336,20 +418,20 @@ export async function listarInstanciasDaOrg(admin: Admin, userId: string): Promi
 }
 
 /**
- * Resolve UM chip pelo id — SÓ se for do próprio dono (ISOLAMENTO: `.eq("user_id", userId)`).
+ * Resolve UM chip pelo id — SÓ se pertencer ao `org_id` autorizado.
  * id forjado de outra org → null. Devolve com token (adota/recria o token se preciso).
  */
 export async function instanciaDaOrgComToken(
   admin: Admin,
-  userId: string,
+  orgId: string,
   id: string,
 ): Promise<WaInstanciaOrg | null> {
   if (!id) return null;
   const { data: row } = await admin
     .from("wa_instancias")
-    .select("id, nome, numero, status, funcao")
+    .select("id, org_id, nome, numero, status, funcao")
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("org_id", orgId)
     .maybeSingle();
   if (!row) return null;
   return await garantirTokenDaLinha(admin, row);
@@ -358,15 +440,15 @@ export async function instanciaDaOrgComToken(
 /** Cria um chip NOVO para a org (Evolution + linha + token). ordem = próxima da fila. */
 export async function criarInstanciaDaOrg(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
   funcao = "disparo",
 ): Promise<WaInstanciaOrg | null> {
   if (!waBase() || !waGlobalKey()) return null;
-  const nome = `org-${userId.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 4)}`;
+  const nome = `org-${scope.orgId.slice(0, 8)}-${crypto.randomUUID().replace(/-/g, "").slice(0, 4)}`;
   const { data: ult } = await admin
     .from("wa_instancias")
     .select("ordem")
-    .eq("user_id", userId)
+    .eq("org_id", scope.orgId)
     .order("ordem", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -374,13 +456,14 @@ export async function criarInstanciaDaOrg(
   const { data: nova, error } = await admin
     .from("wa_instancias")
     .insert({
-      user_id: userId,
+      user_id: scope.userId,
+      org_id: scope.orgId,
       nome,
       status: "desconectado",
       funcao: funcao === "conversa" ? "conversa" : "disparo",
       ordem,
     })
-    .select("id, nome, numero, status, funcao")
+    .select("id, org_id, nome, numero, status, funcao")
     .single();
   if (error || !nova) return null;
   const token = await criarNaEvolution(nome);
@@ -391,6 +474,7 @@ export async function criarInstanciaDaOrg(
   await admin.from("wa_instancia_tokens").insert({ instancia_id: nova.id, token });
   return {
     id: nova.id,
+    orgId: nova.org_id,
     nome: nova.nome,
     token,
     numero: null,
@@ -399,20 +483,16 @@ export async function criarInstanciaDaOrg(
   };
 }
 
-/** RECRIA a sessão Evolution de UM chip do dono (re-parear), escopado ao user_id. */
+/** RECRIA a sessão Evolution de UM chip da organização autorizada. */
 export async function recriarInstanciaPorId(
   admin: Admin,
-  userId: string,
+  orgId: string,
   id: string,
 ): Promise<WaInstanciaOrg | null> {
-  const atual = await instanciaDaOrgComToken(admin, userId, id);
+  const atual = await instanciaDaOrgComToken(admin, orgId, id);
   if (!atual) return null;
   const evoId = await idNaEvolution(atual.nome);
-  if (evoId)
-    await fetch(`${waBase()}/instance/delete/${evoId}`, {
-      method: "DELETE",
-      headers: { apikey: waGlobalKey() },
-    }).catch(() => {});
+  if (evoId && !(await excluirNaEvolution(evoId))) return null;
   const token = await criarNaEvolution(atual.nome);
   if (!token) return null;
   const agora = new Date().toISOString();
@@ -423,21 +503,24 @@ export async function recriarInstanciaPorId(
     .from("wa_instancias")
     .update({ status: "aguardando", numero: null, atualizado_em: agora })
     .eq("id", atual.id)
-    .eq("user_id", userId);
-  return { id: atual.id, nome: atual.nome, token, numero: null, status: "aguardando" };
+    .eq("org_id", orgId);
+  return { id: atual.id, orgId, nome: atual.nome, token, numero: null, status: "aguardando" };
 }
 
 /** Próximo chip de DISPARO da org: funcao='disparo' + status='conectado', por ordem. */
 export async function proximaInstanciaDisparo(
   admin: Admin,
-  userId: string,
+  orgId: string,
 ): Promise<WaInstanciaOrg | null> {
   const { data: row } = await admin
     .from("wa_instancias")
-    .select("id, nome, numero, status, funcao")
-    .eq("user_id", userId)
+    .select("id, org_id, nome, numero, status, funcao")
+    .eq("org_id", orgId)
     .eq("funcao", "disparo")
     .eq("status", "conectado")
+    .eq("provider_status", "connected")
+    .eq("operational_health", "healthy")
+    .gte("last_provider_success_at", new Date(Date.now() - 5 * 60_000).toISOString())
     // 'conectado' (Connected) é ENGANOSO: fica true até num chip NUNCA pareado (ver decidirSaude).
     // Um chip usável tem NÚMERO pareado — sem isso, não é disparo real (evita o falso 'enviado').
     .not("numero", "is", null)
@@ -454,7 +537,7 @@ const STATUS_VALIDOS = ["desconectado", "aguardando", "conectado", "erro", "quei
 /** Atualiza função/status/ordem de UM chip do dono (marcar queimado, graduar, reordenar). */
 export async function atualizarChip(
   admin: Admin,
-  userId: string,
+  orgId: string,
   id: string,
   patch: { funcao?: string; status?: string; ordem?: number },
 ): Promise<boolean> {
@@ -462,11 +545,7 @@ export async function atualizarChip(
   if (patch.funcao === "disparo" || patch.funcao === "conversa") set.funcao = patch.funcao;
   if (patch.status && STATUS_VALIDOS.includes(patch.status)) set.status = patch.status;
   if (typeof patch.ordem === "number" && patch.ordem >= 0) set.ordem = patch.ordem;
-  const { error } = await admin
-    .from("wa_instancias")
-    .update(set)
-    .eq("id", id)
-    .eq("user_id", userId);
+  const { error } = await admin.from("wa_instancias").update(set).eq("id", id).eq("org_id", orgId);
   return !error;
 }
 
@@ -505,7 +584,7 @@ export type ResultadoChecagem = {
  */
 export async function registrarChecagem(
   admin: Admin,
-  userId: string,
+  orgId: string,
   chipId: string,
   loggedIn: boolean,
 ): Promise<ResultadoChecagem> {
@@ -513,7 +592,7 @@ export async function registrarChecagem(
     .from("wa_instancias")
     .select("status, falhas_login, ultima_checagem_em")
     .eq("id", chipId)
-    .eq("user_id", userId)
+    .eq("org_id", orgId)
     .maybeSingle();
   if (!row) return { resultado: "erro" };
   if (row.status === "queimada") return { resultado: "pulado", falhas: row.falhas_login };
@@ -531,7 +610,7 @@ export async function registrarChecagem(
   };
   if (queima) patch.status = "queimada";
   else if (loggedIn) patch.status = "conectado";
-  await admin.from("wa_instancias").update(patch).eq("id", chipId).eq("user_id", userId);
+  await admin.from("wa_instancias").update(patch).eq("id", chipId).eq("org_id", orgId);
   return {
     resultado: queima ? "queimou" : loggedIn ? "sadio" : "suspeito",
     falhas,
@@ -542,23 +621,65 @@ export async function registrarChecagem(
 /** Checagem COMPLETA de um chip: lê o status ao vivo na Evolution e aplica registrarChecagem. */
 export async function checarSaudeChip(
   admin: Admin,
-  userId: string,
+  orgId: string,
   chipId: string,
 ): Promise<ResultadoChecagem> {
-  const inst = await instanciaDaOrgComToken(admin, userId, chipId);
+  const inst = await instanciaDaOrgComToken(admin, orgId, chipId);
   if (!inst) return { resultado: "erro" };
-  const st = await statusInstancia(inst.token);
-  return registrarChecagem(admin, userId, chipId, !!st?.loggedIn);
+  const observation = await observarStatusInstancia(inst.token);
+  const { data: current } = await admin
+    .from("wa_instancias")
+    .select("provider_status, last_provider_success_at, health_failure_count")
+    .eq("id", chipId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (!current) return { resultado: "erro" };
+  const failures = observation.ok ? 0 : (current.health_failure_count ?? 0) + 1;
+  const providerState = observation.ok
+    ? observation.providerState
+    : (current.provider_status ?? "unknown");
+  const health = calculateOperationalHealth({
+    providerState,
+    lastSuccessfulCheckAt: observation.ok
+      ? observation.observedAt
+      : current.last_provider_success_at,
+    lastCheckFailed: !observation.ok,
+    consecutiveFailures: failures,
+  });
+  const { data: applied, error } = await admin.rpc("wa_apply_instance_observation", {
+    p_org: orgId,
+    p_instance: chipId,
+    p_source: "manual",
+    p_observed_at: observation.observedAt,
+    p_provider_status: providerState,
+    p_operational_health: health,
+    p_success: observation.ok,
+    p_error_code: observation.ok ? null : observation.errorCode,
+    p_number: observation.ok ? observation.jid : null,
+    p_actor: null,
+  });
+  if (error || applied === false) return { resultado: "erro", falhas: failures };
+  if (!observation.ok) return { resultado: "suspeito", falhas: failures };
+  return {
+    resultado: health === "healthy" ? "sadio" : "suspeito",
+    falhas: 0,
+    loggedIn: observation.loggedIn,
+  };
 }
 
 /** Aviso VISÍVEL ao dono (a UI lê wa_alertas e mostra). Insert só via edge (service_role). */
 export async function alertar(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
   tipo: string,
   mensagem: string,
 ): Promise<void> {
-  await admin.from("wa_alertas").insert({ user_id: userId, tipo, mensagem });
+  await admin.from("wa_alertas").insert({
+    user_id: scope.userId,
+    org_id: scope.orgId,
+    tipo,
+    mensagem,
+  });
 }
 
 /**
@@ -568,23 +689,23 @@ export async function alertar(
  */
 export async function rotacionarDisparo(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
   chipQueimadoId: string,
 ): Promise<{ proximo: WaInstanciaOrg | null; alerta: string }> {
   await admin
     .from("wa_instancias")
     .update({ status: "queimada", atualizado_em: new Date().toISOString() })
     .eq("id", chipQueimadoId)
-    .eq("user_id", userId);
-  const proximo = await proximaInstanciaDisparo(admin, userId);
+    .eq("org_id", scope.orgId);
+  const proximo = await proximaInstanciaDisparo(admin, scope.orgId);
   if (proximo) {
     const alerta = `Chip queimado — disparo assumido pelo próximo chip (${proximo.numero ?? proximo.nome}).`;
-    await alertar(admin, userId, "rotacao", alerta);
+    await alertar(admin, scope, "rotacao", alerta);
     return { proximo, alerta };
   }
   const alerta =
     "Chip queimado e NÃO há outro chip de disparo conectado — disparo PAUSADO. Conecte um chip novo.";
-  await alertar(admin, userId, "sem_chip", alerta);
+  await alertar(admin, scope, "sem_chip", alerta);
   return { proximo: null, alerta };
 }
 
@@ -595,14 +716,14 @@ export async function rotacionarDisparo(
  */
 export async function graduarChipDoLead(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
   leadId: string,
 ): Promise<{ graduou: boolean; chip?: string }> {
   const { data: env } = await admin
     .from("wa_envios")
     .select("instancia_id")
     .eq("lead_id", leadId)
-    .eq("user_id", userId)
+    .eq("org_id", scope.orgId)
     .order("enviado_em", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -611,7 +732,7 @@ export async function graduarChipDoLead(
     .from("wa_instancias")
     .select("id, nome, numero, funcao")
     .eq("id", env.instancia_id)
-    .eq("user_id", userId)
+    .eq("org_id", scope.orgId)
     .maybeSingle();
   if (!chip || chip.funcao === "conversa")
     return { graduou: false, chip: chip?.numero ?? chip?.nome };
@@ -619,10 +740,10 @@ export async function graduarChipDoLead(
     .from("wa_instancias")
     .update({ funcao: "conversa", atualizado_em: new Date().toISOString() })
     .eq("id", chip.id)
-    .eq("user_id", userId);
+    .eq("org_id", scope.orgId);
   await alertar(
     admin,
-    userId,
+    scope,
     "graduacao",
     `Chip ${chip.numero ?? chip.nome} graduou para CONVERSA (o lead respondeu) — saiu do disparo.`,
   );
@@ -640,7 +761,7 @@ export const WA_TETO_DIARIO_CHIP = 40;
 /** Quantos envios ESTE chip já fez hoje (dia UTC) — consumo do teto diário por chip. */
 export async function enviosHojeDoChip(
   admin: Admin,
-  userId: string,
+  orgId: string,
   instanciaId: string,
 ): Promise<number> {
   const inicioDia = new Date();
@@ -648,8 +769,9 @@ export async function enviosHojeDoChip(
   const { count } = await admin
     .from("wa_envios")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
+    .eq("org_id", orgId)
     .eq("instancia_id", instanciaId)
+    .in("status", ["accepted", "sent", "delivered", "read"])
     .gte("enviado_em", inicioDia.toISOString());
   return count ?? 0;
 }
@@ -657,13 +779,13 @@ export async function enviosHojeDoChip(
 /** Última variação enviada NESTA campanha — para não repetir a anterior (revezamento). */
 export async function ultimaVariacaoDaCampanha(
   admin: Admin,
-  userId: string,
+  orgId: string,
   campanhaId: string,
 ): Promise<string | null> {
   const { data } = await admin
     .from("wa_envios")
     .select("variacao_id")
-    .eq("user_id", userId)
+    .eq("org_id", orgId)
     .eq("campanha_id", campanhaId)
     .order("enviado_em", { ascending: false })
     .limit(1)
@@ -674,14 +796,14 @@ export async function ultimaVariacaoDaCampanha(
 /** Já enviamos pra este lead NESTA campanha? (idempotência do lote — não manda duas vezes.) */
 export async function jaEnviouNaCampanha(
   admin: Admin,
-  userId: string,
+  orgId: string,
   campanhaId: string,
   leadId: string,
 ): Promise<boolean> {
   const { data } = await admin
     .from("wa_envios")
     .select("id")
-    .eq("user_id", userId)
+    .eq("org_id", orgId)
     .eq("campanha_id", campanhaId)
     .eq("lead_id", leadId)
     .limit(1)
@@ -694,7 +816,7 @@ export async function enviarTextoInstancia(
   token: string,
   number: string,
   text: string,
-): Promise<{ ok: boolean; error?: string; data?: unknown }> {
+): Promise<{ ok: boolean; error?: string; data?: unknown; httpStatus: number }> {
   const r = await fetch(`${waBase()}/send/text`, {
     method: "POST",
     headers: { apikey: token, "Content-Type": "application/json" },
@@ -708,7 +830,7 @@ export async function enviarTextoInstancia(
   } catch {
     data = { raw };
   }
-  return interpretarEnvio(r.ok, r.status, data);
+  return { ...interpretarEnvio(r.ok, r.status, data), httpStatus: r.status };
 }
 
 /** Interpreta a resposta do /send/text. PURO (testável) — a Evolution GO às vezes responde
@@ -742,19 +864,19 @@ export function interpretarEnvio(
  * padrão. Fallback: qualquer instância da org resolvida. */
 export async function instanciaConversaDaOrg(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
 ): Promise<WaInstanciaOrg | null> {
   const { data: row } = await admin
     .from("wa_instancias")
-    .select("id, nome, numero, status, funcao")
-    .eq("user_id", userId)
+    .select("id, org_id, nome, numero, status, funcao")
+    .eq("org_id", scope.orgId)
     .eq("funcao", "conversa")
     .eq("status", "conectado")
     .order("ordem", { ascending: true })
     .limit(1)
     .maybeSingle();
   if (row) return await garantirTokenDaLinha(admin, row);
-  return await resolverInstanciaDaOrg(admin, userId, false);
+  return await resolverInstanciaDaOrg(admin, scope, false);
 }
 
 /** Configura o webhook de RECEBIMENTO numa instância (POST /instance/connect com o token dela).
@@ -776,7 +898,7 @@ export async function definirWebhookInstancia(
 /** Registra o envio (base da graduação, do histórico e do revezamento). */
 export async function registrarEnvio(
   admin: Admin,
-  userId: string,
+  scope: WaTenantScope,
   e: {
     leadId: string;
     instanciaId: string;
@@ -786,7 +908,8 @@ export async function registrarEnvio(
   },
 ): Promise<void> {
   const { error } = await admin.from("wa_envios").insert({
-    user_id: userId,
+    user_id: scope.userId,
+    org_id: scope.orgId,
     lead_id: e.leadId,
     instancia_id: e.instanciaId,
     campanha_id: e.campanhaId,

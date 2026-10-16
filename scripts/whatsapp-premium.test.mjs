@@ -17,8 +17,15 @@ test("1. Menu WhatsApp unificado: apenas sob Gestão -> WhatsApp, removido de Ca
   // Gestão -> WhatsApp existe
   assert.match(sidebar, /label: "WhatsApp",\s*section: "whatsapp",\s*icon: SiWhatsapp/);
   // Não há duplicidade em CANAIS DE AQUISIÇÃO
-  const aquisicaoBlock = sidebar.slice(sidebar.indexOf('label: "CANAIS DE AQUISIÇÃO"'), sidebar.indexOf('label: "SISTEMA"'));
-  assert.doesNotMatch(aquisicaoBlock, /section: "whatsapp"/, "WhatsApp não deve constar em Canais de Aquisição");
+  const aquisicaoBlock = sidebar.slice(
+    sidebar.indexOf('label: "CANAIS DE AQUISIÇÃO"'),
+    sidebar.indexOf('label: "SISTEMA"'),
+  );
+  assert.doesNotMatch(
+    aquisicaoBlock,
+    /section: "whatsapp"/,
+    "WhatsApp não deve constar em Canais de Aquisição",
+  );
   // Contagem global de "WhatsApp" na sidebar é exatamente 1
   const matches = [...sidebar.matchAll(/label:\s*"WhatsApp"/g)];
   assert.equal(matches.length, 1, "Deve existir exatamente uma entrada 'WhatsApp' na sidebar");
@@ -68,7 +75,8 @@ test("4. Organização ativa e multi-tenant: consultas respeitam o escopo da org
 // 5. Estado conectado
 test("5. Estado conectado: exibe mensagem positiva e contadores detalhados", () => {
   assert.match(waPainel, /WhatsApp conectado e funcionando/);
-  assert.match(waPainel, /Seus números estão ativos e prontos para enviar e receber mensagens/);
+  assert.match(waPainel, /Seus números têm evidência recente e estão operacionais/);
+  assert.match(waPainel, /Conexões precisam de atenção/);
   assert.match(waPainel, /Números ativos/);
   assert.match(waPainel, /Em contingência/);
   assert.match(waPainel, /Desconectado/);
@@ -182,7 +190,8 @@ test("16. Responsividade: grid adaptativo para desktop, tablet e mobile", () => 
 // 17. Presença do asset 3D oficial e fidelidade estética
 test("17. Presença do asset 3D oficial e fidelidade estética", () => {
   assert.ok(
-    existsSync("public/images/whatsapp-hero-3d.png") || existsSync("public/images/whatsapp-hero-3d.jpg"),
+    existsSync("public/images/whatsapp-hero-3d.png") ||
+      existsSync("public/images/whatsapp-hero-3d.jpg"),
     "Asset 3D oficial do WhatsApp deve existir",
   );
   assert.match(waSection, /\/images\/whatsapp-hero-3d\.(png|jpg)/);

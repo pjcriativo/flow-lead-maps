@@ -32,7 +32,7 @@ test("2. Busca: permite pesquisar em tempo real por nome, telefone, empresa e me
 test("3. Filtros: tabs de status [Todas, Não lidas, Em atendimento] e filtro por etiqueta", () => {
   assert.match(waConversas, /Todas \(\{contatos\.length\}\)/);
   assert.match(waConversas, /Não lidas \(\{/);
-  assert.match(waConversas, /Em atendimento \(\{/);
+  assert.match(waConversas, /Em atendimento\s*\(\s*\{/);
   assert.match(waConversas, /filtroTag/);
   assert.match(waConversas, /menuFiltroAberto/);
 });
@@ -61,7 +61,7 @@ test("6. Histórico: cronologia com mensagens recebidas à esquerda e enviadas �
 
 // 7. Realtime ou fallback
 test("7. Realtime ou fallback: inscrição Supabase Realtime em wa_mensagens com cleanup", () => {
-  assert.match(waConversas, /channel\("wa_inbox_realtime"\)/);
+  assert.match(waConversas, /channel\(`wa_inbox_realtime:\$\{context\.orgId\}`\)/);
   assert.match(waConversas, /postgres_changes/);
   assert.match(waConversas, /table:\s*"wa_mensagens"/);
   assert.match(waConversas, /removeChannel/);
@@ -75,14 +75,17 @@ test("8. Mensagem recebida: atualiza contador de não lidas e thread em tempo re
 
 // 9. Envio manual autorizado
 test("9. Envio manual autorizado: invoca responderConversa e valida parâmetros", () => {
-  assert.match(waConversas, /responderConversa\(numeroLimpo, texto\)/);
+  assert.match(waConversas, /responderConversa\(contatoAtivo\.id, texto\)/);
   assert.match(waConversas, /enviando/);
   assert.match(waConversas, /SendHorizontal/);
 });
 
 // 10. Bloqueio de envio não autorizado
 test("10. Bloqueio de envio não autorizado: barra envio vazio ou sem contato selecionado", () => {
-  assert.match(waConversas, /if \(!contatoAtivo \|\| !textoMensagem\.trim\(\) \|\| enviando\) return/);
+  assert.match(
+    waConversas,
+    /if \(!contatoAtivo \|\| !textoMensagem\.trim\(\) \|\| enviando\) return/,
+  );
   assert.match(waConversas, /disabled=\{enviando \|\| !textoMensagem\.trim\(\)\}/);
 });
 
@@ -194,13 +197,13 @@ test("23. Fidelidade ao layout aprovado: 6 KPIs específicos [Conversas ativas, 
   assert.match(waConversas, /Novos contatos/);
   assert.match(waConversas, /Fechamentos hoje/);
 
-  // Valores de referência do benchmark
-  assert.match(waConversas, /conversasAtivas: 32/);
-  assert.match(waConversas, /naoLidas: 18/);
-  assert.match(waConversas, /aguardandoResposta: 5/);
-  assert.match(waConversas, /emAtendimento: 12/);
-  assert.match(waConversas, /novosContatos: 8/);
-  assert.match(waConversas, /fechamentosHoje: 3/);
+  // Sem dados comprovados, o estado inicial é neutro; o serviço preenche valores reais.
+  assert.match(waConversas, /conversasAtivas: 0/);
+  assert.match(waConversas, /naoLidas: 0/);
+  assert.match(waConversas, /aguardandoResposta: 0/);
+  assert.match(waConversas, /emAtendimento: 0/);
+  assert.match(waConversas, /novosContatos: 0/);
+  assert.match(waConversas, /fechamentosHoje: 0/);
 });
 
 // 24. Ausência de disparos a frio e preservação dos módulos

@@ -1,226 +1,94 @@
-// Edge: send-proposal-wa — envia UMA mensagem de campanha por WhatsApp (o cliente orquestra o lote
-// com o intervalo/jitter, para respeitar a vazão como tempo real e dar progresso ao vivo).
-//
-// REUSA o motor de campanha (mesmas tabelas campanhas/campanha_leads/propostas): este edge é o
-// ESPELHO do send-proposal, trocando só o TRANSPORTE (Resend → Evolution) e a COPY (proposta de
-// e-mail → variações de WhatsApp que revezam). O PORTÃO é o mesmo: nada sai sem o lead estar
-// 'aprovado' (site publicado / link pronto).
-//
-// 🔒 ISOLAMENTO: AUTH OBRIGATÓRIA (getUser); a org sai SEMPRE do JWT. Tudo escopado por user_id.
-// O chip é resolvido por proximaInstanciaDisparo (só 'disparo'+'conectado' → NUNCA o flowleads).
+// O transporte em massa permanece deliberadamente bloqueado até existir reserva atômica.
+// O fluxo anterior tratava `registro_falhou` depois da entrega e consultava `email_opt_out`,
+// que não representa autorização específica de WhatsApp. Nenhum desses caminhos envia agora.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import {
-  waBase,
-  proximaInstanciaDisparo,
-  enviarTextoInstancia,
-  statusInstancia,
-  enviosHojeDoChip,
-  ultimaVariacaoDaCampanha,
-  jaEnviouNaCampanha,
-  registrarEnvio,
-  WA_TETO_DIARIO_CHIP,
-  inicializarCofreWa,
-} from "../_shared/wa.ts";
-import { orgDoUsuario, consumir } from "../_shared/limite.ts";
-import {
-  escolherVariacao,
-  resolverVariaveis,
-  variacoesElegiveis,
-} from "../../../src/lib/wa-copy.ts";
+  authorizeWhatsappRequest,
+  whatsappAuthorizationFailure,
+} from "../_shared/whatsapp-authorization.ts";
+
+export const DISPARO_EM_MASSA_BLOQUEADO = "disparo_em_massa_bloqueado";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
-  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+  if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
-  // 🔐 Cofre de chaves: EVOLUTION_URL/EVOLUTION_API_KEY passam a valer o override do painel.
-  await inicializarCofreWa(admin);
-  if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
-
-  const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } },
+    { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } },
   );
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
-  if (!(await acessoFerramentaLiberado(userClient, userData.user.id)))
-    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
-  const userId = userData.user.id;
-
-  let b: { campanha_lead_id?: string };
+  let body: Record<string, unknown>;
   try {
-    b = await req.json();
+    body = await req.json();
   } catch {
-    return json({ error: "Body inválido" }, 400);
-  }
-  const clId = String(b?.campanha_lead_id || "");
-  if (!clId) return json({ ok: false, reason: "sem_campanha_lead" });
-
-  // 1) campanha_lead do dono (escopado por user_id) — id forjado de outra org → não encontra.
-  const { data: cl } = await admin
-    .from("campanha_leads")
-    .select("id, campanha_id, lead_id, estado, proposta_id")
-    .eq("id", clId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!cl) return json({ ok: false, reason: "nao_encontrado" });
-
-  // 2) campanha precisa ser do canal WhatsApp (não dispara e-mail por aqui).
-  const { data: camp } = await admin
-    .from("campanhas")
-    .select("id, canal, wa_config, status")
-    .eq("id", cl.campanha_id)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!camp) return json({ ok: false, reason: "campanha_nao_encontrada" });
-  if (camp.canal !== "whatsapp") return json({ ok: false, reason: "canal_errado" });
-  if (camp.status !== "ativa") return json({ ok: false, reason: "campanha_concluida" });
-
-  // 3) PORTÃO (o mesmo do e-mail): só sai o que foi aprovado (site publicado / link pronto).
-  if (cl.estado !== "aprovado") return json({ ok: false, reason: "nao_aprovado" });
-
-  // 4) idempotência do lote: não manda duas vezes pro mesmo lead na mesma campanha.
-  if (await jaEnviouNaCampanha(admin, userId, cl.campanha_id, cl.lead_id))
-    return json({ ok: false, reason: "ja_enviado" });
-
-  // 5) lead + link publicado.
-  const { data: lead } = await admin
-    .from("leads")
-    .select(
-      "id, business_name, city, bairro, category, phone, whatsapp, rating, review_count, score_breakdown, email_opt_out",
-    )
-    .eq("id", cl.lead_id)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!lead) return json({ ok: false, reason: "lead_nao_encontrado" });
-
-  // O bloqueio de e-mail continua sendo respeitado por cautela, mas NÃO representa
-  // autorização específica de WhatsApp. O disparo em massa fica bloqueado no cliente até
-  // existir preferência por canal e reserva atômica no servidor.
-  if (lead.email_opt_out) return json({ ok: false, reason: "opt_out" });
-
-  // Lead sem WhatsApp → avisa, não finge (não inventa número).
-  const numero = String(lead.whatsapp || "").replace(/\D/g, "");
-  if (numero.length < 12) return json({ ok: false, reason: "sem_whatsapp" });
-
-  // Link da prévia publicada (do site vinculado à proposta aprovada deste lead).
-  let link: string | null = null;
-  if (cl.proposta_id) {
-    const { data: prop } = await admin
-      .from("propostas")
-      .select("site_id")
-      .eq("id", cl.proposta_id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (prop?.site_id) {
-      const { data: site } = await admin
-        .from("sites_publicados")
-        .select("url_publica")
-        .eq("id", prop.site_id)
-        .maybeSingle();
-      link = site?.url_publica ?? null;
-    }
-  }
-  if (!link) return json({ ok: false, reason: "sem_link" });
-
-  // 6) chip de disparo conectado (proximaInstanciaDisparo NUNCA devolve 'conversa'/flowleads e
-  //    exige número pareado). Ainda assim, confirma AO VIVO na Evolution que está LOGADO (loggedIn
-  //    = pareado de verdade; 'Connected' engana). Sem isso, NÃO envia e NÃO marca — a regra é só
-  //    marcar 'enviado' quando a Evolution puder de fato entregar.
-  const chip = await proximaInstanciaDisparo(admin, userId);
-  if (!chip) return json({ ok: false, reason: "sem_chip" });
-  const st = await statusInstancia(chip.token);
-  if (!st?.loggedIn)
-    return json({ ok: false, reason: "chip_desconectado", chip: chip.numero ?? chip.nome });
-
-  // 7) teto diário POR CHIP (backstop; a vazão real é o intervalo do cliente).
-  const hoje = await enviosHojeDoChip(admin, userId, chip.id);
-  if (hoje >= WA_TETO_DIARIO_CHIP)
-    return json({ ok: false, reason: "teto_dia", chip: chip.numero ?? chip.nome });
-
-  // 8) escolhe a variação (elegível p/ este lead — nunca inventa nota) e NUNCA repete a anterior.
-  const dados = {
-    business_name: lead.business_name,
-    city: lead.city,
-    bairro: lead.bairro,
-    category: lead.category,
-    phone: lead.phone,
-    whatsapp: lead.whatsapp,
-    rating: lead.rating,
-    review_count: lead.review_count,
-    score_breakdown: lead.score_breakdown,
-    link,
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cfg: any = camp.wa_config || {};
-  const eleg = variacoesElegiveis(cfg.variacoes || [], dados);
-  if (eleg.length === 0) return json({ ok: false, reason: "sem_variacao" });
-  const ultima = await ultimaVariacaoDaCampanha(admin, userId, cl.campanha_id);
-  const variacao = escolherVariacao(eleg, lead.id, ultima);
-  if (!variacao) return json({ ok: false, reason: "sem_variacao" });
-  const texto = resolverVariaveis(variacao.texto, dados);
-
-  // 📊 LIMITE DO PLANO (billing camada 2): enviar mensagem consome a cota "mensagens" da org.
-  // Checa e CONTA antes de mandar de verdade — bater o limite bloqueia, NÃO manda, NÃO marca
-  // enviado (mesma regra do falso-"enviado": nada de gravar sucesso sem entrega real).
-  const orgId = await orgDoUsuario(admin, userId);
-  if (orgId) {
-    const cota = await consumir(admin, orgId, "mensagens", 1);
-    if (!cota.ok && cota.reason === "limite_atingido") {
-      return json({
-        ok: false,
-        reason: "limite_plano",
-        error: `Limite de mensagens do plano atingido: ${cota.usado}/${cota.limite} neste mês. Faça upgrade do plano para enviar mais.`,
-        recurso: "mensagens",
-        usado: cota.usado,
-        limite: cota.limite,
-      });
-    }
+    return json({ error: "Dados inválidos." }, 422);
   }
 
-  // 9) ENVIA de fato.
-  const env = await enviarTextoInstancia(chip.token, numero, texto);
-  if (!env.ok)
-    return json({ ok: false, reason: "envio_falhou", error: env.error, chip: chip.numero });
-
-  // 10) registra (base de graduação, histórico e revezamento) + move o lead (best-effort).
+  let context;
   try {
-    await registrarEnvio(admin, userId, {
-      leadId: lead.id,
-      instanciaId: chip.id,
-      campanhaId: cl.campanha_id,
-      variacaoId: variacao.id,
-      mensagem: texto,
+    context = await authorizeWhatsappRequest({
+      admin,
+      userClient,
+      requestedOrgId: body.org_id,
+      permission: "manage_campaigns",
     });
   } catch (error) {
-    console.error("send-proposal-wa: mensagem entregue, mas o registro falhou", error);
-    return json({
-      ok: false,
-      reason: "registro_falhou",
-      estado: "entrega_incerta",
-      error: error instanceof Error ? error.message : "Falha ao persistir o envio",
-    });
+    const failure = whatsappAuthorizationFailure(error);
+    return json({ error: failure.message }, failure.status);
   }
-  await admin
-    .from("leads")
-    .update({ status: "proposta_enviada", last_contacted_at: new Date().toISOString() })
-    .eq("id", lead.id)
-    .eq("user_id", userId)
-    .in("status", ["new", "enriched", "contacted"]);
 
-  return json({
-    ok: true,
-    para: numero,
-    chip: chip.numero ?? chip.nome,
-    variacao: variacao.id,
-    mensagem: texto,
-  });
+  const campaignLeadId = String(body.campanha_lead_id || "");
+  if (!campaignLeadId) return json({ error: "Item de campanha inválido." }, 422);
+  const { data: campaignLead } = await admin
+    .from("campanha_leads")
+    .select("id, campanha_id, lead_id, proposta_id, estado")
+    .eq("id", campaignLeadId)
+    .eq("org_id", context.orgId)
+    .maybeSingle();
+  if (!campaignLead) return json({ error: "Item de campanha não encontrado." }, 404);
+
+  const [{ data: campaign }, { data: lead }] = await Promise.all([
+    admin
+      .from("campanhas")
+      .select("id, canal, status")
+      .eq("id", campaignLead.campanha_id)
+      .eq("org_id", context.orgId)
+      .maybeSingle(),
+    admin
+      .from("leads")
+      .select("id")
+      .eq("id", campaignLead.lead_id)
+      .eq("org_id", context.orgId)
+      .maybeSingle(),
+  ]);
+  if (!campaign || !lead) return json({ error: "Campanha não encontrada." }, 404);
+  if (campaign.canal !== "whatsapp") return json({ error: "Canal inválido." }, 422);
+  if (campaign.status !== "ativa" || campaignLead.estado !== "aprovado") {
+    return json({ error: "Campanha não está pronta para envio." }, 409);
+  }
+  if (campaignLead.proposta_id) {
+    const { data: proposal } = await admin
+      .from("propostas")
+      .select("id")
+      .eq("id", campaignLead.proposta_id)
+      .eq("org_id", context.orgId)
+      .maybeSingle();
+    if (!proposal) return json({ error: "Proposta não encontrada." }, 404);
+  }
+
+  return json(
+    {
+      ok: false,
+      reason: DISPARO_EM_MASSA_BLOQUEADO,
+      error: "Envio em massa indisponível até a reserva atômica ser implantada.",
+    },
+    409,
+  );
 });

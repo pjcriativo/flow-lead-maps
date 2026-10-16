@@ -5,12 +5,17 @@
 // distribuição por chip, timeline de atividade recente e bloqueio rigoroso de disparos frios em massa.
 
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const waCampanhas = readFileSync("src/components/whatsapp/WaCampanhas.tsx", "utf8");
 const waSection = readFileSync("src/components/whatsapp/WhatsAppSection.tsx", "utf8");
 const waService = readFileSync("src/services/whatsapp.ts", "utf8");
+const campaignControl = readFileSync("supabase/functions/wa-campaign-control/index.ts", "utf8");
+const deliveryMigration = readFileSync(
+  "supabase/migrations/202610160002_wa_delivery_engine.sql",
+  "utf8",
+);
 
 // 1. Menu Campanhas
 test("1. Menu Campanhas: aba 'Campanhas' registrada no cabeçalho WhatsApp Premium", () => {
@@ -29,10 +34,10 @@ test("2. Navegação: renderiza WaCampanhas sem redirecionamentos externos indev
 
 // 3. Organização ativa
 test("3. Organização ativa: consultas respeitam RLS e escopo do usuário autenticado", () => {
-  assert.match(waCampanhas, /supabase\.auth\.getUser/);
-  assert.match(waCampanhas, /obterKpisCampanhasWa/);
-  assert.match(waCampanhas, /CAMPANHAS_REFERENCIA/);
-  assert.match(waCampanhas, /user_id/);
+  assert.match(waCampanhas, /getActiveOrganizationContext/);
+  assert.match(waCampanhas, /consultarMotorCampanhasWa/);
+  assert.match(waCampanhas, /\.eq\("org_id",\s*context\.orgId\)/);
+  assert.match(campaignControl, /authorizeWhatsappRequest/);
 });
 
 // 4. KPIs
@@ -43,14 +48,14 @@ test("4. KPIs: 6 indicadores superiores completos e formatados fielmente ao layo
   assert.match(waCampanhas, /Respostas/);
   assert.match(waCampanhas, /Leads gerados/);
   assert.match(waCampanhas, /Vendas atribuídas/);
-  assert.match(waCampanhas, /mensagensEnviadas:\s*8547/);
-  assert.match(waCampanhas, /entregues:\s*7892/);
-  assert.match(waCampanhas, /taxaEntrega:\s*92\.4/);
-  assert.match(waCampanhas, /respostas:\s*1346/);
-  assert.match(waCampanhas, /taxaResposta:\s*15\.7/);
-  assert.match(waCampanhas, /leadsGerados:\s*287/);
-  assert.match(waCampanhas, /taxaLeads:\s*3\.4/);
-  assert.match(waCampanhas, /vendasAtribuidas:\s*12450/);
+  assert.match(waCampanhas, /mensagensEnviadas:\s*0/);
+  assert.match(waCampanhas, /entregues:\s*0/);
+  assert.match(waCampanhas, /taxaEntrega:\s*0/);
+  assert.match(waCampanhas, /respostas:\s*0/);
+  assert.match(waCampanhas, /taxaResposta:\s*0/);
+  assert.match(waCampanhas, /leadsGerados:\s*0/);
+  assert.match(waCampanhas, /taxaLeads:\s*0/);
+  assert.match(waCampanhas, /vendasAtribuidas:\s*0/);
   assert.match(waCampanhas, /kpis\.entregues\.toLocaleString\("pt-BR"\)/);
 });
 
@@ -135,18 +140,21 @@ test("11. Seleção de lista: integração com Minhas Listas / lead_lists e cont
 });
 
 // 12. Seleção de leads
-test("12. Seleção de leads: consulta leads da lista escolhida para validação de integridade", () => {
+test("12. Seleção de leads: valida a lista no servidor com escopo da organização", () => {
   assert.match(waCampanhas, /listaSelecionadaId/);
-  assert.match(waCampanhas, /114 leads selecionados/);
+  assert.match(waCampanhas, /consultarElegibilidadeCampanhaWa/);
+  assert.match(campaignControl, /\.from\("leads"\)/);
+  assert.match(campaignControl, /\.eq\("org_id", context\.orgId\)/);
+  assert.match(waCampanhas, /elegibilidade\.elegiveis/);
 });
 
 // 13. Elegibilidade
 test("13. Elegibilidade: cálculo de contatos elegíveis, bloqueados e duplicados", () => {
   assert.match(waCampanhas, /Resumo de Elegibilidade/);
   assert.match(waCampanhas, /Com WhatsApp válido/);
-  assert.match(waCampanhas, /Duplicados \/ Bloqueados/);
-  assert.match(waCampanhas, /114 elegíveis/);
-  assert.match(waCampanhas, /6 excluídos/);
+  assert.match(waCampanhas, /Sem WhatsApp \/ Bloqueados/);
+  assert.match(waCampanhas, /elegibilidade\.elegiveis/);
+  assert.match(waCampanhas, /elegibilidade\.total - elegibilidade\.elegiveis/);
 });
 
 // 14. Mensagem
@@ -179,11 +187,12 @@ test("17. Revisão: resumo estruturado da campanha antes do salvamento oficial",
 });
 
 // 18. Salvamento de rascunho
-test("18. Salvamento de rascunho: persiste em 'campanhas' com canal='whatsapp' e status 'rascunho'", () => {
+test("18. Salvamento de rascunho: usa RPC atômico com campanha e destinatários", () => {
   assert.match(waCampanhas, /salvarRascunho/);
-  assert.match(waCampanhas, /from\("campanhas"\)\.insert/);
-  assert.match(waCampanhas, /canal:\s*"whatsapp"/);
-  assert.match(waCampanhas, /status:\s*"rascunho"/);
+  assert.match(waCampanhas, /criarRascunhoCampanhaWa/);
+  assert.match(campaignControl, /wa_create_campaign_draft/);
+  assert.match(deliveryMigration, /insert into public\.campanhas/);
+  assert.match(deliveryMigration, /insert into public\.campanha_leads/);
   assert.match(waCampanhas, /salva como rascunho com sucesso/);
 });
 
@@ -197,7 +206,10 @@ test("19. Preservação de campanha existente: não executa delete arbitrário o
 test("20. Gráfico: 'Desempenho das campanhas' com 3 séries SVG (Enviadas, Entregues, Respostas)", () => {
   assert.match(waCampanhas, /Desempenho das campanhas/);
   assert.match(waCampanhas, /Evolução dos envios, entregas e respostas/);
-  assert.match(waCampanhas, /<svg viewBox="0 0 500 140" className="h-full w-full overflow-visible">/);
+  assert.match(
+    waCampanhas,
+    /<svg viewBox="0 0 500 140" className="h-full w-full overflow-visible">/,
+  );
   assert.match(waCampanhas, /stroke="#3b82f6"/); // Enviadas (azul)
   assert.match(waCampanhas, /stroke="#10b981"/); // Entregues (verde)
   assert.match(waCampanhas, /stroke="#ff6200"/); // Respostas (laranja)
@@ -206,39 +218,20 @@ test("20. Gráfico: 'Desempenho das campanhas' com 3 séries SVG (Enviadas, Entr
 });
 
 // 21. Distribuição por número
-test("21. Distribuição por número: 5 chips com avatares autênticos, volumes e barras proporcionais", () => {
+test("21. Distribuição por número: usa somente chips reais sem volumes de referência", () => {
   assert.match(waCampanhas, /Mensagens por número/);
   assert.match(waCampanhas, /Distribuição de envios entre seus chips/);
-  assert.match(waCampanhas, /Chip Principal/);
-  assert.match(waCampanhas, /totalMensagens:\s*4231/);
-  assert.match(waCampanhas, /porcentagem:\s*49\.5/);
-  assert.match(waCampanhas, /totalMensagens:\s*2567/);
-  assert.match(waCampanhas, /porcentagem:\s*30\.0/);
-  assert.match(waCampanhas, /totalMensagens:\s*892/);
-  assert.match(waCampanhas, /porcentagem:\s*10\.4/);
-  assert.match(waCampanhas, /totalMensagens:\s*456/);
-  assert.match(waCampanhas, /porcentagem:\s*5\.3/);
-  assert.match(waCampanhas, /totalMensagens:\s*412/);
-  assert.match(waCampanhas, /porcentagem:\s*4\.8/);
+  assert.match(waCampanhas, /listarChips\(\)/);
+  assert.doesNotMatch(waCampanhas, /CAMPANHAS_REFERENCIA|CHIPS_REFERENCIA/);
   assert.match(waCampanhas, /ch\.totalMensagens\.toLocaleString\("pt-BR"\)/);
-  assert.ok(existsSync("public/images/avatars/chip_01.jpg"), "Avatar chip_01 presente");
-  assert.ok(existsSync("public/images/avatars/chip_02.jpg"), "Avatar chip_02 presente");
-  assert.ok(existsSync("public/images/avatars/chip_03.jpg"), "Avatar chip_03 presente");
-  assert.ok(existsSync("public/images/avatars/chip_04.jpg"), "Avatar chip_04 presente");
-  assert.ok(existsSync("public/images/avatars/chip_05.jpg"), "Avatar chip_05 presente");
 });
 
 // 22. Atividade recente
-test("22. Atividade recente: timeline cronológica com badges e ações realizadas nas campanhas", () => {
+test("22. Atividade recente: timeline não injeta atividade histórica fictícia", () => {
   assert.match(waCampanhas, /Atividade recente/);
   assert.match(waCampanhas, /Últimas ações realizadas nas campanhas/);
-  assert.match(waCampanhas, /Campanha concluída/);
-  assert.match(waCampanhas, /Prospecção Restaurantes SP/);
-  assert.match(waCampanhas, /Campanha iniciada/);
-  assert.match(waCampanhas, /Nova resposta recebida/);
-  assert.match(waCampanhas, /Lead gerado/);
-  assert.match(waCampanhas, /Campanha pausada/);
-  assert.match(waCampanhas, /Falha no envio/);
+  assert.doesNotMatch(waCampanhas, /ATIVIDADES_REFERENCIA/);
+  assert.match(waCampanhas, /setAtividades/);
 });
 
 // 23. Responsividade

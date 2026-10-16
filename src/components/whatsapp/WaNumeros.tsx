@@ -57,6 +57,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   ativarRecebimentoChip,
+  alterarContingencia,
   checarChip,
   criarChip,
   enviarTesteWhatsapp,
@@ -64,11 +65,10 @@ import {
   listarAlertas,
   listarChips,
   marcarChip,
-  obterConfigRotacaoWa,
   obterDadosNumerosWa,
   parearChip,
   qrChip,
-  salvarConfigRotacaoWa,
+  reconectarChip,
   salvarMetaChipWa,
   statusChip,
   type WaAtividadeRecenteItem,
@@ -90,7 +90,14 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
   const [chips, setChips] = useState<WaNumeroItem[]>([]);
   const [kpis, setKpis] = useState<WaNumerosKpis | null>(null);
   const [saude, setSaude] = useState<WaSaudeConexoes | null>(null);
-  const [rotacao, setRotacao] = useState<WaRotacaoConfig>(obterConfigRotacaoWa());
+  const [rotacao, setRotacao] = useState<WaRotacaoConfig>({
+    estrategia: "prioridade",
+    intervalo: 20,
+    backupChipId: null,
+    contingenciaAtiva: false,
+    pausaAutomatica: false,
+    status: "nao_configurada",
+  });
   const [atividades, setAtividades] = useState<WaAtividadeRecenteItem[]>([]);
   const [carregando, setCarregando] = useState(true);
 
@@ -232,10 +239,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           setPairingCode(null);
           toast.success("QR Code atualizado pela Evolution API");
         } else {
-          // Se a Evolution retornar base64 svg fallback
-          setQrCodeData(
-            "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=EvolutionGoPairingTokenSecureSession",
-          );
+          setQrCodeData(null);
+          toast.info("QR Code ainda não está disponível. Tente atualizar em alguns segundos.");
         }
       } else {
         if (telefonePareamento.replace(/\D/g, "").length < 12) {
@@ -361,6 +366,24 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
     }
   };
 
+  const reconectarNumero = async (chip: WaNumeroItem) => {
+    try {
+      const result = await reconectarChip(chip.id);
+      if (result.requires_pairing) {
+        setChipAtivoId(chip.id);
+        setNovoNome(chip.nome);
+        setNovaFuncao(chip.funcaoOperacional);
+        setEtapaAssistente(1);
+        toast.info("A instância precisa de novo pareamento. Escolha QR Code ou código.");
+      } else {
+        toast.success("A instância já está conectada.");
+      }
+      await carregarDados();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível iniciar a reconexão.");
+    }
+  };
+
   const reordenarPrioridade = async (chip: WaNumeroItem, delta: number) => {
     try {
       const novaOrdem = Math.max(0, chip.ordem + delta);
@@ -440,24 +463,38 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
   };
 
   // Toggle de Contingência e Pausa Automática
-  const handleToggleContingencia = (val: boolean) => {
-    const nova = salvarConfigRotacaoWa({ contingenciaAtiva: val });
-    setRotacao(nova);
-    toast.success(
-      val
-        ? "Contingência ativa: em caso de falha de conexão, as mensagens usam os chips reservas."
-        : "Contingência desativada.",
-    );
+  const handleToggleContingencia = async (val: boolean) => {
+    try {
+      if (val) {
+        const source = chips.find((chip) => chip.status !== "conectado");
+        const backup = chips.find(
+          (chip) => chip.id === rotacao.backupChipId && chip.status === "conectado",
+        );
+        if (!source || !backup) {
+          toast.error("Selecione um backup saudável e tenha uma origem indisponível confirmada.");
+          return;
+        }
+        await alterarContingencia({
+          ativa: true,
+          sourceInstanceId: source.id,
+          backupInstanceId: backup.id,
+          finalidade: "continuidade_atendimento_autorizado",
+          motivo: "Aprovação manual na tela Números",
+        });
+      } else {
+        await alterarContingencia({ ativa: false });
+      }
+      setRotacao((current) => ({ ...current, contingenciaAtiva: val }));
+      toast.success(val ? "Contingência autorizada e registrada." : "Contingência encerrada.");
+      await carregarDados();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao alterar contingência.");
+    }
   };
 
   const handleTogglePausa = (val: boolean) => {
-    const nova = salvarConfigRotacaoWa({ pausaAutomatica: val });
-    setRotacao(nova);
-    toast.success(
-      val
-        ? "Pausa automática ativada: chips com taxa de falha elevada são pausados preventivamente."
-        : "Pausa automática desativada.",
-    );
+    setRotacao((current) => ({ ...current, pausaAutomatica: val }));
+    toast.info("A pausa automática permanece local até existir uma política aprovada.");
   };
 
   // Filtros e Seleção
@@ -590,7 +627,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              {kpis?.conectados ?? 5}
+              {kpis?.conectados ?? 0}
             </div>
             <div className="text-xs font-medium text-home-muted">Números conectados</div>
           </div>
@@ -608,7 +645,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              {kpis?.desconectados ?? 1}
+              {kpis?.desconectados ?? 0}
             </div>
             <div className="text-xs font-medium text-home-muted">Desconectado</div>
           </div>
@@ -644,7 +681,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-              {kpis?.mensagensHoje ?? 142}
+              {kpis?.mensagensHoje ?? 0}
             </div>
             <div className="text-xs font-medium text-home-muted">Mensagens hoje</div>
           </div>
@@ -662,7 +699,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-black tracking-tight text-white sm:text-3xl truncate">
-              {kpis?.disponibilidade ?? "98,5%"}
+              {kpis?.disponibilidade ?? "Dados insuficientes"}
             </div>
             <div className="text-xs font-medium text-home-muted">Disponibilidade</div>
           </div>
@@ -846,6 +883,14 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                                 >
                                   <Activity className="h-3.5 w-3.5 text-emerald-400" />
                                   Verificar saúde ao vivo
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                  onClick={() => reconectarNumero(chip)}
+                                  className="cursor-pointer gap-2 rounded-lg hover:bg-white/[0.06] px-2 py-1.5"
+                                >
+                                  <RefreshCw className="h-3.5 w-3.5 text-amber-400" />
+                                  Reconectar
                                 </DropdownMenuItem>
 
                                 <DropdownMenuItem
@@ -1479,7 +1524,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                       stroke="#f43f5e"
                       strokeWidth="10"
                       strokeDasharray="251.2"
-                      strokeDashoffset={251.2 * (1 - (saude?.desconectadosPct ?? 17) / 100)}
+                      strokeDashoffset={251.2 * (1 - (saude?.desconectadosPct ?? 0) / 100)}
                       strokeLinecap="round"
                       fill="transparent"
                     />
@@ -1491,7 +1536,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                       stroke="#22c55e"
                       strokeWidth="10"
                       strokeDasharray="251.2"
-                      strokeDashoffset={251.2 * (1 - (saude?.conectadosPct ?? 83) / 100)}
+                      strokeDashoffset={251.2 * (1 - (saude?.conectadosPct ?? 0) / 100)}
                       strokeLinecap="round"
                       fill="transparent"
                     />
@@ -1499,7 +1544,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   {/* Centro do Donut */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
                     <span className="text-xl font-black text-white">
-                      {saude?.saudeGeralPct ?? 83}%
+                      {saude?.saudeGeralPct ?? 0}%
                     </span>
                     <span className="text-[9px] font-medium text-home-muted">Saúde geral</span>
                   </div>
@@ -1519,9 +1564,9 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                     <span className="text-home-muted">Conectados</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-white">{saude?.conectados ?? 5}</span>
+                    <span className="font-bold text-white">{saude?.conectados ?? 0}</span>
                     <span className="w-8 text-right text-home-muted">
-                      {saude?.conectadosPct ?? 83}%
+                      {saude?.conectadosPct ?? 0}%
                     </span>
                   </div>
                 </div>
@@ -1532,9 +1577,9 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                     <span className="text-home-muted">Desconectados</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-white">{saude?.desconectados ?? 1}</span>
+                    <span className="font-bold text-white">{saude?.desconectados ?? 0}</span>
                     <span className="w-8 text-right text-rose-400 font-medium">
-                      {saude?.desconectadosPct ?? 17}%
+                      {saude?.desconectadosPct ?? 0}%
                     </span>
                   </div>
                 </div>
@@ -1578,7 +1623,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                 <div>
                   <h3 className="text-sm font-bold text-white">Rotação e contingência</h3>
                   <p className="text-[11px] text-home-muted">
-                    Distribuição inteligente de envios entre os chips
+                    Continuidade autorizada para falhas técnicas
                   </p>
                 </div>
               </div>
@@ -1596,11 +1641,10 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   <select
                     value={rotacao.estrategia}
                     onChange={(e) =>
-                      setRotacao(
-                        salvarConfigRotacaoWa({
-                          estrategia: e.target.value as WaRotacaoConfig["estrategia"],
-                        }),
-                      )
+                      setRotacao((current) => ({
+                        ...current,
+                        estrategia: e.target.value as WaRotacaoConfig["estrategia"],
+                      }))
                     }
                     className="h-8 w-full cursor-pointer appearance-none rounded-xl border border-white/10 bg-[#161c28] px-2.5 pr-6 text-xs text-white focus:outline-none"
                   >
@@ -1618,11 +1662,10 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   <select
                     value={rotacao.intervalo}
                     onChange={(e) =>
-                      setRotacao(
-                        salvarConfigRotacaoWa({
-                          intervalo: Number(e.target.value),
-                        }),
-                      )
+                      setRotacao((current) => ({
+                        ...current,
+                        intervalo: Number(e.target.value),
+                      }))
                     }
                     className="h-8 w-full cursor-pointer appearance-none rounded-xl border border-white/10 bg-[#161c28] px-2.5 pr-6 text-xs text-white focus:outline-none"
                   >
@@ -1641,11 +1684,10 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   <select
                     value={rotacao.backupChipId ?? ""}
                     onChange={(e) =>
-                      setRotacao(
-                        salvarConfigRotacaoWa({
-                          backupChipId: e.target.value || null,
-                        }),
-                      )
+                      setRotacao((current) => ({
+                        ...current,
+                        backupChipId: e.target.value || null,
+                      }))
                     }
                     className="h-8 w-full cursor-pointer appearance-none rounded-xl border border-white/10 bg-[#161c28] px-2.5 pr-6 text-xs text-white focus:outline-none"
                   >
@@ -1669,7 +1711,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   <div>
                     <div className="text-xs font-bold text-white">Contingência ativa</div>
                     <div className="text-[10px] text-home-muted leading-tight">
-                      Em caso de falha, os envios são redirecionados automaticamente.
+                      Requer aprovação e não migra envios aceitos ou incertos.
                     </div>
                   </div>
                 </div>

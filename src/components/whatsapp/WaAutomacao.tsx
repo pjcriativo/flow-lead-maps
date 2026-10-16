@@ -50,10 +50,6 @@ import {
   alternarStatusAutomacaoWa,
   excluirAutomacaoWa,
   duplicarAutomacaoWa,
-  KPIS_REFERENCIA_PREMIUM,
-  DESEMPENHO_REFERENCIA_PREMIUM,
-  DISTRIBUICAO_REFERENCIA_PREMIUM,
-  ATIVIDADES_AUTOMACOES_REFERENCIA_PREMIUM,
 } from "@/services/whatsapp";
 
 interface WaAutomacaoProps {
@@ -70,17 +66,30 @@ export function WaAutomacao({
   // Estado dos dados
   const [carregando, setCarregando] = useState(true);
   const [automacoes, setAutomacoes] = useState<WaAutomacaoItem[]>([]);
-  const [kpis, setKpis] = useState<WaAutomacoesKpis>(KPIS_REFERENCIA_PREMIUM);
-  const [desempenho, setDesempenho] = useState<WaAutomacoesDesempenho>(
-    DESEMPENHO_REFERENCIA_PREMIUM,
-  );
-  const [distribuicao, setDistribuicao] = useState<WaAutomacoesDistribuicaoItem[]>(
-    DISTRIBUICAO_REFERENCIA_PREMIUM,
-  );
-  const [atividades, setAtividades] = useState<WaAutomacaoAtividadeItem[]>(
-    ATIVIDADES_AUTOMACOES_REFERENCIA_PREMIUM,
-  );
-  const [conectado, setConectado] = useState(true);
+  const [kpis, setKpis] = useState<WaAutomacoesKpis>({
+    ativas: 0,
+    ativasTrend: "—",
+    mensagens: 0,
+    mensagensTrend: "—",
+    qualificados: 0,
+    qualificadosTrend: "—",
+    taxaResposta: "0%",
+    taxaRespostaTrend: "—",
+    tempoMedio: "Dados insuficientes",
+    tempoMedioTrend: "—",
+  });
+  const [desempenho, setDesempenho] = useState<WaAutomacoesDesempenho>({
+    mensagens: 0,
+    mensagensTrend: "—",
+    qualificados: 0,
+    qualificadosTrend: "—",
+    taxaResposta: "0%",
+    taxaRespostaTrend: "—",
+    pontos: [],
+  });
+  const [distribuicao, setDistribuicao] = useState<WaAutomacoesDistribuicaoItem[]>([]);
+  const [atividades, setAtividades] = useState<WaAutomacaoAtividadeItem[]>([]);
+  const [conectado, setConectado] = useState(false);
 
   // Filtros da tabela
   const [busca, setBusca] = useState("");
@@ -163,9 +172,7 @@ export function WaAutomacao({
   };
 
   const toggleSelecionarItem = (id: string) => {
-    setSelecionados((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    );
+    setSelecionados((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
   };
 
   // Toggle status da automação
@@ -188,13 +195,10 @@ export function WaAutomacao({
       const res = await alternarStatusAutomacaoWa(item.id, novoAtivo);
       if (res.ok) {
         if (novoAtivo) {
-          toast.info(
-            "Automação salva. Execução automática ainda não disponível pelo backend.",
-            {
-              description: `A regra "${item.nome}" foi mantida como ativa para testes manuais.`,
-              duration: 5000,
-            },
-          );
+          toast.info("Automação salva. Execução automática ainda não disponível pelo backend.", {
+            description: `A regra "${item.nome}" foi mantida como ativa para testes manuais.`,
+            duration: 5000,
+          });
         } else {
           toast.success(`Automação "${item.nome}" foi pausada.`);
         }
@@ -436,9 +440,7 @@ export function WaAutomacao({
                 <SiWhatsapp className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white tracking-tight">
-                  Minhas automações
-                </h2>
+                <h2 className="text-base font-bold text-white tracking-tight">Minhas automações</h2>
                 <p className="text-xs text-home-muted mt-0.5">
                   Crie e gerencie regras de automação para atender seus leads 24 horas por dia
                 </p>
@@ -537,13 +539,9 @@ export function WaAutomacao({
                   <th className="py-3 px-2 font-semibold text-white/80">Tipo</th>
                   <th className="py-3 px-2 font-semibold text-white/80">Gatilho</th>
                   <th className="py-3 px-2 font-semibold text-white/80 text-center">Status</th>
-                  <th className="py-3 px-2 font-semibold text-white/80 text-right">
-                    Execuções
-                  </th>
+                  <th className="py-3 px-2 font-semibold text-white/80 text-right">Execuções</th>
                   <th className="py-3 px-3 font-semibold text-white/80">Última atualização</th>
-                  <th className="py-3 px-2 font-semibold text-white/80 text-center w-10">
-                    Ações
-                  </th>
+                  <th className="py-3 px-2 font-semibold text-white/80 text-center w-10">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
@@ -647,7 +645,11 @@ export function WaAutomacao({
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(auto)}
-                            title={auto.ativa ? "Automação ativa (clique para pausar)" : "Automação pausada"}
+                            title={
+                              auto.ativa
+                                ? "Automação ativa (clique para pausar)"
+                                : "Automação pausada"
+                            }
                             className={cn(
                               "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
                               auto.ativa ? "bg-emerald-500" : "bg-white/20",
@@ -809,9 +811,7 @@ export function WaAutomacao({
           {/* CONTEÚDO DO WIZARD CONFORME A ETAPA */}
           {etapaCriacao === 1 && (
             <div className="mt-4 space-y-3">
-              <div className="text-xs font-semibold text-white/90">
-                Tipo de automação
-              </div>
+              <div className="text-xs font-semibold text-white/90">Tipo de automação</div>
 
               {/* Grid 2 Colunas com os 6 cards (ETAPA 7 — REPRODUÇÃO IDÊNTICA) */}
               <div className="grid grid-cols-2 gap-2.5">
@@ -951,14 +951,10 @@ export function WaAutomacao({
 
           {etapaCriacao === 2 && (
             <div className="mt-4 space-y-3.5">
-              <div className="text-xs font-semibold text-white/90">
-                Condições & Gatilhos
-              </div>
+              <div className="text-xs font-semibold text-white/90">Condições & Gatilhos</div>
 
               <div>
-                <label className="text-[11px] font-medium text-home-muted">
-                  Nome da automação
-                </label>
+                <label className="text-[11px] font-medium text-home-muted">Nome da automação</label>
                 <input
                   type="text"
                   value={novoNome}
@@ -968,9 +964,7 @@ export function WaAutomacao({
               </div>
 
               <div>
-                <label className="text-[11px] font-medium text-home-muted">
-                  Gatilho principal
-                </label>
+                <label className="text-[11px] font-medium text-home-muted">Gatilho principal</label>
                 <select
                   value={novoGatilho}
                   onChange={(e) => setNovoGatilho(e.target.value as WaAutomacaoGatilho)}
@@ -1000,8 +994,7 @@ export function WaAutomacao({
                 </div>
               )}
 
-              {(novoGatilho === "tempo_sem_resposta" ||
-                novoGatilho === "tempo_sem_interacao") && (
+              {(novoGatilho === "tempo_sem_resposta" || novoGatilho === "tempo_sem_interacao") && (
                 <div>
                   <label className="text-[11px] font-medium text-home-muted">
                     Tempo de espera sem resposta (horas)
@@ -1038,9 +1031,7 @@ export function WaAutomacao({
 
           {etapaCriacao === 3 && (
             <div className="mt-4 space-y-3.5">
-              <div className="text-xs font-semibold text-white/90">
-                Ações & Respostas
-              </div>
+              <div className="text-xs font-semibold text-white/90">Ações & Respostas</div>
 
               <div>
                 <label className="text-[11px] font-medium text-home-muted">
@@ -1103,9 +1094,7 @@ export function WaAutomacao({
 
           {etapaCriacao === 4 && (
             <div className="mt-4 space-y-3.5">
-              <div className="text-xs font-semibold text-white/90">
-                Revisão & Salvar
-              </div>
+              <div className="text-xs font-semibold text-white/90">Revisão & Salvar</div>
 
               <div className="rounded-xl border border-white/5 bg-[#141a27] p-3 space-y-2 text-xs">
                 <div className="flex justify-between">
@@ -1120,9 +1109,7 @@ export function WaAutomacao({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-home-muted">Gatilho:</span>
-                  <span className="font-semibold text-white">
-                    {novoGatilho.replace(/_/g, " ")}
-                  </span>
+                  <span className="font-semibold text-white">{novoGatilho.replace(/_/g, " ")}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-home-muted">Etapa CRM:</span>
@@ -1194,9 +1181,7 @@ export function WaAutomacao({
               <div className="relative">
                 <select
                   value={periodoDesempenho}
-                  onChange={(e) =>
-                    setPeriodoDesempenho(e.target.value as "30" | "7" | "1")
-                  }
+                  onChange={(e) => setPeriodoDesempenho(e.target.value as "30" | "7" | "1")}
                   className="appearance-none cursor-pointer rounded-lg border border-white/10 bg-[#161c28] pl-2.5 pr-6 py-1 text-[11px] font-medium text-white focus:outline-none"
                 >
                   <option value="30">Últimos 30 dias</option>
@@ -1253,16 +1238,48 @@ export function WaAutomacao({
             <div className="mt-5 relative h-36 w-full">
               <svg className="w-full h-full overflow-visible" viewBox="0 0 400 120">
                 {/* Linhas de Grade Horizontais */}
-                <line x1="30" y1="20" x2="390" y2="20" stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="3 3" />
-                <line x1="30" y1="50" x2="390" y2="50" stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="3 3" />
-                <line x1="30" y1="80" x2="390" y2="80" stroke="#ffffff" strokeOpacity="0.05" strokeDasharray="3 3" />
+                <line
+                  x1="30"
+                  y1="20"
+                  x2="390"
+                  y2="20"
+                  stroke="#ffffff"
+                  strokeOpacity="0.05"
+                  strokeDasharray="3 3"
+                />
+                <line
+                  x1="30"
+                  y1="50"
+                  x2="390"
+                  y2="50"
+                  stroke="#ffffff"
+                  strokeOpacity="0.05"
+                  strokeDasharray="3 3"
+                />
+                <line
+                  x1="30"
+                  y1="80"
+                  x2="390"
+                  y2="80"
+                  stroke="#ffffff"
+                  strokeOpacity="0.05"
+                  strokeDasharray="3 3"
+                />
                 <line x1="30" y1="105" x2="390" y2="105" stroke="#ffffff" strokeOpacity="0.1" />
 
                 {/* Eixo Y Ticks */}
-                <text x="5" y="23" fill="#64748b" fontSize="8">200</text>
-                <text x="5" y="53" fill="#64748b" fontSize="8">100</text>
-                <text x="10" y="83" fill="#64748b" fontSize="8">50</text>
-                <text x="15" y="107" fill="#64748b" fontSize="8">0</text>
+                <text x="5" y="23" fill="#64748b" fontSize="8">
+                  200
+                </text>
+                <text x="5" y="53" fill="#64748b" fontSize="8">
+                  100
+                </text>
+                <text x="10" y="83" fill="#64748b" fontSize="8">
+                  50
+                </text>
+                <text x="15" y="107" fill="#64748b" fontSize="8">
+                  0
+                </text>
 
                 {/* Curva 1: Mensagens (Cyan/Green - Topo) */}
                 <path
@@ -1297,13 +1314,27 @@ export function WaAutomacao({
                 <circle cx="390" cy="82" r="3.5" fill="#a855f7" />
 
                 {/* Eixo X Datas */}
-                <text x="30" y="118" fill="#64748b" fontSize="8">01/03</text>
-                <text x="90" y="118" fill="#64748b" fontSize="8">05/03</text>
-                <text x="150" y="118" fill="#64748b" fontSize="8">10/03</text>
-                <text x="210" y="118" fill="#64748b" fontSize="8">15/03</text>
-                <text x="270" y="118" fill="#64748b" fontSize="8">20/03</text>
-                <text x="330" y="118" fill="#64748b" fontSize="8">25/03</text>
-                <text x="375" y="118" fill="#64748b" fontSize="8">30/03</text>
+                <text x="30" y="118" fill="#64748b" fontSize="8">
+                  01/03
+                </text>
+                <text x="90" y="118" fill="#64748b" fontSize="8">
+                  05/03
+                </text>
+                <text x="150" y="118" fill="#64748b" fontSize="8">
+                  10/03
+                </text>
+                <text x="210" y="118" fill="#64748b" fontSize="8">
+                  15/03
+                </text>
+                <text x="270" y="118" fill="#64748b" fontSize="8">
+                  20/03
+                </text>
+                <text x="330" y="118" fill="#64748b" fontSize="8">
+                  25/03
+                </text>
+                <text x="375" y="118" fill="#64748b" fontSize="8">
+                  30/03
+                </text>
               </svg>
             </div>
           </div>
@@ -1339,9 +1370,7 @@ export function WaAutomacao({
                   <h3 className="text-sm font-bold text-white tracking-tight">
                     Distribuição por tipo
                   </h3>
-                  <p className="text-[11px] text-home-muted">
-                    Execuções das automações por tipo
-                  </p>
+                  <p className="text-[11px] text-home-muted">Execuções das automações por tipo</p>
                 </div>
               </div>
 
@@ -1437,10 +1466,7 @@ export function WaAutomacao({
               {/* Legenda Lateral com Percentuais e Contagens */}
               <div className="flex-1 space-y-1.5 w-full">
                 {distribuicao.map((item) => (
-                  <div
-                    key={item.tipo}
-                    className="flex items-center justify-between text-xs"
-                  >
+                  <div key={item.tipo} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
                       <span
                         className="h-2 w-2 rounded-full"
@@ -1449,9 +1475,7 @@ export function WaAutomacao({
                       <span className="text-white/80">{item.label}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white/90">
-                        {item.percentual}%
-                      </span>
+                      <span className="font-semibold text-white/90">{item.percentual}%</span>
                       <span className="text-home-muted text-[11px] w-8 text-right">
                         {item.execucoes}
                       </span>
@@ -1474,9 +1498,7 @@ export function WaAutomacao({
                   <Clock className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white tracking-tight">
-                    Atividade recente
-                  </h3>
+                  <h3 className="text-sm font-bold text-white tracking-tight">Atividade recente</h3>
                   <p className="text-[11px] text-home-muted">
                     Últimas execuções e eventos das automações
                   </p>
@@ -1495,10 +1517,7 @@ export function WaAutomacao({
             {/* Lista com os 6 Eventos Reais Recentes */}
             <div className="mt-3 divide-y divide-white/[0.04]">
               {atividades.map((act) => (
-                <div
-                  key={act.id}
-                  className="py-2.5 flex items-center justify-between gap-2.5"
-                >
+                <div key={act.id} className="py-2.5 flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
                       className={cn(
@@ -1520,18 +1539,12 @@ export function WaAutomacao({
                     </div>
 
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">
-                        {act.titulo}
-                      </div>
-                      <div className="text-[11px] text-home-muted truncate">
-                        {act.descricao}
-                      </div>
+                      <div className="text-xs font-semibold text-white truncate">{act.titulo}</div>
+                      <div className="text-[11px] text-home-muted truncate">{act.descricao}</div>
                     </div>
                   </div>
 
-                  <span className="text-[11px] text-home-muted shrink-0">
-                    {act.horario}
-                  </span>
+                  <span className="text-[11px] text-home-muted shrink-0">{act.horario}</span>
                 </div>
               ))}
             </div>
@@ -1553,9 +1566,7 @@ export function WaAutomacao({
                   <Info className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">
-                    {modalDetalhes.nome}
-                  </h3>
+                  <h3 className="text-base font-bold text-white">{modalDetalhes.nome}</h3>
                   <p className="text-xs text-home-muted">Detalhes da automação</p>
                 </div>
               </div>
@@ -1578,9 +1589,7 @@ export function WaAutomacao({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-home-muted">Gatilho:</span>
-                  <span className="font-semibold text-white">
-                    {modalDetalhes.gatilho}
-                  </span>
+                  <span className="font-semibold text-white">{modalDetalhes.gatilho}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-home-muted">Status:</span>
@@ -1595,23 +1604,17 @@ export function WaAutomacao({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-home-muted">Total de Execuções:</span>
-                  <span className="font-semibold text-white">
-                    {modalDetalhes.execucoes}
-                  </span>
+                  <span className="font-semibold text-white">{modalDetalhes.execucoes}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-home-muted">Última atualização:</span>
-                  <span className="text-white">
-                    {modalDetalhes.ultimaAtualizacao}
-                  </span>
+                  <span className="text-white">{modalDetalhes.ultimaAtualizacao}</span>
                 </div>
               </div>
 
               <div className="rounded-xl border border-white/5 bg-[#161c28] p-3">
                 <span className="font-semibold text-white">Descrição Operacional</span>
-                <p className="text-home-muted mt-1 leading-relaxed">
-                  {modalDetalhes.descricao}
-                </p>
+                <p className="text-home-muted mt-1 leading-relaxed">{modalDetalhes.descricao}</p>
               </div>
             </div>
 
@@ -1678,9 +1681,7 @@ export function WaAutomacao({
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">
-                  Histórico de Atividades
-                </h3>
+                <h3 className="text-base font-bold text-white">Histórico de Atividades</h3>
               </div>
               <button
                 type="button"
@@ -1723,9 +1724,7 @@ export function WaAutomacao({
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <PieChartIcon className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">
-                  Detalhamento por Tipo
-                </h3>
+                <h3 className="text-base font-bold text-white">Detalhamento por Tipo</h3>
               </div>
               <button
                 type="button"
@@ -1751,9 +1750,7 @@ export function WaAutomacao({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-white">{item.percentual}%</span>
-                    <span className="text-home-muted text-[11px]">
-                      {item.execucoes} execuções
-                    </span>
+                    <span className="text-home-muted text-[11px]">{item.execucoes} execuções</span>
                   </div>
                 </div>
               ))}

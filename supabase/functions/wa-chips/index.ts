@@ -1,184 +1,336 @@
-// Edge: wa-chips — gestão de N chips (instâncias WhatsApp) DA ORG do usuário logado.
-//
-// 🔒 ISOLAMENTO (mesmo padrão do incidente corrigido): AUTH OBRIGATÓRIA (getUser); a org sai
-// SEMPRE do JWT. Toda operação por-chip resolve a instância por (id, user_id) via
-// instanciaDaOrgComToken — um id/nome forjado de outra org devolve null e é NEGADO. O cliente
-// nunca aponta para instância de outra org, nunca lê token (tabelas wa_* só via service_role).
-//
-// Ações (body.acao):
-//   listar                         -> [{id,nome,numero,status,funcao,ordem}]  (sem token)
-//   criar   {funcao?}              -> cria um chip NOVO da org
-//   parear  {instancia_id, phone}  -> recria a sessão do chip e devolve o código de pareamento
-//   qr      {instancia_id}         -> recria a sessão do chip e devolve o QR
-//   status  {instancia_id}         -> lê o status real do chip (sincroniza numero/status)
-//   marcar  {instancia_id, funcao?, status?, ordem?} -> muda função/status/ordem (marcar queimado, graduar, reordenar)
-//   excluir {instancia_id, confirmar?}  -> APAGA o chip (recusa se tem histórico de envios;
-//                                          exige confirmar:true se tem número pareado)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import {
-  waBase,
-  listarInstanciasDaOrg,
-  criarInstanciaDaOrg,
-  excluirInstanciaDaOrg,
-  instanciaDaOrgComToken,
-  recriarInstanciaPorId,
+  authorizeWhatsappRequest,
+  whatsappAuthorizationFailure,
+} from "../_shared/whatsapp-authorization.ts";
+import type { WhatsappPermission } from "../_shared/whatsapp-policy.ts";
+import {
   atualizarChip,
-  statusInstancia,
-  sincronizarInstancia,
+  checarSaudeChip,
+  criarInstanciaDaOrg,
+  definirWebhookInstancia,
+  excluirInstanciaDaOrg,
+  graduarChipDoLead,
+  inicializarCofreWa,
+  instanciaDaOrgComToken,
+  listarInstanciasDaOrg,
   pairInstancia,
   qrInstancia,
-  checarSaudeChip,
-  rotacionarDisparo,
-  graduarChipDoLead,
-  definirWebhookInstancia,
-  inicializarCofreWa,
+  observarStatusInstancia,
+  waBase,
 } from "../_shared/wa.ts";
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
-  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+  if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
-  // 🔐 Cofre de chaves: EVOLUTION_URL/EVOLUTION_API_KEY passam a valer o override do painel.
-  await inicializarCofreWa(admin);
-  if (!waBase()) return json({ error: "EVOLUTION_URL não configurada" }, 503);
-
-  const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
-    {
-      global: { headers: { Authorization: authHeader } },
-    },
+    { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } },
   );
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
-  if (!(await acessoFerramentaLiberado(userClient, userData.user.id)))
-    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
-  const userId = userData.user.id;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let b: any = {};
+  let body: Record<string, unknown> = {};
   try {
-    b = await req.json();
+    body = await req.json();
   } catch {
-    /* corpo vazio */
+    return json({ error: "Dados inválidos." }, 422);
   }
-  const acao = String(b?.acao || "listar");
-  const instanciaId = String(b?.instancia_id || "");
-  const phone = String(b?.phone || "").replace(/\D/g, "");
+  const action = String(body.acao || "listar");
+  const instanceId = String(body.instancia_id || "");
+  const phone = String(body.phone || "").replace(/\D/g, "");
+  const permission: WhatsappPermission = [
+    "listar",
+    "listar_alertas",
+    "listar_contingencia",
+  ].includes(action)
+    ? "view_dashboard"
+    : action === "graduar_lead"
+      ? "reply_conversations"
+      : "manage_numbers";
 
-  if (acao === "listar") {
-    return json({ chips: await listarInstanciasDaOrg(admin, userId) });
-  }
-
-  if (acao === "criar") {
-    const funcao = b?.funcao === "conversa" ? "conversa" : "disparo";
-    const nova = await criarInstanciaDaOrg(admin, userId, funcao);
-    if (!nova) return json({ error: "Não foi possível criar o chip." }, 500);
-    return json({ id: nova.id, nome: nova.nome, status: nova.status, funcao: nova.funcao });
-  }
-
-  // Daqui pra baixo exige instancia_id DO PRÓPRIO DONO. id forjado → NEGADO.
-  if (acao === "parear") {
-    const nova = await recriarInstanciaPorId(admin, userId, instanciaId);
-    if (!nova) return json({ status: "erro", error: "Chip não encontrado." });
-    if (phone.length < 12) return json({ status: "erro", error: "Número inválido (DDI+DDD)." });
-    await sleep(2500);
-    const code = await pairInstancia(nova.token, phone);
-    if (!code) return json({ status: "erro", error: "Não foi possível gerar o código." });
-    return json({ status: "code", instancia_id: nova.id, code });
-  }
-
-  if (acao === "qr") {
-    const nova = await recriarInstanciaPorId(admin, userId, instanciaId);
-    if (!nova) return json({ status: "erro", error: "Chip não encontrado." });
-    await sleep(2500);
-    const qr = await qrInstancia(nova.token);
-    if (!qr) return json({ status: "aguardando", instancia_id: nova.id });
-    return json({ status: "qr", instancia_id: nova.id, qr });
-  }
-
-  if (acao === "status") {
-    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
-    if (!inst) return json({ status: "erro", error: "Chip não encontrado." });
-    const st = await statusInstancia(inst.token);
-    const numero = await sincronizarInstancia(admin, inst, st);
-    return json({
-      status: st?.loggedIn ? "conectado" : st?.connected ? "aguardando" : "desconectado",
-      instancia_id: inst.id,
-      numero: numero ?? inst.numero,
+  let context;
+  try {
+    context = await authorizeWhatsappRequest({
+      admin,
+      userClient,
+      requestedOrgId: body.org_id,
+      permission,
     });
+  } catch (error) {
+    const failure = whatsappAuthorizationFailure(error);
+    return json({ error: failure.message }, failure.status);
   }
+  const scope = { userId: context.userId, orgId: context.orgId };
 
-  // EXCLUIR o chip (irreversível). Recusa se houver histórico de envios (wa_envios é CASCADE —
-  // sumiria a prova) e exige {confirmar:true} se o chip tem número pareado (mata a sessão).
-  if (acao === "excluir") {
-    // sempre 200: o cliente precisa LER o motivo (tem_historico / pareado_precisa_confirmar).
-    return json(await excluirInstanciaDaOrg(admin, userId, instanciaId, b?.confirmar === true));
+  if (action === "listar") {
+    return json({ chips: await listarInstanciasDaOrg(admin, context.orgId) });
   }
-
-  if (acao === "marcar") {
-    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
-    if (!inst) return json({ ok: false, error: "Chip não encontrado." });
-    const ok = await atualizarChip(admin, userId, instanciaId, {
-      funcao: b?.funcao,
-      status: b?.status,
-      ordem: typeof b?.ordem === "number" ? b.ordem : undefined,
-    });
-    return json({ ok });
+  if (action === "listar_alertas") {
+    const { data, error } = await admin
+      .from("wa_alertas")
+      .select("id,tipo,mensagem,lido,criado_em,instancia_id,occurrences,last_seen_at,resolved_at")
+      .eq("org_id", context.orgId)
+      .is("resolved_at", null)
+      .order("last_seen_at", { ascending: false });
+    if (error) return json({ error: "Não foi possível carregar alertas." }, 503);
+    return json({ alertas: data ?? [] });
   }
-
-  // ETAPA 3: checa a saúde do chip ao vivo; se QUEIMOU, já rotaciona pro próximo + avisa.
-  if (acao === "checar") {
-    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
-    if (!inst) return json({ resultado: "erro", error: "Chip não encontrado." });
-    const r = await checarSaudeChip(admin, userId, instanciaId);
-    if (r.resultado === "queimou") {
-      const rot = await rotacionarDisparo(admin, userId, instanciaId);
-      return json({ ...r, rotacao: { proximo: rot.proximo?.id ?? null, alerta: rot.alerta } });
+  if (action === "listar_contingencia") {
+    const { data, error } = await admin
+      .from("wa_contingencias")
+      .select("id,backup_instance_id,status")
+      .eq("org_id", context.orgId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (error) return json({ error: "Não foi possível carregar contingência." }, 503);
+    return json({ contingencia: data ?? null });
+  }
+  if (action === "autorizar_contingencia") {
+    const backupId = String(body.backup_instancia_id || "");
+    const purpose = String(body.finalidade || "").trim();
+    const reason = String(body.motivo || "").trim();
+    if (!instanceId || !backupId || !purpose || !reason || instanceId === backupId) {
+      return json({ error: "Origem, backup, finalidade e motivo válidos são obrigatórios." }, 422);
     }
-    return json(r);
+    const freshness = new Date(Date.now() - 5 * 60_000).toISOString();
+    const [{ data: source }, { data: backup }] = await Promise.all([
+      admin
+        .from("wa_instancias")
+        .select("id,operational_health")
+        .eq("id", instanceId)
+        .eq("org_id", context.orgId)
+        .maybeSingle(),
+      admin
+        .from("wa_instancias")
+        .select("id,provider_status,operational_health,last_provider_success_at")
+        .eq("id", backupId)
+        .eq("org_id", context.orgId)
+        .maybeSingle(),
+    ]);
+    if (!source || !backup) return json({ error: "Instância não encontrada na organização." }, 404);
+    if (source.operational_health === "healthy")
+      return json({ error: "A origem ainda está saudável." }, 409);
+    if (
+      backup.provider_status !== "connected" ||
+      backup.operational_health !== "healthy" ||
+      !backup.last_provider_success_at ||
+      backup.last_provider_success_at < freshness
+    ) {
+      return json({ error: "O backup não possui evidência operacional recente." }, 409);
+    }
+    const { data, error } = await admin
+      .from("wa_contingencias")
+      .insert({
+        org_id: context.orgId,
+        source_instance_id: instanceId,
+        backup_instance_id: backupId,
+        purpose,
+        reason,
+        authorized_by: context.userId,
+      })
+      .select("id")
+      .single();
+    if (error) return json({ error: "Não foi possível autorizar a contingência." }, 409);
+    await admin.rpc("wa_record_instance_event", {
+      p_org: context.orgId,
+      p_instance: instanceId,
+      p_event_type: "contingency_authorized",
+      p_source: "manual",
+      p_actor: context.userId,
+      p_occurred_at: new Date().toISOString(),
+      p_event_key: `contingency:${data.id}`,
+      p_details: { backup_instance_id: backupId, purpose },
+    });
+    const alertAt = new Date().toISOString();
+    await admin.from("wa_alertas").insert({
+      user_id: context.userId,
+      org_id: context.orgId,
+      instancia_id: instanceId,
+      tipo: "contingencia_acionada",
+      mensagem: "Contingência autorizada manualmente para continuidade de atendimento.",
+      lido: false,
+      dedup_key: `instance:${instanceId}:contingency`,
+      first_seen_at: alertAt,
+      last_seen_at: alertAt,
+    });
+    return json({ ok: true, id: data.id });
   }
-
-  // ETAPA 3: rotação explícita (o motor de disparo chama quando confirma um chip queimado).
-  if (acao === "rotacionar") {
-    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
-    if (!inst) return json({ error: "Chip não encontrado." });
-    const rot = await rotacionarDisparo(admin, userId, instanciaId);
+  if (action === "encerrar_contingencia") {
+    const now = new Date().toISOString();
+    const { data, error } = await admin
+      .from("wa_contingencias")
+      .update({
+        status: "ended",
+        ended_by: context.userId,
+        ended_at: now,
+      })
+      .eq("org_id", context.orgId)
+      .eq("status", "active")
+      .select("id");
+    if (error) return json({ error: "Não foi possível encerrar a contingência." }, 409);
+    await admin
+      .from("wa_alertas")
+      .update({ resolved_at: now, resolved_by: context.userId, lido: true })
+      .eq("org_id", context.orgId)
+      .eq("tipo", "contingencia_acionada")
+      .is("resolved_at", null);
+    return json({ ok: true, encerradas: data?.length ?? 0 });
+  }
+  await inicializarCofreWa(admin);
+  if (!waBase()) return json({ error: "Integração WhatsApp indisponível." }, 503);
+  if (action === "criar") {
+    const funcao = body.funcao === "conversa" ? "conversa" : "disparo";
+    const instance = await criarInstanciaDaOrg(admin, scope, funcao);
+    if (!instance) return json({ error: "Não foi possível criar o chip." }, 409);
     return json({
-      proximo: rot.proximo?.id ?? null,
-      numero: rot.proximo?.numero ?? null,
-      alerta: rot.alerta,
+      id: instance.id,
+      nome: instance.nome,
+      status: instance.status,
+      funcao: instance.funcao,
     });
   }
-
-  // CONVERSAS: ativa o RECEBIMENTO neste chip (seta o webhook na Evolution). O dono aciona
-  // explicitamente — não tocamos em chip nenhum sem consentimento.
-  if (acao === "ativar_recebimento") {
-    const inst = await instanciaDaOrgComToken(admin, userId, instanciaId);
-    if (!inst) return json({ ok: false, error: "Chip não encontrado." });
+  if (action === "parear") {
+    if (phone.length < 12) return json({ error: "Número inválido (DDI+DDD)." }, 422);
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    if (!instance) return json({ error: "Chip não encontrado." }, 404);
+    const code = await pairInstancia(instance.token, phone);
+    if (!code) return json({ error: "Não foi possível gerar o código." }, 409);
+    await admin.rpc("wa_record_instance_event", {
+      p_org: context.orgId,
+      p_instance: instance.id,
+      p_event_type: "pairing_requested",
+      p_source: "manual",
+      p_actor: context.userId,
+      p_occurred_at: new Date().toISOString(),
+      p_event_key: `pair:${instance.id}:${Date.now()}`,
+      p_details: {},
+    });
+    return json({ status: "code", instancia_id: instance.id, code });
+  }
+  if (action === "qr") {
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    if (!instance) return json({ error: "Chip não encontrado." }, 404);
+    const qr = await qrInstancia(instance.token);
+    if (qr) {
+      await admin.rpc("wa_record_instance_event", {
+        p_org: context.orgId,
+        p_instance: instance.id,
+        p_event_type: "qr_requested",
+        p_source: "manual",
+        p_actor: context.userId,
+        p_occurred_at: new Date().toISOString(),
+        p_event_key: `qr:${instance.id}:${Date.now()}`,
+        p_details: {},
+      });
+    }
+    return qr
+      ? json({ status: "qr", instancia_id: instance.id, qr })
+      : json({ status: "aguardando", instancia_id: instance.id });
+  }
+  if (action === "reconectar") {
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    if (!instance) return json({ error: "Chip não encontrado." }, 404);
+    const observation = await observarStatusInstancia(instance.token);
+    if (observation.ok && observation.loggedIn) {
+      await checarSaudeChip(admin, context.orgId, instance.id);
+      return json({ status: "conectado", instancia_id: instance.id, requires_pairing: false });
+    }
+    const now = new Date().toISOString();
+    await admin
+      .from("wa_instancias")
+      .update({
+        operational_health: "reconnecting",
+        reconnect_started_at: now,
+        reconnect_requested_by: context.userId,
+        atualizado_em: now,
+      })
+      .eq("id", instance.id)
+      .eq("org_id", context.orgId);
+    await admin.rpc("wa_record_instance_event", {
+      p_org: context.orgId,
+      p_instance: instance.id,
+      p_event_type: "reconnect_started",
+      p_source: "manual",
+      p_actor: context.userId,
+      p_occurred_at: now,
+      p_event_key: `reconnect:${instance.id}:${Date.now()}`,
+      p_details: { provider_evidence: observation.ok ? observation.providerState : "unavailable" },
+    });
+    return json({ status: "aguardando", instancia_id: instance.id, requires_pairing: true });
+  }
+  if (action === "status") {
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    if (!instance) return json({ error: "Chip não encontrado." }, 404);
+    await checarSaudeChip(admin, context.orgId, instance.id);
+    const chips = await listarInstanciasDaOrg(admin, context.orgId);
+    const current = chips.find((chip) => chip.id === instance.id);
+    return json({ ...current, instancia_id: instance.id });
+  }
+  if (action === "excluir") {
+    const result = await excluirInstanciaDaOrg(admin, scope, instanceId, body.confirmar === true);
+    return json(result, result.motivo === "nao_encontrado" ? 404 : result.ok ? 200 : 409);
+  }
+  if (action === "marcar") {
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    if (!instance) return json({ error: "Chip não encontrado." }, 404);
+    let priorityOk = true;
+    if (typeof body.ordem === "number") {
+      const { data, error } = await admin.rpc("wa_set_instance_priority", {
+        p_org: context.orgId,
+        p_instance: instanceId,
+        p_actor: context.userId,
+        p_priority: Math.max(0, Math.trunc(body.ordem)),
+      });
+      priorityOk = !error && data === true;
+    }
+    const ok = await atualizarChip(admin, context.orgId, instanceId, {
+      funcao: typeof body.funcao === "string" ? body.funcao : undefined,
+      status: typeof body.status === "string" ? body.status : undefined,
+    });
+    return json({ ok: ok && priorityOk });
+  }
+  if (action === "checar") {
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    if (!instance) return json({ error: "Chip não encontrado." }, 404);
+    const result = await checarSaudeChip(admin, context.orgId, instanceId);
+    return json(result);
+  }
+  if (action === "rotacionar") {
+    return json(
+      { error: "Rotação automática desativada. Autorize uma contingência explícita." },
+      409,
+    );
+  }
+  if (action === "ativar_recebimento") {
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    if (!instance) return json({ error: "Chip não encontrado." }, 404);
     const secret = Deno.env.get("WA_WEBHOOK_SECRET") ?? "";
+    if (!secret) return json({ error: "Webhook indisponível." }, 503);
     const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/wa-webhook?k=${secret}`;
-    const eventos = Array.isArray(b?.eventos) && b.eventos.length ? b.eventos : ["MESSAGE"];
-    const r = await definirWebhookInstancia(inst.token, url, eventos);
-    return json({ ok: r.ok, status: r.status, detalhe: r.body });
+    const events =
+      Array.isArray(body.eventos) && body.eventos.length ? body.eventos.map(String) : ["MESSAGE"];
+    const result = await definirWebhookInstancia(instance.token, url, events);
+    return json({ ok: result.ok, status: result.status });
   }
-
-  // ETAPA 3.4: graduação — o chip que mandou pro lead vira 'conversa'. Gancho do pipeline.
-  if (acao === "graduar_lead") {
-    const leadId = String(b?.lead_id || "");
-    if (!leadId) return json({ graduou: false });
-    return json(await graduarChipDoLead(admin, userId, leadId));
+  if (action === "graduar_lead") {
+    const leadId = String(body.lead_id || "");
+    if (!leadId) return json({ error: "Lead inválido." }, 422);
+    const { data: lead } = await admin
+      .from("leads")
+      .select("id")
+      .eq("id", leadId)
+      .eq("org_id", context.orgId)
+      .maybeSingle();
+    if (!lead) return json({ error: "Lead não encontrado." }, 404);
+    return json(await graduarChipDoLead(admin, scope, leadId));
   }
-
-  return json({ error: "Ação desconhecida." }, 400);
+  return json({ error: "Ação desconhecida." }, 422);
 });

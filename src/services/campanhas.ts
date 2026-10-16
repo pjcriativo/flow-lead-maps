@@ -42,20 +42,36 @@ const CONTAGEM_VAZIA = {
 /** Lista as campanhas do usuário com as contagens dos leads por estado. 'enviado' =
  * lead aprovado cuja proposta já saiu (proposta.status='enviada'). Filtra por CANAL
  * (default 'email' — preserva a tela de e-mail; a tela de WhatsApp passa 'whatsapp'). */
-export async function listarCampanhas(canal: "email" | "whatsapp" = "email"): Promise<Campanha[]> {
+export async function listarCampanhas(
+  canal: "email" | "whatsapp" = "email",
+  orgId?: string,
+): Promise<Campanha[]> {
+  let campaignsQuery = supabase
+    .from("campanhas")
+    .select("id, list_id, nome, status, criada_em, atualizado_em, revisao, lead_lists(name)")
+    .eq("canal", canal)
+    .order("criada_em", { ascending: false });
+  let campaignLeadsQuery = supabase
+    .from("campanha_leads")
+    .select("campanha_id, estado, proposta_id");
+  let proposalsQuery = supabase
+    .from("propostas")
+    .select("id, status")
+    .not("campanha_id", "is", null);
+  if (orgId) {
+    campaignsQuery = campaignsQuery.eq("org_id", orgId);
+    campaignLeadsQuery = campaignLeadsQuery.eq("org_id", orgId);
+    proposalsQuery = proposalsQuery.eq("org_id", orgId);
+  }
   const [
     { data: camps, error: cErr },
     { data: cls, error: clErr },
     { data: props, error: pErr },
     { data: emailRecipients, error: recipientsError },
   ] = await Promise.all([
-    supabase
-      .from("campanhas")
-      .select("id, list_id, nome, status, criada_em, atualizado_em, revisao, lead_lists(name)")
-      .eq("canal", canal)
-      .order("criada_em", { ascending: false }),
-    supabase.from("campanha_leads").select("campanha_id, estado, proposta_id"),
-    supabase.from("propostas").select("id, status").not("campanha_id", "is", null),
+    campaignsQuery,
+    campaignLeadsQuery,
+    proposalsQuery,
     supabase.from("campanha_email_destinatarios").select("campanha_id").eq("selecionado", true),
   ]);
   if (cErr) throwPersistenceError(cErr);
@@ -288,7 +304,8 @@ export async function contarEnviadosWa(campanhaId: string): Promise<number> {
   const { count, error } = await supabase
     .from("wa_envios")
     .select("id", { count: "exact", head: true })
-    .eq("campanha_id", campanhaId);
+    .eq("campanha_id", campanhaId)
+    .or("status.eq.accepted,status.eq.sent,status.eq.delivered,status.eq.read");
   if (error) throw error;
   return count ?? 0;
 }
@@ -298,7 +315,8 @@ export async function leadsEnviadosWa(campanhaId: string): Promise<Set<string>> 
   const { data, error } = await supabase
     .from("wa_envios")
     .select("lead_id")
-    .eq("campanha_id", campanhaId);
+    .eq("campanha_id", campanhaId)
+    .or("status.eq.accepted,status.eq.sent,status.eq.delivered,status.eq.read");
   if (error) throw error;
   return new Set((data ?? []).map((r) => (r as { lead_id: string }).lead_id));
 }

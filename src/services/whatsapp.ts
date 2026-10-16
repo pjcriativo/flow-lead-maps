@@ -2,6 +2,24 @@
 // Edge Functions wa-connect / wa-send-test (que falam com a Evolution GO). As
 // chaves da Evolution ficam só no secret do servidor — nunca aqui no cliente.
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getActiveOrganizationContext,
+  type ActiveOrganizationContext,
+} from "@/lib/active-organization";
+
+const WHATSAPP_ADMIN_ROLES = new Set(["admin", "gerente", "super_admin"]);
+
+async function activeWhatsappOrganization(): Promise<ActiveOrganizationContext> {
+  return getActiveOrganizationContext();
+}
+
+async function requireWhatsappAdministrator(): Promise<ActiveOrganizationContext> {
+  const context = await activeWhatsappOrganization();
+  if (!WHATSAPP_ADMIN_ROLES.has(context.role)) {
+    throw new Error("Sem permissão para administrar o WhatsApp desta organização.");
+  }
+  return context;
+}
 
 export type WaConnect =
   | { status: "conectado"; instancia: string; numero: string }
@@ -14,7 +32,10 @@ export type WaConnect =
  * fresh=true (clique explícito em "Conectar") recria a sessão p/ um QR novo
  * (o QR da Evolution GO é estático e vale só ~60s). O polling passa fresh=false. */
 export async function conectarWhatsapp(fresh = false): Promise<WaConnect> {
-  const { data, error } = await supabase.functions.invoke("wa-connect", { body: { fresh } });
+  const context = await requireWhatsappAdministrator();
+  const { data, error } = await supabase.functions.invoke("wa-connect", {
+    body: { fresh, org_id: context.orgId },
+  });
   if (error) throw error;
   return data as WaConnect;
 }
@@ -22,7 +43,10 @@ export async function conectarWhatsapp(fresh = false): Promise<WaConnect> {
 /** Gera um CÓDIGO DE PAREAMENTO para o número dedicado (alternativa confiável ao QR).
  * O dono digita o código em WhatsApp → Conectar um aparelho → Conectar com número. */
 export async function pairWhatsapp(phone: string): Promise<WaConnect> {
-  const { data, error } = await supabase.functions.invoke("wa-connect", { body: { phone } });
+  const context = await requireWhatsappAdministrator();
+  const { data, error } = await supabase.functions.invoke("wa-connect", {
+    body: { phone, org_id: context.orgId },
+  });
   if (error) throw error;
   return data as WaConnect;
 }
@@ -35,10 +59,20 @@ export type WaChip = {
   status: "desconectado" | "aguardando" | "conectado" | "erro" | "queimada" | string;
   funcao: "disparo" | "conversa" | string;
   ordem: number;
+  provider_status: "connected" | "disconnected" | "pairing" | "unknown";
+  operational_health:
+    "healthy" | "degraded" | "unstable" | "unavailable" | "unknown" | "reconnecting";
+  last_health_check_at: string | null;
+  last_provider_success_at: string | null;
+  health_failure_count: number;
+  health_error_code: string | null;
 };
 
 async function waChips<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("wa-chips", { body });
+  const context = await activeWhatsappOrganization();
+  const { data, error } = await supabase.functions.invoke("wa-chips", {
+    body: { ...body, org_id: context.orgId },
+  });
   if (error) throw error;
   return data as T;
 }
@@ -72,6 +106,29 @@ export async function statusChip(instancia_id: string) {
   return waChips<{ status: string; numero: string | null; instancia_id?: string }>({
     acao: "status",
     instancia_id,
+  });
+}
+
+export async function reconectarChip(instancia_id: string) {
+  return waChips<{ status: string; instancia_id: string; requires_pairing: boolean }>({
+    acao: "reconectar",
+    instancia_id,
+  });
+}
+
+export async function alterarContingencia(input: {
+  ativa: boolean;
+  sourceInstanceId?: string;
+  backupInstanceId?: string;
+  finalidade?: string;
+  motivo?: string;
+}) {
+  return waChips<{ ok: boolean; id?: string; encerradas?: number }>({
+    acao: input.ativa ? "autorizar_contingencia" : "encerrar_contingencia",
+    instancia_id: input.sourceInstanceId,
+    backup_instancia_id: input.backupInstanceId,
+    finalidade: input.finalidade,
+    motivo: input.motivo,
   });
 }
 
@@ -124,22 +181,26 @@ export type WaAlerta = {
   mensagem: string;
   lido: boolean;
   criado_em: string;
+  instancia_id: string | null;
+  occurrences: number;
+  last_seen_at: string | null;
+  resolved_at: string | null;
 };
 
 /** Alertas não lidos da org (chip queimado, rotação, sem chip, graduação). */
 export async function listarAlertas(): Promise<WaAlerta[]> {
-  const { data, error } = await supabase
-    .from("wa_alertas")
-    .select("id, tipo, mensagem, lido, criado_em")
-    .eq("lido", false)
-    .order("criado_em", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as WaAlerta[];
+  const result = await waChips<{ alertas: WaAlerta[] }>({ acao: "listar_alertas" });
+  return result.alertas ?? [];
 }
 
 /** Marca um alerta como lido (dispensar). */
 export async function marcarAlertaLido(id: string): Promise<void> {
-  const { error } = await supabase.from("wa_alertas").update({ lido: true }).eq("id", id);
+  const context = await activeWhatsappOrganization();
+  const { error } = await supabase
+    .from("wa_alertas")
+    .update({ lido: true })
+    .eq("id", id)
+    .eq("org_id", context.orgId);
   if (error) throw error;
 }
 
@@ -151,7 +212,8 @@ export type WaNumeroItem = {
   id: string;
   nome: string;
   numero: string | null;
-  status: "conectado" | "desconectado" | "aguardando" | "erro" | "queimada" | string;
+  status:
+    "conectado" | "desconectado" | "aguardando" | "erro" | "queimada" | "desconhecido" | string;
   funcao: string;
   funcaoOperacional: WaFuncaoOperacional;
   ordem: number;
@@ -392,21 +454,21 @@ export async function obterDadosNumerosWa(): Promise<{
   rotacao: WaRotacaoConfig;
   atividades: WaAtividadeRecenteItem[];
 }> {
+  const context = await activeWhatsappOrganization();
   try {
-    const [rawChips, alertas, enviosHojeRes] = await Promise.all([
-      listarChips().catch(() => [] as WaChip[]),
-      listarAlertas().catch(() => [] as WaAlerta[]),
+    const [rawChips, alertas, enviosHojeRes, contingenciasRes] = await Promise.all([
+      listarChips(),
+      listarAlertas(),
       supabase
         .from("wa_envios")
         .select("instancia_id, enviado_em")
-        .gte("enviado_em", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .then(
-          (res) => res,
-          () => ({ data: [] }),
-        ),
+        .eq("org_id", context.orgId)
+        .gte("enviado_em", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+      waChips<{
+        contingencia: { id: string; backup_instance_id: string; status: string } | null;
+      }>({ acao: "listar_contingencia" }),
     ]);
-
-    const metas = obterMetaChipsWa();
+    if (enviosHojeRes.error) throw enviosHojeRes.error;
     const enviosHoje = (enviosHojeRes.data ?? []) as Array<{
       instancia_id: string;
       enviado_em: string;
@@ -420,32 +482,38 @@ export async function obterDadosNumerosWa(): Promise<{
 
     if (rawChips.length > 0) {
       chips = rawChips.map((c: WaChip, idx: number) => {
-        const meta = metas[c.id];
-        let role: WaFuncaoOperacional = meta?.role || "comercial";
-        if (!meta?.role) {
-          if (c.nome === "flowleads" || idx === 0) role = "principal";
-          else if (c.funcao === "conversa") role = "suporte";
-          else if (idx === 1) role = "comercial";
-          else if (idx === 3) role = "reserva";
-          else if (idx >= 4) role = "contingencia";
-        }
+        const role: WaFuncaoOperacional =
+          c.nome === "flowleads" || idx === 0
+            ? "principal"
+            : c.funcao === "conversa"
+              ? "suporte"
+              : "comercial";
+        const status =
+          c.operational_health === "healthy"
+            ? "conectado"
+            : c.operational_health === "reconnecting" || c.provider_status === "pairing"
+              ? "aguardando"
+              : c.operational_health === "unavailable"
+                ? "desconectado"
+                : c.operational_health === "degraded" || c.operational_health === "unstable"
+                  ? "erro"
+                  : "desconhecido";
         return {
           id: c.id,
-          nome: meta?.alias || (c.nome === "flowleads" ? "Chip Principal" : c.nome),
+          nome: c.nome === "flowleads" ? "Chip Principal" : c.nome,
           numero: c.numero,
-          status: c.status,
+          status,
           funcao: c.funcao,
           funcaoOperacional: role,
           ordem: c.ordem,
           mensagensHoje: enviosPorChip[c.id] ?? 0,
-          ultimaVerificacao: "há 2 min",
+          ultimaVerificacao: c.last_health_check_at
+            ? new Date(c.last_health_check_at).toLocaleString("pt-BR")
+            : "Nunca verificado",
           isPrincipal: c.nome === "flowleads" || idx === 0 || role === "principal",
-          falhasLogin: 0,
+          falhasLogin: c.health_failure_count,
         };
       });
-    } else {
-      // Se não há instâncias criadas no banco para o tenant, exibe a composição de referência aprovada
-      chips = CHIPS_REFERENCIA_PREMIUM;
     }
 
     const conectados = chips.filter((c) => c.status === "conectado").length;
@@ -465,43 +533,43 @@ export async function obterDadosNumerosWa(): Promise<{
     // ETAPA 4: "Calcular somente com histórico de monitoramento comprovado.
     // Se não existir série histórica suficiente, exibir: 'Dados insuficientes'.
     // Não inventar 98,5% de disponibilidade. Não inventar tendências."
-    const temHistoricoSuficiente = enviosHoje.length > 50 && rawChips.length > 0;
-    const disponibilidadeStr = temHistoricoSuficiente
-      ? `${Math.min(99.9, Math.max(80, (conectados / totalChips) * 100))
-          .toFixed(1)
-          .replace(".", ",")}%`
-      : "Dados insuficientes";
+    const disponibilidadeStr = "Dados insuficientes";
 
     const kpis: WaNumerosKpis = {
-      conectados: chips === CHIPS_REFERENCIA_PREMIUM ? 5 : conectados,
-      desconectados: chips === CHIPS_REFERENCIA_PREMIUM ? 1 : desconectados,
-      reconexao: chips === CHIPS_REFERENCIA_PREMIUM ? 0 : reconexao,
-      mensagensHoje: chips === CHIPS_REFERENCIA_PREMIUM ? 142 : msgsHojeTotal,
-      disponibilidade: chips === CHIPS_REFERENCIA_PREMIUM ? "98,5%" : disponibilidadeStr,
-      conectadosTrend: "+25% ↗",
-      desconectadosTrend: "-50% ↘",
-      reconexaoTrend: "0% —",
-      mensagensTrend: "+18% ↗",
-      disponibilidadeTrend: "+2% ↗",
+      conectados,
+      desconectados,
+      reconexao,
+      mensagensHoje: msgsHojeTotal,
+      disponibilidade: disponibilidadeStr,
+      conectadosTrend: "—",
+      desconectadosTrend: "—",
+      reconexaoTrend: "—",
+      mensagensTrend: "—",
+      disponibilidadeTrend: "—",
     };
 
     const saude: WaSaudeConexoes = {
-      saudeGeralPct: chips === CHIPS_REFERENCIA_PREMIUM ? 83 : saudeGeralPct,
-      conectados: chips === CHIPS_REFERENCIA_PREMIUM ? 5 : conectados,
-      conectadosPct:
-        chips === CHIPS_REFERENCIA_PREMIUM ? 83 : Math.round((conectados / totalChips) * 100),
-      desconectados: chips === CHIPS_REFERENCIA_PREMIUM ? 1 : desconectados,
-      desconectadosPct:
-        chips === CHIPS_REFERENCIA_PREMIUM ? 17 : Math.round((desconectados / totalChips) * 100),
-      emReconexao: chips === CHIPS_REFERENCIA_PREMIUM ? 0 : reconexao,
-      emReconexaoPct:
-        chips === CHIPS_REFERENCIA_PREMIUM ? 0 : Math.round((reconexao / totalChips) * 100),
-      erro: chips === CHIPS_REFERENCIA_PREMIUM ? 0 : erro,
-      erroPct: chips === CHIPS_REFERENCIA_PREMIUM ? 0 : Math.round((erro / totalChips) * 100),
-      variacao: "+5%",
+      saudeGeralPct,
+      conectados,
+      conectadosPct: Math.round((conectados / totalChips) * 100),
+      desconectados,
+      desconectadosPct: Math.round((desconectados / totalChips) * 100),
+      emReconexao: reconexao,
+      emReconexaoPct: Math.round((reconexao / totalChips) * 100),
+      erro,
+      erroPct: Math.round((erro / totalChips) * 100),
+      variacao: "—",
     };
 
-    const rotacao = obterConfigRotacaoWa();
+    const activeContingency = contingenciasRes.contingencia;
+    const rotacao: WaRotacaoConfig = {
+      estrategia: "prioridade",
+      intervalo: 20,
+      backupChipId: activeContingency?.backup_instance_id ?? null,
+      contingenciaAtiva: Boolean(activeContingency),
+      pausaAutomatica: false,
+      status: activeContingency ? "configurada" : "nao_configurada",
+    };
 
     // Atividades reais mapeadas de wa_alertas ou fallback de referência
     const atividades: WaAtividadeRecenteItem[] =
@@ -525,39 +593,12 @@ export async function obterDadosNumerosWa(): Promise<{
             icone: a.tipo === "rotacao" ? "chip" : a.tipo === "sem_chip" ? "alerta" : "whatsapp",
             cor: a.tipo === "rotacao" ? "amber" : a.tipo === "sem_chip" ? "rose" : "emerald",
           }))
-        : ATIVIDADES_REFERENCIA_PREMIUM;
+        : [];
 
     return { chips, kpis, saude, rotacao, atividades };
-  } catch {
-    return {
-      chips: CHIPS_REFERENCIA_PREMIUM,
-      kpis: {
-        conectados: 5,
-        desconectados: 1,
-        reconexao: 0,
-        mensagensHoje: 142,
-        disponibilidade: "98,5%",
-        conectadosTrend: "+25% ↗",
-        desconectadosTrend: "-50% ↘",
-        reconexaoTrend: "0% —",
-        mensagensTrend: "+18% ↗",
-        disponibilidadeTrend: "+2% ↗",
-      },
-      saude: {
-        saudeGeralPct: 83,
-        conectados: 5,
-        conectadosPct: 83,
-        desconectados: 1,
-        desconectadosPct: 17,
-        emReconexao: 0,
-        emReconexaoPct: 0,
-        erro: 0,
-        erroPct: 0,
-        variacao: "+5%",
-      },
-      rotacao: obterConfigRotacaoWa(),
-      atividades: ATIVIDADES_REFERENCIA_PREMIUM,
-    };
+  } catch (error) {
+    console.error("Falha ao carregar números WhatsApp", error);
+    throw error;
   }
 }
 
@@ -591,8 +632,9 @@ export const WA_MOTIVO_LABEL: Record<string, string> = {
 
 /** Envia a mensagem de campanha WhatsApp para UM campanha_lead (aprovado). */
 export async function enviarCampanhaLeadWa(campanha_lead_id: string): Promise<WaCampEnvio> {
+  const context = await requireWhatsappAdministrator();
   const { data, error } = await supabase.functions.invoke("send-proposal-wa", {
-    body: { campanha_lead_id },
+    body: { campanha_lead_id, org_id: context.orgId },
   });
   if (error) throw error;
   return data as WaCampEnvio;
@@ -616,15 +658,17 @@ export type WaLeadCompose = {
 
 /** Todos os leads da org COM WhatsApp + se já foram enviados (para os contadores/filtros). */
 export async function listarLeadsWaCompose(): Promise<WaLeadCompose[]> {
+  const context = await activeWhatsappOrganization();
   const [{ data: leads, error }, { data: envios }] = await Promise.all([
     supabase
       .from("leads")
       .select(
         "id, business_name, whatsapp, city, bairro, category, status, score, rating, review_count, score_breakdown",
       )
+      .eq("org_id", context.orgId)
       .not("whatsapp", "is", null)
       .limit(3000),
-    supabase.from("wa_envios").select("lead_id"),
+    supabase.from("wa_envios").select("lead_id").eq("org_id", context.orgId),
   ]);
   if (error) throw error;
   const enviados = new Set((envios ?? []).map((r) => (r as { lead_id: string }).lead_id));
@@ -656,9 +700,11 @@ export type WaScript = {
 };
 
 export async function listarScripts(): Promise<WaScript[]> {
+  const context = await activeWhatsappOrganization();
   const { data, error } = await supabase
     .from("wa_scripts")
     .select("id, nome, tipo, mensagem, media_url, criado_em")
+    .eq("org_id", context.orgId)
     .order("criado_em", { ascending: false });
   if (error) throw error;
   return (data ?? []) as WaScript[];
@@ -670,10 +716,10 @@ export async function criarScript(s: {
   mensagem?: string;
   media_url?: string;
 }): Promise<void> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Não autenticado");
+  const context = await requireWhatsappAdministrator();
   const { error } = await supabase.from("wa_scripts").insert({
-    user_id: u.user.id,
+    user_id: context.userId,
+    org_id: context.orgId,
     nome: s.nome.trim(),
     tipo: s.tipo,
     mensagem: s.mensagem ?? null,
@@ -683,7 +729,12 @@ export async function criarScript(s: {
 }
 
 export async function excluirScript(id: string): Promise<void> {
-  const { error } = await supabase.from("wa_scripts").delete().eq("id", id);
+  const context = await requireWhatsappAdministrator();
+  const { error } = await supabase
+    .from("wa_scripts")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", context.orgId);
   if (error) throw error;
 }
 
@@ -701,6 +752,8 @@ export type WaMensagem = {
 };
 
 export type WaConversa = {
+  id: string;
+  lead_id: string | null;
   numero: string;
   nome_contato: string | null;
   ultima: string | null;
@@ -710,14 +763,18 @@ export type WaConversa = {
 
 /** Lista as conversas (uma por número), com a última mensagem e não-lidas. */
 export async function listarConversas(): Promise<WaConversa[]> {
+  const context = await activeWhatsappOrganization();
   const { data, error } = await supabase
     .from("wa_mensagens")
-    .select("numero, nome_contato, direcao, texto, lida, criado_em")
+    .select("id, lead_id, numero, nome_contato, direcao, texto, lida, criado_em")
+    .eq("org_id", context.orgId)
     .order("criado_em", { ascending: false })
     .limit(3000);
   if (error) throw error;
   const porNumero = new Map<string, WaConversa>();
   for (const m of (data ?? []) as Array<{
+    id: string;
+    lead_id: string | null;
     numero: string;
     nome_contato: string | null;
     direcao: string;
@@ -728,6 +785,8 @@ export async function listarConversas(): Promise<WaConversa[]> {
     const cur = porNumero.get(m.numero);
     if (!cur) {
       porNumero.set(m.numero, {
+        id: m.id,
+        lead_id: m.lead_id,
         numero: m.numero,
         nome_contato: m.nome_contato,
         ultima: m.texto,
@@ -744,9 +803,11 @@ export async function listarConversas(): Promise<WaConversa[]> {
 
 /** Mensagens de uma conversa (por número), em ordem cronológica. */
 export async function listarMensagens(numero: string): Promise<WaMensagem[]> {
+  const context = await activeWhatsappOrganization();
   const { data, error } = await supabase
     .from("wa_mensagens")
     .select("id, numero, direcao, tipo, texto, media_url, lida, criado_em, nome_contato")
+    .eq("org_id", context.orgId)
     .eq("numero", numero)
     .order("criado_em", { ascending: true });
   if (error) throw error;
@@ -755,9 +816,11 @@ export async function listarMensagens(numero: string): Promise<WaMensagem[]> {
 
 /** Marca as mensagens recebidas de um número como lidas. */
 export async function marcarConversaLida(numero: string): Promise<void> {
+  const context = await activeWhatsappOrganization();
   await supabase
     .from("wa_mensagens")
     .update({ lida: true })
+    .eq("org_id", context.orgId)
     .eq("numero", numero)
     .eq("direcao", "in")
     .eq("lida", false);
@@ -765,24 +828,25 @@ export async function marcarConversaLida(numero: string): Promise<void> {
 
 /** Responde uma conversa (envia pelo chip da org via edge + grava a saída). */
 export async function responderConversa(
-  numero: string,
+  conversaId: string,
   texto: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  const context = await activeWhatsappOrganization();
   const { data, error } = await supabase.functions.invoke("wa-responder", {
-    body: { numero, texto },
+    body: { conversa_id: conversaId, texto, org_id: context.orgId },
   });
   if (error) throw error;
   return data as { ok: boolean; error?: string };
 }
 
 /** Limpa o histórico de conversas da org (aba WhatsApp). Devolve quantas removeu. */
-export async function limparConversas(): Promise<number> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Não autenticado");
+export async function limparConversas(confirmar = false): Promise<number> {
+  if (!confirmar) throw new Error("Confirmação explícita obrigatória.");
+  const context = await requireWhatsappAdministrator();
   const { data, error } = await supabase
     .from("wa_mensagens")
     .delete()
-    .eq("user_id", u.user.id)
+    .eq("org_id", context.orgId)
     .select("id");
   if (error) throw error;
   return (data ?? []).length;
@@ -799,14 +863,20 @@ export type WaConversaKpis = {
 };
 
 export async function obterKpisConversasWa(): Promise<WaConversaKpis> {
+  const context = await activeWhatsappOrganization();
   try {
     const [msgsRes, leadsRes] = await Promise.all([
       supabase
         .from("wa_mensagens")
         .select("numero, direcao, lida, criado_em")
+        .eq("org_id", context.orgId)
         .order("criado_em", { ascending: false })
         .limit(2000),
-      supabase.from("leads").select("id, status, created_at").limit(1000),
+      supabase
+        .from("leads")
+        .select("id, status, created_at")
+        .eq("org_id", context.orgId)
+        .limit(1000),
     ]);
 
     const msgs = msgsRes.data ?? [];
@@ -841,21 +911,22 @@ export async function obterKpisConversasWa(): Promise<WaConversaKpis> {
     ).length;
 
     return {
-      conversasAtivas: Math.max(32, numerosAtivos.size),
-      naoLidas: Math.max(18, totalNaoLidas),
-      aguardandoResposta: Math.max(5, aguardando),
-      emAtendimento: 12,
-      novosContatos: Math.max(8, novosHoje),
-      fechamentosHoje: Math.max(3, fechamentosHoje),
+      conversasAtivas: numerosAtivos.size,
+      naoLidas: totalNaoLidas,
+      aguardandoResposta: aguardando,
+      emAtendimento: Math.max(0, numerosAtivos.size - aguardando),
+      novosContatos: novosHoje,
+      fechamentosHoje,
     };
-  } catch {
+  } catch (error) {
+    console.error("Falha ao carregar KPIs de conversas WhatsApp", error);
     return {
-      conversasAtivas: 32,
-      naoLidas: 18,
-      aguardandoResposta: 5,
-      emAtendimento: 12,
-      novosContatos: 8,
-      fechamentosHoje: 3,
+      conversasAtivas: 0,
+      naoLidas: 0,
+      aguardandoResposta: 0,
+      emAtendimento: 0,
+      novosContatos: 0,
+      fechamentosHoje: 0,
     };
   }
 }
@@ -873,7 +944,12 @@ export async function atualizarLeadCrm(
     assigned_to?: string | null;
   },
 ): Promise<boolean> {
-  const { error } = await supabase.from("leads").update(dados).eq("id", leadId);
+  const context = await activeWhatsappOrganization();
+  const { error } = await supabase
+    .from("leads")
+    .update(dados)
+    .eq("id", leadId)
+    .eq("org_id", context.orgId);
   return !error;
 }
 
@@ -883,10 +959,10 @@ export async function registrarInteracaoWa(
   metadata: Record<string, unknown> = {},
 ): Promise<void> {
   try {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    const context = await activeWhatsappOrganization();
     await supabase.from("activity_log").insert({
-      user_id: u.user.id,
+      user_id: context.userId,
+      org_id: context.orgId,
       action,
       entity_type: "wa_conversas",
       entity_id: leadId,
@@ -929,47 +1005,252 @@ export type WaCampanhaAtividade = {
   cor: "emerald" | "blue" | "amber" | "rose";
 };
 
+export type WaDeliveryCounts = Partial<
+  Record<
+    | "draft"
+    | "pending_approval"
+    | "scheduled"
+    | "queued"
+    | "processing"
+    | "accepted"
+    | "sent"
+    | "delivered"
+    | "read"
+    | "failed"
+    | "uncertain"
+    | "cancelled"
+    | "blocked",
+    number
+  >
+> & { responses?: number };
+
+export type WaCampaignEngineItem = {
+  id: string;
+  nome: string;
+  status: string;
+  list_id: string | null;
+  criada_em: string;
+  scheduled_at: string | null;
+  schedule_timezone: string;
+  dispatch_enabled: boolean;
+  counts: WaDeliveryCounts;
+};
+
+export type WaCampaignEngineSnapshot = {
+  campaigns: WaCampaignEngineItem[];
+  chipMetrics: Record<string, { sent: number; percentage: number }>;
+  metrics: {
+    prepared: number;
+    pending: number;
+    processed: number;
+    sent: number;
+    delivered: number;
+    failed: number;
+    uncertain: number;
+    responses: number;
+    paused: number;
+  };
+};
+
+function campaignEngineItem(value: unknown): WaCampaignEngineItem {
+  if (!value || typeof value !== "object")
+    throw new Error("Campanha invÃ¡lida no motor de envios.");
+  const row = value as Record<string, unknown>;
+  if (
+    typeof row.id !== "string" ||
+    typeof row.nome !== "string" ||
+    typeof row.status !== "string" ||
+    typeof row.criada_em !== "string" ||
+    typeof row.schedule_timezone !== "string" ||
+    typeof row.dispatch_enabled !== "boolean" ||
+    !row.counts ||
+    typeof row.counts !== "object"
+  ) {
+    throw new Error("Campanha invÃ¡lida no motor de envios.");
+  }
+  const counts = Object.fromEntries(
+    Object.entries(row.counts as Record<string, unknown>).map(([key, count]) => [
+      key,
+      Number(count ?? 0),
+    ]),
+  ) as WaDeliveryCounts;
+  return {
+    id: row.id,
+    nome: row.nome,
+    status: row.status,
+    list_id: typeof row.list_id === "string" ? row.list_id : null,
+    criada_em: row.criada_em,
+    scheduled_at: typeof row.scheduled_at === "string" ? row.scheduled_at : null,
+    schedule_timezone: row.schedule_timezone,
+    dispatch_enabled: row.dispatch_enabled,
+    counts,
+  };
+}
+
+async function invokeCampaignControl(
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const context = await activeWhatsappOrganization();
+  const { data, error } = await supabase.functions.invoke("wa-campaign-control", {
+    body: { ...body, org_id: context.orgId },
+  });
+  if (error) throw error;
+  if (!data || typeof data !== "object")
+    throw new Error("Resposta invÃ¡lida do motor de campanhas.");
+  return data as Record<string, unknown>;
+}
+
+export async function consultarMotorCampanhasWa(): Promise<WaCampaignEngineSnapshot> {
+  const value = await invokeCampaignControl({ action: "list" });
+  if (!Array.isArray(value.campaigns) || !value.metrics || typeof value.metrics !== "object") {
+    throw new Error("Resposta invÃ¡lida do motor de campanhas.");
+  }
+  const metrics = value.metrics as Record<string, unknown>;
+  const rawChipMetrics =
+    value.chip_metrics && typeof value.chip_metrics === "object"
+      ? (value.chip_metrics as Record<string, unknown>)
+      : {};
+  const chipMetrics = Object.fromEntries(
+    Object.entries(rawChipMetrics).map(([instanceId, raw]) => {
+      const row = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      return [instanceId, { sent: Number(row.sent ?? 0), percentage: Number(row.percentage ?? 0) }];
+    }),
+  );
+  return {
+    campaigns: value.campaigns.map(campaignEngineItem),
+    chipMetrics,
+    metrics: {
+      prepared: Number(metrics.prepared ?? 0),
+      pending: Number(metrics.pending ?? 0),
+      processed: Number(metrics.processed ?? 0),
+      sent: Number(metrics.sent ?? 0),
+      delivered: Number(metrics.delivered ?? 0),
+      failed: Number(metrics.failed ?? 0),
+      uncertain: Number(metrics.uncertain ?? 0),
+      responses: Number(metrics.responses ?? 0),
+      paused: Number(metrics.paused ?? 0),
+    },
+  };
+}
+
+export async function consultarElegibilidadeCampanhaWa(listId: string): Promise<{
+  total: number;
+  eligible: number;
+  blocked: number;
+}> {
+  const value = await invokeCampaignControl({ action: "eligibility", list_id: listId });
+  return {
+    total: Number(value.total ?? 0),
+    eligible: Number(value.eligible ?? 0),
+    blocked: Number(value.blocked ?? 0),
+  };
+}
+
+export async function criarRascunhoCampanhaWa(input: {
+  name: string;
+  listId: string;
+  message: string;
+  campaignType: string;
+  scheduledAt?: string | null;
+  timezone: string;
+}): Promise<{ id: string; createdAt: string; recipientCount: number }> {
+  const value = await invokeCampaignControl({
+    action: "create_draft",
+    name: input.name,
+    list_id: input.listId,
+    message: input.message,
+    campaign_type: input.campaignType,
+    scheduled_at: input.scheduledAt ?? null,
+    timezone: input.timezone,
+  });
+  const campaign = value.campaign;
+  if (!campaign || typeof campaign !== "object") throw new Error("Rascunho nÃ£o persistido.");
+  const row = campaign as Record<string, unknown>;
+  return {
+    id: String(row.campaign_id),
+    createdAt: String(row.created_at),
+    recipientCount: Number(row.recipient_count ?? 0),
+  };
+}
+
+export async function prepararCampanhaWa(input: {
+  campaignId: string;
+  purpose: string;
+  scheduledAt?: string | null;
+  timezone: string;
+}): Promise<{ queued: number; blocked: number; dispatchEnabled: false }> {
+  const response = await invokeCampaignControl({
+    action: "prepare",
+    campaign_id: input.campaignId,
+    purpose: input.purpose,
+    scheduled_at: input.scheduledAt ?? null,
+    timezone: input.timezone,
+  });
+  const result = Array.isArray(response.result) ? response.result[0] : response.result;
+  const counts = result && typeof result === "object" ? (result as Record<string, unknown>) : {};
+  return {
+    queued: Number(counts.queued_count ?? 0),
+    blocked: Number(counts.blocked_count ?? 0),
+    dispatchEnabled: false,
+  };
+}
+
+export async function controlarCampanhaWa(
+  campaignId: string,
+  action: "pause" | "resume" | "cancel",
+  reason?: string,
+): Promise<void> {
+  await invokeCampaignControl({ action, campaign_id: campaignId, reason });
+}
+
+export async function reagendarCampanhaWa(
+  campaignId: string,
+  scheduledAt: string,
+  timezone: string,
+): Promise<void> {
+  await invokeCampaignControl({
+    action: "reschedule",
+    campaign_id: campaignId,
+    scheduled_at: scheduledAt,
+    timezone,
+  });
+}
+
 export async function obterKpisCampanhasWa(): Promise<WaCampanhasKpis> {
   try {
-    const [campsRes, enviosRes, msgsRes, leadsRes] = await Promise.all([
-      supabase
-        .from("campanhas")
-        .select("id", { count: "exact", head: true })
-        .eq("canal", "whatsapp"),
-      supabase.from("wa_envios").select("id, campanha_id", { count: "exact" }),
-      supabase.from("wa_mensagens").select("id, direcao", { count: "exact" }).eq("direcao", "in"),
-      supabase.from("leads").select("id", { count: "exact", head: true }),
-    ]);
-
-    const totalCampanhas = Math.max(12, campsRes.count ?? 0);
-    const mensagensEnviadas = Math.max(8547, enviosRes.count ?? 0);
-    const entregues = Math.round(mensagensEnviadas * 0.924);
-    const respostas = Math.max(1346, msgsRes.count ?? 0);
-    const leadsGerados = Math.max(287, Math.round((leadsRes.count ?? 0) * 0.2));
-    const vendasAtribuidas = 12450;
+    const snapshot = await consultarMotorCampanhasWa();
+    const totalCampanhas = snapshot.campaigns.length;
+    const mensagensEnviadas = snapshot.metrics.sent;
+    const entregues = snapshot.metrics.delivered;
+    const respostas = snapshot.metrics.responses;
+    const leadsGerados = 0;
+    const vendasAtribuidas = 0;
 
     return {
       totalCampanhas,
       mensagensEnviadas,
       entregues,
-      taxaEntrega: 92.4,
+      taxaEntrega:
+        mensagensEnviadas > 0 ? Math.round((entregues / mensagensEnviadas) * 1000) / 10 : 0,
       respostas,
-      taxaResposta: 15.7,
+      taxaResposta:
+        mensagensEnviadas > 0 ? Math.round((respostas / mensagensEnviadas) * 1000) / 10 : 0,
       leadsGerados,
-      taxaLeads: 3.4,
+      taxaLeads: 0,
       vendasAtribuidas,
     };
-  } catch {
+  } catch (error) {
+    console.error("Falha ao carregar KPIs de campanhas WhatsApp", error);
     return {
-      totalCampanhas: 12,
-      mensagensEnviadas: 8547,
-      entregues: 7892,
-      taxaEntrega: 92.4,
-      respostas: 1346,
-      taxaResposta: 15.7,
-      leadsGerados: 287,
-      taxaLeads: 3.4,
-      vendasAtribuidas: 12450,
+      totalCampanhas: 0,
+      mensagensEnviadas: 0,
+      entregues: 0,
+      taxaEntrega: 0,
+      respostas: 0,
+      taxaResposta: 0,
+      leadsGerados: 0,
+      taxaLeads: 0,
+      vendasAtribuidas: 0,
     };
   }
 }
@@ -988,11 +1269,16 @@ export type WaEstatisticas = {
 };
 
 export async function estatisticasWa(): Promise<WaEstatisticas> {
+  const context = await activeWhatsappOrganization();
   const [leadsWa, total, envios, msgs, chips] = await Promise.all([
-    supabase.from("leads").select("id", { count: "exact", head: true }).not("whatsapp", "is", null),
-    supabase.from("leads").select("id", { count: "exact", head: true }),
-    supabase.from("wa_envios").select("campanha_id"),
-    supabase.from("wa_mensagens").select("numero").limit(5000),
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", context.orgId)
+      .not("whatsapp", "is", null),
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("org_id", context.orgId),
+    supabase.from("wa_envios").select("campanha_id").eq("org_id", context.orgId),
+    supabase.from("wa_mensagens").select("numero").eq("org_id", context.orgId).limit(5000),
     listarChips().catch(() => [] as WaChip[]),
   ]);
   const campanhas = new Set(
@@ -1029,10 +1315,13 @@ export async function enviadosPorCampanhaWa(
   campanhaIds: string[],
 ): Promise<Record<string, number>> {
   if (campanhaIds.length === 0) return {};
+  const context = await activeWhatsappOrganization();
   const { data, error } = await supabase
     .from("wa_envios")
     .select("campanha_id")
-    .in("campanha_id", campanhaIds);
+    .eq("org_id", context.orgId)
+    .in("campanha_id", campanhaIds)
+    .or("status.eq.accepted,status.eq.sent,status.eq.delivered,status.eq.read");
   if (error) throw error;
   const m: Record<string, number> = {};
   for (const r of (data ?? []) as { campanha_id: string | null }[])
@@ -1042,10 +1331,13 @@ export async function enviadosPorCampanhaWa(
 
 /** Estatísticas de uma campanha de WhatsApp já realizada (lê o ledger wa_envios). */
 export async function historicoCampanhaWa(campanhaId: string): Promise<WaHistorico> {
+  const context = await activeWhatsappOrganization();
   const { data: envios, error } = await supabase
     .from("wa_envios")
     .select("lead_id, instancia_id, enviado_em")
+    .eq("org_id", context.orgId)
     .eq("campanha_id", campanhaId)
+    .or("status.eq.accepted,status.eq.sent,status.eq.delivered,status.eq.read")
     .order("enviado_em", { ascending: true });
   if (error) throw error;
   const rows = (envios ?? []) as { lead_id: string; instancia_id: string; enviado_em: string }[];
@@ -1063,6 +1355,7 @@ export async function historicoCampanhaWa(campanhaId: string): Promise<WaHistori
   const { data: leads } = await supabase
     .from("leads")
     .select("id, status")
+    .eq("org_id", context.orgId)
     .in("id", leadIds)
     .in("status", ["responded", "meeting"]);
   return {
@@ -1082,8 +1375,9 @@ export type WaEnvio = { ok: boolean; para?: string; error?: string };
 
 /** Envia 1 mensagem de teste para um número (DDI+DDD). Erro real da Evolution. */
 export async function enviarTesteWhatsapp(numero: string, texto?: string): Promise<WaEnvio> {
+  const context = await requireWhatsappAdministrator();
   const { data, error } = await supabase.functions.invoke("wa-send-test", {
-    body: { number: numero, text: texto },
+    body: { number: numero, text: texto, org_id: context.orgId },
   });
   if (error) throw error;
   return data as WaEnvio;
@@ -1190,9 +1484,11 @@ export type SdrSugestao = {
 
 /** Rascunhos pendentes da org (o dono lê por RLS). */
 export async function listarSugestoesSdr(): Promise<SdrSugestao[]> {
+  const context = await activeWhatsappOrganization();
   const { data, error } = await supabase
     .from("sdr_sugestoes")
     .select("id, numero, lead_id, texto, alertas, estado, criado_em")
+    .eq("org_id", context.orgId)
     .eq("estado", "rascunho")
     .order("criado_em", { ascending: false });
   if (error) throw error;
@@ -1201,7 +1497,10 @@ export async function listarSugestoesSdr(): Promise<SdrSugestao[]> {
 
 /** Pede ao agente para rascunhar (só conversas de LEAD; respeita o teto de IA). */
 export async function rodarSdr(limite = 3) {
-  const { data, error } = await supabase.functions.invoke("sdr-sugerir", { body: { limite } });
+  const context = await activeWhatsappOrganization();
+  const { data, error } = await supabase.functions.invoke("sdr-sugerir", {
+    body: { limite, org_id: context.orgId },
+  });
   if (error) throw error;
   return data as {
     ok: boolean;
@@ -1215,10 +1514,12 @@ export async function rodarSdr(limite = 3) {
 
 /** Descarta o rascunho (nada é enviado). */
 export async function descartarSugestaoSdr(id: string): Promise<void> {
+  const context = await activeWhatsappOrganization();
   const { error } = await supabase
     .from("sdr_sugestoes")
     .update({ estado: "descartada", decidido_em: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("org_id", context.orgId);
   if (error) throw error;
 }
 
@@ -1231,12 +1532,23 @@ export async function aprovarSugestaoSdr(
   s: Pick<SdrSugestao, "id" | "numero">,
   texto: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const r = await responderConversa(s.numero, texto);
+  const context = await activeWhatsappOrganization();
+  const { data: conversation } = await supabase
+    .from("wa_mensagens")
+    .select("id")
+    .eq("org_id", context.orgId)
+    .eq("numero", s.numero)
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!conversation) return { ok: false, error: "Conversa não encontrada." };
+  const r = await responderConversa(conversation.id, texto);
   if (!r.ok) return { ok: false, error: r.error ?? "falha no envio" };
   const { error } = await supabase
     .from("sdr_sugestoes")
     .update({ estado: "enviada", texto, decidido_em: new Date().toISOString() })
-    .eq("id", s.id);
+    .eq("id", s.id)
+    .eq("org_id", context.orgId);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
@@ -1278,6 +1590,7 @@ export type WaPainelData = {
 };
 
 export async function obterDadosPainelWa(): Promise<WaPainelData> {
+  const context = await activeWhatsappOrganization();
   const [chipsRes, statsRes, campanhasRes, conversasRes, enviosRes, msgsRes, alertasRes] =
     await Promise.allSettled([
       listarChips(),
@@ -1285,6 +1598,7 @@ export async function obterDadosPainelWa(): Promise<WaPainelData> {
       supabase
         .from("campanhas")
         .select("id, nome, status, list_id, criada_em, lead_lists(name)")
+        .eq("org_id", context.orgId)
         .eq("canal", "whatsapp")
         .order("criada_em", { ascending: false })
         .limit(6),
@@ -1292,11 +1606,13 @@ export async function obterDadosPainelWa(): Promise<WaPainelData> {
       supabase
         .from("wa_envios")
         .select("id, campanha_id, lead_id, enviado_em")
+        .eq("org_id", context.orgId)
         .order("enviado_em", { ascending: false })
         .limit(2000),
       supabase
         .from("wa_mensagens")
         .select("id, numero, nome_contato, direcao, texto, criado_em, lida")
+        .eq("org_id", context.orgId)
         .order("criado_em", { ascending: false })
         .limit(500),
       listarAlertas(),
@@ -1335,12 +1651,10 @@ export async function obterDadosPainelWa(): Promise<WaPainelData> {
   // Campanhas com estatísticas consolidadas
   const campanhas: WaPainelCampanha[] = rawCampanhas.map((c) => {
     const enviados = enviosPorCampanha.get(c.id) ?? 0;
-    // Entregues reais estimados por envios com sucesso
-    const entregues = enviados > 0 ? Math.round(enviados * 0.96) : 0;
-    const taxaEntrega = enviados > 0 ? Math.round((entregues / enviados) * 100) : 0;
-    // Respostas reais estimadas com base em conversas
-    const respostas = enviados > 0 ? Math.round(enviados * 0.24) : 0;
-    const taxaResposta = enviados > 0 ? Math.round((respostas / enviados) * 100) : 0;
+    const entregues = 0;
+    const taxaEntrega = 0;
+    const respostas = 0;
+    const taxaResposta = 0;
     const listName =
       c.lead_lists && typeof c.lead_lists === "object" && "name" in c.lead_lists
         ? (c.lead_lists as { name: string }).name
@@ -1366,16 +1680,20 @@ export async function obterDadosPainelWa(): Promise<WaPainelData> {
   let taxaRespostaGeral = 0;
   if (msgsEnviadas > 0 && msgsRecebidas > 0) {
     taxaRespostaGeral = Math.min(100, Math.round((msgsRecebidas / msgsEnviadas) * 100));
-  } else if (stats.conversas > 0) {
-    taxaRespostaGeral = 68; // referência dos últimos 7 dias se houver fluxo ativo
   }
 
   // Status de conexão
-  const ativos = chips.filter((c) => c.status === "conectado").length;
-  const totalChips = chips.length;
-  const desconectados = chips.filter(
-    (c) => c.status === "desconectado" || c.status === "queimada" || c.status === "erro",
+  const ativos = chips.filter(
+    (c) =>
+      c.provider_status === "connected" &&
+      c.operational_health === "healthy" &&
+      Boolean(
+        c.last_provider_success_at &&
+        Date.now() - Date.parse(c.last_provider_success_at) <= 5 * 60_000,
+      ),
   ).length;
+  const totalChips = chips.length;
+  const desconectados = chips.filter((c) => c.operational_health !== "healthy").length;
 
   const indisponivel = chipsRes.status === "rejected";
   const conectado = !indisponivel && totalChips > 0 && ativos > 0 && desconectados === 0;
@@ -1472,12 +1790,7 @@ export async function obterDadosPainelWa(): Promise<WaPainelData> {
 // ============================================================================
 
 export type WaAutomacaoTipo =
-  | "boas_vindas"
-  | "qualificacao"
-  | "agendamento"
-  | "follow_up"
-  | "recuperacao"
-  | "atendimento";
+  "boas_vindas" | "qualificacao" | "agendamento" | "follow_up" | "recuperacao" | "atendimento";
 
 export type WaAutomacaoGatilho =
   | "nova_conversa"
@@ -1807,38 +2120,31 @@ export const ATIVIDADES_AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoAtividadeItem[
   },
 ];
 
-const LOCAL_STORAGE_WA_AUTOMACOES = "flow_wa_automacoes_v1";
+const localStorageWaAutomacoes = (orgId: string) => `flow_wa_automacoes_v1.${orgId}`;
 
 /**
  * Lê automações persistidas no storage local da organização ou mescla com receitas do banco
  */
-export function listarAutomacoesLocais(): WaAutomacaoItem[] {
-  if (typeof window === "undefined") return AUTOMACOES_REFERENCIA_PREMIUM;
+export function listarAutomacoesLocais(orgId: string): WaAutomacaoItem[] {
+  if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_WA_AUTOMACOES);
-    if (!raw) {
-      localStorage.setItem(
-        LOCAL_STORAGE_WA_AUTOMACOES,
-        JSON.stringify(AUTOMACOES_REFERENCIA_PREMIUM),
-      );
-      return AUTOMACOES_REFERENCIA_PREMIUM;
-    }
+    const raw = localStorage.getItem(localStorageWaAutomacoes(orgId));
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : AUTOMACOES_REFERENCIA_PREMIUM;
-  } catch {
-    return AUTOMACOES_REFERENCIA_PREMIUM;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("Falha ao ler automações locais", error);
+    return [];
   }
 }
 
 /**
  * Salva a lista inteira de automações no storage local
  */
-export function salvarAutomacoesLocais(itens: WaAutomacaoItem[]): void {
+export function salvarAutomacoesLocais(orgId: string, itens: WaAutomacaoItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_WA_AUTOMACOES, JSON.stringify(itens));
+    localStorage.setItem(localStorageWaAutomacoes(orgId), JSON.stringify(itens));
   } catch (err) {
     console.error("Falha ao salvar automações locais:", err);
   }
@@ -1847,10 +2153,9 @@ export function salvarAutomacoesLocais(itens: WaAutomacaoItem[]): void {
 /**
  * Cria ou atualiza uma automação comercial de WhatsApp
  */
-export async function salvarAutomacaoWa(
-  auto: Partial<WaAutomacaoItem>,
-): Promise<WaAutomacaoItem> {
-  const lista = listarAutomacoesLocais();
+export async function salvarAutomacaoWa(auto: Partial<WaAutomacaoItem>): Promise<WaAutomacaoItem> {
+  const context = await requireWhatsappAdministrator();
+  const lista = listarAutomacoesLocais(context.orgId);
   const agora = new Date();
   const dataFormatada = `${String(agora.getDate()).padStart(2, "0")}/${String(
     agora.getMonth() + 1,
@@ -1868,7 +2173,7 @@ export async function salvarAutomacaoWa(
         ultimaAtualizacao: dataFormatada,
       } as WaAutomacaoItem;
       lista[index] = atualizada;
-      salvarAutomacoesLocais(lista);
+      salvarAutomacoesLocais(context.orgId, lista);
       return atualizada;
     }
   }
@@ -1890,7 +2195,7 @@ export async function salvarAutomacaoWa(
   };
 
   const novaLista = [nova, ...lista];
-  salvarAutomacoesLocais(novaLista);
+  salvarAutomacoesLocais(context.orgId, novaLista);
   return nova;
 }
 
@@ -1901,14 +2206,15 @@ export async function alternarStatusAutomacaoWa(
   id: string,
   ativa: boolean,
 ): Promise<{ ok: boolean; status: WaAutomacaoStatus; aviso?: string }> {
-  const lista = listarAutomacoesLocais();
+  const context = await requireWhatsappAdministrator();
+  const lista = listarAutomacoesLocais(context.orgId);
   const index = lista.findIndex((a) => a.id === id);
   if (index < 0) return { ok: false, status: "pausada", aviso: "Automação não encontrada" };
 
   const novoStatus: WaAutomacaoStatus = ativa ? "ativa" : "pausada";
   lista[index].ativa = ativa;
   lista[index].status = novoStatus;
-  salvarAutomacoesLocais(lista);
+  salvarAutomacoesLocais(context.orgId, lista);
 
   return {
     ok: true,
@@ -1923,9 +2229,10 @@ export async function alternarStatusAutomacaoWa(
  * Exclui uma automação do sistema
  */
 export async function excluirAutomacaoWa(id: string): Promise<boolean> {
-  const lista = listarAutomacoesLocais();
+  const context = await requireWhatsappAdministrator();
+  const lista = listarAutomacoesLocais(context.orgId);
   const novaLista = lista.filter((a) => a.id !== id);
-  salvarAutomacoesLocais(novaLista);
+  salvarAutomacoesLocais(context.orgId, novaLista);
   return true;
 }
 
@@ -1933,7 +2240,8 @@ export async function excluirAutomacaoWa(id: string): Promise<boolean> {
  * Duplica uma automação
  */
 export async function duplicarAutomacaoWa(id: string): Promise<WaAutomacaoItem | null> {
-  const lista = listarAutomacoesLocais();
+  const context = await requireWhatsappAdministrator();
+  const lista = listarAutomacoesLocais(context.orgId);
   const original = lista.find((a) => a.id === id);
   if (!original) return null;
 
@@ -1958,35 +2266,39 @@ export async function obterDadosAutomacoesWa(): Promise<{
   atividades: WaAutomacaoAtividadeItem[];
   conectado: boolean;
 }> {
-  const automacoes = listarAutomacoesLocais();
+  const context = await activeWhatsappOrganization();
+  const automacoes = listarAutomacoesLocais(context.orgId);
 
   // Buscar dados reais de chips e mensagens se disponíveis
-  let totalMensagens = 1428;
-  let leadsQualificados = 342;
-  let taxaResp = "87%";
-  let conectado = true;
+  let totalMensagens = 0;
+  const leadsQualificados = 0;
+  let taxaResp = "0%";
+  let conectado = false;
 
   try {
-    const { data: chips } = await supabase.from("wa_instancias").select("id, status");
+    const { data: chips } = await supabase
+      .from("wa_instancias")
+      .select("id, status")
+      .eq("org_id", context.orgId);
     if (chips && chips.length > 0) {
       conectado = chips.some((c) => c.status === "conectado");
     }
 
-    const { count: msgCount } = await supabase
+    const { data: messages, count: msgCount } = await supabase
       .from("wa_mensagens")
-      .select("id", { count: "exact", head: true });
+      .select("id, direcao", { count: "exact" })
+      .eq("org_id", context.orgId);
     if (typeof msgCount === "number" && msgCount > 0) {
       totalMensagens = msgCount;
     }
 
-    const { count: leadCount } = await supabase
-      .from("leads")
-      .select("id", { count: "exact", head: true });
-    if (typeof leadCount === "number" && leadCount > 0) {
-      leadsQualificados = Math.round(leadCount * 0.4);
+    if (messages?.length) {
+      const outbound = messages.filter((message) => message.direcao === "out").length;
+      const inbound = messages.filter((message) => message.direcao === "in").length;
+      taxaResp = outbound > 0 ? `${Math.round((inbound / outbound) * 100)}%` : "0%";
     }
-  } catch {
-    // Modo resiliente — mantém fidelidade aos benchmarks da imagem
+  } catch (error) {
+    console.error("Falha ao carregar automações WhatsApp", error);
   }
 
   const ativas = automacoes.filter((a) => a.ativa).length;
@@ -1994,20 +2306,28 @@ export async function obterDadosAutomacoesWa(): Promise<{
   return {
     automacoes,
     kpis: {
-      ativas: ativas > 0 ? ativas : KPIS_REFERENCIA_PREMIUM.ativas,
-      ativasTrend: KPIS_REFERENCIA_PREMIUM.ativasTrend,
+      ativas,
+      ativasTrend: "—",
       mensagens: totalMensagens,
-      mensagensTrend: KPIS_REFERENCIA_PREMIUM.mensagensTrend,
+      mensagensTrend: "—",
       qualificados: leadsQualificados,
-      qualificadosTrend: KPIS_REFERENCIA_PREMIUM.qualificadosTrend,
+      qualificadosTrend: "—",
       taxaResposta: taxaResp,
-      taxaRespostaTrend: KPIS_REFERENCIA_PREMIUM.taxaRespostaTrend,
-      tempoMedio: KPIS_REFERENCIA_PREMIUM.tempoMedio,
-      tempoMedioTrend: KPIS_REFERENCIA_PREMIUM.tempoMedioTrend,
+      taxaRespostaTrend: "—",
+      tempoMedio: "Dados insuficientes",
+      tempoMedioTrend: "—",
     },
-    desempenho: DESEMPENHO_REFERENCIA_PREMIUM,
-    distribuicao: DISTRIBUICAO_REFERENCIA_PREMIUM,
-    atividades: ATIVIDADES_AUTOMACOES_REFERENCIA_PREMIUM,
+    desempenho: {
+      mensagens: totalMensagens,
+      mensagensTrend: "—",
+      qualificados: leadsQualificados,
+      qualificadosTrend: "—",
+      taxaResposta: taxaResp,
+      taxaRespostaTrend: "—",
+      pontos: [],
+    },
+    distribuicao: [],
+    atividades: [],
     conectado,
   };
 }
@@ -2017,12 +2337,7 @@ export async function obterDadosAutomacoesWa(): Promise<{
 // ============================================================================
 
 export type WaScriptCategoria =
-  | "boas_vindas"
-  | "qualificacao"
-  | "agendamento"
-  | "follow_up"
-  | "recuperacao"
-  | "atendimento";
+  "boas_vindas" | "qualificacao" | "agendamento" | "follow_up" | "recuperacao" | "atendimento";
 
 export type WaScriptStatus = "ativo" | "inativo";
 
@@ -2366,51 +2681,41 @@ export const ATIVIDADES_SCRIPTS_PREMIUM: WaScriptAtividadeItem[] = [
   },
 ];
 
-const LOCAL_STORAGE_WA_SCRIPTS_META = "flow_wa_scripts_meta_v1";
+const localStorageWaScripts = (orgId: string) => `flow_wa_scripts_meta_v1.${orgId}`;
 
 export function extrairVariaveis(texto: string): { lista: string[]; count: number } {
   if (!texto) return { lista: [], count: 0 };
   const matches = texto.match(/\{\{\s*(\w+)\s*\}\}/g);
   if (!matches) return { lista: [], count: 0 };
-  const unicas = Array.from(
-    new Set(matches.map((m) => m.replace(/[\{\}\s]/g, ""))),
-  );
+  const unicas = Array.from(new Set(matches.map((m) => m.replace(/[{}\s]/g, ""))));
   return { lista: unicas, count: unicas.length };
 }
 
-export function listarScriptsLocais(): WaScriptItem[] {
-  if (typeof window === "undefined") return SCRIPTS_REFERENCIA_PREMIUM;
+export function listarScriptsLocais(orgId: string): WaScriptItem[] {
+  if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_WA_SCRIPTS_META);
-    if (!raw) {
-      localStorage.setItem(
-        LOCAL_STORAGE_WA_SCRIPTS_META,
-        JSON.stringify(SCRIPTS_REFERENCIA_PREMIUM),
-      );
-      return SCRIPTS_REFERENCIA_PREMIUM;
-    }
+    const raw = localStorage.getItem(localStorageWaScripts(orgId));
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : SCRIPTS_REFERENCIA_PREMIUM;
-  } catch {
-    return SCRIPTS_REFERENCIA_PREMIUM;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("Falha ao ler scripts locais", error);
+    return [];
   }
 }
 
-export function salvarScriptsLocais(itens: WaScriptItem[]): void {
+export function salvarScriptsLocais(orgId: string, itens: WaScriptItem[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_WA_SCRIPTS_META, JSON.stringify(itens));
+    localStorage.setItem(localStorageWaScripts(orgId), JSON.stringify(itens));
   } catch (err) {
     console.error("Falha ao salvar scripts locais:", err);
   }
 }
 
-export async function salvarScriptWa(
-  s: Partial<WaScriptItem>,
-): Promise<WaScriptItem> {
-  const lista = listarScriptsLocais();
+export async function salvarScriptWa(s: Partial<WaScriptItem>): Promise<WaScriptItem> {
+  const context = await requireWhatsappAdministrator();
+  const lista = listarScriptsLocais(context.orgId);
   const agora = new Date();
   const dataFormatada = `${String(agora.getDate()).padStart(2, "0")}/${String(
     agora.getMonth() + 1,
@@ -2421,36 +2726,32 @@ export async function salvarScriptWa(
 
   const { lista: vars, count: varsCount } = extrairVariaveis(s.mensagem || "");
 
-  // Tentativa de sincronizar com a tabela oficial wa_scripts no Supabase
   let dbId = s.id;
-  try {
-    const { data: u } = await supabase.auth.getUser();
-    if (u.user) {
-      if (s.id && !s.id.startsWith("sc-")) {
-        await supabase
-          .from("wa_scripts")
-          .update({
-            nome: s.nome?.trim(),
-            mensagem: s.mensagem ?? null,
-            tipo: s.tipo ?? "texto",
-          })
-          .eq("id", s.id);
-      } else {
-        const { data: novoDb } = await supabase
-          .from("wa_scripts")
-          .insert({
-            user_id: u.user.id,
-            nome: s.nome?.trim() || "Novo Script",
-            mensagem: s.mensagem ?? null,
-            tipo: s.tipo ?? "texto",
-          })
-          .select("id")
-          .single();
-        if (novoDb?.id) dbId = novoDb.id;
-      }
-    }
-  } catch {
-    // Sincronização offline / fallback resiliente
+  if (s.id && !s.id.startsWith("sc-")) {
+    const { error } = await supabase
+      .from("wa_scripts")
+      .update({
+        nome: s.nome?.trim(),
+        mensagem: s.mensagem ?? null,
+        tipo: s.tipo ?? "texto",
+      })
+      .eq("id", s.id)
+      .eq("org_id", context.orgId);
+    if (error) throw error;
+  } else {
+    const { data: novoDb, error } = await supabase
+      .from("wa_scripts")
+      .insert({
+        user_id: context.userId,
+        org_id: context.orgId,
+        nome: s.nome?.trim() || "Novo Script",
+        mensagem: s.mensagem ?? null,
+        tipo: s.tipo ?? "texto",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    if (novoDb?.id) dbId = novoDb.id;
   }
 
   if (s.id) {
@@ -2465,7 +2766,7 @@ export async function salvarScriptWa(
         atualizado_em: dataFormatada,
       };
       lista[index] = atualizado;
-      salvarScriptsLocais(lista);
+      salvarScriptsLocais(context.orgId, lista);
       return atualizado;
     }
   }
@@ -2480,7 +2781,7 @@ export async function salvarScriptWa(
     variaveis: vars,
     usos: s.usos || 0,
     ativo: s.ativo ?? true,
-    status: s.status || (s.ativo ?? true ? "ativo" : "inativo"),
+    status: s.status || ((s.ativo ?? true) ? "ativo" : "inativo"),
     tipo: s.tipo || "texto",
     criado_em: new Date().toISOString(),
     atualizado_em: dataFormatada,
@@ -2488,7 +2789,7 @@ export async function salvarScriptWa(
   };
 
   const novaLista = [novo, ...lista];
-  salvarScriptsLocais(novaLista);
+  salvarScriptsLocais(context.orgId, novaLista);
   return novo;
 }
 
@@ -2496,35 +2797,39 @@ export async function alternarStatusScriptWa(
   id: string,
   ativo: boolean,
 ): Promise<{ ok: boolean; status: WaScriptStatus }> {
-  const lista = listarScriptsLocais();
+  const context = await requireWhatsappAdministrator();
+  const lista = listarScriptsLocais(context.orgId);
   const index = lista.findIndex((s) => s.id === id);
   if (index < 0) return { ok: false, status: "inativo" };
 
   const novoStatus: WaScriptStatus = ativo ? "ativo" : "inativo";
   lista[index].ativo = ativo;
   lista[index].status = novoStatus;
-  salvarScriptsLocais(lista);
+  salvarScriptsLocais(context.orgId, lista);
 
   return { ok: true, status: novoStatus };
 }
 
 export async function excluirScriptWa(id: string): Promise<boolean> {
-  const lista = listarScriptsLocais();
+  const context = await requireWhatsappAdministrator();
+  const lista = listarScriptsLocais(context.orgId);
   const novaLista = lista.filter((s) => s.id !== id);
-  salvarScriptsLocais(novaLista);
+  salvarScriptsLocais(context.orgId, novaLista);
 
-  try {
-    if (!id.startsWith("sc-")) {
-      await supabase.from("wa_scripts").delete().eq("id", id);
-    }
-  } catch {
-    // Modo resiliente
+  if (!id.startsWith("sc-")) {
+    const { error } = await supabase
+      .from("wa_scripts")
+      .delete()
+      .eq("id", id)
+      .eq("org_id", context.orgId);
+    if (error) throw error;
   }
   return true;
 }
 
 export async function duplicarScriptWa(id: string): Promise<WaScriptItem | null> {
-  const lista = listarScriptsLocais();
+  const context = await requireWhatsappAdministrator();
+  const lista = listarScriptsLocais(context.orgId);
   const original = lista.find((s) => s.id === id);
   if (!original) return null;
 
@@ -2546,13 +2851,15 @@ export async function obterDadosScriptsWa(): Promise<{
   atividades: WaScriptAtividadeItem[];
   conectado: boolean;
 }> {
-  let scripts = listarScriptsLocais();
+  const context = await activeWhatsappOrganization();
+  let scripts = listarScriptsLocais(context.orgId);
 
   // Buscar scripts do Supabase para unificar
   try {
     const { data: dbScripts } = await supabase
       .from("wa_scripts")
       .select("id, nome, tipo, mensagem, media_url, criado_em")
+      .eq("org_id", context.orgId)
       .order("criado_em", { ascending: false });
 
     if (dbScripts && dbScripts.length > 0) {
@@ -2590,7 +2897,7 @@ export async function obterDadosScriptsWa(): Promise<{
             usos: 1,
             ativo: true,
             status: "ativo",
-            tipo: (d.tipo as any) || "texto",
+            tipo: d.tipo || "texto",
             media_url: d.media_url,
             criado_em: d.criado_em,
             origem: "db",
@@ -2599,37 +2906,51 @@ export async function obterDadosScriptsWa(): Promise<{
       }
       scripts = mesclados;
     }
-  } catch {
-    // Modo resiliente
+  } catch (error) {
+    console.error("Falha ao carregar scripts WhatsApp", error);
+    throw error;
   }
 
-  let conectado = true;
+  let conectado = false;
   try {
-    const { data: chips } = await supabase.from("wa_instancias").select("id, status");
+    const { data: chips } = await supabase
+      .from("wa_instancias")
+      .select("id, status")
+      .eq("org_id", context.orgId);
     if (chips && chips.length > 0) {
       conectado = chips.some((c) => c.status === "conectado");
     }
-  } catch {
-    // Resiliente
+  } catch (error) {
+    console.error("Falha ao consultar conexão dos scripts WhatsApp", error);
   }
 
   return {
     scripts,
     kpis: {
-      criados: scripts.length >= 8 ? 128 : scripts.length,
-      criadosTrend: KPIS_SCRIPTS_REFERENCIA_PREMIUM.criadosTrend,
-      usosMes: KPIS_SCRIPTS_REFERENCIA_PREMIUM.usosMes,
-      usosMesTrend: KPIS_SCRIPTS_REFERENCIA_PREMIUM.usosMesTrend,
-      atendimentos: KPIS_SCRIPTS_REFERENCIA_PREMIUM.atendimentos,
-      atendimentosTrend: KPIS_SCRIPTS_REFERENCIA_PREMIUM.atendimentosTrend,
-      taxaUtilizacao: KPIS_SCRIPTS_REFERENCIA_PREMIUM.taxaUtilizacao,
-      taxaUtilizacaoTrend: KPIS_SCRIPTS_REFERENCIA_PREMIUM.taxaUtilizacaoTrend,
-      avaliacao: KPIS_SCRIPTS_REFERENCIA_PREMIUM.avaliacao,
-      avaliacaoTrend: KPIS_SCRIPTS_REFERENCIA_PREMIUM.avaliacaoTrend,
+      criados: scripts.length,
+      criadosTrend: "—",
+      usosMes: 0,
+      usosMesTrend: "—",
+      atendimentos: 0,
+      atendimentosTrend: "—",
+      taxaUtilizacao: "0%",
+      taxaUtilizacaoTrend: "—",
+      avaliacao: "—",
+      avaliacaoTrend: "—",
     },
-    desempenho: DESEMPENHO_SCRIPTS_REFERENCIA_PREMIUM,
-    maisUsados: SCRIPTS_MAIS_USADOS_PREMIUM,
-    atividades: ATIVIDADES_SCRIPTS_PREMIUM,
+    desempenho: {
+      usosMes: 0,
+      usosMesTrend: "—",
+      conversas: 0,
+      conversasTrend: "—",
+      taxaResposta: "0%",
+      taxaRespostaTrend: "—",
+      avaliacao: "—",
+      avaliacaoTrend: "—",
+      pontos: [],
+    },
+    maisUsados: [],
+    atividades: [],
     conectado,
   };
 }
@@ -2764,11 +3085,46 @@ export const KPIS_RELATORIOS_PREMIUM: WaRelatoriosKpis = {
 export const DESEMPENHO_GERAL_PREMIUM: WaDesempenhoPonto[] = [
   { data: "2024-03-01", label: "01/03", enviadas: 480, entregues: 440, respostas: 190, leads: 50 },
   { data: "2024-03-05", label: "05/03", enviadas: 920, entregues: 850, respostas: 320, leads: 95 },
-  { data: "2024-03-10", label: "10/03", enviadas: 1450, entregues: 1380, respostas: 490, leads: 140 },
-  { data: "2024-03-15", label: "15/03", enviadas: 1320, entregues: 1210, respostas: 440, leads: 130 },
-  { data: "2024-03-20", label: "20/03", enviadas: 1680, entregues: 1540, respostas: 590, leads: 180 },
-  { data: "2024-03-25", label: "25/03", enviadas: 1520, entregues: 1420, respostas: 530, leads: 165 },
-  { data: "2024-03-30", label: "30/03", enviadas: 1750, entregues: 1620, respostas: 620, leads: 195 },
+  {
+    data: "2024-03-10",
+    label: "10/03",
+    enviadas: 1450,
+    entregues: 1380,
+    respostas: 490,
+    leads: 140,
+  },
+  {
+    data: "2024-03-15",
+    label: "15/03",
+    enviadas: 1320,
+    entregues: 1210,
+    respostas: 440,
+    leads: 130,
+  },
+  {
+    data: "2024-03-20",
+    label: "20/03",
+    enviadas: 1680,
+    entregues: 1540,
+    respostas: 590,
+    leads: 180,
+  },
+  {
+    data: "2024-03-25",
+    label: "25/03",
+    enviadas: 1520,
+    entregues: 1420,
+    respostas: 530,
+    leads: 165,
+  },
+  {
+    data: "2024-03-30",
+    label: "30/03",
+    enviadas: 1750,
+    entregues: 1620,
+    respostas: 620,
+    leads: 195,
+  },
 ];
 
 export const DISTRIBUICAO_CANAL_PREMIUM: WaDistribuicaoCanal[] = [
@@ -2985,97 +3341,161 @@ export const ATIVIDADES_RELATORIOS_PREMIUM: WaRelatorioAtividade[] = [
 export async function obterDadosRelatoriosWa(
   filtros?: Partial<WaRelatoriosFiltros>,
 ): Promise<WaRelatoriosData> {
-  let chipsDb: WaChip[] = [];
-  let mensagensCount = 0;
-  let respostasCount = 0;
-  let leadsCount = 0;
-  let propostasValor = 0;
-  let conectado = true;
+  const context = await activeWhatsappOrganization();
+  const [chipsDb, enviosRes, mensagensRes, propostasRes] = await Promise.all([
+    listarChips(),
+    supabase
+      .from("wa_envios")
+      .select("instancia_id, campanha_id, lead_id, enviado_em")
+      .eq("org_id", context.orgId)
+      .order("enviado_em", { ascending: true })
+      .limit(5000),
+    supabase
+      .from("wa_mensagens")
+      .select("id, instancia_id, lead_id, direcao, criado_em, texto")
+      .eq("org_id", context.orgId)
+      .order("criado_em", { ascending: true })
+      .limit(5000),
+    supabase.from("propostas").select("valor, status, campanha_id").eq("org_id", context.orgId),
+  ]);
+  if (enviosRes.error) throw enviosRes.error;
+  if (mensagensRes.error) throw mensagensRes.error;
+  if (propostasRes.error) throw propostasRes.error;
 
-  try {
-    const [chipsRes, msgsRes, leadsRes, propostasRes] = await Promise.all([
-      listarChips().catch(() => [] as WaChip[]),
-      supabase.from("wa_mensagens").select("id, direcao", { count: "exact" }).limit(1000),
-      supabase.from("leads").select("id", { count: "exact", head: true }),
-      supabase.from("propostas").select("valor, status"),
-    ]);
+  const selectedInstance =
+    filtros?.numeroId && filtros.numeroId !== "todos" ? filtros.numeroId : null;
+  const envios = (enviosRes.data ?? []).filter(
+    (row) => !selectedInstance || row.instancia_id === selectedInstance,
+  );
+  const mensagens = (mensagensRes.data ?? []).filter(
+    (row) => !selectedInstance || row.instancia_id === selectedInstance,
+  );
+  const recebidas = mensagens.filter((row) => row.direcao === "in");
+  const leadIds = new Set(recebidas.map((row) => row.lead_id).filter(Boolean));
+  const campaignIds = new Set(envios.map((row) => row.campanha_id).filter(Boolean));
+  const vendasAtribuidas = (propostasRes.data ?? [])
+    .filter(
+      (proposal) =>
+        proposal.campanha_id &&
+        campaignIds.has(proposal.campanha_id) &&
+        ["aprovada", "ganha", "paga"].includes(proposal.status),
+    )
+    .reduce((sum, proposal) => sum + (Number(proposal.valor) || 0), 0);
 
-    chipsDb = chipsRes || [];
-    conectado = chipsDb.length > 0 ? chipsDb.some((c) => c.status === "conectado") : true;
-
-    if (msgsRes.data && msgsRes.data.length > 0) {
-      mensagensCount = msgsRes.count || msgsRes.data.length;
-      respostasCount = msgsRes.data.filter((m) => m.direcao === "in").length;
-    }
-
-    if (leadsRes.count) {
-      leadsCount = leadsRes.count;
-    }
-
-    if (propostasRes.data && propostasRes.data.length > 0) {
-      propostasValor = propostasRes.data
-        .filter((p) => p.status === "aprovada" || p.status === "ganha" || p.status === "paga")
-        .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
-    }
-  } catch {
-    // Modo resiliente
+  const sentByInstance = new Map<string, number>();
+  const repliesByInstance = new Map<string, number>();
+  const leadsByInstance = new Map<string, Set<string>>();
+  for (const row of envios) {
+    if (!row.instancia_id) continue;
+    sentByInstance.set(row.instancia_id, (sentByInstance.get(row.instancia_id) ?? 0) + 1);
   }
-
-  // Se houver chips no banco, mapeia com dados do banco ou complementa o benchmark
-  let desempenhoNumeros = [...DESEMPENHO_NUMEROS_PREMIUM];
-  if (chipsDb.length > 0) {
-    desempenhoNumeros = chipsDb.map((chip, idx) => {
-      const benchmark = DESEMPENHO_NUMEROS_PREMIUM[idx % DESEMPENHO_NUMEROS_PREMIUM.length];
+  for (const row of recebidas) {
+    if (!row.instancia_id) continue;
+    repliesByInstance.set(row.instancia_id, (repliesByInstance.get(row.instancia_id) ?? 0) + 1);
+    if (row.lead_id) {
+      const ids = leadsByInstance.get(row.instancia_id) ?? new Set<string>();
+      ids.add(row.lead_id);
+      leadsByInstance.set(row.instancia_id, ids);
+    }
+  }
+  const desempenhoNumeros: WaDesempenhoNumero[] = chipsDb
+    .filter((chip) => !selectedInstance || chip.id === selectedInstance)
+    .map((chip) => {
+      const enviadas = sentByInstance.get(chip.id) ?? 0;
+      const respostas = repliesByInstance.get(chip.id) ?? 0;
       return {
         id: chip.id,
-        nome: chip.nome || benchmark.nome,
-        numero: chip.numero || benchmark.numero,
-        enviadas: benchmark.enviadas,
-        entregues: benchmark.entregues,
-        respostas: benchmark.respostas,
-        leads: benchmark.leads,
-        taxaResposta: benchmark.taxaResposta,
-        cor: benchmark.cor,
+        nome: chip.nome,
+        numero: chip.numero ?? "—",
+        enviadas,
+        entregues: 0,
+        respostas,
+        leads: leadsByInstance.get(chip.id)?.size ?? 0,
+        taxaResposta: enviadas > 0 ? (respostas / enviadas) * 100 : 0,
+        cor: "emerald",
       };
     });
-  }
 
-  // Aplicação dos filtros se fornecidos
-  let kpis = { ...KPIS_RELATORIOS_PREMIUM };
-  let desempenhoGeral = [...DESEMPENHO_GERAL_PREMIUM];
-  let leadsPorDia = [...LEADS_POR_DIA_PREMIUM];
-  let conversoesVendas = [...CONVERSOES_VENDAS_PREMIUM];
-
-  if (filtros?.numeroId && filtros.numeroId !== "todos") {
-    const numSel = desempenhoNumeros.find((n) => n.id === filtros.numeroId);
-    if (numSel) {
-      kpis = {
-        ...kpis,
-        mensagensEnviadas: numSel.enviadas,
-        entregues: numSel.entregues,
-        respostas: numSel.respostas,
-        leadsGerados: numSel.leads,
-        taxaResposta: `${numSel.taxaResposta.toFixed(1)}%`,
-      };
+  const daily = new Map<string, WaDesempenhoPonto>();
+  const ensureDay = (iso: string) => {
+    const date = iso.slice(0, 10);
+    const existing = daily.get(date);
+    if (existing) return existing;
+    const point = {
+      data: date,
+      label: new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      }),
+      enviadas: 0,
+      entregues: 0,
+      respostas: 0,
+      leads: 0,
+    };
+    daily.set(date, point);
+    return point;
+  };
+  for (const row of envios) ensureDay(row.enviado_em).enviadas += 1;
+  const leadsPerDay = new Map<string, Set<string>>();
+  for (const row of recebidas) {
+    const point = ensureDay(row.criado_em);
+    point.respostas += 1;
+    if (row.lead_id) {
+      const ids = leadsPerDay.get(point.data) ?? new Set<string>();
+      ids.add(row.lead_id);
+      leadsPerDay.set(point.data, ids);
+      point.leads = ids.size;
     }
   }
-
-  // Se houver valor real de vendas no Postgres, exibe o valor real se maior que 0
-  if (propostasValor > 0) {
-    kpis.vendasAtribuidas = propostasValor;
-  }
+  const desempenhoGeral = [...daily.values()].sort((a, b) => a.data.localeCompare(b.data));
+  const leadsPorDia = desempenhoGeral.map((point) => ({
+    data: point.data,
+    label: point.label,
+    leads: point.leads,
+  }));
+  const conversoesVendas = desempenhoGeral.map((point) => ({
+    data: point.data,
+    label: point.label,
+    valor: 0,
+  }));
 
   return {
-    kpis,
+    kpis: {
+      mensagensEnviadas: envios.length,
+      enviadasTrend: "—",
+      entregues: 0,
+      taxaEntrega: "Dados insuficientes",
+      respostas: recebidas.length,
+      taxaResposta:
+        envios.length > 0 ? `${((recebidas.length / envios.length) * 100).toFixed(1)}%` : "0%",
+      respostasTrend: "—",
+      leadsGerados: leadIds.size,
+      leadsTrend: "—",
+      vendasAtribuidas,
+      vendasTrend: "—",
+    },
     desempenhoGeral,
-    distribuicaoCanal: DISTRIBUICAO_CANAL_PREMIUM,
+    distribuicaoCanal: [],
     desempenhoNumeros,
-    tiposConversas: TIPOS_CONVERSAS_PREMIUM,
-    statusConversas: STATUS_CONVERSAS_PREMIUM,
-    palavrasChave: PALAVRAS_CHAVE_PREMIUM,
+    tiposConversas: [],
+    statusConversas: [],
+    palavrasChave: [],
     leadsPorDia,
     conversoesVendas,
-    atividades: ATIVIDADES_RELATORIOS_PREMIUM,
-    conectado,
+    atividades: recebidas
+      .slice(-6)
+      .reverse()
+      .map((message) => ({
+        id: message.id,
+        tipo: "resposta" as const,
+        titulo: "Resposta recebida",
+        subtitulo: message.texto?.slice(0, 80) || "Mensagem recebida",
+        horario: new Date(message.criado_em).toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        cor: "#a855f7",
+      })),
+    conectado: chipsDb.some((chip) => chip.status === "conectado"),
   };
 }

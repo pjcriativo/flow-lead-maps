@@ -29,6 +29,10 @@ verify_jwt = true
 # Envia proposta via WhatsApp. JWT obrigatório.
 verify_jwt = true
 
+[functions.wa-campaign-control]
+# Controle autenticado de campanhas; a Edge valida organizacao e papel.
+verify_jwt = true
+
 [functions.melhorar-proposta]
 # Melhora a proposta via IA. JWT obrigatório.
 verify_jwt = true
@@ -90,6 +94,10 @@ verify_jwt = true
 # Webhook da Evolution API. PÚBLICO — anti-spoof via ?k=WA_WEBHOOK_SECRET.
 verify_jwt = false
 
+[functions.wa-send-worker]
+# Worker server-to-server: exige WA_WORKER_SECRET e nao possui cron ativo.
+verify_jwt = false
+
 [functions.resend-webhook]
 # Webhook do Resend. PÚBLICO — anti-spoof via assinatura HMAC Svix.
 verify_jwt = false
@@ -125,4 +133,8 @@ verify_jwt = true
 
 [functions.instagram-session-automation-cron]
 # Chamado pelo pg_cron; protegido por segredo e assinatura HMAC ate o worker.
+verify_jwt = false
+
+[functions.wa-health-monitor]
+# Backend-only: protegido por WA_WORKER_SECRET. Nenhum cron é criado pela Correção 03.
 verify_jwt = false

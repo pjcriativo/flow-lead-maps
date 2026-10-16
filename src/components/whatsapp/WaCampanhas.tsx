@@ -12,7 +12,6 @@ import {
   CheckCheck,
   ChevronDown,
   Clock,
-  Copy,
   DollarSign,
   Eye,
   FileText,
@@ -48,25 +47,34 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { supabase } from "@/integrations/supabase/client";
 import {
   listarChips,
   listarScripts,
-  obterKpisCampanhasWa,
+  consultarElegibilidadeCampanhaWa,
+  consultarMotorCampanhasWa,
+  controlarCampanhaWa,
+  criarRascunhoCampanhaWa,
+  prepararCampanhaWa,
+  reagendarCampanhaWa,
   type WaCampanhasKpis,
   type WaChipDistribuicao,
   type WaCampanhaAtividade,
   type WaScript,
   type WaChip,
 } from "@/services/whatsapp";
-import { listarCampanhas, type Campanha } from "@/services/campanhas";
+import { listarCampanhas } from "@/services/campanhas";
+
+export const DISPARO_EM_MASSA_BLOQUEADO = true;
 
 // ==========================================
 // TIPOS E MODELOS DE DADOS DA TELA 03
 // ==========================================
 
 export type TipoCampanha = "prospeccao" | "followup" | "relacionamento" | "promocao";
-export type StatusFiltroCampanha = "todas" | "rascunho" | "agendada" | "em_execucao" | "concluida" | "pausada" | "falhou";
+export type StatusFiltroCampanha =
+  "todas" | "rascunho" | "agendada" | "em_execucao" | "concluida" | "pausada" | "falhou";
 
 export interface CampanhaItemWa {
   id: string;
@@ -82,204 +90,25 @@ export interface CampanhaItemWa {
   taxaLeads: number;
   criadaEm: string;
   tipo?: TipoCampanha;
+  dispatchEnabled?: boolean;
+  scheduledAt?: string | null;
 }
 
-// ==========================================
-// DATASET DE REFERÊNCIA FIEL (BENCHMARK APROVADO)
-// ==========================================
-
-const CAMPANHAS_REFERENCIA: CampanhaItemWa[] = [
-  {
-    id: "camp-1",
-    nome: "Prospecção Restaurantes SP",
-    listaNome: "Restaurantes São Paulo",
-    status: "concluida",
-    enviados: 2843,
-    entregues: 2687,
-    taxaEntrega: 94.5,
-    respostas: 423,
-    taxaResposta: 14.9,
-    leads: 98,
-    taxaLeads: 3.4,
-    criadaEm: "12/03/2024 14:30",
-    tipo: "prospeccao",
-  },
-  {
-    id: "camp-2",
-    nome: "Clínicas e Estética - Follow Up",
-    listaNome: "Clínicas Estética",
-    status: "em_execucao",
-    enviados: 1256,
-    entregues: 1102,
-    taxaEntrega: 87.7,
-    respostas: 321,
-    taxaResposta: 25.5,
-    leads: 74,
-    taxaLeads: 5.9,
-    criadaEm: "11/03/2024 09:15",
-    tipo: "followup",
-  },
-  {
-    id: "camp-3",
-    nome: "Lançamento Nova Solução",
-    listaNome: "Leads Qualificados",
-    status: "agendada",
-    enviados: 0,
+export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
+  // Dados de Campanhas
+  const [campanhas, setCampanhas] = useState<CampanhaItemWa[]>([]);
+  const [chips, setChips] = useState<WaChipDistribuicao[]>([]);
+  const [atividades, setAtividades] = useState<WaCampanhaAtividade[]>([]);
+  const [kpis, setKpis] = useState<WaCampanhasKpis>({
+    totalCampanhas: 0,
+    mensagensEnviadas: 0,
     entregues: 0,
     taxaEntrega: 0,
     respostas: 0,
     taxaResposta: 0,
-    leads: 0,
+    leadsGerados: 0,
     taxaLeads: 0,
-    criadaEm: "15/03/2024 08:00",
-    tipo: "promocao",
-  },
-  {
-    id: "camp-4",
-    nome: "Reativação - Clientes Antigos",
-    listaNome: "Clientes Inativos",
-    status: "pausada",
-    enviados: 892,
-    entregues: 764,
-    taxaEntrega: 85.7,
-    respostas: 156,
-    taxaResposta: 17.5,
-    leads: 42,
-    taxaLeads: 4.7,
-    criadaEm: "09/03/2024 16:20",
-    tipo: "relacionamento",
-  },
-  {
-    id: "camp-5",
-    nome: "Evento Networking",
-    listaNome: "Empresários SP",
-    status: "falhou",
-    enviados: 234,
-    entregues: 198,
-    taxaEntrega: 84.6,
-    respostas: 18,
-    taxaResposta: 7.7,
-    leads: 3,
-    taxaLeads: 1.3,
-    criadaEm: "08/03/2024 11:45",
-    tipo: "prospeccao",
-  },
-];
-
-const CHIPS_REFERENCIA: WaChipDistribuicao[] = [
-  {
-    id: "chip-1",
-    nome: "Chip Principal",
-    numero: "+55 11 98765-4321",
-    avatar: "/images/avatars/chip_01.jpg",
-    totalMensagens: 4231,
-    porcentagem: 49.5,
-    cor: "emerald",
-  },
-  {
-    id: "chip-2",
-    nome: "Chip 02 - Reserva",
-    numero: "+55 11 91234-5678",
-    avatar: "/images/avatars/chip_02.jpg",
-    totalMensagens: 2567,
-    porcentagem: 30.0,
-    cor: "blue",
-  },
-  {
-    id: "chip-3",
-    nome: "Chip 03 - Contingência",
-    numero: "+55 11 99876-5432",
-    avatar: "/images/avatars/chip_03.jpg",
-    totalMensagens: 892,
-    porcentagem: 10.4,
-    cor: "amber",
-  },
-  {
-    id: "chip-4",
-    nome: "Chip 04",
-    numero: "+55 11 98888-7777",
-    avatar: "/images/avatars/chip_04.jpg",
-    totalMensagens: 456,
-    porcentagem: 5.3,
-    cor: "cyan",
-  },
-  {
-    id: "chip-5",
-    nome: "Chip 05",
-    numero: "+55 11 99999-6666",
-    avatar: "/images/avatars/chip_05.jpg",
-    totalMensagens: 412,
-    porcentagem: 4.8,
-    cor: "purple",
-  },
-];
-
-const ATIVIDADES_REFERENCIA: WaCampanhaAtividade[] = [
-  {
-    id: "atv-1",
-    tipo: "concluida",
-    titulo: "Campanha concluída",
-    subtitulo: "Prospecção Restaurantes SP",
-    horario: "14:30",
-    cor: "emerald",
-  },
-  {
-    id: "atv-2",
-    tipo: "iniciada",
-    titulo: "Campanha iniciada",
-    subtitulo: "Clínicas e Estética - Follow Up",
-    horario: "09:15",
-    cor: "blue",
-  },
-  {
-    id: "atv-3",
-    tipo: "resposta",
-    titulo: "Nova resposta recebida",
-    subtitulo: "João Silva respondeu sua mensagem",
-    horario: "08:42",
-    cor: "emerald",
-  },
-  {
-    id: "atv-4",
-    tipo: "lead",
-    titulo: "Lead gerado",
-    subtitulo: "Maria Santos - Clínica Vida Plena",
-    horario: "08:15",
-    cor: "emerald",
-  },
-  {
-    id: "atv-5",
-    tipo: "pausada",
-    titulo: "Campanha pausada",
-    subtitulo: "Reativação - Clientes Antigos",
-    horario: "Ontem 16:20",
-    cor: "amber",
-  },
-  {
-    id: "atv-6",
-    tipo: "falha",
-    titulo: "Falha no envio",
-    subtitulo: "Número indisponível",
-    horario: "Ontem 11:45",
-    cor: "rose",
-  },
-];
-
-export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
-  // Dados de Campanhas
-  const [campanhas, setCampanhas] = useState<CampanhaItemWa[]>(CAMPANHAS_REFERENCIA);
-  const [chips, setChips] = useState<WaChipDistribuicao[]>(CHIPS_REFERENCIA);
-  const [atividades, setAtividades] = useState<WaCampanhaAtividade[]>(ATIVIDADES_REFERENCIA);
-  const [kpis, setKpis] = useState<WaCampanhasKpis>({
-    totalCampanhas: 12,
-    mensagensEnviadas: 8547,
-    entregues: 7892,
-    taxaEntrega: 92.4,
-    respostas: 1346,
-    taxaResposta: 15.7,
-    leadsGerados: 287,
-    taxaLeads: 3.4,
-    vendasAtribuidas: 12450,
+    vendasAtribuidas: 0,
   });
 
   // Filtros
@@ -293,12 +122,19 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
   const [tipoSelecionado, setTipoSelecionado] = useState<TipoCampanha>("prospeccao");
   const [nomeNovaCampanha, setNomeNovaCampanha] = useState("");
   const [listaSelecionadaId, setListaSelecionadaId] = useState<string>("");
-  const [listasDisponiveis, setListasDisponiveis] = useState<{ id: string; name: string; count?: number }[]>([]);
+  const [listasDisponiveis, setListasDisponiveis] = useState<
+    { id: string; name: string; count?: number }[]
+  >([]);
+  const [elegibilidade, setElegibilidade] = useState({ total: 0, elegiveis: 0 });
   const [textoMensagem, setTextoMensagem] = useState(
     "Olá, {nome}! Tudo bem? Vi que o {empresa} é referência em gastronomia. Gostaria de apresentar uma oportunidade exclusiva de aceleração comercial.",
   );
   const [scripts, setScripts] = useState<WaScript[]>([]);
   const [salvandoRascunho, setSalvandoRascunho] = useState(false);
+  const [acaoCampanhaId, setAcaoCampanhaId] = useState<string | null>(null);
+  const [agendamento, setAgendamento] = useState("");
+  const [fusoHorario, setFusoHorario] = useState("America/Sao_Paulo");
+  const [reagendamentoDetalhes, setReagendamentoDetalhes] = useState("");
 
   // Modais de Apoio
   const [modalDetalhes, setModalDetalhes] = useState<CampanhaItemWa | null>(null);
@@ -308,16 +144,30 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
   // Carregar dados reais do Supabase
   const carregarDadosReais = useCallback(async () => {
     try {
-      const [kpisRes, campsDb, listasDb, scriptsDb, chipsDb] = await Promise.allSettled([
-        obterKpisCampanhasWa(),
-        listarCampanhas("whatsapp"),
-        supabase.from("lead_lists").select("id, name").order("name"),
+      const context = await getActiveOrganizationContext();
+      const [engineRes, campsDb, listasDb, scriptsDb, chipsDb] = await Promise.allSettled([
+        consultarMotorCampanhasWa(),
+        listarCampanhas("whatsapp", context.orgId),
+        supabase.from("lead_lists").select("id, name").eq("org_id", context.orgId).order("name"),
         listarScripts(),
         listarChips(),
       ]);
 
-      if (kpisRes.status === "fulfilled") {
-        setKpis(kpisRes.value);
+      if (engineRes.status === "fulfilled") {
+        const metrics = engineRes.value.metrics;
+        setKpis({
+          totalCampanhas: engineRes.value.campaigns.length,
+          mensagensEnviadas: metrics.sent,
+          entregues: metrics.delivered,
+          taxaEntrega:
+            metrics.sent > 0 ? Math.round((metrics.delivered / metrics.sent) * 1000) / 10 : 0,
+          respostas: metrics.responses,
+          taxaResposta:
+            metrics.sent > 0 ? Math.round((metrics.responses / metrics.sent) * 1000) / 10 : 0,
+          leadsGerados: 0,
+          taxaLeads: 0,
+          vendasAtribuidas: 0,
+        });
       }
 
       if (listasDb.status === "fulfilled" && listasDb.value.data) {
@@ -331,40 +181,147 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
         setScripts(scriptsDb.value);
       }
 
-      // Se houver campanhas cadastradas no banco, mesclar com as de referência
-      if (campsDb.status === "fulfilled" && campsDb.value.length > 0) {
-        const mapeadas: CampanhaItemWa[] = campsDb.value.map((c) => ({
-          id: c.id,
-          nome: c.nome,
-          listaNome: c.list_name || "Lista direta",
-          status: c.status === "ativa" ? "em_execucao" : c.status === "concluida" ? "concluida" : "rascunho",
-          enviados: c.enviado || 0,
-          entregues: Math.round((c.enviado || 0) * 0.94),
-          taxaEntrega: c.enviado ? 94.0 : 0,
-          respostas: Math.round((c.enviado || 0) * 0.15),
-          taxaResposta: c.enviado ? 15.0 : 0,
-          leads: Math.round((c.enviado || 0) * 0.04),
-          taxaLeads: c.enviado ? 4.0 : 0,
-          criadaEm: new Date(c.criada_em).toLocaleDateString("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          tipo: "prospeccao",
-        }));
+      // Combina o estado operacional do motor com os nomes das listas persistidas.
+      if (engineRes.status === "fulfilled") {
+        const details =
+          campsDb.status === "fulfilled"
+            ? new Map(campsDb.value.map((campaign) => [campaign.id, campaign]))
+            : new Map();
+        const mapeadas: CampanhaItemWa[] = engineRes.value.campaigns.map((c) => {
+          const detail = details.get(c.id);
+          const enviados =
+            (c.counts.accepted ?? 0) +
+            (c.counts.sent ?? 0) +
+            (c.counts.delivered ?? 0) +
+            (c.counts.read ?? 0);
+          const entregues = (c.counts.delivered ?? 0) + (c.counts.read ?? 0);
+          return {
+            id: c.id,
+            nome: c.nome,
+            listaNome: detail?.list_name || "Lista direta",
+            status:
+              c.status === "ativa"
+                ? "em_execucao"
+                : c.status === "concluida"
+                  ? "concluida"
+                  : c.status === "agendada"
+                    ? "agendada"
+                    : c.status === "pausada"
+                      ? "pausada"
+                      : c.status === "falhou" || c.status === "cancelada"
+                        ? "falhou"
+                        : "rascunho",
+            enviados,
+            entregues,
+            taxaEntrega: enviados > 0 ? Math.round((entregues / enviados) * 1000) / 10 : 0,
+            respostas: c.counts.responses ?? 0,
+            taxaResposta:
+              enviados > 0 ? Math.round(((c.counts.responses ?? 0) / enviados) * 1000) / 10 : 0,
+            leads: 0,
+            taxaLeads: 0,
+            criadaEm: new Date(c.criada_em).toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            tipo: "prospeccao",
+            dispatchEnabled: c.dispatch_enabled,
+            scheduledAt: c.scheduled_at,
+          };
+        });
 
-        setCampanhas([...mapeadas, ...CAMPANHAS_REFERENCIA.filter((r) => !mapeadas.some((m) => m.nome === r.nome))]);
+        setCampanhas(mapeadas);
+        setAtividades(
+          engineRes.value.campaigns.slice(0, 6).map((campaign) => ({
+            id: `campaign-${campaign.id}`,
+            tipo:
+              campaign.status === "concluida"
+                ? "concluida"
+                : campaign.status === "pausada"
+                  ? "pausada"
+                  : campaign.status === "falhou"
+                    ? "falha"
+                    : "iniciada",
+            titulo:
+              campaign.status === "concluida"
+                ? "Campanha concluída"
+                : campaign.status === "pausada"
+                  ? "Campanha pausada"
+                  : campaign.status === "falhou"
+                    ? "Falha na campanha"
+                    : "Campanha atualizada",
+            subtitulo: campaign.nome,
+            horario: new Date(campaign.criada_em).toLocaleDateString("pt-BR"),
+            cor:
+              campaign.status === "concluida"
+                ? "emerald"
+                : campaign.status === "pausada"
+                  ? "amber"
+                  : campaign.status === "falhou"
+                    ? "rose"
+                    : "blue",
+          })),
+        );
       }
-    } catch {
-      // Fallback gracioso mantendo integridade
+      if (chipsDb.status === "fulfilled") {
+        setChips(
+          chipsDb.value.map((chip, index) => ({
+            id: chip.id,
+            nome: chip.nome,
+            numero: chip.numero ?? "—",
+            avatar: "/placeholder.svg",
+            totalMensagens:
+              engineRes.status === "fulfilled"
+                ? (engineRes.value.chipMetrics[chip.id]?.sent ?? 0)
+                : 0,
+            porcentagem:
+              engineRes.status === "fulfilled"
+                ? (engineRes.value.chipMetrics[chip.id]?.percentage ?? 0)
+                : 0,
+            cor: (["emerald", "blue", "amber", "cyan", "purple"] as const)[index % 5],
+          })),
+        );
+      }
+    } catch (error) {
+      console.error("Falha ao carregar campanhas WhatsApp", error);
+      toast.error("Não foi possível carregar as campanhas desta organização.");
     }
   }, [listaSelecionadaId]);
 
   useEffect(() => {
     carregarDadosReais();
   }, [carregarDadosReais]);
+
+  useEffect(() => {
+    let ativo = true;
+    const carregarElegibilidade = async () => {
+      if (!listaSelecionadaId) {
+        setElegibilidade({ total: 0, elegiveis: 0 });
+        return;
+      }
+      const result = await consultarElegibilidadeCampanhaWa(listaSelecionadaId);
+      if (!Number.isFinite(result.total) || !Number.isFinite(result.eligible)) {
+        throw new Error("Não foi possível validar os destinatários da lista.");
+      }
+      if (ativo) {
+        setElegibilidade({
+          total: result.total,
+          elegiveis: result.eligible,
+        });
+      }
+    };
+    void carregarElegibilidade().catch((error) => {
+      if (ativo) {
+        setElegibilidade({ total: 0, elegiveis: 0 });
+        toast.error(error instanceof Error ? error.message : "Falha ao validar destinatários.");
+      }
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [listaSelecionadaId]);
 
   // Filtragem da Tabela
   const campanhasFiltradas = useMemo(() => {
@@ -405,28 +362,25 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
   // Salvar Rascunho da Campanha
   const salvarRascunho = async () => {
     setSalvandoRascunho(true);
-    const nomeFinal = nomeNovaCampanha.trim() || `Campanha ${tipoSelecionado.toUpperCase()} - ${new Date().toLocaleDateString("pt-BR")}`;
+    const nomeFinal =
+      nomeNovaCampanha.trim() ||
+      `Campanha ${tipoSelecionado.toUpperCase()} - ${new Date().toLocaleDateString("pt-BR")}`;
 
     try {
-      const { data: u } = await supabase.auth.getUser();
-      if (u.user) {
-        await supabase.from("campanhas").insert({
-          user_id: u.user.id,
-          nome: nomeFinal,
-          canal: "whatsapp",
-          status: "rascunho",
-          list_id: listaSelecionadaId || null,
-          wa_config: {
-            tipo: tipoSelecionado,
-            mensagemPadrao: textoMensagem,
-          },
-        });
-      }
-
+      if (!listaSelecionadaId) throw new Error("Selecione uma lista.");
+      const campanhaCriada = await criarRascunhoCampanhaWa({
+        name: nomeFinal,
+        listId: listaSelecionadaId,
+        message: textoMensagem,
+        campaignType: tipoSelecionado,
+        scheduledAt: agendamento ? new Date(agendamento).toISOString() : null,
+        timezone: fusoHorario,
+      });
       const novaCamp: CampanhaItemWa = {
-        id: `camp-${Date.now()}`,
+        id: campanhaCriada.id,
         nome: nomeFinal,
-        listaNome: listasDisponiveis.find((l) => l.id === listaSelecionadaId)?.name || "Restaurantes São Paulo",
+        listaNome:
+          listasDisponiveis.find((l) => l.id === listaSelecionadaId)?.name || "Lista selecionada",
         status: "rascunho",
         enviados: 0,
         entregues: 0,
@@ -435,7 +389,7 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
         taxaResposta: 0,
         leads: 0,
         taxaLeads: 0,
-        criadaEm: new Date().toLocaleDateString("pt-BR", {
+        criadaEm: new Date(campanhaCriada.createdAt).toLocaleDateString("pt-BR", {
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
@@ -443,6 +397,7 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           minute: "2-digit",
         }),
         tipo: tipoSelecionado,
+        scheduledAt: agendamento ? new Date(agendamento).toISOString() : null,
       };
 
       setCampanhas((prev) => [novaCamp, ...prev]);
@@ -461,15 +416,73 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
       toast.success(`Campanha "${nomeFinal}" salva como rascunho com sucesso.`);
       setEtapaAssistente(1);
       setNomeNovaCampanha("");
-    } catch {
-      toast.info(`Campanha "${nomeFinal}" registrada no painel de rascunhos.`);
-      setEtapaAssistente(1);
+      await carregarDadosReais();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao salvar o rascunho.");
     } finally {
       setSalvandoRascunho(false);
     }
   };
 
   // Inserir variável no texto
+  const executarAcaoCampanha = async (
+    campanha: CampanhaItemWa,
+    action: "prepare" | "pause" | "resume" | "cancel",
+  ) => {
+    setAcaoCampanhaId(campanha.id);
+    try {
+      if (action === "prepare") {
+        const result = await prepararCampanhaWa({
+          campaignId: campanha.id,
+          purpose: campanha.tipo ?? "prospeccao",
+          scheduledAt: campanha.scheduledAt ?? null,
+          timezone: fusoHorario,
+        });
+        toast.success(
+          `${result.queued} itens preparados; ${result.blocked} bloqueados. Envio permanece desativado.`,
+        );
+      } else {
+        await controlarCampanhaWa(
+          campanha.id,
+          action,
+          action === "cancel" ? "Cancelada pelo operador." : undefined,
+        );
+        toast.success(
+          action === "pause"
+            ? "Campanha pausada."
+            : action === "resume"
+              ? "Campanha retomada."
+              : "Campanha cancelada.",
+        );
+      }
+      await carregarDadosReais();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao atualizar a campanha.");
+    } finally {
+      setAcaoCampanhaId(null);
+    }
+  };
+
+  const reagendarCampanhaSelecionada = async () => {
+    if (!modalDetalhes || !reagendamentoDetalhes) return;
+    setAcaoCampanhaId(modalDetalhes.id);
+    try {
+      await reagendarCampanhaWa(
+        modalDetalhes.id,
+        new Date(reagendamentoDetalhes).toISOString(),
+        fusoHorario,
+      );
+      toast.success("Agendamento atualizado.");
+      setModalDetalhes(null);
+      setReagendamentoDetalhes("");
+      await carregarDadosReais();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao reagendar a campanha.");
+    } finally {
+      setAcaoCampanhaId(null);
+    }
+  };
+
   const inserirVariavel = (variavel: string) => {
     setTextoMensagem((prev) => prev + ` {${variavel}}`);
   };
@@ -547,7 +560,9 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           </div>
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl font-bold tracking-tight text-white">{kpis.leadsGerados}</span>
+              <span className="text-xl font-bold tracking-tight text-white">
+                {kpis.leadsGerados}
+              </span>
               <span className="rounded bg-emerald-500/15 px-1 py-0.2 text-[10px] font-bold text-emerald-400">
                 {kpis.taxaLeads}%
               </span>
@@ -563,7 +578,9 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           </div>
           <div className="min-w-0">
             <div className="text-xl font-bold tracking-tight text-white">
-              {kpis.vendasAtribuidas > 0 ? `R$ ${kpis.vendasAtribuidas.toLocaleString("pt-BR")}` : "Indisponível"}
+              {kpis.vendasAtribuidas > 0
+                ? `R$ ${kpis.vendasAtribuidas.toLocaleString("pt-BR")}`
+                : "Indisponível"}
             </div>
             <div className="truncate text-xs font-medium text-home-muted">Vendas atribuídas</div>
           </div>
@@ -635,12 +652,30 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
             {(
               [
                 { key: "todas", label: `Todas (${campanhas.length})` },
-                { key: "rascunho", label: `Rascunho (${campanhas.filter((c) => c.status === "rascunho").length})` },
-                { key: "agendada", label: `Agendada (${campanhas.filter((c) => c.status === "agendada").length})` },
-                { key: "em_execucao", label: `Em execução (${campanhas.filter((c) => c.status === "em_execucao").length})` },
-                { key: "concluida", label: `Concluída (${campanhas.filter((c) => c.status === "concluida").length})` },
-                { key: "pausada", label: `Pausada (${campanhas.filter((c) => c.status === "pausada").length})` },
-                { key: "falhou", label: `Falhou (${campanhas.filter((c) => c.status === "falhou").length})` },
+                {
+                  key: "rascunho",
+                  label: `Rascunho (${campanhas.filter((c) => c.status === "rascunho").length})`,
+                },
+                {
+                  key: "agendada",
+                  label: `Agendada (${campanhas.filter((c) => c.status === "agendada").length})`,
+                },
+                {
+                  key: "em_execucao",
+                  label: `Em execução (${campanhas.filter((c) => c.status === "em_execucao").length})`,
+                },
+                {
+                  key: "concluida",
+                  label: `Concluída (${campanhas.filter((c) => c.status === "concluida").length})`,
+                },
+                {
+                  key: "pausada",
+                  label: `Pausada (${campanhas.filter((c) => c.status === "pausada").length})`,
+                },
+                {
+                  key: "falhou",
+                  label: `Falhou (${campanhas.filter((c) => c.status === "falhou").length})`,
+                },
               ] as { key: StatusFiltroCampanha; label: string }[]
             ).map((st) => (
               <button
@@ -666,7 +701,10 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                 <tr>
                   <th className="p-3 w-8">
                     <Checkbox
-                      checked={selecionadas.size === campanhasFiltradas.length && campanhasFiltradas.length > 0}
+                      checked={
+                        selecionadas.size === campanhasFiltradas.length &&
+                        campanhasFiltradas.length > 0
+                      }
                       onCheckedChange={toggleSelecaoTodas}
                       className="border-white/20 data-[state=checked]:bg-home-orange data-[state=checked]:border-home-orange"
                     />
@@ -792,42 +830,56 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                             </button>
                             <div className="absolute right-0 top-8 z-50 hidden group-hover/acoes:block w-40 rounded-xl border border-[#1b2334] bg-[#111723] p-1.5 shadow-xl text-left">
                               <button
-                                onClick={() => setModalDetalhes(c)}
+                                onClick={() => {
+                                  setModalDetalhes(c);
+                                  setReagendamentoDetalhes("");
+                                }}
                                 className="w-full px-2.5 py-1.5 text-xs text-white hover:bg-white/5 rounded-lg flex items-center gap-2"
                               >
                                 <Eye className="h-3.5 w-3.5 text-cyan-400" /> Detalhes
                               </button>
-                              <button
-                                onClick={() => {
-                                  toast.success(`Campanha "${c.nome}" duplicada.`);
-                                }}
-                                className="w-full px-2.5 py-1.5 text-xs text-white hover:bg-white/5 rounded-lg flex items-center gap-2"
-                              >
-                                <Copy className="h-3.5 w-3.5 text-home-muted" /> Duplicar
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setCampanhas((prev) =>
-                                    prev.map((item) =>
-                                      item.id === c.id
-                                        ? { ...item, status: item.status === "pausada" ? "em_execucao" : "pausada" }
-                                        : item,
-                                    ),
-                                  );
-                                  toast.info(`Status de "${c.nome}" atualizado.`);
-                                }}
-                                className="w-full px-2.5 py-1.5 text-xs text-white hover:bg-white/5 rounded-lg flex items-center gap-2"
-                              >
-                                {c.status === "pausada" ? (
-                                  <>
-                                    <Play className="h-3.5 w-3.5 text-emerald-400" /> Retomar
-                                  </>
-                                ) : (
-                                  <>
-                                    <Pause className="h-3.5 w-3.5 text-amber-400" /> Pausar
-                                  </>
-                                )}
-                              </button>
+                              {c.status === "rascunho" && (
+                                <button
+                                  onClick={() => void executarAcaoCampanha(c, "prepare")}
+                                  disabled={acaoCampanhaId === c.id}
+                                  className="w-full px-2.5 py-1.5 text-xs text-white hover:bg-white/5 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                                >
+                                  <Clock className="h-3.5 w-3.5 text-purple-400" /> Preparar fila
+                                </button>
+                              )}
+                              {(c.status === "pausada" ||
+                                c.status === "em_execucao" ||
+                                c.status === "agendada") && (
+                                <button
+                                  onClick={() =>
+                                    void executarAcaoCampanha(
+                                      c,
+                                      c.status === "pausada" ? "resume" : "pause",
+                                    )
+                                  }
+                                  disabled={acaoCampanhaId === c.id}
+                                  className="w-full px-2.5 py-1.5 text-xs text-white hover:bg-white/5 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                                >
+                                  {c.status === "pausada" ? (
+                                    <>
+                                      <Play className="h-3.5 w-3.5 text-emerald-400" /> Retomar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Pause className="h-3.5 w-3.5 text-amber-400" /> Pausar
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                              {!["concluida", "falhou"].includes(c.status) && (
+                                <button
+                                  onClick={() => void executarAcaoCampanha(c, "cancel")}
+                                  disabled={acaoCampanhaId === c.id}
+                                  className="w-full px-2.5 py-1.5 text-xs text-rose-300 hover:bg-white/5 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" /> Cancelar
+                                </button>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -882,7 +934,11 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                   <span
                     className={cn(
                       "text-xs font-semibold whitespace-nowrap",
-                      ativo ? "text-home-orange font-bold" : concluido ? "text-white" : "text-home-muted",
+                      ativo
+                        ? "text-home-orange font-bold"
+                        : concluido
+                          ? "text-white"
+                          : "text-home-muted",
                     )}
                   >
                     {st.label}
@@ -1072,15 +1128,23 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                 <div className="font-bold text-white">Resumo de Elegibilidade</div>
                 <div className="flex justify-between text-home-muted">
                   <span>Contatos na lista:</span>
-                  <span className="font-bold text-white">120 contatos</span>
+                  <span className="font-bold text-white">{elegibilidade.total} contatos</span>
                 </div>
                 <div className="flex justify-between text-home-muted">
                   <span>Com WhatsApp válido:</span>
-                  <span className="font-bold text-emerald-400">114 elegíveis (95%)</span>
+                  <span className="font-bold text-emerald-400">
+                    {elegibilidade.elegiveis} elegíveis (
+                    {elegibilidade.total
+                      ? Math.round((elegibilidade.elegiveis / elegibilidade.total) * 100)
+                      : 0}
+                    %)
+                  </span>
                 </div>
                 <div className="flex justify-between text-home-muted">
-                  <span>Duplicados / Bloqueados:</span>
-                  <span className="font-bold text-rose-400">6 excluídos</span>
+                  <span>Sem WhatsApp / Bloqueados:</span>
+                  <span className="font-bold text-rose-400">
+                    {Math.max(0, elegibilidade.total - elegibilidade.elegiveis)} excluídos
+                  </span>
                 </div>
               </div>
 
@@ -1108,7 +1172,9 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label className="text-white font-bold">Mensagem do Disparo</Label>
-                  <span className="text-[10px] text-home-muted">{textoMensagem.length} caracteres</span>
+                  <span className="text-[10px] text-home-muted">
+                    {textoMensagem.length} caracteres
+                  </span>
                 </div>
                 <Textarea
                   value={textoMensagem}
@@ -1120,7 +1186,9 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
 
               {/* Variáveis rápidas */}
               <div className="space-y-1">
-                <span className="text-home-muted font-bold text-[11px]">Variáveis disponíveis:</span>
+                <span className="text-home-muted font-bold text-[11px]">
+                  Variáveis disponíveis:
+                </span>
                 <div className="flex flex-wrap gap-1.5">
                   {["nome", "empresa", "cargo", "telefone"].map((v) => (
                     <button
@@ -1141,7 +1209,9 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                   <SiWhatsapp className="h-3 w-3" /> Prévia da mensagem
                 </div>
                 <div className="rounded-lg bg-[#0e3b2e] p-2.5 text-xs text-[#e6f4ee] leading-relaxed shadow-sm">
-                  {textoMensagem.replace(/{nome}/g, "Carla").replace(/{empresa}/g, "Restaurante Sabor & Arte")}
+                  {textoMensagem
+                    .replace(/{nome}/g, "Carla")
+                    .replace(/{empresa}/g, "Restaurante Sabor & Arte")}
                 </div>
               </div>
 
@@ -1170,14 +1240,46 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                 <div className="font-bold text-white text-sm">Resumo da Campanha</div>
                 <div className="space-y-1.5 text-home-muted">
                   <div>
-                    <span className="font-bold text-white">Tipo:</span> {tipoSelecionado.toUpperCase()}
+                    <span className="font-bold text-white">Tipo:</span>{" "}
+                    {tipoSelecionado.toUpperCase()}
                   </div>
                   <div>
                     <span className="font-bold text-white">Nome:</span>{" "}
                     {nomeNovaCampanha || `Campanha ${tipoSelecionado.toUpperCase()}`}
                   </div>
                   <div>
-                    <span className="font-bold text-white">Destinatários:</span> 114 leads selecionados
+                    <span className="font-bold text-white">Destinatários:</span>{" "}
+                    {elegibilidade.elegiveis} leads elegíveis
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="wa-campaign-schedule" className="text-[11px] text-home-muted">
+                      Agendar para (opcional)
+                    </Label>
+                    <Input
+                      id="wa-campaign-schedule"
+                      type="datetime-local"
+                      value={agendamento}
+                      onChange={(event) => setAgendamento(event.target.value)}
+                      className="h-8 border-[#1b2334] bg-[#0c101a] text-xs text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="wa-campaign-timezone" className="text-[11px] text-home-muted">
+                      Fuso horÃ¡rio
+                    </Label>
+                    <select
+                      id="wa-campaign-timezone"
+                      value={fusoHorario}
+                      onChange={(event) => setFusoHorario(event.target.value)}
+                      className="h-8 w-full rounded-md border border-[#1b2334] bg-[#0c101a] px-2 text-xs text-white"
+                    >
+                      <option value="America/Sao_Paulo">BrasÃ­lia (America/Sao_Paulo)</option>
+                      <option value="America/Manaus">Manaus (America/Manaus)</option>
+                      <option value="America/Rio_Branco">Rio Branco (America/Rio_Branco)</option>
+                    </select>
                   </div>
                 </div>
 
@@ -1185,7 +1287,10 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-300 flex items-start gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
                   <div>
-                    <span className="font-bold">Disparo em massa temporariamente bloqueado:</span> Para proteger sua reputação e cumprir as diretrizes anti-spam, a campanha será salva como rascunho oficial. A ativação direta sem aquecimento prévio permanece restrita.
+                    <span className="font-bold">Disparo em massa temporariamente bloqueado:</span>{" "}
+                    Para proteger sua reputação e cumprir as diretrizes anti-spam, a campanha será
+                    salva como rascunho oficial. A ativação direta sem aquecimento prévio permanece
+                    restrita.
                   </div>
                 </div>
               </div>
@@ -1296,11 +1401,21 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                 <line x1="30" y1="110" x2="490" y2="110" stroke="#1b2334" strokeDasharray="3 3" />
 
                 {/* Rótulos do Eixo Y */}
-                <text x="5" y="24" fill="#64748b" fontSize="9" fontFamily="sans-serif">1.200</text>
-                <text x="12" y="54" fill="#64748b" fontSize="9" fontFamily="sans-serif">900</text>
-                <text x="12" y="84" fill="#64748b" fontSize="9" fontFamily="sans-serif">600</text>
-                <text x="12" y="114" fill="#64748b" fontSize="9" fontFamily="sans-serif">300</text>
-                <text x="22" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">0</text>
+                <text x="5" y="24" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  1.200
+                </text>
+                <text x="12" y="54" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  900
+                </text>
+                <text x="12" y="84" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  600
+                </text>
+                <text x="12" y="114" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  300
+                </text>
+                <text x="22" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  0
+                </text>
 
                 {/* Curva 1: Enviadas (Azul) */}
                 <path
@@ -1318,7 +1433,15 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                   { cx: 400, cy: 35 },
                   { cx: 480, cy: 30 },
                 ].map((pt, idx) => (
-                  <circle key={`bl-${idx}`} cx={pt.cx} cy={pt.cy} r="3" fill="#3b82f6" stroke="#0c101a" strokeWidth="1.5" />
+                  <circle
+                    key={`bl-${idx}`}
+                    cx={pt.cx}
+                    cy={pt.cy}
+                    r="3"
+                    fill="#3b82f6"
+                    stroke="#0c101a"
+                    strokeWidth="1.5"
+                  />
                 ))}
 
                 {/* Curva 2: Entregues (Verde Esmeralda) */}
@@ -1337,7 +1460,15 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                   { cx: 400, cy: 45 },
                   { cx: 480, cy: 40 },
                 ].map((pt, idx) => (
-                  <circle key={`gr-${idx}`} cx={pt.cx} cy={pt.cy} r="3" fill="#10b981" stroke="#0c101a" strokeWidth="1.5" />
+                  <circle
+                    key={`gr-${idx}`}
+                    cx={pt.cx}
+                    cy={pt.cy}
+                    r="3"
+                    fill="#10b981"
+                    stroke="#0c101a"
+                    strokeWidth="1.5"
+                  />
                 ))}
 
                 {/* Curva 3: Respostas (Laranja Flow Business) */}
@@ -1356,17 +1487,39 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                   { cx: 400, cy: 98 },
                   { cx: 480, cy: 95 },
                 ].map((pt, idx) => (
-                  <circle key={`or-${idx}`} cx={pt.cx} cy={pt.cy} r="3" fill="#ff6200" stroke="#0c101a" strokeWidth="1.5" />
+                  <circle
+                    key={`or-${idx}`}
+                    cx={pt.cx}
+                    cy={pt.cy}
+                    r="3"
+                    fill="#ff6200"
+                    stroke="#0c101a"
+                    strokeWidth="1.5"
+                  />
                 ))}
 
                 {/* Rótulos do Eixo X */}
-                <text x="35" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">01/03</text>
-                <text x="105" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">05/03</text>
-                <text x="175" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">10/03</text>
-                <text x="245" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">15/03</text>
-                <text x="315" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">20/03</text>
-                <text x="390" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">25/03</text>
-                <text x="465" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">30/03</text>
+                <text x="35" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  01/03
+                </text>
+                <text x="105" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  05/03
+                </text>
+                <text x="175" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  10/03
+                </text>
+                <text x="245" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  15/03
+                </text>
+                <text x="315" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  20/03
+                </text>
+                <text x="390" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  25/03
+                </text>
+                <text x="465" y="138" fill="#64748b" fontSize="9" fontFamily="sans-serif">
+                  30/03
+                </text>
               </svg>
             </div>
 
@@ -1540,7 +1693,10 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
               <h3 className="text-base font-extrabold text-white">
                 Detalhes da Campanha: {modalDetalhes.nome}
               </h3>
-              <button onClick={() => setModalDetalhes(null)} className="text-home-muted hover:text-white">
+              <button
+                onClick={() => setModalDetalhes(null)}
+                className="text-home-muted hover:text-white"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1558,7 +1714,9 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
 
               <div className="rounded-xl border border-white/5 bg-[#111723] p-3 space-y-1">
                 <span className="text-home-muted">Total de Envios:</span>
-                <div className="font-bold text-white">{modalDetalhes.enviados.toLocaleString("pt-BR")}</div>
+                <div className="font-bold text-white">
+                  {modalDetalhes.enviados.toLocaleString("pt-BR")}
+                </div>
               </div>
 
               <div className="rounded-xl border border-white/5 bg-[#111723] p-3 space-y-1">
@@ -1568,7 +1726,9 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
 
               <div className="rounded-xl border border-white/5 bg-[#111723] p-3 space-y-1">
                 <span className="text-home-muted">Respostas Recebidas:</span>
-                <div className="font-bold text-white">{modalDetalhes.respostas} ({modalDetalhes.taxaResposta}%)</div>
+                <div className="font-bold text-white">
+                  {modalDetalhes.respostas} ({modalDetalhes.taxaResposta}%)
+                </div>
               </div>
 
               <div className="rounded-xl border border-white/5 bg-[#111723] p-3 space-y-1">
@@ -1576,6 +1736,32 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                 <div className="font-bold text-white">{modalDetalhes.criadaEm}</div>
               </div>
             </div>
+
+            {["agendada", "pausada", "em_execucao"].includes(modalDetalhes.status) && (
+              <div className="rounded-xl border border-white/5 bg-[#111723] p-3 space-y-2">
+                <Label htmlFor="reagendamento-campanha" className="text-xs text-home-muted">
+                  Alterar agendamento antes do processamento
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="reagendamento-campanha"
+                    type="datetime-local"
+                    value={reagendamentoDetalhes}
+                    onChange={(event) => setReagendamentoDetalhes(event.target.value)}
+                    className="border-[#1b2334] bg-[#0c101a] text-white"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!reagendamentoDetalhes || acaoCampanhaId === modalDetalhes.id}
+                    onClick={() => void reagendarCampanhaSelecionada()}
+                    className="bg-[#ff6200] text-white hover:bg-[#ff7a26]"
+                  >
+                    Reagendar
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end pt-2">
               <Button
@@ -1597,15 +1783,23 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
           <div className="w-full max-w-lg rounded-2xl border border-[#1b2334] bg-[#0c101a] p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-[#1b2334] pb-3">
               <h3 className="text-base font-extrabold text-white">Histórico de Atividades</h3>
-              <button onClick={() => setModalTodasAtividades(false)} className="text-home-muted hover:text-white">
+              <button
+                onClick={() => setModalTodasAtividades(false)}
+                className="text-home-muted hover:text-white"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="max-h-80 overflow-y-auto space-y-2.5 scrollbar-thin">
               {atividades.map((atv) => (
-                <div key={atv.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-white/5 bg-[#111723] text-xs">
-                  <div className="font-bold text-white flex-1">{atv.titulo} — {atv.subtitulo}</div>
+                <div
+                  key={atv.id}
+                  className="flex items-center gap-3 p-2.5 rounded-xl border border-white/5 bg-[#111723] text-xs"
+                >
+                  <div className="font-bold text-white flex-1">
+                    {atv.titulo} — {atv.subtitulo}
+                  </div>
                   <div className="text-home-muted text-[10px]">{atv.horario}</div>
                 </div>
               ))}
@@ -1630,21 +1824,31 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="w-full max-w-lg rounded-2xl border border-[#1b2334] bg-[#0c101a] p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-[#1b2334] pb-3">
-              <h3 className="text-base font-extrabold text-white">Distribuição por Número / Chip</h3>
-              <button onClick={() => setModalTodosChips(false)} className="text-home-muted hover:text-white">
+              <h3 className="text-base font-extrabold text-white">
+                Distribuição por Número / Chip
+              </h3>
+              <button
+                onClick={() => setModalTodosChips(false)}
+                className="text-home-muted hover:text-white"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="max-h-80 overflow-y-auto space-y-2.5 scrollbar-thin">
               {chips.map((ch) => (
-                <div key={ch.id} className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-[#111723] text-xs">
+                <div
+                  key={ch.id}
+                  className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-[#111723] text-xs"
+                >
                   <div>
                     <div className="font-bold text-white">{ch.nome}</div>
                     <div className="text-home-muted">{ch.numero}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-emerald-400">{ch.totalMensagens.toLocaleString("pt-BR")} msgs</div>
+                    <div className="font-bold text-emerald-400">
+                      {ch.totalMensagens.toLocaleString("pt-BR")} msgs
+                    </div>
                     <div className="text-[10px] text-home-muted">{ch.porcentagem}% do total</div>
                   </div>
                 </div>

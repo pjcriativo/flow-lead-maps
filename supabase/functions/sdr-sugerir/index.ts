@@ -8,8 +8,12 @@
 // 💸 TETO: US$1/dia e US$10/mês de IA. Sem teto não liga (doutrina do projeto).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
-import { acessoFerramentaLiberado } from "../_shared/acesso.ts";
 import { resolverChave } from "../_shared/chaves.ts";
+import {
+  authorizeWhatsappRequest,
+  whatsappAuthorizationFailure,
+} from "../_shared/whatsapp-authorization.ts";
+import { isAssignedConversationAllowed } from "../_shared/whatsapp-policy.ts";
 import {
   conversaElegivel,
   alertasDePromessa,
@@ -47,27 +51,33 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
   // 🔐 Cofre de chaves: ANTHROPIC_API_KEY passa a valer o override do painel, se houver.
-  const chave = await resolverChave(admin, "ANTHROPIC_API_KEY");
-  if (!chave) return json({ error: "ANTHROPIC_API_KEY não configurada" }, 503);
-
   const authHeader = req.headers.get("Authorization") ?? "";
   const userClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
     { global: { headers: { Authorization: authHeader } } },
   );
-  const { data: userData, error: userErr } = await userClient.auth.getUser();
-  if (userErr || !userData.user) return json({ error: "Não autenticado" }, 401);
-  if (!(await acessoFerramentaLiberado(userClient, userData.user.id)))
-    return json({ error: "Acesso aguardando liberação do administrador" }, 403);
-  const userId = userData.user.id;
-
   let b: Rec = {};
   try {
     b = await req.json();
   } catch {
-    /* body opcional */
+    return json({ error: "Dados inválidos." }, 422);
   }
+  let context;
+  try {
+    context = await authorizeWhatsappRequest({
+      admin,
+      userClient,
+      requestedOrgId: b.org_id,
+      permission: "reply_conversations",
+    });
+  } catch (error) {
+    const failure = whatsappAuthorizationFailure(error);
+    return json({ error: failure.message }, failure.status);
+  }
+  const userId = context.userId;
+  const chave = await resolverChave(admin, "ANTHROPIC_API_KEY");
+  if (!chave) return json({ error: "Assistente indisponível." }, 503);
   const limite = Math.max(1, Math.min(10, Number(b?.limite ?? 3)));
   const agora = new Date();
   const diaRef = agora.toISOString().slice(0, 10);
@@ -77,7 +87,7 @@ Deno.serve(async (req) => {
   const { data: gastos } = await admin
     .from("sdr_sugestoes")
     .select("custo_usd, dia_ref")
-    .eq("user_id", userId)
+    .eq("org_id", context.orgId)
     .eq("mes_ref", mesRef);
   const gastoMes = (gastos ?? []).reduce((s, g) => s + Number(g.custo_usd ?? 0), 0);
   const gastoDia = (gastos ?? [])
@@ -91,7 +101,7 @@ Deno.serve(async (req) => {
   const { data: msgs } = await admin
     .from("wa_mensagens")
     .select("id, numero, lead_id, direcao, texto, criado_em")
-    .eq("user_id", userId)
+    .eq("org_id", context.orgId)
     .not("lead_id", "is", null)
     .order("criado_em", { ascending: false })
     .limit(500);
@@ -105,7 +115,7 @@ Deno.serve(async (req) => {
   const { data: pendentes } = await admin
     .from("sdr_sugestoes")
     .select("numero")
-    .eq("user_id", userId)
+    .eq("org_id", context.orgId)
     .eq("estado", "rascunho");
   const comPendencia = new Set((pendentes ?? []).map((p) => p.numero));
 
@@ -128,10 +138,23 @@ Deno.serve(async (req) => {
     const { data: lead } = leadId
       ? await admin
           .from("leads")
-          .select("business_name, category, city, website")
+          .select("business_name, category, city, website, assigned_to")
           .eq("id", leadId)
+          .eq("org_id", context.orgId)
           .maybeSingle()
       : { data: null };
+
+    if (
+      !isAssignedConversationAllowed({
+        role: context.role,
+        userId,
+        assignedTo: lead?.assigned_to ?? null,
+        leadId,
+      })
+    ) {
+      pulados.push({ numero, motivo: "sem_permissao" });
+      continue;
+    }
 
     const contexto = `NEGÓCIO DO LEAD: ${lead?.business_name ?? "(desconhecido)"}${
       lead?.category ? ` · ${lead.category}` : ""
@@ -179,6 +202,7 @@ ${historicoParaPrompt(lista)}`;
       .from("sdr_sugestoes")
       .insert({
         user_id: userId,
+        org_id: context.orgId,
         numero,
         lead_id: leadId,
         mensagem_id: ultima.id,

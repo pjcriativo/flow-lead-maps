@@ -44,7 +44,7 @@ import { WaAutomacao } from "./WaAutomacao";
 import { WaRelatorios } from "./WaRelatorios";
 
 export type AbaWhatsApp =
-  | "painel" | "conversas" | "campanhas" | "automacao" | "scripts" | "numeros" | "relatorios";
+  "painel" | "conversas" | "campanhas" | "automacao" | "scripts" | "numeros" | "relatorios";
 
 export interface WhatsAppSectionProps {
   user?: {
@@ -81,10 +81,16 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
         estatisticasWa(),
         listarChips().catch(() => [] as WaChip[]),
       ]);
-      const ativos = chips.filter((c) => c.status === "conectado").length;
-      const desconectados = chips.filter(
-        (c) => c.status === "desconectado" || c.status === "queimada" || c.status === "erro",
+      const ativos = chips.filter(
+        (c) =>
+          c.provider_status === "connected" &&
+          c.operational_health === "healthy" &&
+          Boolean(
+            c.last_provider_success_at &&
+            Date.now() - Date.parse(c.last_provider_success_at) <= 5 * 60_000,
+          ),
       ).length;
+      const desconectados = chips.filter((c) => c.operational_health !== "healthy").length;
 
       if (chips.length > 0) {
         setConectado(ativos > 0);
@@ -158,7 +164,9 @@ export function WhatsAppSection({ initialTab = "conversas" }: WhatsAppSectionPro
             <div className="flex items-center gap-2.5">
               <div
                 title={
-                  conectado ? "Todos os sistemas operacionais conectados" : "Nenhum número conectado"
+                  conectado
+                    ? "Todos os sistemas operacionais conectados"
+                    : "Nenhum número conectado"
                 }
                 className={cn(
                   "flex items-center gap-2 rounded-full border px-3.5 py-1.5 backdrop-blur-md shadow-sm",
@@ -370,7 +378,7 @@ function LimparHistorico() {
       return;
     setLimpando(true);
     try {
-      const removidas = await limparConversas();
+      const removidas = await limparConversas(true);
       toast.success(`${removidas} mensagens apagadas.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao limpar histórico");

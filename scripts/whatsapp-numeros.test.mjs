@@ -13,6 +13,10 @@ const waNumeros = readFileSync("src/components/whatsapp/WaNumeros.tsx", "utf8");
 const waSection = readFileSync("src/components/whatsapp/WhatsAppSection.tsx", "utf8");
 const waService = readFileSync("src/services/whatsapp.ts", "utf8");
 const waShared = readFileSync("supabase/functions/_shared/wa.ts", "utf8");
+const waAuthorization = readFileSync(
+  "supabase/functions/_shared/whatsapp-authorization.ts",
+  "utf8",
+);
 
 // 1. Organização ativa
 test("1. Organização ativa: consultas respeitam RLS e escopo do usuário autenticado", () => {
@@ -25,7 +29,10 @@ test("1. Organização ativa: consultas respeitam RLS e escopo do usuário auten
 // 2. Permissões
 test("2. Permissões: operações de instância exigem autenticação e autorização", () => {
   assert.match(waShared, /instanciaDaOrgComToken/);
-  assert.match(waShared, /\.eq\("user_id",\s*userId\)/);
+  assert.match(waShared, /\.eq\("org_id",\s*(?:scope\.)?orgId\)/);
+  assert.match(waAuthorization, /auth\.getUser/);
+  assert.match(waAuthorization, /from\("memberships"\)/);
+  assert.match(waAuthorization, /org_papeis/);
   assert.match(waNumeros, /excluirChip/);
   assert.match(waNumeros, /marcarChip/);
 });
@@ -140,7 +147,8 @@ test("15. Saúde: card 'Saúde das conexões' com gráfico donut circular e perc
 // 16. Contingência indisponível / Configuração
 test("16. Contingência: card central com seleção de estratégia, intervalo, backup e toggle", () => {
   assert.match(waNumeros, /Rotação e contingência/);
-  assert.match(waNumeros, /Distribuição inteligente de envios entre os chips/);
+  assert.match(waNumeros, /Continuidade autorizada para falhas técnicas/);
+  assert.match(waNumeros, /não migra envios aceitos ou incertos/);
   assert.match(waNumeros, /Estratégia de rotação/);
   assert.match(waNumeros, /Por prioridade/);
   assert.match(waNumeros, /Intervalo entre números/);

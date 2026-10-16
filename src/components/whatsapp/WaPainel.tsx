@@ -194,7 +194,7 @@ const BENCHMARK_ATIVIDADES = [
 ];
 
 function formatarTelefone(telefone?: string | null): string {
-  if (!telefone) return "+55 11 98765-4321";
+  if (!telefone) return "—";
   const limpo = telefone.replace(/\D/g, "");
   if (limpo.length === 13) {
     return `+${limpo.slice(0, 2)} ${limpo.slice(2, 4)} ${limpo.slice(4, 9)}-${limpo.slice(9)}`;
@@ -209,7 +209,7 @@ function formatarTelefone(telefone?: string | null): string {
 }
 
 function formatarDataHora(dataIso?: string | null): { data: string; hora: string } {
-  if (!dataIso) return { data: "28/10/2024", hora: "14:32" };
+  if (!dataIso) return { data: "—", hora: "—" };
   try {
     const d = new Date(dataIso);
     const data = d.toLocaleDateString("pt-BR", {
@@ -220,7 +220,7 @@ function formatarDataHora(dataIso?: string | null): { data: string; hora: string
     const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return { data, hora };
   } catch {
-    return { data: "28/10/2024", hora: "14:32" };
+    return { data: "—", hora: "—" };
   }
 }
 
@@ -242,7 +242,7 @@ export function WaPainel({
       const res = await obterDadosPainelWa();
       setDados(res);
     } catch {
-      // Graceful fallback para manter o visual aprovado sempre de pé
+      setDados(null);
     }
   }, []);
 
@@ -250,35 +250,32 @@ export function WaPainel({
     carregar();
   }, [carregar]);
 
-  // Valores de exibição com fallback nos dados oficiais do layout aprovado
   const stats = dados?.stats;
-  const numAtivos = dados?.chips?.filter((c) => c.status === "conectado").length || 3;
-  const numConfigurados = dados?.chips?.length ? Math.max(dados.chips.length, 4) : 4;
-  const leadsWhatsapp = stats?.leadsComWhatsapp
-    ? stats.leadsComWhatsapp.toLocaleString("pt-BR")
-    : "3.753";
-  const campanhasEnviadas = stats?.campanhasEnviadas ? stats.campanhasEnviadas : 12;
-  const conversasAtivas = dados?.conversas?.length ? dados.conversas.length : 32;
-  const taxaResposta = dados?.taxaRespostaGeral ? `${dados.taxaRespostaGeral}%` : "68%";
-  const totalLeads = stats?.totalLeads ? stats.totalLeads.toLocaleString("pt-BR") : "6.472";
+  const numAtivos = dados?.chips?.filter((c) => c.operational_health === "healthy").length ?? 0;
+  const numConfigurados = dados?.chips?.length ?? 0;
+  const leadsWhatsapp = (stats?.leadsComWhatsapp ?? 0).toLocaleString("pt-BR");
+  const campanhasEnviadas = stats?.campanhasEnviadas ?? 0;
+  const conversasAtivas = dados?.conversas?.length ?? 0;
+  const taxaResposta = `${dados?.taxaRespostaGeral ?? 0}%`;
+  const totalLeads = (stats?.totalLeads ?? 0).toLocaleString("pt-BR");
 
   // Campanhas para a tabela
-  const campanhasLista =
-    dados?.campanhas && dados.campanhas.length > 0 && dados.campanhas.some((c) => c.enviados > 0)
-      ? dados.campanhas
-      : BENCHMARK_CAMPANHAS;
+  const campanhasLista = dados?.campanhas ?? [];
 
   // Números ativos
   const numerosLista =
     dados?.chips && dados.chips.length > 0
-      ? dados.chips.slice(0, 3).map((ch, idx) => ({
+      ? dados.chips.slice(0, 3).map((ch) => ({
           id: ch.id,
           nome: ch.nome,
-          numero: ch.numero || BENCHMARK_NUMEROS[idx]?.numero || "5511987654321",
-          status: ch.status === "conectado" ? "conectado" : "conectado",
-          taxaResposta: BENCHMARK_NUMEROS[idx]?.taxaResposta || 68,
+          numero: ch.numero,
+          status: ch.operational_health === "healthy" ? "conectado" : "desconectado",
+          taxaResposta: 0,
         }))
-      : BENCHMARK_NUMEROS;
+      : [];
+  const emContingencia = 0;
+  const numDesconectados = Math.max(0, numConfigurados - numAtivos);
+  const conexoesSaudaveis = numConfigurados > 0 && numDesconectados === 0;
 
   return (
     <div className="w-full space-y-4 text-home-foreground animate-in fade-in duration-150">
@@ -413,10 +410,14 @@ export function WaPainel({
 
                 <div className="space-y-1 min-w-0">
                   <h2 className="text-base font-bold text-[#22c55e]">
-                    WhatsApp conectado e funcionando
+                    {conexoesSaudaveis
+                      ? "WhatsApp conectado e funcionando"
+                      : "Conexões precisam de atenção"}
                   </h2>
                   <p className="text-xs text-home-muted leading-relaxed">
-                    Seus números estão ativos e prontos para enviar e receber mensagens.
+                    {conexoesSaudaveis
+                      ? "Seus números têm evidência recente e estão operacionais."
+                      : "Consulte a tela Números para verificar saúde, pareamento e incidentes."}
                   </p>
 
                   {/* 3 Contadores em Linha: 3 Números ativos | 0 Em contingência | 1 Desconectado */}
@@ -428,12 +429,12 @@ export function WaPainel({
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-amber-400" />
-                      <strong className="text-white font-bold">0</strong>
+                      <strong className="text-white font-bold">{emContingencia}</strong>
                       <span className="text-home-muted text-[11px]">Em contingência</span>
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="h-2 w-2 rounded-full bg-slate-400" />
-                      <strong className="text-white font-bold">1</strong>
+                      <strong className="text-white font-bold">{numDesconectados}</strong>
                       <span className="text-home-muted text-[11px]">Desconectado</span>
                     </span>
                   </div>
@@ -710,7 +711,9 @@ export function WaPainel({
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-white">Atividade recente</h3>
-                    <p className="text-[11px] text-home-muted">Últimas ações realizadas no WhatsApp</p>
+                    <p className="text-[11px] text-home-muted">
+                      Últimas ações realizadas no WhatsApp
+                    </p>
                   </div>
                 </div>
 
@@ -877,7 +880,9 @@ export function WaPainel({
                     </div>
                     <div>
                       <h4 className="text-xs font-semibold text-white">Rotação e contingência</h4>
-                      <p className="text-[10px] text-home-muted">Distribuição inteligente de envios</p>
+                      <p className="text-[10px] text-home-muted">
+                        Distribuição inteligente de envios
+                      </p>
                     </div>
                   </div>
 
