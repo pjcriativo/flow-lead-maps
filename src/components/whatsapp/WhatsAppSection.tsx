@@ -107,18 +107,15 @@ export function WhatsAppSection({ initialTab = "painel" }: WhatsAppSectionProps)
       <div className="relative overflow-hidden rounded-2xl border border-[#1b2334] bg-[#0c101a] p-6 shadow-2xl transition-all">
         {/* Glow verde sutil atmosférico no canto superior direito */}
         <div className="pointer-events-none absolute -right-10 -top-10 h-80 w-80 rounded-full bg-emerald-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute right-48 top-4 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl" />
+        <div className="pointer-events-none absolute right-36 top-1 h-44 w-64 rounded-full bg-emerald-500/20 blur-2xl" />
 
-        {/* 3D WhatsApp Artwork no background à direita (exatamente como na imagem aprovada) */}
-        <div className="pointer-events-none absolute right-24 md:right-32 top-1/2 -translate-y-1/2 select-none opacity-85 hidden sm:block">
-          <div className="relative h-28 w-28 md:h-36 md:w-36">
-            <div className="absolute inset-0 rounded-full bg-emerald-500/30 blur-2xl" />
-            <img
-              src="/images/whatsapp-hero-3d.jpg"
-              alt="WhatsApp 3D"
-              className="relative z-10 h-full w-full object-contain drop-shadow-[0_0_35px_rgba(34,197,94,0.6)]"
-            />
-          </div>
+        {/* 3D WhatsApp Artwork no background à direita (reprodução idêntica ao layout aprovado) */}
+        <div className="pointer-events-none absolute right-24 md:right-40 top-1 bottom-14 select-none flex items-center justify-center opacity-90 hidden sm:flex">
+          <img
+            src="/images/whatsapp-hero-3d.png"
+            alt="WhatsApp 3D"
+            className="h-20 md:h-24 w-auto object-contain drop-shadow-[0_0_35px_rgba(34,197,94,0.6)] filter brightness-105"
+          />
         </div>
 
         <div className="relative z-10 flex flex-col justify-between gap-6 md:flex-row md:items-start">

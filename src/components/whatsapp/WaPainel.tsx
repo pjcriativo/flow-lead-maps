@@ -626,74 +626,122 @@ export function WaPainel({
             </div>
           </div>
 
-          {/* CONVERSAS RECENTES (ETAPA 12 — AVATARES E MENSAGENS REAIS DA IMAGEM) */}
-          <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-5 transition-all hover:border-white/10">
-            <div className="flex items-center justify-between pb-3.5">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/15 text-emerald-400">
-                  <MessagesSquare className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Conversas recentes</h3>
-                  <p className="text-[11px] text-home-muted">
-                    Suas conversas mais recentes com leads e clientes
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={onIrParaConversas}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-white/10 bg-[#161c28] px-2.5 py-1 text-xs font-medium text-home-muted transition-colors hover:text-white hover:border-white/20"
-              >
-                <span>Ver todas</span>
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            </div>
-
-            {/* Lista das 3 Conversas Oficiais */}
-            <div className="divide-y divide-white/5">
-              {BENCHMARK_CONVERSAS.map((conv) => (
-                <div
-                  key={conv.nome}
-                  onClick={onIrParaConversas}
-                  className="group flex cursor-pointer items-center justify-between py-2.5 transition-colors hover:bg-white/[0.02]"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={conv.avatar}
-                      alt={conv.nome}
-                      className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-semibold text-white text-xs group-hover:text-home-orange transition-colors">
-                          {conv.nome}
-                        </span>
-                        {conv.isNovo && (
-                          <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
-                            Novo
-                          </span>
-                        )}
-                      </div>
-                      <p className="truncate text-[11px] text-home-muted max-w-sm">
-                        {conv.mensagem}
+          {/* CONVERSAS RECENTES + ATIVIDADE RECENTE (LADO A LADO NA COLUNA ESQUERDA) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CONVERSAS RECENTES (ETAPA 12 — AVATARES E MENSAGENS REAIS DA IMAGEM) */}
+            <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-5 transition-all hover:border-white/10 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/15 text-emerald-400">
+                      <MessagesSquare className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">Conversas recentes</h3>
+                      <p className="text-[11px] text-home-muted">
+                        Suas conversas mais recentes com leads e clientes
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-2.5 pl-3">
-                    <span className="text-[10px] text-home-muted">{conv.hora}</span>
-                    {conv.naoLidas > 0 ? (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-home-orange text-[9px] font-bold text-white shadow-[0_0_8px_rgba(255,98,0,0.5)]">
-                        {conv.naoLidas}
-                      </span>
-                    ) : (
-                      <CheckCheck className="h-3.5 w-3.5 text-emerald-400" />
-                    )}
+                  <button
+                    type="button"
+                    onClick={onIrParaConversas}
+                    className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-white/10 bg-[#161c28] px-2.5 py-1 text-xs font-medium text-home-muted transition-colors hover:text-white hover:border-white/20"
+                  >
+                    <span>Ver todas</span>
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+
+                {/* Lista das 3 Conversas Oficiais */}
+                <div className="divide-y divide-white/5">
+                  {BENCHMARK_CONVERSAS.map((conv) => (
+                    <div
+                      key={conv.nome}
+                      onClick={onIrParaConversas}
+                      className="group flex cursor-pointer items-center justify-between py-2.5 transition-colors hover:bg-white/[0.02]"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={conv.avatar}
+                          alt={conv.nome}
+                          className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate font-semibold text-white text-xs group-hover:text-home-orange transition-colors">
+                              {conv.nome}
+                            </span>
+                            {conv.isNovo && (
+                              <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
+                                Novo
+                              </span>
+                            )}
+                          </div>
+                          <p className="truncate text-[11px] text-home-muted max-w-[170px] sm:max-w-[200px]">
+                            {conv.mensagem}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2 pl-2">
+                        <span className="text-[10px] text-home-muted">{conv.hora}</span>
+                        {conv.naoLidas > 0 ? (
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-home-orange text-[9px] font-bold text-white shadow-[0_0_8px_rgba(255,98,0,0.5)]">
+                            {conv.naoLidas}
+                          </span>
+                        ) : (
+                          <CheckCheck className="h-3.5 w-3.5 text-emerald-400" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ATIVIDADE RECENTE (LADO A LADO COM CONVERSAS RECENTES) */}
+            <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-5 transition-all hover:border-white/10 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2.5 pb-3.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-home-muted">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">Atividade recente</h3>
+                    <p className="text-[11px] text-home-muted">Últimas ações realizadas no WhatsApp</p>
                   </div>
                 </div>
-              ))}
+
+                {/* Linha do Tempo Fiel */}
+                <div className="relative pl-4 space-y-3.5 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-[1px] before:bg-white/10">
+                  {BENCHMARK_ATIVIDADES.map((item) => (
+                    <div
+                      key={item.id}
+                      className="relative flex items-start justify-between gap-2 text-xs"
+                    >
+                      <span
+                        className={cn(
+                          "absolute -left-4 mt-1.5 h-2 w-2 rounded-full border border-black",
+                          item.tipo === "blue"
+                            ? "bg-blue-400"
+                            : "bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]",
+                        )}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-white text-[11px]">
+                          {item.titulo}
+                        </div>
+                        <div className="truncate text-[10px] text-home-muted">{item.descricao}</div>
+                      </div>
+                      <span className="shrink-0 text-[10px] text-home-muted font-mono">
+                        {item.hora}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -817,139 +865,105 @@ export function WaPainel({
             </div>
           </div>
 
-          {/* ROTAÇÃO E CONTINGÊNCIA (ETAPA 10 — REPRODUÇÃO FIEL) */}
-          <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-4 transition-all hover:border-white/10">
-            <div className="flex items-center justify-between pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-orange-500/25 bg-orange-500/15 text-orange-400">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-white">Rotação e contingência</h4>
-                  <p className="text-[10px] text-home-muted">Distribuição inteligente de envios</p>
-                </div>
-              </div>
-
-              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
-                Ativo
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={irParaNumeros}
-              className="group flex w-full cursor-pointer items-center justify-between rounded-xl border border-white/5 bg-[#121824] p-2.5 text-left transition-all hover:bg-[#161e2c] hover:border-white/10"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-                  <ShieldCheck className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-semibold text-white group-hover:text-home-orange transition-colors">
-                    Estratégia em operação
-                  </div>
-                  <div className="text-[10px] text-home-muted">
-                    Rotação automática entre números
-                  </div>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-home-muted group-hover:text-white group-hover:translate-x-0.5 transition-all" />
-            </button>
-          </div>
-
-          {/* AÇÕES RÁPIDAS (ETAPA 11 — REPRODUÇÃO FIEL 2x2) */}
-          <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-4 transition-all hover:border-white/10">
-            <div className="flex items-center gap-2 pb-3">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/15 text-amber-400">
-                <Zap className="h-3.5 w-3.5" />
-              </div>
+          {/* ROTAÇÃO E CONTINGÊNCIA + AÇÕES RÁPIDAS (LADO A LADO NA COLUNA DIREITA) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* ROTAÇÃO E CONTINGÊNCIA (ETAPA 10 — REPRODUÇÃO FIEL) */}
+            <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-4 transition-all hover:border-white/10 flex flex-col justify-between">
               <div>
-                <h4 className="text-xs font-semibold text-white">Ações rápidas</h4>
-                <p className="text-[10px] text-home-muted">Atalhos para as principais ações</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {/* Botão Laranja Sólido */}
-              <button
-                type="button"
-                onClick={onIrParaCampanhas}
-                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-3 py-2 text-xs font-semibold text-white shadow-[0_0_15px_rgba(255,98,0,0.35)] transition-all hover:brightness-110"
-              >
-                <Megaphone className="h-3.5 w-3.5" />
-                <span>Nova campanha</span>
-              </button>
-
-              {/* Botão Roxo Escuro */}
-              <button
-                type="button"
-                onClick={onIrParaScripts}
-                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-purple-500/30 bg-[#1c142b] px-3 py-2 text-xs font-semibold text-purple-200 transition-all hover:bg-[#251a3d] hover:border-purple-500/50"
-              >
-                <Zap className="h-3.5 w-3.5 text-purple-400" />
-                <span>Novo script</span>
-              </button>
-
-              {/* Botão Escuro Conversas */}
-              <button
-                type="button"
-                onClick={onIrParaConversas}
-                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#121824] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-[#182130] hover:border-white/20"
-              >
-                <MessagesSquare className="h-3.5 w-3.5 text-home-muted" />
-                <span>Ver conversas</span>
-              </button>
-
-              {/* Botão Escuro Automação */}
-              <button
-                type="button"
-                onClick={onIrParaAutomacao}
-                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#121824] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-[#182130] hover:border-white/20"
-              >
-                <Workflow className="h-3.5 w-3.5 text-home-muted" />
-                <span>Automação</span>
-              </button>
-            </div>
-          </div>
-
-          {/* ATIVIDADE RECENTE (ETAPA 13 — TIMELINE FIEL AO LAYOUT) */}
-          <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-5 transition-all hover:border-white/10">
-            <div className="flex items-center gap-2.5 pb-3.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-home-muted">
-                <Clock className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">Atividade recente</h3>
-                <p className="text-[11px] text-home-muted">Últimas ações realizadas no WhatsApp</p>
-              </div>
-            </div>
-
-            {/* Linha do Tempo Fiel */}
-            <div className="relative pl-4 space-y-3.5 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-[1px] before:bg-white/10">
-              {BENCHMARK_ATIVIDADES.map((item) => (
-                <div
-                  key={item.id}
-                  className="relative flex items-start justify-between gap-3 text-xs"
-                >
-                  <span
-                    className={cn(
-                      "absolute -left-4 mt-1.5 h-2 w-2 rounded-full border border-black",
-                      item.tipo === "blue"
-                        ? "bg-blue-400"
-                        : "bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]",
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-white text-[11px]">
-                      {item.titulo}
+                <div className="flex items-center justify-between pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-orange-500/25 bg-orange-500/15 text-orange-400">
+                      <RefreshCw className="h-3.5 w-3.5" />
                     </div>
-                    <div className="truncate text-[10px] text-home-muted">{item.descricao}</div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-white">Rotação e contingência</h4>
+                      <p className="text-[10px] text-home-muted">Distribuição inteligente de envios</p>
+                    </div>
                   </div>
-                  <span className="shrink-0 text-[10px] text-home-muted font-mono">
-                    {item.hora}
+
+                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    Ativo
                   </span>
                 </div>
-              ))}
+
+                <button
+                  type="button"
+                  onClick={irParaNumeros}
+                  className="group flex w-full cursor-pointer items-center justify-between rounded-xl border border-white/5 bg-[#121824] p-2.5 mt-2 text-left transition-all hover:bg-[#161e2c] hover:border-white/10"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-white group-hover:text-home-orange transition-colors">
+                        Estratégia em operação
+                      </div>
+                      <div className="truncate text-[10px] text-home-muted">
+                        Rotação automática entre números
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-home-muted group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                </button>
+              </div>
+            </div>
+
+            {/* AÇÕES RÁPIDAS (ETAPA 11 — REPRODUÇÃO FIEL 2x2) */}
+            <div className="rounded-2xl border border-[#1b2334] bg-[#0c101a] p-4 transition-all hover:border-white/10 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 pb-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/15 text-amber-400">
+                    <Zap className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-semibold text-white">Ações rápidas</h4>
+                    <p className="text-[10px] text-home-muted">Atalhos para as principais ações</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {/* Botão Laranja Sólido */}
+                  <button
+                    type="button"
+                    onClick={onIrParaCampanhas}
+                    className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-2 py-2 text-[11px] font-semibold text-white shadow-[0_0_15px_rgba(255,98,0,0.35)] transition-all hover:brightness-110"
+                  >
+                    <Megaphone className="h-3 w-3 shrink-0" />
+                    <span className="truncate">Nova campanha</span>
+                  </button>
+
+                  {/* Botão Roxo Escuro */}
+                  <button
+                    type="button"
+                    onClick={onIrParaScripts}
+                    className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-purple-500/30 bg-[#1c142b] px-2 py-2 text-[11px] font-semibold text-purple-200 transition-all hover:bg-[#251a3d] hover:border-purple-500/50"
+                  >
+                    <Zap className="h-3 w-3 text-purple-400 shrink-0" />
+                    <span className="truncate">Novo script</span>
+                  </button>
+
+                  {/* Botão Escuro Conversas */}
+                  <button
+                    type="button"
+                    onClick={onIrParaConversas}
+                    className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#121824] px-2 py-2 text-[11px] font-semibold text-white transition-all hover:bg-[#182130] hover:border-white/20"
+                  >
+                    <MessagesSquare className="h-3 w-3 text-home-muted shrink-0" />
+                    <span className="truncate">Ver conversas</span>
+                  </button>
+
+                  {/* Botão Escuro Automação */}
+                  <button
+                    type="button"
+                    onClick={onIrParaAutomacao}
+                    className="flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#121824] px-2 py-2 text-[11px] font-semibold text-white transition-all hover:bg-[#182130] hover:border-white/20"
+                  >
+                    <Workflow className="h-3 w-3 text-home-muted shrink-0" />
+                    <span className="truncate">Automação</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

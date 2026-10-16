@@ -181,8 +181,11 @@ test("16. Responsividade: grid adaptativo para desktop, tablet e mobile", () => 
 
 // 17. Presença do asset 3D oficial e fidelidade estética
 test("17. Presença do asset 3D oficial e fidelidade estética", () => {
-  assert.ok(existsSync("public/images/whatsapp-hero-3d.jpg"), "Asset 3D oficial do WhatsApp deve existir");
-  assert.match(waSection, /\/images\/whatsapp-hero-3d\.jpg/);
+  assert.ok(
+    existsSync("public/images/whatsapp-hero-3d.png") || existsSync("public/images/whatsapp-hero-3d.jpg"),
+    "Asset 3D oficial do WhatsApp deve existir",
+  );
+  assert.match(waSection, /\/images\/whatsapp-hero-3d\.(png|jpg)/);
 });
 
 // 18. Ausência de envio automático no carregamento do painel
