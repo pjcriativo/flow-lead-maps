@@ -1,7 +1,8 @@
 // Edge: wa-webhook — RECEBE os eventos de mensagem da Evolution GO e grava em wa_mensagens.
 // PÚBLICA (verify_jwt=false) porque quem chama é a Evolution, não um usuário. Anti-spoof: exige
 // ?k=<WA_WEBHOOK_SECRET> na URL (só a Evolution, configurada por nós, conhece). A org é
-// identificada pelo NOME da instância (única por org). Sempre responde 200 (não provoca retry).
+// identificada pelo NOME da instância (única por org). Falhas transitórias de persistência
+// respondem 503 para que o provedor possa repetir o evento idempotente com segurança.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import {
@@ -10,6 +11,11 @@ import {
   extractProviderMessageId,
   type WhatsappDeliveryStatus,
 } from "../_shared/whatsapp-delivery-engine.ts";
+import {
+  canAdvanceConversationMessageStatus,
+  normalizeInboundWhatsappMessage,
+  normalizeWhatsappTimestamp,
+} from "../_shared/whatsapp-conversation.ts";
 
 function pick(obj: unknown, paths: string[]): unknown {
   for (const p of paths) {
@@ -26,14 +32,6 @@ function pick(obj: unknown, paths: string[]): unknown {
     if (ok && cur !== undefined && cur !== null) return cur;
   }
   return undefined;
-}
-
-function soDigitos(jidOuNumero: string): string {
-  // "554199999@s.whatsapp.net" | "554199999:12@s.whatsapp.net" -> "554199999"
-  return String(jidOuNumero || "")
-    .split("@")[0]
-    .split(":")[0]
-    .replace(/\D/g, "");
 }
 
 function deliveryStatus(
@@ -85,12 +83,6 @@ Deno.serve(async (req) => {
   const info = pick(data, ["Info", "info", "key"]) ?? data;
 
   const evento = String(body.event ?? body.Event ?? body.type ?? "").toLowerCase();
-  const fromMe = Boolean(
-    pick(info, ["IsFromMe", "isFromMe", "fromMe"]) ??
-    pick(data, ["IsFromMe", "fromMe"]) ??
-    pick(body, ["fromMe"]),
-  );
-
   const nomeInstancia = String(
     pick(body, ["instance", "instanceName", "Instance", "name", "Name"]) ?? "",
   );
@@ -137,15 +129,10 @@ Deno.serve(async (req) => {
         : /close|disconnect|logout/.test(rawState)
           ? "disconnected"
           : "unknown";
-    const occurredAtRaw = pick(body, ["data.timestamp", "timestamp", "date_time"]);
-    const occurredAtDate =
-      typeof occurredAtRaw === "string" || typeof occurredAtRaw === "number"
-        ? new Date(occurredAtRaw)
-        : new Date();
-    const occurredAt = Number.isNaN(occurredAtDate.getTime())
-      ? new Date().toISOString()
-      : occurredAtDate.toISOString();
-    await admin.rpc("wa_apply_instance_observation", {
+    const occurredAt = normalizeWhatsappTimestamp(
+      pick(body, ["data.timestamp", "timestamp", "date_time"]),
+    );
+    const { error: observationError } = await admin.rpc("wa_apply_instance_observation", {
       p_org: inst.org_id,
       p_instance: inst.id,
       p_source: "webhook",
@@ -162,6 +149,10 @@ Deno.serve(async (req) => {
       p_number: null,
       p_actor: null,
     });
+    if (observationError) {
+      console.error("wa-webhook health persistence failed", observationError.code);
+      return json({ ok: false, stored: false }, 503);
+    }
     return json({ ok: true, stored: true, connection: providerState });
   }
 
@@ -175,7 +166,34 @@ Deno.serve(async (req) => {
       .eq("instancia_id", inst.id)
       .eq("provider_message_id", providerMessageId)
       .maybeSingle();
-    if (!delivery) return json({ ok: true, ignored: "envio-desconhecido" });
+    const messageStatus = providerStatus === "accepted" ? "sent" : providerStatus;
+    const { data: conversationMessage } = await admin
+      .from("wa_mensagens")
+      .select("id,status,conversa_id")
+      .eq("org_id", inst.org_id)
+      .eq("instancia_id", inst.id)
+      .eq("externo_id", providerMessageId)
+      .maybeSingle();
+    if (
+      conversationMessage &&
+      canAdvanceConversationMessageStatus(conversationMessage.status, messageStatus)
+    ) {
+      const { error: messageStatusError } = await admin
+        .from("wa_mensagens")
+        .update({ status: messageStatus })
+        .eq("id", conversationMessage.id)
+        .eq("org_id", inst.org_id)
+        .eq("status", conversationMessage.status);
+      if (messageStatusError) {
+        console.error("wa-webhook message status persistence failed", messageStatusError.code);
+        return json({ ok: false, stored: false }, 503);
+      }
+    }
+    if (!delivery) {
+      return conversationMessage
+        ? json({ ok: true, stored: true, status: messageStatus })
+        : json({ ok: true, ignored: "envio-desconhecido" });
+    }
 
     const occurredAtRaw = pick(body, [
       "data.timestamp",
@@ -183,13 +201,7 @@ Deno.serve(async (req) => {
       "timestamp",
       "date_time",
     ]);
-    const occurredAtValue =
-      typeof occurredAtRaw === "string" || typeof occurredAtRaw === "number" ? occurredAtRaw : null;
-    const parsedOccurredAt = occurredAtValue !== null ? new Date(occurredAtValue) : null;
-    const occurredAt =
-      parsedOccurredAt && !Number.isNaN(parsedOccurredAt.getTime())
-        ? parsedOccurredAt.toISOString()
-        : null;
+    const occurredAt = normalizeWhatsappTimestamp(occurredAtRaw);
     const eventKey = await deliveryEventIdentity({
       instanceId: inst.id,
       providerMessageId,
@@ -209,7 +221,7 @@ Deno.serve(async (req) => {
     });
     if (eventError && !String(eventError.code).includes("23505")) {
       console.error("wa-webhook delivery event persistence failed", eventError.code);
-      return json({ ok: true, stored: false });
+      return json({ ok: false, stored: false }, 503);
     }
 
     if (
@@ -225,7 +237,7 @@ Deno.serve(async (req) => {
         read: "read_at",
         failed: "failed_at",
       }[providerStatus];
-      await admin
+      const { error: deliveryUpdateError } = await admin
         .from("wa_envios")
         .update({
           status: providerStatus,
@@ -236,109 +248,38 @@ Deno.serve(async (req) => {
         .eq("id", delivery.id)
         .eq("org_id", inst.org_id)
         .eq("status", delivery.status);
+      if (deliveryUpdateError) {
+        console.error("wa-webhook delivery update failed", deliveryUpdateError.code);
+        return json({ ok: false, stored: false }, 503);
+      }
     }
-    return json({ ok: true, stored: !eventError, status: providerStatus });
+    return json({
+      ok: true,
+      stored: true,
+      duplicate: Boolean(eventError),
+      status: providerStatus,
+    });
   }
 
-  const chatJid = String(
-    pick(info, ["Chat", "chat", "RemoteJid", "remoteJid", "Sender", "sender"]) ??
-      pick(data, ["Chat", "remoteJid", "from"]) ??
-      "",
-  );
-  const numero = soDigitos(chatJid);
+  const inbound = normalizeInboundWhatsappMessage(body);
+  if (!inbound) return json({ ok: true, ignored: "not-supported-inbound", evento });
 
-  // SÓ conversas 1-a-1 com um número (@s.whatsapp.net). Grupos (@g.us), newsletters
-  // (@newsletter), status/broadcast e listas ficam de fora — não são leads.
-  const ehGrupo =
-    Boolean(pick(info, ["IsGroup", "isGroup"])) ||
-    /@g\.us|@broadcast|@newsletter|status@/i.test(chatJid) ||
-    !/@s\.whatsapp\.net$/i.test(chatJid);
-  if (ehGrupo) return json({ ok: true, ignored: "nao-individual" });
-
-  const texto = String(
-    pick(data, [
-      "Message.conversation",
-      "Message.Conversation",
-      "message.conversation",
-      "Message.extendedTextMessage.text",
-      "Message.ExtendedTextMessage.Text",
-      "message.extendedTextMessage.text",
-      "body",
-      "text",
-    ]) ?? "",
-  );
-  const externoId =
-    String(pick(info, ["ID", "Id", "id"]) ?? pick(data, ["id", "ID"]) ?? "") || null;
-  const pushName = pick(info, ["PushName", "pushName", "notifyName"]) ?? null;
-
-  // Só nos interessa MENSAGEM recebida (não a nossa própria, não evento de conexão).
-  const ehMensagem = !evento || evento.includes("message") || evento.includes("msg") || !!texto;
-  if (!ehMensagem || fromMe || !numero || !texto) {
-    return json({ ok: true, ignored: "not-inbound-text", evento, fromMe, temTexto: !!texto });
-  }
-
-  // Org dona da instância (pelo NOME). O server vê todas; escopamos pela linha encontrada.
-  // Casa o número com um lead da org (best-effort).
-  const { data: lead } = await admin
-    .from("leads")
-    .select("id")
-    .eq("org_id", inst.org_id)
-    .eq("whatsapp", numero)
-    .maybeSingle();
-
-  const { data: attributedDelivery } = lead?.id
-    ? await admin
-        .from("wa_envios")
-        .select("id,campanha_id")
-        .eq("org_id", inst.org_id)
-        .eq("instancia_id", inst.id)
-        .eq("lead_id", lead.id)
-        .in("status", ["accepted", "sent", "delivered", "read"])
-        .order("accepted_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
-
-  const { error } = await admin.from("wa_mensagens").insert({
-    user_id: inst.user_id,
-    org_id: inst.org_id,
-    instancia_id: inst.id,
-    numero,
-    lead_id: lead?.id ?? null,
-    envio_id: attributedDelivery?.id ?? null,
-    campanha_id: attributedDelivery?.campanha_id ?? null,
-    nome_contato: pushName,
-    direcao: "in",
-    tipo: "texto",
-    texto,
-    externo_id: externoId,
-    lida: false,
+  const { data: ingested, error: ingestError } = await admin.rpc("wa_ingest_inbound_message", {
+    p_org: inst.org_id,
+    p_instance: inst.id,
+    p_remote_contact_id: inbound.contact.remoteId,
+    p_phone: inbound.contact.phone,
+    p_contact_name: inbound.contactName,
+    p_external_id: inbound.externalId,
+    p_message_type: inbound.type,
+    p_text: inbound.text,
+    p_occurred_at: inbound.occurredAt,
   });
-  // externo_id duplicado (23505) = evento repetido → ok, ignora.
-  if (error && !String(error.code).includes("23505")) {
-    console.error("wa-webhook persistence failed", error.code);
-    return json({ ok: true, stored: false });
+  if (ingestError) {
+    console.error("wa-webhook conversation persistence failed", ingestError.code);
+    return json({ ok: false, stored: false }, 503);
   }
 
-  if (lead?.id && /^\s*(sair|pare|cancelar|remover)\s*[.!]?\s*$/i.test(texto)) {
-    const optedOutAt = new Date().toISOString();
-    await admin
-      .from("leads")
-      .update({ whatsapp_opt_out: true, whatsapp_opt_out_at: optedOutAt })
-      .eq("id", lead.id)
-      .eq("org_id", inst.org_id);
-    await admin
-      .from("wa_envios")
-      .update({
-        status: "blocked",
-        blocked_reason: "opt_out",
-        retryable: false,
-        updated_at: optedOutAt,
-      })
-      .eq("lead_id", lead.id)
-      .eq("org_id", inst.org_id)
-      .in("status", ["draft", "pending_approval", "scheduled", "queued", "failed"]);
-  }
-
-  return json({ ok: true, stored: true });
+  const persisted = Array.isArray(ingested) ? ingested[0] : ingested;
+  return json({ ok: true, stored: true, duplicate: !persisted?.inserted });
 });

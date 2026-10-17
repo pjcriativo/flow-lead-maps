@@ -9,14 +9,21 @@ import test from "node:test";
 const waConversas = readFileSync("src/components/whatsapp/WaConversas.tsx", "utf8");
 const waSection = readFileSync("src/components/whatsapp/WhatsAppSection.tsx", "utf8");
 const waService = readFileSync("src/services/whatsapp.ts", "utf8");
+const migration = readFileSync("supabase/migrations/202610160004_wa_conversations_crm.sql", "utf8");
+const webhook = readFileSync("supabase/functions/wa-webhook/index.ts", "utf8");
+const responder = readFileSync("supabase/functions/wa-responder/index.ts", "utf8");
+const conversationsEdge = readFileSync("supabase/functions/wa-conversations/index.ts", "utf8");
+
+// SUT_IS_CORRECT_BECAUSE: a Correção 04 substitui fixtures visuais e agrupamento por telefone
+// por entidades persistidas e auditáveis; estes contratos verificam o comportamento de produção.
 
 // 1. Lista por organização (Multi-tenant)
 test("1. Lista por organização: consultas respeitam RLS e escopo da organização ativa", () => {
-  assert.match(waService, /from\("wa_mensagens"\)/);
+  assert.match(waService, /invoke\("wa-conversations"/);
   assert.match(waService, /listarConversas/);
   assert.match(waService, /obterKpisConversasWa/);
   assert.match(waConversas, /obterKpisConversasWa/);
-  assert.match(waConversas, /CONTATOS_REFERENCIA/);
+  assert.match(migration, /unique \(org_id, instancia_id, remote_contact_id\)/);
 });
 
 // 2. Busca
@@ -38,10 +45,12 @@ test("3. Filtros: tabs de status [Todas, Não lidas, Em atendimento] e filtro po
 });
 
 // 4. Paginação / Limites seguros
-test("4. Paginação e limites: consultas com limites controlados sem memory dump arbitrário", () => {
-  assert.match(waService, /limit\(2000\)/);
-  assert.match(waService, /limit\(1000\)/);
-  assert.doesNotMatch(waConversas, /limit\(3000\)/);
+test("4. Paginação e limites: snapshot limita conversas e mensagens no servidor", () => {
+  // SUT_IS_CORRECT_BECAUSE: keyset/offset pages keep the 200-row cap while allowing the client
+  // to continue beyond the first page; requiring limit(200) would reject real pagination.
+  assert.match(conversationsEdge, /Math\.min\(requestedPageSize, 200\)/);
+  assert.match(conversationsEdge, /\.range\(page \* pageSize, page \* pageSize \+ pageSize - 1\)/);
+  assert.match(conversationsEdge, /limit\(500\)/);
 });
 
 // 5. Conversa selecionada
@@ -60,22 +69,25 @@ test("6. Histórico: cronologia com mensagens recebidas à esquerda e enviadas �
 });
 
 // 7. Realtime ou fallback
-test("7. Realtime ou fallback: inscrição Supabase Realtime em wa_mensagens com cleanup", () => {
+test("7. Realtime ou fallback: inscrição com cleanup e polling somente em falha", () => {
   assert.match(waConversas, /channel\(`wa_inbox_realtime:\$\{context\.orgId\}`\)/);
   assert.match(waConversas, /postgres_changes/);
   assert.match(waConversas, /table:\s*"wa_mensagens"/);
   assert.match(waConversas, /removeChannel/);
+  assert.match(waConversas, /CHANNEL_ERROR/);
+  assert.match(waConversas, /setInterval\(refresh, 30_000\)/);
 });
 
 // 8. Mensagem recebida
-test("8. Mensagem recebida: atualiza contador de não lidas e thread em tempo real", () => {
-  assert.match(waConversas, /target\.naoLidas \+= 1/);
-  assert.match(waConversas, /target\.ultimaMensagem/);
+test("8. Mensagem recebida: webhook normaliza e persiste por RPC idempotente", () => {
+  assert.match(webhook, /normalizeInboundWhatsappMessage/);
+  assert.match(webhook, /wa_ingest_inbound_message/);
+  assert.match(migration, /on conflict\(org_id,instancia_id,externo_id\)/);
 });
 
 // 9. Envio manual autorizado
 test("9. Envio manual autorizado: invoca responderConversa e valida parâmetros", () => {
-  assert.match(waConversas, /responderConversa\(contatoAtivo\.id, texto\)/);
+  assert.match(waConversas, /responderConversa\(contatoAtivo\.id, texto, operationId\)/);
   assert.match(waConversas, /enviando/);
   assert.match(waConversas, /SendHorizontal/);
 });
@@ -94,12 +106,15 @@ test("11. Prevenção de duplicidade: proteção contra cliques múltiplos e est
   assert.match(waConversas, /setEnviando\(true\)/);
   assert.match(waConversas, /Loader2.*animate-spin/);
   assert.match(waConversas, /disabled:pointer-events-none/);
+  assert.match(responder, /wa_reserve_outbound_message/);
+  assert.match(migration, /client_operation_id/);
 });
 
 // 12. Resultado de envio com estados claros
-test("12. Resultado de envio: toast informativo e atualização otimista imediata", () => {
+test("12. Resultado de envio: estados persistidos e nenhuma confirmação otimista inventada", () => {
   assert.match(waConversas, /toast\.success\("Mensagem enviada com sucesso\."\)/);
-  assert.match(waConversas, /toast\.info/);
+  assert.match(waConversas, /status === "uncertain"/);
+  assert.doesNotMatch(waConversas, /msg-out-\$\{Date\.now\(\)\}/);
 });
 
 // 13. Respostas rápidas
@@ -114,9 +129,9 @@ test("13. Respostas rápidas: lista scripts de wa_scripts, interpola {nome} e {e
 });
 
 // 14. Anexos
-test("14. Anexos: card preview de documento PDF [2.4 MB • PDF] e modal de seleção", () => {
-  assert.match(waConversas, /Apresentação Flow Business\.pdf/);
-  assert.match(waConversas, /2\.4 MB • PDF/);
+test("14. Anexos: mídia não suportada é declarada indisponível e nunca simulada", () => {
+  assert.match(waConversas, /Envio de mídia indisponível/);
+  assert.doesNotMatch(waConversas, /msg-doc-\$\{Date\.now\(\)\}/);
   assert.match(waConversas, /modalAnexo/);
   assert.match(waConversas, /Download/);
 });
@@ -144,42 +159,40 @@ test("16. Pipeline e Status: dropdown de status [Lead] e dropdown azul [Prospec�
 });
 
 // 17. Responsáveis
-test("17. Responsáveis: avatar e identificação do atendente responsável [Marcos Gonçalves]", () => {
+test("17. Responsáveis: carrega membros reais e permite assumir ou transferir", () => {
   assert.match(waConversas, /Responsável/);
-  assert.match(waConversas, /Marcos Gonçalves/);
-  assert.match(waConversas, /marcos_goncalves\.jpg/);
+  assert.match(waConversas, /listarMembrosDaOrg/);
+  assert.match(waConversas, /assumirAtendimento/);
+  assert.match(waConversas, /transferirAtendimento/);
 });
 
 // 18. Notas
-test("18. Notas: adicionar nova nota, listar notas com autor e timestamp", () => {
+test("18. Notas: adicionar e listar notas persistidas com autor e timestamp", () => {
   assert.match(waConversas, /Adicionar nota/);
   assert.match(waConversas, /modalAdicionarNota/);
   assert.match(waConversas, /salvarNovaNota/);
-  assert.match(waConversas, /Interessada nos planos de marketing digital/);
+  assert.match(waConversas, /acaoConversaWa\(contatoAtivo\.id, "add_note"/);
 });
 
 // 19. Etiquetas (Tags)
-test("19. Etiquetas: adicionar, remover e listar badges [Restaurante, São Paulo, Quente]", () => {
-  assert.match(waConversas, /Restaurante/);
-  assert.match(waConversas, /São Paulo/);
-  assert.match(waConversas, /Quente/);
+test("19. Etiquetas: adicionar e remover relações persistidas", () => {
   assert.match(waConversas, /adicionarTag/);
   assert.match(waConversas, /removerTag/);
+  assert.match(migration, /wa_conversa_etiquetas/);
 });
 
 // 20. Histórico de interações
-test("20. Histórico de interações: timeline real com eventos [Recebeu documento, Conversa iniciada, Lead criado]", () => {
+test("20. Histórico de interações: timeline vem de eventos persistidos", () => {
   assert.match(waConversas, /Últimas interações/);
-  assert.match(waConversas, /Recebeu um documento/);
-  assert.match(waConversas, /Conversa iniciada/);
-  assert.match(waConversas, /Lead criado/);
+  assert.match(conversationsEdge, /wa_conversa_eventos/);
   assert.match(waConversas, /modalVerInteracoes/);
 });
 
 // 21. Organização A vs Organização B (Multi-tenant estrito)
 test("21. Multi-tenant estrito: isolamento de dados e consultas ancoradas", () => {
   assert.match(waService, /atualizarLeadCrm/);
-  assert.match(waService, /registrarInteracaoWa/);
+  assert.match(conversationsEdge, /context\.orgId/);
+  assert.match(migration, /wa_conversation_visible/);
 });
 
 // 22. Usuário com duas organizações

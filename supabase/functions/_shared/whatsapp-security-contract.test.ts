@@ -54,8 +54,13 @@ test("chip management requires the manage_numbers backend permission", () => {
 
 test("manual replies resolve the destination from a persisted conversation id", () => {
   assert.match(responder, /body\.conversa_id/);
-  assert.match(responder, /\.from\("wa_mensagens"\)[\s\S]*?\.eq\("id", conversationId\)/);
-  assert.match(responder, /enviarTextoInstancia\(instance\.token, conversation\.numero, text\)/);
+  // SUT_IS_CORRECT_BECAUSE: conversa_id now identifies wa_conversas, while wa_mensagens contains
+  // timeline items. The canonical row owns the persisted instance and normalized destination.
+  assert.match(responder, /\.from\("wa_conversas"\)[\s\S]*?\.eq\("id", conversationId\)/);
+  assert.match(
+    responder,
+    /enviarTextoInstancia\(instance\.token, conversation\.normalized_phone, text\)/,
+  );
   assert.doesNotMatch(responder, /body\.numero/);
 });
 

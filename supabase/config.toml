@@ -61,6 +61,10 @@ verify_jwt = true
 # Responde mensagem WhatsApp. JWT obrigatório.
 verify_jwt = true
 
+[functions.wa-conversations]
+# Inbox e mutações auditadas de conversas. JWT obrigatório.
+verify_jwt = true
+
 [functions.buscar-redes]
 # Busca em redes sociais (IG/LinkedIn). JWT obrigatório.
 verify_jwt = true

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(path, "utf8");
 const migration = read("supabase/migrations/202610160002_wa_delivery_engine.sql");
+const conversationMigration = read("supabase/migrations/202610160004_wa_conversations_crm.sql");
 const control = read("supabase/functions/wa-campaign-control/index.ts");
 const worker = read("supabase/functions/wa-send-worker/index.ts");
 const webhook = read("supabase/functions/wa-webhook/index.ts");
@@ -193,8 +194,11 @@ test("real metrics distinguish accepted, delivered, failed, uncertain, and respo
 
 test("inbound responses are attributed to an exact organization delivery", () => {
   assert.match(webhook, /\.eq\("org_id", inst\.org_id\)/);
-  assert.match(webhook, /attributedDelivery/);
-  assert.match(webhook, /campanha_id: attributedDelivery/);
+  // SUT_IS_CORRECT_BECAUSE: attribution now belongs to the same PostgreSQL transaction that
+  // persists the inbound message; the webhook only supplies the instance-derived tenant.
+  assert.match(webhook, /rpc\("wa_ingest_inbound_message"/);
+  assert.match(conversationMigration, /e\.org_id=p_org and e\.instancia_id=p_instance/);
+  assert.match(conversationMigration, /v_conversation\.lead_id,v_envio,v_campanha/);
 });
 
 test("prepared content is an immutable snapshot in the queue", () => {

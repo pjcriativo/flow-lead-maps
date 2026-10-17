@@ -741,102 +741,198 @@ export async function excluirScript(id: string): Promise<void> {
 // ===== Conversas (bate-papo) =====
 export type WaMensagem = {
   id: string;
-  numero: string;
+  conversa_id: string;
   direcao: "in" | "out" | string;
   tipo: string;
   texto: string | null;
   media_url: string | null;
   lida: boolean;
+  status: "pending" | "sent" | "delivered" | "read" | "failed" | "uncertain" | "received";
+  provider_occurred_at: string | null;
   criado_em: string;
-  nome_contato: string | null;
 };
 
 export type WaConversa = {
   id: string;
+  instancia_id: string;
   lead_id: string | null;
+  assigned_to: string | null;
   numero: string;
   nome_contato: string | null;
   ultima: string | null;
   ultima_em: string;
   nao_lidas: number;
+  status:
+    "unassigned" | "in_progress" | "waiting_contact" | "waiting_agent" | "completed" | "archived";
+  prioridade: "low" | "normal" | "high" | "urgent";
+  versao: number;
+  criada_em: string;
 };
 
-/** Lista as conversas (uma por número), com a última mensagem e não-lidas. */
-export async function listarConversas(): Promise<WaConversa[]> {
-  const context = await activeWhatsappOrganization();
-  const { data, error } = await supabase
-    .from("wa_mensagens")
-    .select("id, lead_id, numero, nome_contato, direcao, texto, lida, criado_em")
-    .eq("org_id", context.orgId)
-    .order("criado_em", { ascending: false })
-    .limit(3000);
-  if (error) throw error;
-  const porNumero = new Map<string, WaConversa>();
-  for (const m of (data ?? []) as Array<{
+export type WaConversaSnapshot = {
+  role: string;
+  conversations: Array<Record<string, unknown>>;
+  selected_id: string | null;
+  pagination: {
+    page: number;
+    page_size: number;
+    total: number;
+    has_more: boolean;
+  };
+  messages: WaMensagem[];
+  notes: Array<{
     id: string;
-    lead_id: string | null;
-    numero: string;
-    nome_contato: string | null;
-    direcao: string;
-    texto: string | null;
-    lida: boolean;
-    criado_em: string;
-  }>) {
-    const cur = porNumero.get(m.numero);
-    if (!cur) {
-      porNumero.set(m.numero, {
-        id: m.id,
-        lead_id: m.lead_id,
-        numero: m.numero,
-        nome_contato: m.nome_contato,
-        ultima: m.texto,
-        ultima_em: m.criado_em,
-        nao_lidas: m.direcao === "in" && !m.lida ? 1 : 0,
-      });
-    } else {
-      if (m.direcao === "in" && !m.lida) cur.nao_lidas += 1;
-      if (!cur.nome_contato && m.nome_contato) cur.nome_contato = m.nome_contato;
-    }
-  }
-  return [...porNumero.values()];
+    author_id: string;
+    body: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+  events: Array<{
+    id: string;
+    event_type: string;
+    actor_id: string | null;
+    occurred_at: string;
+    details: Record<string, unknown>;
+  }>;
+  tags: Array<Record<string, unknown>>;
+  lead: Record<string, unknown> | null;
+  proposal: {
+    id: string;
+    lead_id: string;
+    assunto: string;
+    valor: number | null;
+    status: string;
+    criada_em: string;
+    enviada_em: string | null;
+    respondida_em: string | null;
+  } | null;
+};
+
+async function invokeConversations(
+  body: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const context = await activeWhatsappOrganization();
+  const { data, error } = await supabase.functions.invoke("wa-conversations", {
+    body: { ...body, org_id: context.orgId },
+  });
+  if (error) throw error;
+  if (!data || typeof data !== "object")
+    throw new Error("Resposta inválida da central de conversas.");
+  return data as Record<string, unknown>;
 }
 
-/** Mensagens de uma conversa (por número), em ordem cronológica. */
-export async function listarMensagens(numero: string): Promise<WaMensagem[]> {
+export async function consultarConversasWa(
+  conversaId?: string,
+  page = 0,
+  pageSize = 200,
+): Promise<WaConversaSnapshot> {
+  const data = await invokeConversations({
+    acao: "snapshot",
+    conversa_id: conversaId,
+    page,
+    page_size: pageSize,
+  });
+  return data as unknown as WaConversaSnapshot;
+}
+
+/** Lista entidades de conversa canônicas; nunca agrupa números no cliente. */
+export async function listarConversas(): Promise<WaConversa[]> {
+  const values: Array<Record<string, unknown>> = [];
+  let page = 0;
+  let hasMore = false;
+  do {
+    const snapshot = await consultarConversasWa(undefined, page);
+    values.push(...snapshot.conversations);
+    hasMore = snapshot.pagination.has_more;
+    page += 1;
+  } while (hasMore);
+
+  return values.map((value) => {
+    const row = value as Record<string, unknown>;
+    return {
+      id: String(row.id),
+      instancia_id: String(row.instancia_id),
+      lead_id: typeof row.lead_id === "string" ? row.lead_id : null,
+      assigned_to: typeof row.assigned_to === "string" ? row.assigned_to : null,
+      numero: String(row.normalized_phone ?? row.remote_contact_id ?? ""),
+      nome_contato: typeof row.contact_name === "string" ? row.contact_name : null,
+      ultima: typeof row.last_message_preview === "string" ? row.last_message_preview : null,
+      ultima_em: String(row.last_message_at ?? row.updated_at),
+      nao_lidas: Number(row.unread_count ?? 0),
+      status: String(row.status) as WaConversa["status"],
+      prioridade: String(row.priority) as WaConversa["prioridade"],
+      versao: Number(row.version ?? 1),
+      criada_em: String(row.created_at ?? row.updated_at),
+    };
+  });
+}
+
+/** Mensagens da entidade de conversa, em ordem cronológica. */
+export async function listarMensagens(conversaId: string): Promise<WaMensagem[]> {
+  return (await consultarConversasWa(conversaId)).messages;
+}
+
+export async function acaoConversaWa(
+  conversaId: string,
+  acao:
+    | "claim"
+    | "transfer"
+    | "unassign"
+    | "set_status"
+    | "mark_read"
+    | "add_note"
+    | "link_lead"
+    | "create_lead"
+    | "add_tag"
+    | "remove_tag",
+  valor: Record<string, unknown> = {},
+): Promise<Record<string, unknown> | null> {
+  const result = await invokeConversations({ acao, conversa_id: conversaId, valor });
+  return result.conversation && typeof result.conversation === "object"
+    ? (result.conversation as Record<string, unknown>)
+    : null;
+}
+
+export type WaLeadVinculavel = {
+  id: string;
+  business_name: string;
+  owner_name: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  status: string;
+};
+
+/** Leads oficiais visíveis na organização ativa para vinculação manual. */
+export async function listarLeadsVinculaveisWa(): Promise<WaLeadVinculavel[]> {
   const context = await activeWhatsappOrganization();
   const { data, error } = await supabase
-    .from("wa_mensagens")
-    .select("id, numero, direcao, tipo, texto, media_url, lida, criado_em, nome_contato")
+    .from("leads")
+    .select("id,business_name,owner_name,phone,whatsapp,email,status")
     .eq("org_id", context.orgId)
-    .eq("numero", numero)
-    .order("criado_em", { ascending: true });
+    .order("updated_at", { ascending: false })
+    .limit(100);
   if (error) throw error;
-  return (data ?? []) as WaMensagem[];
+  return (data ?? []) as WaLeadVinculavel[];
 }
 
-/** Marca as mensagens recebidas de um número como lidas. */
-export async function marcarConversaLida(numero: string): Promise<void> {
-  const context = await activeWhatsappOrganization();
-  await supabase
-    .from("wa_mensagens")
-    .update({ lida: true })
-    .eq("org_id", context.orgId)
-    .eq("numero", numero)
-    .eq("direcao", "in")
-    .eq("lida", false);
+/** Marca a entidade de conversa e suas mensagens inbound como lidas. */
+export async function marcarConversaLida(conversaId: string): Promise<void> {
+  await acaoConversaWa(conversaId, "mark_read");
 }
 
 /** Responde uma conversa (envia pelo chip da org via edge + grava a saída). */
 export async function responderConversa(
   conversaId: string,
   texto: string,
-): Promise<{ ok: boolean; error?: string }> {
+  operationId = crypto.randomUUID(),
+): Promise<{ ok: boolean; error?: string; status?: string; message_id?: string }> {
   const context = await activeWhatsappOrganization();
   const { data, error } = await supabase.functions.invoke("wa-responder", {
-    body: { conversa_id: conversaId, texto, org_id: context.orgId },
+    body: { conversa_id: conversaId, texto, operation_id: operationId, org_id: context.orgId },
   });
   if (error) throw error;
-  return data as { ok: boolean; error?: string };
+  return data as { ok: boolean; error?: string; status?: string; message_id?: string };
 }
 
 /** Limpa o histórico de conversas da org (aba WhatsApp). Devolve quantas removeu. */
@@ -864,71 +960,29 @@ export type WaConversaKpis = {
 
 export async function obterKpisConversasWa(): Promise<WaConversaKpis> {
   const context = await activeWhatsappOrganization();
-  try {
-    const [msgsRes, leadsRes] = await Promise.all([
-      supabase
-        .from("wa_mensagens")
-        .select("numero, direcao, lida, criado_em")
-        .eq("org_id", context.orgId)
-        .order("criado_em", { ascending: false })
-        .limit(2000),
-      supabase
-        .from("leads")
-        .select("id, status, created_at")
-        .eq("org_id", context.orgId)
-        .limit(1000),
-    ]);
-
-    const msgs = msgsRes.data ?? [];
-    const leads = leadsRes.data ?? [];
-
-    const numerosAtivos = new Set(msgs.map((m) => m.numero));
-    const totalNaoLidas = msgs.filter((m) => m.direcao === "in" && !m.lida).length;
-
-    // Aguardando resposta: conversas onde a última mensagem foi inbound
-    const porNumero = new Map<string, string>();
-    for (const m of msgs) {
-      if (!porNumero.has(m.numero)) porNumero.set(m.numero, m.direcao);
-    }
-    let aguardando = 0;
-    for (const d of porNumero.values()) {
-      if (d === "in") aguardando++;
-    }
-
-    // Hoje
-    const inicioHoje = new Date();
-    inicioHoje.setHours(0, 0, 0, 0);
-
-    const novosHoje = leads.filter(
-      (l) => l.created_at && new Date(l.created_at) >= inicioHoje,
-    ).length;
-
-    const fechamentosHoje = leads.filter(
-      (l) =>
-        (l.status === "won" || l.status === "Ganho" || l.status === "cliente") &&
-        l.created_at &&
-        new Date(l.created_at) >= inicioHoje,
-    ).length;
-
-    return {
-      conversasAtivas: numerosAtivos.size,
-      naoLidas: totalNaoLidas,
-      aguardandoResposta: aguardando,
-      emAtendimento: Math.max(0, numerosAtivos.size - aguardando),
-      novosContatos: novosHoje,
-      fechamentosHoje,
-    };
-  } catch (error) {
-    console.error("Falha ao carregar KPIs de conversas WhatsApp", error);
-    return {
-      conversasAtivas: 0,
-      naoLidas: 0,
-      aguardandoResposta: 0,
-      emAtendimento: 0,
-      novosContatos: 0,
-      fechamentosHoje: 0,
-    };
-  }
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const [allConversations, winsResult] = await Promise.all([
+    listarConversas(),
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", context.orgId)
+      .eq("status", "won")
+      .gte("updated_at", start.toISOString()),
+  ]);
+  if (winsResult.error) throw winsResult.error;
+  const conversations = allConversations.filter(
+    (row) => !["completed", "archived"].includes(row.status),
+  );
+  return {
+    conversasAtivas: conversations.length,
+    naoLidas: conversations.reduce((total, row) => total + row.nao_lidas, 0),
+    aguardandoResposta: conversations.filter((row) => row.status === "waiting_contact").length,
+    emAtendimento: conversations.filter((row) => row.status === "in_progress").length,
+    novosContatos: allConversations.filter((row) => new Date(row.criada_em) >= start).length,
+    fechamentosHoje: winsResult.count ?? 0,
+  };
 }
 
 export async function atualizarLeadCrm(
@@ -958,19 +1012,16 @@ export async function registrarInteracaoWa(
   action: string,
   metadata: Record<string, unknown> = {},
 ): Promise<void> {
-  try {
-    const context = await activeWhatsappOrganization();
-    await supabase.from("activity_log").insert({
-      user_id: context.userId,
-      org_id: context.orgId,
-      action,
-      entity_type: "wa_conversas",
-      entity_id: leadId,
-      metadata: metadata as Record<string, string | number | boolean | null>,
-    });
-  } catch {
-    // Silencioso em caso de log opcional
-  }
+  const context = await activeWhatsappOrganization();
+  const { error } = await supabase.from("activity_log").insert({
+    user_id: context.userId,
+    org_id: context.orgId,
+    action,
+    entity_type: "wa_conversas",
+    entity_id: leadId,
+    metadata: metadata as Record<string, string | number | boolean | null>,
+  });
+  if (error) throw error;
 }
 
 // ===== KPIs e Métricas da Tela 03 — Campanhas WhatsApp (ETAPA 3 — Layout Aprovado) =====
@@ -1270,7 +1321,7 @@ export type WaEstatisticas = {
 
 export async function estatisticasWa(): Promise<WaEstatisticas> {
   const context = await activeWhatsappOrganization();
-  const [leadsWa, total, envios, msgs, chips] = await Promise.all([
+  const [leadsWa, total, envios, conversations, chips] = await Promise.all([
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })
@@ -1278,7 +1329,7 @@ export async function estatisticasWa(): Promise<WaEstatisticas> {
       .not("whatsapp", "is", null),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("org_id", context.orgId),
     supabase.from("wa_envios").select("campanha_id").eq("org_id", context.orgId),
-    supabase.from("wa_mensagens").select("numero").eq("org_id", context.orgId).limit(5000),
+    listarConversas(),
     listarChips().catch(() => [] as WaChip[]),
   ]);
   const campanhas = new Set(
@@ -1286,7 +1337,7 @@ export async function estatisticasWa(): Promise<WaEstatisticas> {
       .map((r) => (r as { campanha_id: string | null }).campanha_id)
       .filter(Boolean),
   ).size;
-  const conversas = new Set((msgs.data ?? []).map((r) => (r as { numero: string }).numero)).size;
+  const conversas = conversations.length;
   return {
     leadsComWhatsapp: leadsWa.count ?? 0,
     totalLeads: total.count ?? 0,

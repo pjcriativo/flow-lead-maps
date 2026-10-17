@@ -69,7 +69,9 @@ test("4. Organização ativa e multi-tenant: consultas respeitam o escopo da org
   assert.match(waService, /canal", "whatsapp"/);
   assert.match(waService, /from\("leads"\)/);
   assert.match(waService, /from\("wa_envios"\)/);
-  assert.match(waService, /from\("wa_mensagens"\)/);
+  // SUT_IS_CORRECT_BECAUSE: métricas de conversas usam a entidade canônica da Correção 04,
+  // evitando mesclar o mesmo telefone entre instâncias.
+  assert.match(waService, /invoke\("wa-conversations"/);
 });
 
 // 5. Estado conectado

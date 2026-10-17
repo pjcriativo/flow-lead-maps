@@ -45,20 +45,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { dashboardUrlForSection } from "@/lib/dashboard-navigation";
 import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { supabase } from "@/integrations/supabase/client";
+import { listarMembrosDaOrg, type Membro } from "@/services/membros";
 import {
+  acaoConversaWa,
   atualizarLeadCrm,
+  consultarConversasWa,
   listarConversas,
-  listarMensagens,
+  listarLeadsVinculaveisWa,
   listarScripts,
   marcarConversaLida,
   obterKpisConversasWa,
-  registrarInteracaoWa,
   responderConversa,
   type WaConversa,
   type WaConversaKpis,
   type WaMensagem,
+  type WaLeadVinculavel,
   type WaScript,
 } from "@/services/whatsapp";
 
@@ -67,7 +71,15 @@ import {
 // ==========================================
 
 export type StatusAtendimento =
-  "todas" | "nao_lidas" | "em_atendimento" | "aguardando" | "concluida" | "arquivada";
+  "nao_atribuida" | "em_atendimento" | "aguardando" | "concluida" | "arquivada";
+type FiltroConversa =
+  | "todas"
+  | "minhas"
+  | "nao_atribuidas"
+  | "nao_lidas"
+  | "em_atendimento"
+  | "aguardando"
+  | "concluidas";
 export type StatusComercial =
   "Lead" | "Em qualificação" | "Proposta" | "Negociação" | "Cliente" | "Perdido";
 export type PipelineEtapa =
@@ -85,7 +97,7 @@ export interface MensagemChat {
   direcao: "in" | "out";
   texto: string;
   horario: string;
-  statusEnvio?: "enviado" | "entregue" | "lido" | "falha";
+  statusEnvio?: "pendente" | "enviado" | "entregue" | "lido" | "falha" | "incerto";
   anexo?: AnexoMsg;
 }
 
@@ -123,7 +135,6 @@ export interface ContatoConversa {
     avatar: string;
   };
   tags: string[];
-  favorito: boolean;
   email: string;
   empresa: string;
   cargo: string;
@@ -134,434 +145,37 @@ export interface ContatoConversa {
   interacoes: InteracaoLead[];
   mensagens: MensagemChat[];
   leadId?: string;
+  assignedTo?: string;
+  proposal?: {
+    id: string;
+    assunto: string;
+    valor: number | null;
+    status: string;
+  };
 }
 
-// ==========================================
-// DATASET DE REFERÊNCIA FIEL (BENCHMARK APROVADO)
-// ==========================================
+function crmStatusFromLead(status: unknown): StatusComercial {
+  if (status === "won") return "Cliente";
+  if (status === "lost") return "Perdido";
+  if (status === "proposta_enviada") return "Proposta";
+  if (status === "responded" || status === "meeting") return "Negociação";
+  if (status === "contacted" || status === "enriched" || status === "nurture") {
+    return "Em qualificação";
+  }
+  return "Lead";
+}
 
-const CONTATOS_REFERENCIA: ContatoConversa[] = [
-  {
-    id: "contato-1",
-    numero: "+55 11 98765-4321",
-    nome: "Carla Mendes",
-    avatar: "/images/avatars/contact_carla.jpg",
-    crmAvatar: "/images/avatars/carla_mendes.jpg",
-    ultimaMensagem: "Olá! Gostaria de saber mais sobre o pla...",
-    horario: "10:24",
-    naoLidas: 3,
-    statusAtendimento: "em_atendimento",
-    statusComercial: "Lead",
-    pipelineEtapa: "Prospecção",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Restaurante", "São Paulo", "Quente"],
-    favorito: true,
-    email: "carla@restaurante.com.br",
-    empresa: "Restaurante Sabor & Arte",
-    cargo: "Proprietária",
-    origem: "Site",
-    dataCadastro: "12/03/2024",
-    online: true,
-    notas: [
-      {
-        id: "n-1",
-        texto:
-          "Interessada nos planos de marketing digital. Enviar cases do segmento e agendar call.",
-        autor: "Marcos Gonçalves",
-        horario: "10:24",
-      },
-    ],
-    interacoes: [
-      {
-        id: "i-1",
-        tipo: "documento",
-        titulo: "Recebeu um documento",
-        subtitulo: "Apresentação Flow Business.pdf",
-        horario: "10:23",
-        cor: "rose",
-      },
-      {
-        id: "i-2",
-        tipo: "conversa",
-        titulo: "Conversa iniciada",
-        subtitulo: "Olá! Vi o site de vocês...",
-        horario: "10:20",
-        cor: "emerald",
-      },
-      {
-        id: "i-3",
-        tipo: "lead",
-        titulo: "Lead criado",
-        subtitulo: "Origem: Site",
-        horario: "12/03",
-        cor: "blue",
-      },
-    ],
-    mensagens: [
-      {
-        id: "m-1",
-        direcao: "in",
-        texto:
-          "Olá! Vi o site de vocês e me interessei pelos serviços de marketing para meu restaurante. Vocês atendem em São Paulo?",
-        horario: "10:20",
-      },
-      {
-        id: "m-2",
-        direcao: "out",
-        texto:
-          "Olá, Carla! 👋\nSim, atendemos em toda a região de São Paulo. Posso te mostrar alguns casos de sucesso no seu segmento.",
-        horario: "10:21",
-        statusEnvio: "lido",
-      },
-      {
-        id: "m-3",
-        direcao: "in",
-        texto: "Perfeito! Gostaria de ver alguns exemplos e entender melhor os planos disponíveis.",
-        horario: "10:22",
-      },
-      {
-        id: "m-4",
-        direcao: "out",
-        texto:
-          "Segue nossa apresentação com os planos e alguns cases de restaurantes. Qualquer dúvida estou à disposição!",
-        horario: "10:23",
-        statusEnvio: "lido",
-        anexo: {
-          tipo: "pdf",
-          nome: "Apresentação Flow Business.pdf",
-          tamanho: "2.4 MB • PDF",
-          url: "/files/Apresentacao-Flow-Business.pdf",
-        },
-      },
-      {
-        id: "m-5",
-        direcao: "in",
-        texto: "Muito obrigado! Vou analisar e te retorno ainda hoje.",
-        horario: "10:24",
-      },
-    ],
-  },
-  {
-    id: "contato-2",
-    numero: "+55 11 97654-3210",
-    nome: "João Silva",
-    avatar: "/images/avatars/contact_joao.jpg",
-    ultimaMensagem: "Perfeito! Vamos agendar uma demonstra...",
-    horario: "09:18",
-    naoLidas: 1,
-    statusAtendimento: "em_atendimento",
-    statusComercial: "Em qualificação",
-    pipelineEtapa: "Qualificação",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Advocacia", "São Paulo"],
-    favorito: false,
-    email: "joao.silva@advocacia.com.br",
-    empresa: "Silva Advocacia & Consultoria",
-    cargo: "Sócio-Diretor",
-    origem: "Google Maps",
-    dataCadastro: "14/03/2024",
-    online: false,
-    notas: [],
-    interacoes: [
-      {
-        id: "i-21",
-        tipo: "conversa",
-        titulo: "Mensagem recebida",
-        subtitulo: "Perfeito! Vamos agendar uma demonstra...",
-        horario: "09:18",
-        cor: "emerald",
-      },
-    ],
-    mensagens: [
-      {
-        id: "m-21",
-        direcao: "in",
-        texto: "Perfeito! Vamos agendar uma demonstração do sistema para amanhã?",
-        horario: "09:18",
-      },
-    ],
-  },
-  {
-    id: "contato-3",
-    numero: "+55 11 98877-6655",
-    nome: "Restaurante Sabor & Arte",
-    avatar: "/images/avatars/contact_sabor.jpg",
-    ultimaMensagem: "Enviou uma imagem",
-    ultimaMensagemTipo: "imagem",
-    horario: "Ontem",
-    naoLidas: 2,
-    statusAtendimento: "aguardando",
-    statusComercial: "Lead",
-    pipelineEtapa: "Prospecção",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Gastronomia", "Delivery"],
-    favorito: false,
-    email: "contato@saborearte.com.br",
-    empresa: "Restaurante Sabor & Arte",
-    cargo: "Gerente",
-    origem: "Instagram",
-    dataCadastro: "10/03/2024",
-    online: true,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-31",
-        direcao: "in",
-        texto: "📷 Enviou uma foto do cardápio promocional.",
-        horario: "18:40",
-      },
-    ],
-  },
-  {
-    id: "contato-4",
-    numero: "+55 11 97766-5544",
-    nome: "Ana Costa",
-    avatar: "/images/avatars/contact_ana.jpg",
-    ultimaMensagem: "Qual o valor para minha região?",
-    horario: "Ontem",
-    naoLidas: 0,
-    statusAtendimento: "aguardando",
-    statusComercial: "Proposta",
-    pipelineEtapa: "Proposta",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Arquitetura", "Design"],
-    favorito: false,
-    email: "ana@anacosta.arq.br",
-    empresa: "Studio Ana Costa Arquitetura",
-    cargo: "Arquiteta Titular",
-    origem: "Site",
-    dataCadastro: "08/03/2024",
-    online: false,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-41",
-        direcao: "in",
-        texto: "Qual o valor para minha região em Campinas?",
-        horario: "17:15",
-      },
-    ],
-  },
-  {
-    id: "contato-5",
-    numero: "+55 11 96655-4433",
-    nome: "Clínica Vida Plena",
-    avatar: "/images/avatars/contact_clinica.jpg",
-    ultimaMensagem: "Eu tenho interesse, pode me enviar mai...",
-    horario: "Ontem",
-    naoLidas: 0,
-    statusAtendimento: "em_atendimento",
-    statusComercial: "Lead",
-    pipelineEtapa: "Prospecção",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Saúde", "Odontologia"],
-    favorito: false,
-    email: "atendimento@vidaplena.com.br",
-    empresa: "Clínica Vida Plena",
-    cargo: "Coordenadora",
-    origem: "Google Maps",
-    dataCadastro: "05/03/2024",
-    online: false,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-51",
-        direcao: "in",
-        texto: "Eu tenho interesse, pode me enviar mais informações sobre a captação de pacientes?",
-        horario: "15:20",
-      },
-    ],
-  },
-  {
-    id: "contato-6",
-    numero: "+55 21 98899-1122",
-    nome: "Pedro Oliveira",
-    avatar: "/images/avatars/contact_pedro.jpg",
-    ultimaMensagem: "Muito obrigado! 🙏",
-    horario: "Seg",
-    naoLidas: 0,
-    statusAtendimento: "concluida",
-    statusComercial: "Cliente",
-    pipelineEtapa: "Fechamento",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Contabilidade", "Rio de Janeiro"],
-    favorito: true,
-    email: "pedro@oliveiracontab.com.br",
-    empresa: "Oliveira Contabilidade",
-    cargo: "Diretor Fiscal",
-    origem: "Indicação",
-    dataCadastro: "01/03/2024",
-    online: false,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-61",
-        direcao: "in",
-        texto: "Muito obrigado! Contrato assinado. 🙏",
-        horario: "Seg 11:30",
-      },
-    ],
-  },
-  {
-    id: "contato-7",
-    numero: "+55 11 99911-2233",
-    nome: "Academia PowerFit",
-    avatar: "/images/avatars/contact_powerfit.jpg",
-    ultimaMensagem: "Enviou um documento",
-    ultimaMensagemTipo: "documento",
-    horario: "Seg",
-    naoLidas: 0,
-    statusAtendimento: "em_atendimento",
-    statusComercial: "Negociação",
-    pipelineEtapa: "Proposta",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Fitness", "Academia"],
-    favorito: false,
-    email: "gerencia@powerfit.com.br",
-    empresa: "Academia PowerFit",
-    cargo: "Sócio",
-    origem: "Instagram",
-    dataCadastro: "28/02/2024",
-    online: false,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-71",
-        direcao: "in",
-        texto: "📄 Segue em anexo a lista de professores.",
-        horario: "Seg 09:12",
-      },
-    ],
-  },
-  {
-    id: "contato-8",
-    numero: "+55 31 98777-8899",
-    nome: "Mariana Santos",
-    avatar: "/images/avatars/contact_mariana.jpg",
-    ultimaMensagem: "Vocês atendem em outras cidades?",
-    horario: "Seg",
-    naoLidas: 0,
-    statusAtendimento: "aguardando",
-    statusComercial: "Lead",
-    pipelineEtapa: "Prospecção",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Joias", "Varejo"],
-    favorito: false,
-    email: "mariana@santosjoias.com.br",
-    empresa: "Mariana Joias",
-    cargo: "Fundadora",
-    origem: "Site",
-    dataCadastro: "26/02/2024",
-    online: false,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-81",
-        direcao: "in",
-        texto: "Vocês atendem em outras cidades além de São Paulo e Belo Horizonte?",
-        horario: "Seg 08:45",
-      },
-    ],
-  },
-  {
-    id: "contato-9",
-    numero: "+55 41 99888-7766",
-    nome: "Bruno Almeida",
-    avatar: "/images/avatars/contact_bruno.jpg",
-    ultimaMensagem: "Quero contratar, qual o próximo passo?",
-    horario: "Seg",
-    naoLidas: 0,
-    statusAtendimento: "em_atendimento",
-    statusComercial: "Negociação",
-    pipelineEtapa: "Proposta",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Software", "Curitiba"],
-    favorito: false,
-    email: "bruno@almeidasoft.com.br",
-    empresa: "Almeida Software",
-    cargo: "CTO",
-    origem: "LinkedIn",
-    dataCadastro: "24/02/2024",
-    online: false,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-91",
-        direcao: "in",
-        texto: "Quero contratar, qual o próximo passo para liberar o acesso?",
-        horario: "Seg 08:10",
-      },
-    ],
-  },
-  {
-    id: "contato-10",
-    numero: "+55 11 95544-3322",
-    nome: "Loja Estilo & Cia",
-    avatar: "/images/avatars/contact_estilo.jpg",
-    ultimaMensagem: "Ok, aguardo o retorno!",
-    horario: "Seg",
-    naoLidas: 0,
-    statusAtendimento: "concluida",
-    statusComercial: "Cliente",
-    pipelineEtapa: "Fechamento",
-    responsavel: {
-      nome: "Marcos Gonçalves",
-      avatar: "/images/avatars/marcos_goncalves.jpg",
-    },
-    tags: ["Moda", "Varejo"],
-    favorito: false,
-    email: "contato@estiloecia.com.br",
-    empresa: "Loja Estilo & Cia",
-    cargo: "Diretor Comercial",
-    origem: "Google Maps",
-    dataCadastro: "20/02/2024",
-    online: false,
-    notas: [],
-    interacoes: [],
-    mensagens: [
-      {
-        id: "m-101",
-        direcao: "in",
-        texto: "Ok, aguardo o retorno da equipe técnica!",
-        horario: "Seg 07:50",
-      },
-    ],
-  },
-];
+function pipelineFromLead(status: unknown): PipelineEtapa {
+  if (status === "won") return "Fechamento";
+  if (status === "proposta_enviada") return "Proposta";
+  if (status === "responded" || status === "meeting" || status === "lost") {
+    return "Negociação";
+  }
+  if (status === "contacted" || status === "enriched" || status === "nurture") {
+    return "Qualificação";
+  }
+  return "Prospecção";
+}
 
 export function WaConversas() {
   // Estado das conversas
@@ -578,7 +192,7 @@ export function WaConversas() {
 
   // Filtros e busca
   const [busca, setBusca] = useState("");
-  const [tabFiltro, setTabFiltro] = useState<"todas" | "nao_lidas" | "em_atendimento">("todas");
+  const [tabFiltro, setTabFiltro] = useState<FiltroConversa>("todas");
   const [menuFiltroAberto, setMenuFiltroAberto] = useState(false);
   const [filtroTag, setFiltroTag] = useState<string | null>(null);
 
@@ -587,6 +201,9 @@ export function WaConversas() {
   const [textoMensagem, setTextoMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [scriptsDisponiveis, setScriptsDisponiveis] = useState<WaScript[]>([]);
+  const [membros, setMembros] = useState<Membro[]>([]);
+  const [usuarioAtualId, setUsuarioAtualId] = useState("");
+  const [papelAtual, setPapelAtual] = useState("");
   const [buscaScript, setBuscaScript] = useState("");
   const [mostrarEmojis, setMostrarEmojis] = useState(false);
 
@@ -595,6 +212,10 @@ export function WaConversas() {
   const [modalAdicionarNota, setModalAdicionarNota] = useState(false);
   const [modalVerInteracoes, setModalVerInteracoes] = useState(false);
   const [modalAnexo, setModalAnexo] = useState(false);
+  const [modalVincularLead, setModalVincularLead] = useState(false);
+  const [leadsVinculaveis, setLeadsVinculaveis] = useState<WaLeadVinculavel[]>([]);
+  const [buscaLead, setBuscaLead] = useState("");
+  const [carregandoLeads, setCarregandoLeads] = useState(false);
 
   // Form states de edição
   const [editNome, setEditNome] = useState("");
@@ -604,6 +225,7 @@ export function WaConversas() {
   const [editTelefone, setEditTelefone] = useState("");
   const [novaNotaTexto, setNovaNotaTexto] = useState("");
   const [novaTagTexto, setNovaTagTexto] = useState("");
+  const [tagIds, setTagIds] = useState<Record<string, string>>({});
   const [mostrarInputTag, setMostrarInputTag] = useState(false);
 
   // Responsividade Mobile: tela ativa ("lista", "chat", "crm")
@@ -633,48 +255,44 @@ export function WaConversas() {
         setScriptsDisponiveis(scriptsRes.value);
       }
       if (conversationsRes.status === "fulfilled") {
-        const mapped = await Promise.all(
-          conversationsRes.value.map(async (conversation: WaConversa): Promise<ContatoConversa> => {
-            const messages = await listarMensagens(conversation.numero);
-            return {
-              id: conversation.id,
-              numero: conversation.numero,
-              nome: conversation.nome_contato || conversation.numero,
-              avatar: "/placeholder.svg",
-              ultimaMensagem: conversation.ultima || "",
-              horario: new Date(conversation.ultima_em).toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              naoLidas: conversation.nao_lidas,
-              statusAtendimento: conversation.nao_lidas > 0 ? "em_atendimento" : "todas",
-              statusComercial: "Lead",
-              pipelineEtapa: "Prospecção",
-              responsavel: { nome: "Equipe", avatar: "/placeholder.svg" },
-              tags: [],
-              favorito: false,
-              email: "",
-              empresa: "",
-              cargo: "",
-              origem: "WhatsApp",
-              dataCadastro: new Date(conversation.ultima_em).toLocaleDateString("pt-BR"),
-              online: false,
-              notas: [],
-              interacoes: [],
-              mensagens: messages.map((message: WaMensagem) => ({
-                id: message.id,
-                direcao: message.direcao === "out" ? "out" : "in",
-                texto: message.texto || "",
-                horario: new Date(message.criado_em).toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                }),
-                statusEnvio: message.lida ? "lido" : "entregue",
-              })),
-              leadId: conversation.lead_id ?? undefined,
-            };
+        const mapped = conversationsRes.value.map((conversation: WaConversa): ContatoConversa => ({
+          id: conversation.id,
+          numero: conversation.numero,
+          nome: conversation.nome_contato || conversation.numero,
+          avatar: "/placeholder.svg",
+          ultimaMensagem: conversation.ultima || "",
+          horario: new Date(conversation.ultima_em).toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
           }),
-        );
+          naoLidas: conversation.nao_lidas,
+          statusAtendimento:
+            conversation.status === "archived"
+              ? "arquivada"
+              : conversation.status === "completed"
+                ? "concluida"
+                : conversation.status === "waiting_contact" ||
+                    conversation.status === "waiting_agent"
+                  ? "aguardando"
+                  : conversation.status === "in_progress"
+                    ? "em_atendimento"
+                    : "nao_atribuida",
+          statusComercial: "Lead",
+          pipelineEtapa: "Prospecção",
+          responsavel: { nome: "Equipe", avatar: "/placeholder.svg" },
+          tags: [],
+          email: "",
+          empresa: "",
+          cargo: "",
+          origem: "WhatsApp",
+          dataCadastro: new Date(conversation.ultima_em).toLocaleDateString("pt-BR"),
+          online: false,
+          notas: [],
+          interacoes: [],
+          mensagens: [],
+          leadId: conversation.lead_id ?? undefined,
+          assignedTo: conversation.assigned_to ?? undefined,
+        }));
         setContatos(mapped);
         setContatoAtivoId((current) => current || mapped[0]?.id || "");
       }
@@ -687,6 +305,110 @@ export function WaConversas() {
     carregarDadosIniciais();
   }, [carregarDadosIniciais]);
 
+  useEffect(() => {
+    void getActiveOrganizationContext()
+      .then(async (organization) => {
+        setUsuarioAtualId(organization.userId);
+        return listarMembrosDaOrg(organization.orgId);
+      })
+      .then(setMembros)
+      .catch((error) => console.error("Falha ao carregar responsáveis", error));
+  }, []);
+
+  const carregarDetalhes = useCallback(
+    async (conversationId: string) => {
+      try {
+        const snapshot = await consultarConversasWa(conversationId);
+        setPapelAtual(snapshot.role);
+        const statusMap: Record<string, MensagemChat["statusEnvio"]> = {
+          pending: "pendente",
+          sent: "enviado",
+          delivered: "entregue",
+          read: "lido",
+          failed: "falha",
+          uncertain: "incerto",
+          received: "entregue",
+        };
+        const lead = snapshot.lead ?? {};
+        const persistedTags = snapshot.tags
+          .map((item) => {
+            const relation = item.wa_etiquetas;
+            const tag = Array.isArray(relation) ? relation[0] : relation;
+            return tag && typeof tag === "object" ? (tag as Record<string, unknown>) : null;
+          })
+          .filter((tag): tag is Record<string, unknown> => Boolean(tag));
+        const tags = persistedTags.map((tag) => String(tag.name ?? "")).filter(Boolean);
+        setTagIds(
+          Object.fromEntries(persistedTags.map((tag) => [String(tag.name), String(tag.id)])),
+        );
+        setContatos((previous) =>
+          previous.map((contact) =>
+            contact.id !== conversationId
+              ? contact
+              : {
+                  ...contact,
+                  nome: String(lead.owner_name ?? lead.business_name ?? contact.nome),
+                  email: String(lead.email ?? ""),
+                  empresa: String(lead.business_name ?? ""),
+                  cargo: String(lead.cargo ?? ""),
+                  statusComercial: crmStatusFromLead(lead.status),
+                  pipelineEtapa: pipelineFromLead(lead.status),
+                  proposal: snapshot.proposal
+                    ? {
+                        id: snapshot.proposal.id,
+                        assunto: snapshot.proposal.assunto,
+                        valor: snapshot.proposal.valor,
+                        status: snapshot.proposal.status,
+                      }
+                    : undefined,
+                  tags,
+                  notas: snapshot.notes.map((note) => ({
+                    id: note.id,
+                    texto: note.body,
+                    autor:
+                      membros.find((member) => member.user_id === note.author_id)?.nome ||
+                      membros.find((member) => member.user_id === note.author_id)?.email ||
+                      note.author_id,
+                    horario: new Date(note.created_at).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                  })),
+                  interacoes: snapshot.events.map((event) => ({
+                    id: event.id,
+                    tipo: "status" as const,
+                    titulo: event.event_type,
+                    subtitulo: "Evento registrado na conversa",
+                    horario: new Date(event.occurred_at).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                    cor: "blue" as const,
+                  })),
+                  mensagens: snapshot.messages.map((message: WaMensagem) => ({
+                    id: message.id,
+                    direcao: message.direcao === "out" ? "out" : "in",
+                    texto: message.texto || (message.tipo === "text" ? "" : `[${message.tipo}]`),
+                    horario: new Date(
+                      message.provider_occurred_at ?? message.criado_em,
+                    ).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+                    statusEnvio: statusMap[message.status],
+                  })),
+                },
+          ),
+        );
+      } catch (error) {
+        console.error("Falha ao carregar detalhes da conversa", error);
+        toast.error("Não foi possível atualizar esta conversa.");
+      }
+    },
+    [membros],
+  );
+
+  useEffect(() => {
+    if (contatoAtivoId) void carregarDetalhes(contatoAtivoId);
+  }, [carregarDetalhes, contatoAtivoId]);
+
   // Scroll automático ao fim do chat
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -695,7 +417,20 @@ export function WaConversas() {
   // Supabase Realtime Subscription para novas mensagens recebidas
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let polling: ReturnType<typeof setInterval> | null = null;
     let cancelled = false;
+    const refresh = () => {
+      void carregarDadosIniciais();
+      if (contatoAtivoId) void carregarDetalhes(contatoAtivoId);
+    };
+    const startFallback = () => {
+      if (polling) return;
+      polling = setInterval(refresh, 30_000);
+    };
+    const stopFallback = () => {
+      if (polling) clearInterval(polling);
+      polling = null;
+    };
     void getActiveOrganizationContext().then((context) => {
       if (cancelled) return;
       channel = supabase
@@ -708,60 +443,32 @@ export function WaConversas() {
             table: "wa_mensagens",
             filter: `org_id=eq.${context.orgId}`,
           },
-          (payload) => {
-            const nova = payload.new as {
-              numero: string;
-              texto: string | null;
-              direcao: string;
-              nome_contato: string | null;
-              criado_em: string;
-            };
-
-            if (nova && nova.numero) {
-              setContatos((prev) => {
-                const idx = prev.findIndex(
-                  (c) => c.numero.replace(/\D/g, "") === nova.numero.replace(/\D/g, ""),
-                );
-
-                const horaFormatada = new Date(nova.criado_em || Date.now()).toLocaleTimeString(
-                  "pt-BR",
-                  { hour: "2-digit", minute: "2-digit" },
-                );
-
-                if (idx >= 0) {
-                  const copia = [...prev];
-                  const target = { ...copia[idx] };
-                  target.ultimaMensagem = nova.texto || "Mensagem recebida";
-                  target.horario = horaFormatada;
-                  if (nova.direcao === "in") {
-                    target.naoLidas += 1;
-                  }
-                  target.mensagens = [
-                    ...target.mensagens,
-                    {
-                      id: `rt-${Date.now()}`,
-                      direcao: nova.direcao === "out" ? "out" : "in",
-                      texto: nova.texto || "",
-                      horario: horaFormatada,
-                      statusEnvio: "lido",
-                    },
-                  ];
-                  copia[idx] = target;
-                  return copia;
-                }
-                return prev;
-              });
-            }
-          },
+          refresh,
         )
-        .subscribe();
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "wa_conversas",
+            filter: `org_id=eq.${context.orgId}`,
+          },
+          refresh,
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") stopFallback();
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+            startFallback();
+          }
+        });
     });
 
     return () => {
       cancelled = true;
+      stopFallback();
       if (channel) supabase.removeChannel(channel);
     };
-  }, []);
+  }, [carregarDadosIniciais, carregarDetalhes, contatoAtivoId]);
 
   // Selecionar conversa
   const selecionarContato = useCallback((c: ContatoConversa) => {
@@ -773,7 +480,9 @@ export function WaConversas() {
       setContatos((prev) =>
         prev.map((item) => (item.id === c.id ? { ...item, naoLidas: 0 } : item)),
       );
-      marcarConversaLida(c.numero.replace(/\D/g, "")).catch(() => {});
+      void marcarConversaLida(c.id).catch(() => {
+        toast.error("Não foi possível marcar a conversa como lida.");
+      });
     }
   }, []);
 
@@ -782,53 +491,26 @@ export function WaConversas() {
     if (!contatoAtivo || !textoMensagem.trim() || enviando) return;
 
     const texto = textoMensagem.trim();
-    const numeroLimpo = contatoAtivo.numero.replace(/\D/g, "");
+    const operationId = crypto.randomUUID();
     setEnviando(true);
-    setTextoMensagem("");
-
-    const horaAtual = new Date().toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    // Atualização otimista imediata na thread
-    const novaMensagemId = `msg-out-${Date.now()}`;
-    setContatos((prev) =>
-      prev.map((c) => {
-        if (c.id === contatoAtivo.id) {
-          return {
-            ...c,
-            ultimaMensagem: texto,
-            horario: horaAtual,
-            mensagens: [
-              ...c.mensagens,
-              {
-                id: novaMensagemId,
-                direcao: "out",
-                texto,
-                horario: horaAtual,
-                statusEnvio: "enviado",
-              },
-            ],
-          };
-        }
-        return c;
-      }),
-    );
 
     try {
-      const resp = await responderConversa(contatoAtivo.id, texto);
-      if (!resp.ok) {
-        toast.info(resp.error || "Mensagem registrada no histórico da conversa.");
+      const resp = await responderConversa(contatoAtivo.id, texto, operationId);
+      if (!resp.ok || resp.status !== "sent") {
+        toast.error(
+          resp.status === "uncertain"
+            ? "Envio sem confirmação do provedor. Não reenvie automaticamente."
+            : resp.error || "A mensagem não foi enviada.",
+        );
       } else {
+        setTextoMensagem("");
         toast.success("Mensagem enviada com sucesso.");
       }
-      registrarInteracaoWa(contatoAtivo.leadId ?? null, "mensagem_enviada", {
-        numero: numeroLimpo,
-        texto,
-      });
-    } catch {
-      toast.info("Mensagem registrada e armazenada na conversa.");
+      await carregarDetalhes(contatoAtivo.id);
+      await carregarDadosIniciais();
+    } catch (error) {
+      console.error("Falha ao enviar mensagem", error);
+      toast.error("A mensagem não foi confirmada. Consulte o status antes de tentar novamente.");
     } finally {
       setEnviando(false);
       textareaRef.current?.focus();
@@ -850,64 +532,134 @@ export function WaConversas() {
     toast.success(`Script "${script.nome}" carregado na composição.`);
   };
 
-  // Alternar Favorito
-  const alternarFavorito = () => {
-    if (!contatoAtivo) return;
-    const novoValor = !contatoAtivo.favorito;
-    setContatos((prev) =>
-      prev.map((c) => (c.id === contatoAtivo.id ? { ...c, favorito: novoValor } : c)),
-    );
-    toast.success(novoValor ? "Conversa favoritada." : "Removida dos favoritos.");
-  };
-
   // Marcar como Cliente
   const marcarComoCliente = async () => {
     if (!contatoAtivo) return;
-    const horaAtual = new Date().toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    setContatos((prev) =>
-      prev.map((c) => {
-        if (c.id === contatoAtivo.id) {
-          return {
-            ...c,
-            statusComercial: "Cliente",
-            pipelineEtapa: "Fechamento",
-            interacoes: [
-              {
-                id: `int-${Date.now()}`,
-                tipo: "status",
-                titulo: "Lead convertido em Cliente",
-                subtitulo: "Etapa alterada para Fechamento",
-                horario: horaAtual,
-                cor: "emerald",
-              },
-              ...c.interacoes,
-            ],
-          };
-        }
-        return c;
-      }),
-    );
-
-    if (contatoAtivo.leadId) {
-      await atualizarLeadCrm(contatoAtivo.leadId, { status: "Ganho" });
+    try {
+      let leadId = contatoAtivo.leadId;
+      if (!leadId) {
+        const conversation = await acaoConversaWa(contatoAtivo.id, "create_lead");
+        leadId = typeof conversation?.lead_id === "string" ? conversation.lead_id : undefined;
+      }
+      if (!leadId || !(await atualizarLeadCrm(leadId, { status: "won" }))) {
+        throw new Error("CRM update failed");
+      }
+      await carregarDetalhes(contatoAtivo.id);
+      setContatos((prev) =>
+        prev.map((c) =>
+          c.id === contatoAtivo.id
+            ? { ...c, leadId, statusComercial: "Cliente", pipelineEtapa: "Fechamento" }
+            : c,
+        ),
+      );
+      toast.success(`🎉 ${contatoAtivo.nome} marcado como Cliente!`);
+    } catch (error) {
+      console.error("Falha ao marcar contato como cliente", error);
+      toast.error("Não foi possível atualizar o cliente no CRM.");
     }
-    registrarInteracaoWa(contatoAtivo.leadId ?? null, "marcar_cliente", {
-      nome: contatoAtivo.nome,
-    });
-    toast.success(`🎉 ${contatoAtivo.nome} marcado como Cliente!`);
+  };
+
+  const criarLeadNoCrm = async () => {
+    if (!contatoAtivo || contatoAtivo.leadId) return;
+    try {
+      const conversation = await acaoConversaWa(contatoAtivo.id, "create_lead");
+      const leadId = typeof conversation?.lead_id === "string" ? conversation.lead_id : undefined;
+      setContatos((previous) =>
+        previous.map((contact) =>
+          contact.id === contatoAtivo.id ? { ...contact, leadId } : contact,
+        ),
+      );
+      await carregarDetalhes(contatoAtivo.id);
+      toast.success("Lead criado e vinculado ao CRM.");
+    } catch {
+      toast.error("Não foi possível criar ou vincular o lead.");
+    }
+  };
+
+  const abrirVinculacaoLead = async () => {
+    setModalVincularLead(true);
+    setCarregandoLeads(true);
+    try {
+      setLeadsVinculaveis(await listarLeadsVinculaveisWa());
+    } catch {
+      toast.error("Não foi possível carregar os leads do CRM.");
+    } finally {
+      setCarregandoLeads(false);
+    }
+  };
+
+  const vincularLeadExistente = async (leadId: string) => {
+    if (!contatoAtivo) return;
+    try {
+      await acaoConversaWa(contatoAtivo.id, "link_lead", { lead_id: leadId });
+      setModalVincularLead(false);
+      setBuscaLead("");
+      await carregarDadosIniciais();
+      await carregarDetalhes(contatoAtivo.id);
+      toast.success("Lead existente vinculado à conversa.");
+    } catch {
+      toast.error("Não foi possível vincular este lead.");
+    }
+  };
+
+  const leadsVinculaveisFiltrados = useMemo(() => {
+    const term = buscaLead.trim().toLocaleLowerCase("pt-BR");
+    if (!term) return leadsVinculaveis;
+    return leadsVinculaveis.filter((lead) =>
+      [lead.business_name, lead.owner_name, lead.phone, lead.whatsapp, lead.email].some((value) =>
+        value?.toLocaleLowerCase("pt-BR").includes(term),
+      ),
+    );
+  }, [buscaLead, leadsVinculaveis]);
+
+  const assumirAtendimento = async () => {
+    if (!contatoAtivo) return;
+    try {
+      const conversation = await acaoConversaWa(contatoAtivo.id, "claim");
+      const assignedTo =
+        typeof conversation?.assigned_to === "string" ? conversation.assigned_to : undefined;
+      setContatos((previous) =>
+        previous.map((contact) =>
+          contact.id === contatoAtivo.id
+            ? { ...contact, assignedTo, statusAtendimento: "em_atendimento" }
+            : contact,
+        ),
+      );
+      toast.success("Atendimento assumido.");
+    } catch {
+      toast.error("Esta conversa já foi assumida ou você não possui permissão.");
+    }
+  };
+
+  const transferirAtendimento = async (userId: string) => {
+    if (!contatoAtivo || !userId) return;
+    try {
+      await acaoConversaWa(contatoAtivo.id, "transfer", { user_id: userId });
+      setContatos((previous) =>
+        previous.map((contact) =>
+          contact.id === contatoAtivo.id
+            ? { ...contact, assignedTo: userId, statusAtendimento: "em_atendimento" }
+            : contact,
+        ),
+      );
+      toast.success("Atendimento transferido.");
+    } catch {
+      toast.error("Não foi possível transferir o atendimento.");
+    }
   };
 
   // Arquivar Conversa
-  const arquivarConversa = () => {
+  const arquivarConversa = async () => {
     if (!contatoAtivo) return;
-    setContatos((prev) =>
-      prev.map((c) => (c.id === contatoAtivo.id ? { ...c, statusAtendimento: "arquivada" } : c)),
-    );
-    toast.success(`Conversa de ${contatoAtivo.nome} arquivada.`);
+    try {
+      await acaoConversaWa(contatoAtivo.id, "set_status", { status: "archived" });
+      setContatos((prev) =>
+        prev.map((c) => (c.id === contatoAtivo.id ? { ...c, statusAtendimento: "arquivada" } : c)),
+      );
+      toast.success(`Conversa de ${contatoAtivo.nome} arquivada.`);
+    } catch {
+      toast.error("Não foi possível arquivar a conversa.");
+    }
   };
 
   // Abrir modal de edição de contato
@@ -924,125 +676,117 @@ export function WaConversas() {
   // Salvar Edição do Contato
   const salvarEdicaoContato = async () => {
     if (!contatoAtivo) return;
-    setContatos((prev) =>
-      prev.map((c) => {
-        if (c.id === contatoAtivo.id) {
-          return {
-            ...c,
-            nome: editNome.trim() || c.nome,
-            email: editEmail.trim() || c.email,
-            empresa: editEmpresa.trim() || c.empresa,
-            cargo: editCargo.trim() || c.cargo,
-            numero: editTelefone.trim() || c.numero,
-          };
-        }
-        return c;
-      }),
-    );
-
-    if (contatoAtivo.leadId) {
-      await atualizarLeadCrm(contatoAtivo.leadId, {
+    if (!contatoAtivo.leadId) {
+      toast.info("Crie o lead no CRM antes de editar seus dados.");
+      return;
+    }
+    try {
+      const updated = await atualizarLeadCrm(contatoAtivo.leadId, {
         owner_name: editNome,
         email: editEmail,
         business_name: editEmpresa,
         cargo: editCargo,
         phone: editTelefone,
       });
+      if (!updated) throw new Error("CRM update failed");
+      await carregarDetalhes(contatoAtivo.id);
+      setModalEditarContato(false);
+      toast.success("Dados do contato atualizados com sucesso.");
+    } catch {
+      toast.error("Não foi possível atualizar os dados no CRM.");
     }
-
-    setModalEditarContato(false);
-    toast.success("Dados do contato atualizados com sucesso.");
   };
 
   // Adicionar Nota
   const salvarNovaNota = async () => {
     if (!contatoAtivo || !novaNotaTexto.trim()) return;
-    const horaAtual = new Date().toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    const novaNota: NotaLead = {
-      id: `nota-${Date.now()}`,
-      texto: novaNotaTexto.trim(),
-      autor: "Marcos Gonçalves",
-      horario: horaAtual,
-    };
-
-    setContatos((prev) =>
-      prev.map((c) => {
-        if (c.id === contatoAtivo.id) {
-          return {
-            ...c,
-            notas: [novaNota, ...c.notas],
-            interacoes: [
-              {
-                id: `int-${Date.now()}`,
-                tipo: "nota",
-                titulo: "Nota adicionada",
-                subtitulo: novaNota.texto.substring(0, 45) + "...",
-                horario: horaAtual,
-                cor: "amber",
-              },
-              ...c.interacoes,
-            ],
-          };
-        }
-        return c;
-      }),
-    );
-
-    if (contatoAtivo.leadId) {
-      await atualizarLeadCrm(contatoAtivo.leadId, { notes: novaNotaTexto });
+    try {
+      await acaoConversaWa(contatoAtivo.id, "add_note", { body: novaNotaTexto.trim() });
+      setNovaNotaTexto("");
+      setModalAdicionarNota(false);
+      await carregarDetalhes(contatoAtivo.id);
+      toast.success("Nota salva com sucesso.");
+    } catch {
+      toast.error("Não foi possível salvar a nota.");
     }
-
-    setNovaNotaTexto("");
-    setModalAdicionarNota(false);
-    toast.success("Nota salva com sucesso.");
   };
 
   // Adicionar Tag
-  const adicionarTag = () => {
+  const adicionarTag = async () => {
     if (!contatoAtivo || !novaTagTexto.trim()) return;
     const tagFormatada = novaTagTexto.trim();
     if (contatoAtivo.tags.includes(tagFormatada)) {
       toast.info("Esta etiqueta já existe no contato.");
       return;
     }
-    setContatos((prev) =>
-      prev.map((c) => (c.id === contatoAtivo.id ? { ...c, tags: [...c.tags, tagFormatada] } : c)),
-    );
-    setNovaTagTexto("");
-    setMostrarInputTag(false);
-    toast.success(`Etiqueta "${tagFormatada}" aplicada.`);
+    try {
+      await acaoConversaWa(contatoAtivo.id, "add_tag", { name: tagFormatada, color: "#64748b" });
+      setNovaTagTexto("");
+      setMostrarInputTag(false);
+      await carregarDetalhes(contatoAtivo.id);
+      toast.success(`Etiqueta "${tagFormatada}" aplicada.`);
+    } catch {
+      toast.error("Não foi possível aplicar a etiqueta.");
+    }
   };
 
   // Remover Tag
-  const removerTag = (tagParaRemover: string) => {
+  const removerTag = async (tagParaRemover: string) => {
     if (!contatoAtivo) return;
-    setContatos((prev) =>
-      prev.map((c) =>
-        c.id === contatoAtivo.id ? { ...c, tags: c.tags.filter((t) => t !== tagParaRemover) } : c,
-      ),
-    );
-    toast.success(`Etiqueta "${tagParaRemover}" removida.`);
+    const tagId = tagIds[tagParaRemover];
+    if (!tagId) return;
+    try {
+      await acaoConversaWa(contatoAtivo.id, "remove_tag", { tag_id: tagId });
+      await carregarDetalhes(contatoAtivo.id);
+      toast.success(`Etiqueta "${tagParaRemover}" removida.`);
+    } catch {
+      toast.error("Não foi possível remover a etiqueta.");
+    }
   };
 
   // Alterar Status Comercial (Lead, Em qualificação, etc.)
   const alterarStatusComercial = async (novoStatus: StatusComercial) => {
     if (!contatoAtivo) return;
+    if (!contatoAtivo.leadId) {
+      toast.info("Crie o lead no CRM antes de alterar o status comercial.");
+      return;
+    }
+    const statusMap: Record<StatusComercial, string> = {
+      Lead: "new",
+      "Em qualificação": "contacted",
+      Proposta: "proposta_enviada",
+      Negociação: "responded",
+      Cliente: "won",
+      Perdido: "lost",
+    };
+    if (!(await atualizarLeadCrm(contatoAtivo.leadId, { status: statusMap[novoStatus] }))) {
+      toast.error("Não foi possível atualizar o status no CRM.");
+      return;
+    }
     setContatos((prev) =>
       prev.map((c) => (c.id === contatoAtivo.id ? { ...c, statusComercial: novoStatus } : c)),
     );
-    if (contatoAtivo.leadId) {
-      await atualizarLeadCrm(contatoAtivo.leadId, { status: novoStatus });
-    }
     toast.success(`Status comercial alterado para "${novoStatus}".`);
   };
 
   // Alterar Pipeline Etapa
   const alterarPipelineEtapa = async (novaEtapa: PipelineEtapa) => {
     if (!contatoAtivo) return;
+    if (!contatoAtivo.leadId) {
+      toast.info("Crie o lead no CRM antes de alterar o pipeline.");
+      return;
+    }
+    const statusMap: Record<PipelineEtapa, string> = {
+      Prospecção: "new",
+      Qualificação: "contacted",
+      Proposta: "proposta_enviada",
+      Negociação: "responded",
+      Fechamento: "won",
+    };
+    if (!(await atualizarLeadCrm(contatoAtivo.leadId, { status: statusMap[novaEtapa] }))) {
+      toast.error("Não foi possível atualizar o pipeline.");
+      return;
+    }
     setContatos((prev) =>
       prev.map((c) => (c.id === contatoAtivo.id ? { ...c, pipelineEtapa: novaEtapa } : c)),
     );
@@ -1056,45 +800,15 @@ export function WaConversas() {
     textareaRef.current?.focus();
   };
 
-  // Enviar anexo simulado seguro
-  const enviarAnexoSimulado = (nome: string, tamanho: string) => {
-    if (!contatoAtivo) return;
-    const horaAtual = new Date().toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    setContatos((prev) =>
-      prev.map((c) => {
-        if (c.id === contatoAtivo.id) {
-          return {
-            ...c,
-            ultimaMensagem: `Enviou ${nome}`,
-            horario: horaAtual,
-            mensagens: [
-              ...c.mensagens,
-              {
-                id: `msg-doc-${Date.now()}`,
-                direcao: "out",
-                texto: `Arquivo anexado: ${nome}`,
-                horario: horaAtual,
-                statusEnvio: "lido",
-                anexo: {
-                  tipo: "pdf",
-                  nome,
-                  tamanho,
-                  url: "#",
-                },
-              },
-            ],
-          };
-        }
-        return c;
-      }),
-    );
+  const informarAnexoIndisponivel = () => {
     setModalAnexo(false);
-    toast.success(`Documento "${nome}" anexado à conversa.`);
+    toast.info("Envio de mídia ainda não está disponível nesta etapa.");
   };
+
+  const etiquetasDisponiveis = useMemo(
+    () => Array.from(new Set(contatos.flatMap((contact) => contact.tags))).sort(),
+    [contatos],
+  );
 
   // Filtragem da Lista de Conversas
   const contatosFiltrados = useMemo(() => {
@@ -1102,6 +816,10 @@ export function WaConversas() {
       // Filtro de Tabs
       if (tabFiltro === "nao_lidas" && c.naoLidas === 0) return false;
       if (tabFiltro === "em_atendimento" && c.statusAtendimento !== "em_atendimento") return false;
+      if (tabFiltro === "minhas" && c.assignedTo !== usuarioAtualId) return false;
+      if (tabFiltro === "nao_atribuidas" && c.assignedTo) return false;
+      if (tabFiltro === "aguardando" && c.statusAtendimento !== "aguardando") return false;
+      if (tabFiltro === "concluidas" && c.statusAtendimento !== "concluida") return false;
 
       // Filtro de Tag
       if (filtroTag && !c.tags.includes(filtroTag)) return false;
@@ -1118,7 +836,7 @@ export function WaConversas() {
 
       return true;
     });
-  }, [contatos, tabFiltro, filtroTag, busca]);
+  }, [contatos, tabFiltro, filtroTag, busca, usuarioAtualId]);
 
   return (
     <div className="w-full space-y-4 animate-in fade-in duration-200">
@@ -1267,7 +985,7 @@ export function WaConversas() {
                     >
                       Todas as etiquetas
                     </button>
-                    {["Restaurante", "São Paulo", "Quente", "Advocacia", "Saúde"].map((tag) => (
+                    {etiquetasDisponiveis.map((tag) => (
                       <button
                         key={tag}
                         onClick={() => {
@@ -1328,6 +1046,40 @@ export function WaConversas() {
                 Em atendimento (
                 {contatos.filter((c) => c.statusAtendimento === "em_atendimento").length})
               </button>
+              {(
+                [
+                  [
+                    "minhas",
+                    `Minhas (${contatos.filter((c) => c.assignedTo === usuarioAtualId).length})`,
+                  ],
+                  [
+                    "nao_atribuidas",
+                    `Não atribuídas (${contatos.filter((c) => !c.assignedTo).length})`,
+                  ],
+                  [
+                    "aguardando",
+                    `Aguardando (${contatos.filter((c) => c.statusAtendimento === "aguardando").length})`,
+                  ],
+                  [
+                    "concluidas",
+                    `Concluídas (${contatos.filter((c) => c.statusAtendimento === "concluida").length})`,
+                  ],
+                ] as Array<[FiltroConversa, string]>
+              ).map(([filter, label]) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setTabFiltro(filter)}
+                  className={cn(
+                    "rounded-xl px-3 py-1.5 text-xs font-semibold transition-all whitespace-nowrap",
+                    tabFiltro === filter
+                      ? "border border-home-orange text-home-orange bg-home-orange/10 shadow-[0_0_12px_rgba(255,98,0,0.2)]"
+                      : "border border-transparent bg-[#111723] text-home-muted hover:text-white",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -1357,10 +1109,6 @@ export function WaConversas() {
                       <img
                         src={c.avatar}
                         alt={c.nome}
-                        onError={(e) => {
-                          // Fallback gracioso
-                          (e.target as HTMLImageElement).src = "/images/avatars/carla_mendes.jpg";
-                        }}
                         className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10"
                       />
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#22c55e] text-white ring-2 ring-[#0c101a]">
@@ -1491,16 +1239,11 @@ export function WaConversas() {
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={alternarFavorito}
-                    title={contatoAtivo.favorito ? "Remover dos favoritos" : "Favoritar"}
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-[#141a26] transition-all hover:border-white/20",
-                      contatoAtivo.favorito
-                        ? "text-amber-400 border-amber-500/30"
-                        : "text-home-muted hover:text-white",
-                    )}
+                    disabled
+                    title="Favoritos ainda não estão disponíveis"
+                    className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-xl border border-white/10 bg-[#141a26] text-home-muted opacity-50"
                   >
-                    <Star className={cn("h-4 w-4", contatoAtivo.favorito && "fill-amber-400")} />
+                    <Star className="h-4 w-4" />
                   </button>
 
                   <button
@@ -1631,10 +1374,20 @@ export function WaConversas() {
                         {/* Horário e confirmação de entrega */}
                         <div className="mt-1.5 flex items-center justify-end gap-1 text-[10px] text-home-muted/80">
                           <span>{m.horario}</span>
-                          {ehSaida && (
-                            <span className="text-emerald-400">
-                              <CheckCheck className="h-3 w-3 inline" />
-                            </span>
+                          {ehSaida && m.statusEnvio === "falha" && (
+                            <span className="text-rose-400">Falha</span>
+                          )}
+                          {ehSaida && m.statusEnvio === "incerto" && (
+                            <span className="text-amber-400">Não confirmado</span>
+                          )}
+                          {ehSaida && m.statusEnvio === "pendente" && (
+                            <Clock className="h-3 w-3 text-home-muted" />
+                          )}
+                          {ehSaida && m.statusEnvio === "enviado" && (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          )}
+                          {ehSaida && ["entregue", "lido"].includes(m.statusEnvio ?? "") && (
+                            <CheckCheck className="h-3 w-3 text-emerald-400" />
                           )}
                         </div>
                       </div>
@@ -1695,32 +1448,11 @@ export function WaConversas() {
                     <div className="max-h-36 overflow-y-auto space-y-1.5 scrollbar-thin">
                       {scriptsDisponiveis.length === 0 ? (
                         <div className="text-xs text-home-muted py-2">
-                          Nenhum script customizado salvo. Usando scripts padrão do SDR:
+                          Nenhum script autorizado salvo.
                         </div>
                       ) : null}
 
-                      {/* Scripts Padrão + Customizados */}
-                      {[
-                        {
-                          id: "s-1",
-                          nome: "Apresentação e Cases de Restaurante",
-                          mensagem:
-                            "Olá, {nome}! Tudo bem? Segue nossa apresentação oficial com cases de sucesso para restaurantes em São Paulo.",
-                        },
-                        {
-                          id: "s-2",
-                          nome: "Agendamento de Demonstração",
-                          mensagem:
-                            "Olá, {nome}! Conseguimos agendar uma breve demonstração de 15 minutos amanhã às 14h?",
-                        },
-                        {
-                          id: "s-3",
-                          nome: "Envio de Proposta Comercial",
-                          mensagem:
-                            "Prezada {nome}, elaborei a proposta personalizada com as melhores condições para o {empresa}. Quando puder conversar?",
-                        },
-                        ...scriptsDisponiveis,
-                      ]
+                      {scriptsDisponiveis
                         .filter(
                           (s) =>
                             !buscaScript ||
@@ -1878,8 +1610,8 @@ export function WaConversas() {
                     </div>
                     <div className="truncate text-xs text-home-muted">{contatoAtivo.numero}</div>
                     <div className="flex items-center gap-1 text-[11px] font-medium text-emerald-400">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      <span>Online</span>
+                      <SiWhatsapp className="h-3 w-3" />
+                      <span>Contato WhatsApp</span>
                     </div>
                   </div>
                 </div>
@@ -1913,6 +1645,52 @@ export function WaConversas() {
                   Arquivar
                 </button>
               </div>
+
+              {!contatoAtivo.leadId && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={criarLeadNoCrm}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-home-orange/40 bg-home-orange/10 px-3 py-2 text-xs font-semibold text-home-orange transition-all hover:bg-home-orange/15"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" /> Criar lead no CRM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void abrirVinculacaoLead()}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#141a26] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-white/10"
+                  >
+                    <UserCheck className="h-3.5 w-3.5" /> Vincular lead
+                  </button>
+                </div>
+              )}
+
+              {contatoAtivo.leadId && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      window.location.assign(dashboardUrlForSection(window.location.href, "leads"))
+                    }
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#141a26] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-white/10"
+                  >
+                    <User className="h-3.5 w-3.5" /> Abrir lead
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!contatoAtivo.proposal}
+                    onClick={() =>
+                      window.location.assign(
+                        dashboardUrlForSection(window.location.href, "propostas"),
+                      )
+                    }
+                    title={contatoAtivo.proposal?.assunto ?? "Nenhuma proposta vinculada"}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#141a26] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <FileText className="h-3.5 w-3.5" /> Abrir proposta
+                  </button>
+                </div>
+              )}
 
               {/* Seção 1: Informações do contato */}
               <div className="space-y-2.5 rounded-xl border border-[#1b2334] bg-[#0e131f] p-3.5">
@@ -2032,15 +1810,45 @@ export function WaConversas() {
                   <div className="flex items-center justify-between">
                     <span className="text-home-muted">Responsável</span>
                     <div className="flex items-center gap-2">
-                      <img
-                        src={contatoAtivo.responsavel.avatar}
-                        alt={contatoAtivo.responsavel.nome}
-                        className="h-5 w-5 rounded-full object-cover ring-1 ring-white/20"
-                      />
-                      <span className="font-semibold text-white">
-                        {contatoAtivo.responsavel.nome}
-                      </span>
+                      {contatoAtivo.assignedTo && ["admin", "gerente"].includes(papelAtual) ? (
+                        <select
+                          value={contatoAtivo.assignedTo}
+                          onChange={(event) => void transferirAtendimento(event.target.value)}
+                          className="max-w-36 rounded-md border border-white/10 bg-[#111723] px-2 py-1 text-[11px] font-semibold text-white"
+                        >
+                          {membros.map((member) => (
+                            <option key={member.user_id} value={member.user_id}>
+                              {member.nome || member.email}
+                            </option>
+                          ))}
+                        </select>
+                      ) : contatoAtivo.assignedTo ? (
+                        <span className="font-semibold text-white">
+                          {membros.find((member) => member.user_id === contatoAtivo.assignedTo)
+                            ?.nome ||
+                            membros.find((member) => member.user_id === contatoAtivo.assignedTo)
+                              ?.email ||
+                            "Equipe"}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={assumirAtendimento}
+                          className="rounded-md border border-home-orange/40 px-2 py-1 text-[11px] font-semibold text-home-orange"
+                        >
+                          Assumir
+                        </button>
+                      )}
                     </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-home-muted">Oportunidade</span>
+                    <span className="max-w-40 truncate font-semibold text-white">
+                      {contatoAtivo.proposal
+                        ? `${contatoAtivo.proposal.assunto} · ${contatoAtivo.proposal.status}`
+                        : "Nenhuma proposta"}
+                    </span>
                   </div>
 
                   {/* Tags */}
@@ -2364,7 +2172,63 @@ export function WaConversas() {
         </div>
       )}
 
-      {/* Modal 4: Envio de Anexos */}
+      {/* Modal 4: Vincular lead existente */}
+      {modalVincularLead && contatoAtivo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md space-y-4 rounded-2xl border border-[#1b2334] bg-[#0c101a] p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#1b2334] pb-3">
+              <h3 className="text-base font-extrabold text-white">Vincular lead do CRM</h3>
+              <button
+                type="button"
+                onClick={() => setModalVincularLead(false)}
+                className="text-home-muted hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <Input
+              value={buscaLead}
+              onChange={(event) => setBuscaLead(event.target.value)}
+              placeholder="Buscar por nome, empresa, telefone ou e-mail..."
+              className="border-[#1b2334] bg-[#111723] text-white"
+            />
+            <div className="max-h-72 space-y-2 overflow-y-auto">
+              {carregandoLeads ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-xs text-home-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Carregando leads...
+                </div>
+              ) : leadsVinculaveisFiltrados.length === 0 ? (
+                <div className="py-8 text-center text-xs text-home-muted">
+                  Nenhum lead encontrado.
+                </div>
+              ) : (
+                leadsVinculaveisFiltrados.map((lead) => (
+                  <button
+                    key={lead.id}
+                    type="button"
+                    onClick={() => void vincularLeadExistente(lead.id)}
+                    className="flex w-full items-center justify-between rounded-xl border border-white/5 bg-[#111723] p-3 text-left transition-colors hover:border-home-orange/40"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-bold text-white">
+                        {lead.owner_name || lead.business_name}
+                      </span>
+                      <span className="block truncate text-[11px] text-home-muted">
+                        {[lead.business_name, lead.whatsapp || lead.phone, lead.email]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    <UserPlus className="h-4 w-4 shrink-0 text-home-orange" />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Envio de Anexos */}
       {modalAnexo && contatoAtivo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="w-full max-w-md rounded-2xl border border-[#1b2334] bg-[#0c101a] p-6 shadow-2xl space-y-4">
@@ -2383,41 +2247,18 @@ export function WaConversas() {
                 Selecione um arquivo para enviar diretamente a {contatoAtivo.nome}:
               </div>
 
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  onClick={() =>
-                    enviarAnexoSimulado("Apresentação Flow Business.pdf", "2.4 MB • PDF")
-                  }
-                  className="flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-[#111723] hover:border-emerald-500/40 hover:bg-[#162030] transition-all text-left"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-600 text-white font-bold text-xs">
-                    PDF
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-white">
-                      Apresentação Flow Business.pdf
-                    </div>
-                    <div className="text-[11px] text-home-muted">2.4 MB • Catálogo de Serviços</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() =>
-                    enviarAnexoSimulado("Proposta Comercial Flow Leads.pdf", "1.8 MB • PDF")
-                  }
-                  className="flex items-center gap-3 p-3 rounded-xl border border-white/5 bg-[#111723] hover:border-emerald-500/40 hover:bg-[#162030] transition-all text-left"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-600 text-white font-bold text-xs">
-                    PDF
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-white">
-                      Proposta Comercial Flow Leads.pdf
-                    </div>
-                    <div className="text-[11px] text-home-muted">1.8 MB • Tabela de Preços</div>
-                  </div>
-                </button>
-              </div>
+              <button
+                onClick={informarAnexoIndisponivel}
+                className="flex w-full items-center gap-3 p-3 rounded-xl border border-white/5 bg-[#111723] text-left"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-700 text-white">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-white">Envio de mídia indisponível</div>
+                  <div className="text-[11px] text-home-muted">Disponível em uma etapa futura.</div>
+                </div>
+              </button>
             </div>
 
             <div className="flex justify-end pt-2">

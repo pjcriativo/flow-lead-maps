@@ -18,7 +18,9 @@ const automacaoService = readFileSync("src/services/automacao.ts", "utf8");
 // 1. Organização ativa
 test("1. Organização ativa: consultas respeitam RLS e escopo da organização autenticada", () => {
   assert.match(waAutomacao, /obterDadosAutomacoesWa/);
-  assert.match(waService, /supabase\.from\("wa_mensagens"\)/);
+  // SUT_IS_CORRECT_BECAUSE: conversas agora são lidas pela API autenticada e pela entidade
+  // canônica, não por mensagens brutas agrupadas no cliente.
+  assert.match(waService, /invoke\("wa-conversations"/);
   assert.match(waService, /supabase\.from\("leads"\)/);
 });
 
@@ -61,7 +63,10 @@ test("5. Filtro de status: seletor com opções [Todos os status, Ativa, Pausada
 // 6. Listagem
 test("6. Listagem: tabela estruturada com colunas idênticas à referência visual aprovada", () => {
   assert.match(waAutomacao, /Minhas automações/);
-  assert.match(waAutomacao, /Crie e gerencie regras de automação para atender seus leads 24 horas por dia/);
+  assert.match(
+    waAutomacao,
+    /Crie e gerencie regras de automação para atender seus leads 24 horas por dia/,
+  );
   assert.match(waAutomacao, /Nome da automação/);
   assert.match(waAutomacao, /Tipo/);
   assert.match(waAutomacao, /Gatilho/);
@@ -213,7 +218,10 @@ test("23. Isolamento multi-tenant: dados pertencem estritamente à organização
 // 24. Ausência de envios indevidos e anti-loop
 test("24. Ausência de envios indevidos: proteção explícita anti-loop contra disparos repetitivos", () => {
   assert.match(waAutomacao, /Proteção Anti-Loop Ativada/);
-  assert.match(waAutomacao, /Máximo de 1 resposta automática por contato no intervalo de 30 minutos/);
+  assert.match(
+    waAutomacao,
+    /Máximo de 1 resposta automática por contato no intervalo de 30 minutos/,
+  );
 });
 
 // 25. Preservação das automações legadas
@@ -223,5 +231,8 @@ test("25. Preservação das automações legadas: receitas e rodadas do robô de
   assert.match(automacaoService, /automacao_receitas/);
   assert.match(automacaoService, /automacao_rodadas/);
   assert.match(waSection, /WaAutomacao/);
-  assert.match(waSection, /Automações — responda, qualifique e gerencie seus leads automaticamente/);
+  assert.match(
+    waSection,
+    /Automações — responda, qualifique e gerencie seus leads automaticamente/,
+  );
 });
