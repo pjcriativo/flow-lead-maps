@@ -50,6 +50,9 @@ import {
   alternarStatusAutomacaoWa,
   excluirAutomacaoWa,
   duplicarAutomacaoWa,
+  simularAutomacaoWa,
+  type WaAutomacaoControles,
+  type WaAutomacaoSimulacao,
 } from "@/services/whatsapp";
 
 interface WaAutomacaoProps {
@@ -89,7 +92,6 @@ export function WaAutomacao({
   });
   const [distribuicao, setDistribuicao] = useState<WaAutomacoesDistribuicaoItem[]>([]);
   const [atividades, setAtividades] = useState<WaAutomacaoAtividadeItem[]>([]);
-  const [conectado, setConectado] = useState(false);
 
   // Filtros da tabela
   const [busca, setBusca] = useState("");
@@ -104,8 +106,7 @@ export function WaAutomacao({
   const [etapaCriacao, setEtapaCriacao] = useState<1 | 2 | 3 | 4>(1);
   const [novoTipo, setNovoTipo] = useState<WaAutomacaoTipo>("boas_vindas");
   const [novoNome, setNovoNome] = useState("Boas-vindas para novos leads");
-  const [novoGatilho, setNovoGatilho] = useState<WaAutomacaoGatilho>("nova_conversa");
-  const [novasPalavras, setNovasPalavras] = useState("olá, boa tarde, suporte, orçamento");
+  const [novoGatilho, setNovoGatilho] = useState<WaAutomacaoGatilho>("conversation_created");
   const [novoTempoHoras, setNovoTempoHoras] = useState(24);
   const [novaEtapaCrm, setNovaEtapaCrm] = useState("contato_inicial");
   const [novoScriptId, setNovoScriptId] = useState("");
@@ -113,6 +114,14 @@ export function WaAutomacao({
     "Olá! Seja muito bem-vindo ao Flow Business. Como posso te ajudar hoje?",
   );
   const [salvandoNova, setSalvandoNova] = useState(false);
+  const [editando, setEditando] = useState<{
+    id: string;
+    versao: number;
+    status: WaAutomacaoStatus;
+  } | null>(null);
+  const [scriptsDisponiveis, setScriptsDisponiveis] = useState<
+    Array<{ id: string; nome: string; tipo: string; mensagem: string | null }>
+  >([]);
 
   // Filtro de período no desempenho
   const [periodoDesempenho, setPeriodoDesempenho] = useState<"30" | "7" | "1">("30");
@@ -122,6 +131,14 @@ export function WaAutomacao({
   const [itemParaExcluir, setItemParaExcluir] = useState<WaAutomacaoItem | null>(null);
   const [modalVerTodasAtividades, setModalVerTodasAtividades] = useState(false);
   const [modalVerDetalhesDist, setModalVerDetalhesDist] = useState(false);
+  const [simulacao, setSimulacao] = useState<WaAutomacaoSimulacao | null>(null);
+  const [simulandoId, setSimulandoId] = useState<string | null>(null);
+  const [controles, setControles] = useState<WaAutomacaoControles>({
+    organizacaoAtiva: false,
+    plataformaAtiva: false,
+    dispatchAtivo: false,
+    timezone: "America/Sao_Paulo",
+  });
 
   // Carregar dados
   const carregarDados = useCallback(async () => {
@@ -133,7 +150,8 @@ export function WaAutomacao({
       setDesempenho(res.desempenho);
       setDistribuicao(res.distribuicao);
       setAtividades(res.atividades);
-      setConectado(res.conectado);
+      setControles(res.controles);
+      setScriptsDisponiveis(res.scripts);
     } catch (err) {
       console.error("Erro ao carregar automações:", err);
       toast.error("Não foi possível sincronizar todas as automações com o servidor");
@@ -161,6 +179,10 @@ export function WaAutomacao({
       return true;
     });
   }, [automacoes, busca, filtroTipo, filtroStatus]);
+  const totalExecucoes = useMemo(
+    () => distribuicao.reduce((total, item) => total + item.execucoes, 0),
+    [distribuicao],
+  );
 
   // Alternar seleção única/todas
   const toggleSelecionarTudo = () => {
@@ -186,6 +208,7 @@ export function WaAutomacao({
               ...a,
               ativa: novoAtivo,
               status: novoAtivo ? "ativa" : "pausada",
+              versao: a.versao + 1,
             }
           : a,
       ),
@@ -209,16 +232,16 @@ export function WaAutomacao({
     }
   };
 
-  // Excluir automação
+  // Arquivar automação preservando o histórico
   const handleConfirmarExclusao = async () => {
     if (!itemParaExcluir) return;
     try {
       await excluirAutomacaoWa(itemParaExcluir.id);
       setAutomacoes((prev) => prev.filter((a) => a.id !== itemParaExcluir.id));
-      toast.success(`Automação "${itemParaExcluir.nome}" excluída.`);
+      toast.success(`Automação "${itemParaExcluir.nome}" arquivada.`);
       setItemParaExcluir(null);
     } catch {
-      toast.error("Falha ao excluir automação");
+      toast.error("Falha ao arquivar automação");
     }
   };
 
@@ -237,27 +260,63 @@ export function WaAutomacao({
     }
   };
 
+  const handleSimular = async (item: WaAutomacaoItem) => {
+    try {
+      setSimulandoId(item.id);
+      const resultado = await simularAutomacaoWa(item.id, {
+        conversation: { origin: "whatsapp", status: "unassigned", tag_ids: [] },
+        contact: { eligible: true, consent: true },
+        event: {
+          elapsed_minutes: item.condicoes?.tempoHoras ? item.condicoes.tempoHoras * 60 : 0,
+          local_hour: new Date().getHours(),
+        },
+        lead: { id: null, stage: item.condicoes?.etapaCrm ?? null },
+        variables: {},
+      });
+      setSimulacao(resultado);
+    } catch {
+      toast.error("Não foi possível simular esta automação");
+    } finally {
+      setSimulandoId(null);
+      setMenuAbertoId(null);
+    }
+  };
+
+  const handleEditar = (item: WaAutomacaoItem) => {
+    setEditando({ id: item.id, versao: item.versao, status: item.status });
+    setNovoNome(item.nome);
+    setNovoTipo(item.tipo);
+    setNovoGatilho(item.gatilhoTipo);
+    setNovoTempoHoras(item.condicoes?.tempoHoras ?? 24);
+    setNovaEtapaCrm(item.condicoes?.etapaCrm ?? "contato_inicial");
+    setNovoScriptId(item.acoes?.scriptId ?? "");
+    setNovoTexto(item.acoes?.textoMensagem ?? "");
+    setEtapaCriacao(2);
+    setModalDetalhes(null);
+    document.getElementById("painel-criar-automacao")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   // Avançar no Wizard
   const handleContinuarWizard = () => {
     if (etapaCriacao === 1) {
       if (novoTipo === "boas_vindas") {
         setNovoNome("Boas-vindas novos contatos");
-        setNovoGatilho("nova_conversa");
+        setNovoGatilho("conversation_created");
       } else if (novoTipo === "qualificacao") {
         setNovoNome("Qualificação automática de interesse");
-        setNovoGatilho("palavras_chave");
+        setNovoGatilho("message_received");
       } else if (novoTipo === "agendamento") {
         setNovoNome("Link de agendamento automático");
-        setNovoGatilho("comando");
+        setNovoGatilho("message_received");
       } else if (novoTipo === "follow_up") {
         setNovoNome("Follow-up de propostas abertas");
-        setNovoGatilho("tempo_sem_resposta");
+        setNovoGatilho("follow_up_due");
       } else if (novoTipo === "recuperacao") {
         setNovoNome("Reativação de contatos inativos");
-        setNovoGatilho("tempo_sem_interacao");
+        setNovoGatilho("follow_up_due");
       } else if (novoTipo === "atendimento") {
         setNovoNome("Transferência para equipe comercial");
-        setNovoGatilho("palavras_chave");
+        setNovoGatilho("message_received");
       }
       setEtapaCriacao(2);
     } else if (etapaCriacao === 2) {
@@ -272,19 +331,19 @@ export function WaAutomacao({
     try {
       setSalvandoNova(true);
       const gatilhoDescricao =
-        novoGatilho === "nova_conversa"
+        novoGatilho === "conversation_created"
           ? "Nova conversa"
-          : novoGatilho === "palavras_chave"
-            ? "Palavras-chave"
-            : novoGatilho === "comando"
-              ? "Comando / palavra"
-              : novoGatilho === "tempo_sem_resposta"
-                ? "Tempo sem resposta"
-                : novoGatilho === "tempo_sem_interacao"
-                  ? "Tempo sem interação"
-                  : "Etapa CRM";
+          : novoGatilho === "message_received"
+            ? "Nova mensagem recebida"
+            : novoGatilho === "follow_up_due"
+              ? "Tempo sem resposta"
+              : novoGatilho === "crm_stage_changed"
+                ? "Etapa comercial alterada"
+                : "Evento da conversa";
 
       const nova = await salvarAutomacaoWa({
+        id: editando?.id,
+        versao: editando?.versao ?? 1,
         nome: novoNome,
         descricao:
           novoTipo === "boas_vindas"
@@ -301,11 +360,10 @@ export function WaAutomacao({
         tipo: novoTipo,
         gatilho: gatilhoDescricao,
         gatilhoTipo: novoGatilho,
-        status: "ativa",
-        ativa: true,
+        status: editando?.status ?? "rascunho",
+        ativa: false,
         execucoes: 0,
         condicoes: {
-          palavrasChave: novasPalavras.split(",").map((s) => s.trim()),
           tempoHoras: novoTempoHoras,
           etapaCrm: novaEtapaCrm,
         },
@@ -316,7 +374,9 @@ export function WaAutomacao({
         },
       });
 
-      setAutomacoes((prev) => [nova, ...prev]);
+      setAutomacoes((prev) =>
+        editando ? prev.map((item) => (item.id === nova.id ? nova : item)) : [nova, ...prev],
+      );
       toast.info("Automação salva. Execução automática ainda não disponível.", {
         description:
           "Regra cadastrada com sucesso! Ativações em segundo plano aguardam homologação do worker.",
@@ -325,6 +385,7 @@ export function WaAutomacao({
 
       // Resetar Wizard
       setEtapaCriacao(1);
+      setEditando(null);
     } catch {
       toast.error("Falha ao salvar automação");
     } finally {
@@ -334,6 +395,22 @@ export function WaAutomacao({
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300">
+      {(!controles.plataformaAtiva || !controles.organizacaoAtiva) && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-amber-100"
+        >
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+          <div>
+            <div className="text-sm font-bold">Motor de automações bloqueado operacionalmente</div>
+            <p className="mt-1 text-xs text-amber-100/70">
+              Regras podem ser configuradas e simuladas, mas nenhuma ação será executada.
+              Plataforma: {controles.plataformaAtiva ? "liberada" : "desativada"}; organização:{" "}
+              {controles.organizacaoAtiva ? "liberada" : "desativada"}; envios: bloqueados.
+            </p>
+          </div>
+        </div>
+      )}
       {/* 5 KPIS SUPERIORES (ETAPA 4 — REPRODUÇÃO FIEL AO LAYOUT APROVADO) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         {/* KPI 1: Automações ativas */}
@@ -450,6 +527,7 @@ export function WaAutomacao({
             <button
               type="button"
               onClick={() => {
+                setEditando(null);
                 setEtapaCriacao(1);
                 const el = document.getElementById("painel-criar-automacao");
                 if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -512,7 +590,7 @@ export function WaAutomacao({
                 <option value="ativa">Ativa</option>
                 <option value="pausada">Pausada</option>
                 <option value="rascunho">Rascunho</option>
-                <option value="com_erro">Com erro</option>
+                <option value="arquivada">Arquivada</option>
               </select>
               <Calendar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-home-muted" />
               <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-home-muted" />
@@ -718,6 +796,15 @@ export function WaAutomacao({
                               </button>
                               <button
                                 type="button"
+                                disabled={simulandoId === auto.id}
+                                onClick={() => handleSimular(auto)}
+                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-white/90 hover:bg-white/10 disabled:opacity-50"
+                              >
+                                <Play className="h-3.5 w-3.5 text-cyan-400" />{" "}
+                                {simulandoId === auto.id ? "Simulando..." : "Simular"}
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleDuplicar(auto)}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-white/90 hover:bg-white/10"
                               >
@@ -731,7 +818,7 @@ export function WaAutomacao({
                                 }}
                                 className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10"
                               >
-                                <Trash2 className="h-3.5 w-3.5" /> Excluir
+                                <Trash2 className="h-3.5 w-3.5" /> Arquivar
                               </button>
                             </div>
                           )}
@@ -759,7 +846,7 @@ export function WaAutomacao({
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-tight">
-                Criar nova automação
+                {editando ? "Editar automação" : "Criar nova automação"}
               </h2>
               <p className="text-xs text-home-muted mt-0.5">
                 Configure regras de automação em poucos passos
@@ -970,31 +1057,25 @@ export function WaAutomacao({
                   onChange={(e) => setNovoGatilho(e.target.value as WaAutomacaoGatilho)}
                   className="mt-1 w-full rounded-xl border border-white/10 bg-[#161c28] px-3 py-2 text-xs text-white focus:border-home-orange/60 focus:outline-none"
                 >
-                  <option value="nova_conversa">Nova conversa recebida (Inbound)</option>
-                  <option value="palavras_chave">Palavras-chave na mensagem</option>
-                  <option value="comando">Comando específico (/agenda, /orcamento)</option>
-                  <option value="tempo_sem_resposta">Tempo sem resposta do lead</option>
-                  <option value="tempo_sem_interacao">Tempo sem interação total</option>
-                  <option value="etapa_crm">Mudança de etapa no funil CRM</option>
+                  <option value="conversation_created">Nova conversa recebida (Inbound)</option>
+                  <option value="message_received">Nova mensagem recebida</option>
+                  <option value="conversation_assigned">Conversa atribuída</option>
+                  <option value="conversation_status_changed">Status da conversa alterado</option>
+                  <option value="tag_applied">Etiqueta aplicada</option>
+                  <option value="lead_linked">Lead vinculado</option>
+                  <option value="crm_stage_changed">Mudança de etapa no funil CRM</option>
+                  <option value="follow_up_due">Prazo de follow-up atingido</option>
                 </select>
               </div>
 
-              {novoGatilho === "palavras_chave" && (
-                <div>
-                  <label className="text-[11px] font-medium text-home-muted">
-                    Palavras-chave (separadas por vírgula)
-                  </label>
-                  <input
-                    type="text"
-                    value={novasPalavras}
-                    onChange={(e) => setNovasPalavras(e.target.value)}
-                    placeholder="orçamento, preço, ajuda, planos"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-[#161c28] px-3 py-2 text-xs text-white focus:border-home-orange/60 focus:outline-none"
-                  />
+              {novoGatilho === "message_received" && (
+                <div className="rounded-xl border border-white/5 bg-[#161c28] p-3 text-[11px] text-home-muted">
+                  O evento usa apenas metadados persistidos da conversa. O conteúdo da mensagem não
+                  é interpretado como código.
                 </div>
               )}
 
-              {(novoGatilho === "tempo_sem_resposta" || novoGatilho === "tempo_sem_interacao") && (
+              {novoGatilho === "follow_up_due" && (
                 <div>
                   <label className="text-[11px] font-medium text-home-muted">
                     Tempo de espera sem resposta (horas)
@@ -1035,6 +1116,29 @@ export function WaAutomacao({
 
               <div>
                 <label className="text-[11px] font-medium text-home-muted">
+                  Script existente (opcional)
+                </label>
+                <select
+                  value={novoScriptId}
+                  onChange={(event) => {
+                    const scriptId = event.target.value;
+                    setNovoScriptId(scriptId);
+                    const script = scriptsDisponiveis.find((item) => item.id === scriptId);
+                    if (script?.mensagem) setNovoTexto(script.mensagem);
+                  }}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-[#161c28] px-3 py-2 text-xs text-white focus:border-home-orange/60 focus:outline-none"
+                >
+                  <option value="">Sem script vinculado</option>
+                  {scriptsDisponiveis.map((script) => (
+                    <option key={script.id} value={script.id}>
+                      {script.nome} · {script.tipo}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium text-home-muted">
                   Mensagem automática ou resposta
                 </label>
                 <textarea
@@ -1048,7 +1152,7 @@ export function WaAutomacao({
 
               <div>
                 <label className="text-[11px] font-medium text-home-muted">
-                  Atualizar etapa no CRM (Pipeline)
+                  Sugerir próxima etapa no CRM (não altera o pipeline)
                 </label>
                 <select
                   value={novaEtapaCrm}
@@ -1458,7 +1562,9 @@ export function WaAutomacao({
 
                 {/* Total Central */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-base font-extrabold text-white">1.428</span>
+                  <span className="text-base font-extrabold text-white">
+                    {totalExecucoes.toLocaleString("pt-BR")}
+                  </span>
                   <span className="text-[10px] text-home-muted">execuções</span>
                 </div>
               </div>
@@ -1557,6 +1663,57 @@ export function WaAutomacao({
           ===================================================================== */}
 
       {/* Modal Detalhes da Automação */}
+      {simulacao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#101520] p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-base font-bold text-white">Resultado da simulação</h3>
+                <p className="text-xs text-home-muted">Nenhum dado operacional foi alterado.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSimulacao(null)}
+                aria-label="Fechar simulação"
+                className="text-home-muted hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+              <div className="rounded-xl bg-[#161c28] p-3">
+                <span className="text-home-muted">Condições atendidas</span>
+                <div className="mt-1 text-lg font-bold text-white">
+                  {
+                    simulacao.conditionResults.filter((condition) => condition.matched === true)
+                      .length
+                  }
+                </div>
+              </div>
+              <div className="rounded-xl bg-[#161c28] p-3">
+                <span className="text-home-muted">Ações planejadas</span>
+                <div className="mt-1 text-lg font-bold text-white">
+                  {simulacao.plannedActions.length}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+              <div className="text-xs font-semibold text-amber-300">Bloqueios</div>
+              <p className="mt-1 text-xs text-amber-100/70">
+                {simulacao.blockers.length
+                  ? simulacao.blockers.join(" · ")
+                  : "Nenhum bloqueio lógico; transporte automático continua indisponível."}
+              </p>
+            </div>
+            {simulacao.missingVariables.length > 0 && (
+              <div className="mt-3 text-xs text-rose-300">
+                Variáveis ausentes: {simulacao.missingVariables.join(", ")}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {modalDetalhes && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#101520] p-6 shadow-2xl">
@@ -1621,6 +1778,13 @@ export function WaAutomacao({
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
+                onClick={() => handleEditar(modalDetalhes)}
+                className="rounded-xl bg-home-orange px-4 py-2 text-xs font-semibold text-white hover:bg-home-orange/90"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
                 onClick={() => setModalDetalhes(null)}
                 className="rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/15"
               >
@@ -1640,9 +1804,9 @@ export function WaAutomacao({
                 <Trash2 className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Excluir automação?</h3>
+                <h3 className="text-base font-bold text-white">Arquivar automação?</h3>
                 <p className="text-xs text-home-muted mt-0.5">
-                  Esta ação é irreversível. Deseja remover permanentemente?
+                  A regra deixará a lista ativa, mas seu histórico será preservado.
                 </p>
               </div>
             </div>
@@ -1667,7 +1831,7 @@ export function WaAutomacao({
                 onClick={handleConfirmarExclusao}
                 className="rounded-xl bg-rose-500 px-4 py-2 text-xs font-bold text-white hover:bg-rose-600 shadow-[0_0_15px_rgba(244,63,94,0.3)]"
               >
-                Sim, excluir
+                Sim, arquivar
               </button>
             </div>
           </div>

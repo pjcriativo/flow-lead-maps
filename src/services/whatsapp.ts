@@ -1844,14 +1844,16 @@ export type WaAutomacaoTipo =
   "boas_vindas" | "qualificacao" | "agendamento" | "follow_up" | "recuperacao" | "atendimento";
 
 export type WaAutomacaoGatilho =
-  | "nova_conversa"
-  | "palavras_chave"
-  | "comando"
-  | "tempo_sem_resposta"
-  | "tempo_sem_interacao"
-  | "etapa_crm";
+  | "conversation_created"
+  | "message_received"
+  | "conversation_assigned"
+  | "conversation_status_changed"
+  | "tag_applied"
+  | "lead_linked"
+  | "crm_stage_changed"
+  | "follow_up_due";
 
-export type WaAutomacaoStatus = "ativa" | "pausada" | "rascunho" | "com_erro";
+export type WaAutomacaoStatus = "ativa" | "pausada" | "rascunho" | "arquivada";
 
 export type WaAutomacaoItem = {
   id: string;
@@ -1862,6 +1864,7 @@ export type WaAutomacaoItem = {
   gatilhoTipo: WaAutomacaoGatilho;
   status: WaAutomacaoStatus;
   ativa: boolean;
+  versao: number;
   execucoes: number;
   ultimaAtualizacao: string;
   condicoes?: {
@@ -1881,6 +1884,21 @@ export type WaAutomacaoItem = {
     notificarEquipe?: boolean;
   };
   origem: "db" | "custom" | "referencia";
+};
+
+export type WaAutomacaoControles = {
+  organizacaoAtiva: boolean;
+  plataformaAtiva: boolean;
+  dispatchAtivo: boolean;
+  timezone: string;
+};
+
+export type WaAutomacaoSimulacao = {
+  eligible: boolean;
+  conditionResults: Array<Record<string, unknown>>;
+  plannedActions: Array<Record<string, unknown>>;
+  blockers: string[];
+  missingVariables: string[];
 };
 
 export type WaAutomacoesKpis = {
@@ -1940,7 +1958,8 @@ export const AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoItem[] = [
     descricao: "Mensagem inicial automática",
     tipo: "boas_vindas",
     gatilho: "Nova conversa",
-    gatilhoTipo: "nova_conversa",
+    gatilhoTipo: "conversation_created",
+    versao: 1,
     status: "ativa",
     ativa: true,
     execucoes: 842,
@@ -1955,7 +1974,8 @@ export const AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoItem[] = [
     descricao: "Identifica interesse e segmento",
     tipo: "qualificacao",
     gatilho: "Palavras-chave",
-    gatilhoTipo: "palavras_chave",
+    gatilhoTipo: "message_received",
+    versao: 1,
     status: "ativa",
     ativa: true,
     execucoes: 623,
@@ -1970,7 +1990,8 @@ export const AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoItem[] = [
     descricao: "Oferece link de agendamento",
     tipo: "agendamento",
     gatilho: "Comando / palavra",
-    gatilhoTipo: "comando",
+    gatilhoTipo: "message_received",
+    versao: 1,
     status: "ativa",
     ativa: true,
     execucoes: 428,
@@ -1985,7 +2006,8 @@ export const AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoItem[] = [
     descricao: "Lembra o cliente sobre propostas",
     tipo: "follow_up",
     gatilho: "Tempo sem resposta",
-    gatilhoTipo: "tempo_sem_resposta",
+    gatilhoTipo: "follow_up_due",
+    versao: 1,
     status: "ativa",
     ativa: true,
     execucoes: 356,
@@ -2000,7 +2022,8 @@ export const AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoItem[] = [
     descricao: "Reativa contatos inativos",
     tipo: "recuperacao",
     gatilho: "Tempo sem interação",
-    gatilhoTipo: "tempo_sem_interacao",
+    gatilhoTipo: "follow_up_due",
+    versao: 1,
     status: "pausada",
     ativa: false,
     execucoes: 98,
@@ -2015,7 +2038,8 @@ export const AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoItem[] = [
     descricao: "Direciona para equipe de vendas",
     tipo: "atendimento",
     gatilho: "Palavras-chave",
-    gatilhoTipo: "palavras_chave",
+    gatilhoTipo: "message_received",
+    versao: 1,
     status: "ativa",
     ativa: true,
     execucoes: 276,
@@ -2171,144 +2195,196 @@ export const ATIVIDADES_AUTOMACOES_REFERENCIA_PREMIUM: WaAutomacaoAtividadeItem[
   },
 ];
 
-const localStorageWaAutomacoes = (orgId: string) => `flow_wa_automacoes_v1.${orgId}`;
+// ============================================================================
+// WHATSAPP SCRIPTS PREMIUM (PROMPT 61 — FIDELIDADE VISUAL MÁXIMA + INTEGRAÇÃO REAL)
+// ============================================================================
 
-/**
- * Lê automações persistidas no storage local da organização ou mescla com receitas do banco
- */
-export function listarAutomacoesLocais(orgId: string): WaAutomacaoItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(localStorageWaAutomacoes(orgId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error("Falha ao ler automações locais", error);
-    return [];
-  }
-}
+type WaAutomationRow = {
+  id: string;
+  name: string;
+  description: string;
+  automation_type: WaAutomacaoTipo;
+  status: WaAutomacaoStatus;
+  version: number;
+  trigger: { type: WaAutomacaoGatilho; config?: Record<string, unknown> };
+  conditions: Array<{ field: string; operator: string; value?: unknown }>;
+  actions: Array<{ type: string; config: Record<string, unknown> }>;
+  config: Record<string, unknown>;
+  updated_at: string;
+};
 
-/**
- * Salva a lista inteira de automações no storage local
- */
-export function salvarAutomacoesLocais(orgId: string, itens: WaAutomacaoItem[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(localStorageWaAutomacoes(orgId), JSON.stringify(itens));
-  } catch (err) {
-    console.error("Falha ao salvar automações locais:", err);
-  }
-}
+type WaAutomationRunRow = {
+  id: string;
+  automation_id: string;
+  automation_version: number;
+  mode: "simulation" | "preparation" | "execution";
+  state: "planned" | "completed" | "failed" | "blocked" | "cycle_blocked" | "duplicate";
+  planned_actions: Array<Record<string, unknown>>;
+  executed_actions: Array<Record<string, unknown>>;
+  blockers: string[];
+  sanitized_error: string | null;
+  started_at: string;
+  finished_at: string | null;
+};
 
-/**
- * Cria ou atualiza uma automação comercial de WhatsApp
- */
-export async function salvarAutomacaoWa(auto: Partial<WaAutomacaoItem>): Promise<WaAutomacaoItem> {
-  const context = await requireWhatsappAdministrator();
-  const lista = listarAutomacoesLocais(context.orgId);
-  const agora = new Date();
-  const dataFormatada = `${String(agora.getDate()).padStart(2, "0")}/${String(
-    agora.getMonth() + 1,
-  ).padStart(2, "0")}/${agora.getFullYear()} ${String(agora.getHours()).padStart(
-    2,
-    "0",
-  )}:${String(agora.getMinutes()).padStart(2, "0")}`;
-
-  if (auto.id) {
-    const index = lista.findIndex((a) => a.id === auto.id);
-    if (index >= 0) {
-      const atualizada: WaAutomacaoItem = {
-        ...lista[index],
-        ...auto,
-        ultimaAtualizacao: dataFormatada,
-      } as WaAutomacaoItem;
-      lista[index] = atualizada;
-      salvarAutomacoesLocais(context.orgId, lista);
-      return atualizada;
-    }
-  }
-
-  const nova: WaAutomacaoItem = {
-    id: auto.id || `wa-auto-${Date.now()}`,
-    nome: auto.nome || "Nova automação",
-    descricao: auto.descricao || "Automação comercial WhatsApp",
-    tipo: auto.tipo || "boas_vindas",
-    gatilho: auto.gatilho || "Nova conversa",
-    gatilhoTipo: auto.gatilhoTipo || "nova_conversa",
-    status: auto.status || "ativa",
-    ativa: auto.ativa ?? true,
-    execucoes: auto.execucoes || 0,
-    ultimaAtualizacao: dataFormatada,
-    condicoes: auto.condicoes || {},
-    acoes: auto.acoes || {},
-    origem: "custom",
+type WaAutomationSnapshot = {
+  automations: WaAutomationRow[];
+  controls: {
+    organization_enabled: boolean;
+    platform_enabled: boolean;
+    dispatch_enabled: boolean;
+    timezone: string;
   };
+  runs: WaAutomationRunRow[];
+  scripts: Array<{ id: string; nome: string; tipo: string; mensagem: string | null }>;
+};
 
-  const novaLista = [nova, ...lista];
-  salvarAutomacoesLocais(context.orgId, novaLista);
-  return nova;
+async function waAutomationApi<T>(body: Record<string, unknown>): Promise<T> {
+  const context = await requireWhatsappAdministrator();
+  const { data, error } = await supabase.functions.invoke("wa-automations", {
+    body: { ...body, org_id: context.orgId },
+  });
+  if (error) throw error;
+  return data as T;
 }
 
-/**
- * Alterna status (Ativa / Pausada) de uma automação
- */
+const AUTOMATION_TRIGGER_LABELS: Record<WaAutomacaoGatilho, string> = {
+  conversation_created: "Nova conversa recebida",
+  message_received: "Nova mensagem recebida",
+  conversation_assigned: "Conversa atribuída",
+  conversation_status_changed: "Status da conversa alterado",
+  tag_applied: "Etiqueta aplicada",
+  lead_linked: "Lead vinculado",
+  crm_stage_changed: "Etapa comercial alterada",
+  follow_up_due: "Prazo de follow-up atingido",
+};
+
+function automationRowToItem(
+  row: WaAutomationRow,
+  runs: WaAutomationRunRow[] = [],
+): WaAutomacaoItem {
+  const realRuns = runs.filter((run) => run.automation_id === row.id && run.mode !== "simulation");
+  const firstAction = row.actions[0]?.config ?? {};
+  const timeCondition = row.conditions.find(
+    (condition) => condition.field === "event.elapsed_minutes",
+  );
+  const stageCondition = row.conditions.find((condition) => condition.field === "lead.stage");
+  return {
+    id: row.id,
+    nome: row.name,
+    descricao: row.description,
+    tipo: row.automation_type,
+    gatilho: AUTOMATION_TRIGGER_LABELS[row.trigger.type],
+    gatilhoTipo: row.trigger.type,
+    status: row.status,
+    ativa: row.status === "ativa",
+    versao: row.version,
+    execucoes: realRuns.length,
+    ultimaAtualizacao: new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(row.updated_at)),
+    condicoes: {
+      tempoHoras: typeof timeCondition?.value === "number" ? timeCondition.value / 60 : undefined,
+      etapaCrm: typeof stageCondition?.value === "string" ? stageCondition.value : undefined,
+    },
+    acoes: {
+      scriptId: typeof firstAction.script_id === "string" ? firstAction.script_id : undefined,
+      textoMensagem:
+        typeof firstAction.script_snapshot === "string" ? firstAction.script_snapshot : undefined,
+    },
+    origem: "db",
+  };
+}
+
+function itemToDefinition(auto: Partial<WaAutomacaoItem>) {
+  const conditions: Array<{ field: string; operator: string; value?: unknown }> = [
+    { field: "contact.eligible", operator: "eq", value: true },
+    { field: "contact.consent", operator: "eq", value: true },
+  ];
+  if (auto.condicoes?.tempoHoras)
+    conditions.push({
+      field: "event.elapsed_minutes",
+      operator: "gt",
+      value: auto.condicoes.tempoHoras * 60,
+    });
+  if (auto.condicoes?.etapaCrm)
+    conditions.push({ field: "lead.stage", operator: "eq", value: auto.condicoes.etapaCrm });
+  const actionConfig: Record<string, unknown> = {};
+  if (auto.acoes?.scriptId) actionConfig.script_id = auto.acoes.scriptId;
+  if (auto.acoes?.textoMensagem) actionConfig.script_snapshot = auto.acoes.textoMensagem;
+  const actionType =
+    auto.tipo === "atendimento"
+      ? "request_human"
+      : auto.tipo === "follow_up"
+        ? "prepare_follow_up"
+        : "prepare_reply";
+  return {
+    id: auto.id,
+    name: auto.nome ?? "Nova automação",
+    description: auto.descricao ?? "Automação WhatsApp",
+    type: auto.tipo ?? "boas_vindas",
+    status: auto.status ?? "rascunho",
+    version: auto.versao ?? 1,
+    trigger: { type: auto.gatilhoTipo ?? "conversation_created", config: {} },
+    conditions,
+    actions: [
+      { type: actionType, config: actionConfig },
+      { type: "prepare_task", config: { suggested_stage: auto.acoes?.mudarEtapaCrm ?? null } },
+      { type: "record_activity", config: {} },
+    ],
+    config: { automatic_transport_allowed: false },
+  };
+}
+
+export async function salvarAutomacaoWa(auto: Partial<WaAutomacaoItem>): Promise<WaAutomacaoItem> {
+  const response = await waAutomationApi<{ automation: WaAutomationRow }>({
+    acao: "save",
+    definition: itemToDefinition(auto),
+  });
+  return automationRowToItem(response.automation);
+}
+
 export async function alternarStatusAutomacaoWa(
   id: string,
   ativa: boolean,
 ): Promise<{ ok: boolean; status: WaAutomacaoStatus; aviso?: string }> {
-  const context = await requireWhatsappAdministrator();
-  const lista = listarAutomacoesLocais(context.orgId);
-  const index = lista.findIndex((a) => a.id === id);
-  if (index < 0) return { ok: false, status: "pausada", aviso: "Automação não encontrada" };
-
-  const novoStatus: WaAutomacaoStatus = ativa ? "ativa" : "pausada";
-  lista[index].ativa = ativa;
-  lista[index].status = novoStatus;
-  salvarAutomacoesLocais(context.orgId, lista);
-
+  const status: WaAutomacaoStatus = ativa ? "ativa" : "pausada";
+  await waAutomationApi({ acao: "set_status", automation_id: id, status });
   return {
     ok: true,
-    status: novoStatus,
+    status,
     aviso: ativa
-      ? "Automação salva. Execução automática ainda não disponível pelo backend."
+      ? "Regra ativa, mas a execução permanece bloqueada pelos controles da plataforma."
       : "Automação pausada com sucesso.",
   };
 }
 
-/**
- * Exclui uma automação do sistema
- */
 export async function excluirAutomacaoWa(id: string): Promise<boolean> {
-  const context = await requireWhatsappAdministrator();
-  const lista = listarAutomacoesLocais(context.orgId);
-  const novaLista = lista.filter((a) => a.id !== id);
-  salvarAutomacoesLocais(context.orgId, novaLista);
+  await waAutomationApi({ acao: "archive", automation_id: id });
   return true;
 }
 
-/**
- * Duplica uma automação
- */
 export async function duplicarAutomacaoWa(id: string): Promise<WaAutomacaoItem | null> {
-  const context = await requireWhatsappAdministrator();
-  const lista = listarAutomacoesLocais(context.orgId);
-  const original = lista.find((a) => a.id === id);
-  if (!original) return null;
-
-  return salvarAutomacaoWa({
-    ...original,
-    id: undefined,
-    nome: `${original.nome} (Cópia)`,
-    execucoes: 0,
-    status: "rascunho",
-    ativa: false,
+  const response = await waAutomationApi<{ automation: WaAutomationRow }>({
+    acao: "duplicate",
+    automation_id: id,
   });
+  return automationRowToItem(response.automation);
 }
 
-/**
- * Obtém todos os dados consolidados da tela de Automações WhatsApp
- */
+export async function simularAutomacaoWa(
+  id: string,
+  event: Record<string, unknown>,
+): Promise<WaAutomacaoSimulacao> {
+  const response = await waAutomationApi<{ simulation: WaAutomacaoSimulacao }>({
+    acao: "simulate",
+    automation_id: id,
+    event,
+  });
+  return response.simulation;
+}
+
 export async function obterDadosAutomacoesWa(): Promise<{
   automacoes: WaAutomacaoItem[];
   kpis: WaAutomacoesKpis;
@@ -2316,76 +2392,104 @@ export async function obterDadosAutomacoesWa(): Promise<{
   distribuicao: WaAutomacoesDistribuicaoItem[];
   atividades: WaAutomacaoAtividadeItem[];
   conectado: boolean;
+  controles: WaAutomacaoControles;
+  scripts: Array<{ id: string; nome: string; tipo: string; mensagem: string | null }>;
 }> {
-  const context = await activeWhatsappOrganization();
-  const automacoes = listarAutomacoesLocais(context.orgId);
-
-  // Buscar dados reais de chips e mensagens se disponíveis
-  let totalMensagens = 0;
-  const leadsQualificados = 0;
-  let taxaResp = "0%";
-  let conectado = false;
-
-  try {
-    const { data: chips } = await supabase
-      .from("wa_instancias")
-      .select("id, status")
-      .eq("org_id", context.orgId);
-    if (chips && chips.length > 0) {
-      conectado = chips.some((c) => c.status === "conectado");
-    }
-
-    const { data: messages, count: msgCount } = await supabase
-      .from("wa_mensagens")
-      .select("id, direcao", { count: "exact" })
-      .eq("org_id", context.orgId);
-    if (typeof msgCount === "number" && msgCount > 0) {
-      totalMensagens = msgCount;
-    }
-
-    if (messages?.length) {
-      const outbound = messages.filter((message) => message.direcao === "out").length;
-      const inbound = messages.filter((message) => message.direcao === "in").length;
-      taxaResp = outbound > 0 ? `${Math.round((inbound / outbound) * 100)}%` : "0%";
-    }
-  } catch (error) {
-    console.error("Falha ao carregar automações WhatsApp", error);
-  }
-
-  const ativas = automacoes.filter((a) => a.ativa).length;
-
+  const snapshot = await waAutomationApi<WaAutomationSnapshot>({ acao: "snapshot" });
+  const automacoes = snapshot.automations.map((row) => automationRowToItem(row, snapshot.runs));
+  const realRuns = snapshot.runs.filter((run) => run.mode !== "simulation");
+  const completed = realRuns.filter((run) => run.state === "completed");
+  const totalActions = realRuns.reduce((total, run) => total + run.executed_actions.length, 0);
+  const distribution = new Map<WaAutomacaoTipo, number>();
+  realRuns.forEach((run) => {
+    const type = automacoes.find((automation) => automation.id === run.automation_id)?.tipo;
+    if (type) distribution.set(type, (distribution.get(type) ?? 0) + 1);
+  });
+  const labels: Record<WaAutomacaoTipo, { label: string; cor: string; hex: string }> = {
+    boas_vindas: { label: "Boas-vindas", cor: "emerald", hex: "#10b981" },
+    qualificacao: { label: "Qualificação", cor: "blue", hex: "#3b82f6" },
+    agendamento: { label: "Agendamento", cor: "purple", hex: "#8b5cf6" },
+    follow_up: { label: "Follow-up", cor: "amber", hex: "#f59e0b" },
+    recuperacao: { label: "Recuperação", cor: "red", hex: "#ef4444" },
+    atendimento: { label: "Atendimento", cor: "cyan", hex: "#06b6d4" },
+  };
+  const successRate = realRuns.length
+    ? `${Math.round((completed.length / realRuns.length) * 100)}%`
+    : "0%";
   return {
     automacoes,
     kpis: {
-      ativas,
+      ativas: automacoes.filter((item) => item.ativa).length,
       ativasTrend: "—",
-      mensagens: totalMensagens,
+      mensagens: totalActions,
       mensagensTrend: "—",
-      qualificados: leadsQualificados,
+      qualificados: 0,
       qualificadosTrend: "—",
-      taxaResposta: taxaResp,
+      taxaResposta: successRate,
       taxaRespostaTrend: "—",
       tempoMedio: "Dados insuficientes",
       tempoMedioTrend: "—",
     },
     desempenho: {
-      mensagens: totalMensagens,
+      mensagens: totalActions,
       mensagensTrend: "—",
-      qualificados: leadsQualificados,
+      qualificados: 0,
       qualificadosTrend: "—",
-      taxaResposta: taxaResp,
+      taxaResposta: successRate,
       taxaRespostaTrend: "—",
       pontos: [],
     },
-    distribuicao: [],
-    atividades: [],
-    conectado,
+    distribuicao: [...distribution.entries()].map(([tipo, execucoes]) => ({
+      tipo,
+      ...labels[tipo],
+      execucoes,
+      percentual: realRuns.length ? Math.round((execucoes / realRuns.length) * 100) : 0,
+    })),
+    atividades: snapshot.runs.slice(0, 20).map((run) => ({
+      id: run.id,
+      tipo: run.mode,
+      titulo:
+        run.mode === "simulation"
+          ? "Simulação registrada"
+          : run.state === "completed"
+            ? "Automação concluída"
+            : run.state === "failed"
+              ? "Falha na automação"
+              : "Ação bloqueada",
+      descricao:
+        automacoes.find((automation) => automation.id === run.automation_id)?.nome ??
+        "Automação arquivada",
+      horario: new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(
+        new Date(run.started_at),
+      ),
+      automacao: run.automation_id,
+      icone:
+        run.state === "failed"
+          ? "erro"
+          : run.mode === "simulation"
+            ? "qualificado"
+            : run.state === "completed"
+              ? "executada"
+              : "humano",
+      cor:
+        run.state === "failed"
+          ? "red"
+          : run.mode === "simulation"
+            ? "blue"
+            : run.state === "completed"
+              ? "green"
+              : "cyan",
+    })),
+    conectado: false,
+    controles: {
+      organizacaoAtiva: snapshot.controls.organization_enabled,
+      plataformaAtiva: snapshot.controls.platform_enabled,
+      dispatchAtivo: snapshot.controls.dispatch_enabled,
+      timezone: snapshot.controls.timezone,
+    },
+    scripts: snapshot.scripts,
   };
 }
-
-// ============================================================================
-// WHATSAPP SCRIPTS PREMIUM (PROMPT 61 — FIDELIDADE VISUAL MÁXIMA + INTEGRAÇÃO REAL)
-// ============================================================================
 
 export type WaScriptCategoria =
   "boas_vindas" | "qualificacao" | "agendamento" | "follow_up" | "recuperacao" | "atendimento";

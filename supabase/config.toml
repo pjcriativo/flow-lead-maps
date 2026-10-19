@@ -65,6 +65,10 @@ verify_jwt = true
 # Inbox e mutações auditadas de conversas. JWT obrigatório.
 verify_jwt = true
 
+[functions.wa-automations]
+# CRUD e simulador das automações WhatsApp. Execução e transporte permanecem bloqueados.
+verify_jwt = true
+
 [functions.buscar-redes]
 # Busca em redes sociais (IG/LinkedIn). JWT obrigatório.
 verify_jwt = true
