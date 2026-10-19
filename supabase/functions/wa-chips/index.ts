@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsPreflightResponse, json as jsonResponse } from "../_shared/cors.ts";
 import {
   authorizeWhatsappRequest,
   whatsappAuthorizationFailure,
@@ -18,11 +18,13 @@ import {
   pairInstancia,
   qrInstancia,
   observarStatusInstancia,
+  verificarEvolutionGo,
   waBase,
 } from "../_shared/wa.ts";
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
+async function handleRequest(req: Request): Promise<Response> {
+  const json = (body: unknown, status = 200) => jsonResponse(body, status, req);
+  if (req.method === "OPTIONS") return corsPreflightResponse(req);
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
   const admin = createClient(
@@ -186,6 +188,9 @@ Deno.serve(async (req) => {
   }
   await inicializarCofreWa(admin);
   if (!waBase()) return json({ error: "Integração WhatsApp indisponível." }, 503);
+  if (action === "validar_integracao") {
+    return json({ evolution: await verificarEvolutionGo() });
+  }
   if (action === "criar") {
     const funcao = body.funcao === "conversa" ? "conversa" : "disparo";
     const instance = await criarInstanciaDaOrg(admin, scope, funcao);
@@ -333,4 +338,14 @@ Deno.serve(async (req) => {
     return json(await graduarChipDoLead(admin, scope, leadId));
   }
   return json({ error: "Ação desconhecida." }, 422);
-});
+}
+
+Deno.serve((req) =>
+  handleRequest(req).catch((error) => {
+    console.error(
+      "wa-chips unhandled request failure",
+      error instanceof Error ? error.name : "error",
+    );
+    return jsonResponse({ error: "Erro interno." }, 500, req);
+  }),
+);

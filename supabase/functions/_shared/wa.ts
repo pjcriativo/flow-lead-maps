@@ -50,6 +50,39 @@ export function waGlobalKey(): string {
   return _waKeyCache ?? Deno.env.get("EVOLUTION_API_KEY") ?? "";
 }
 
+export async function verificarEvolutionGo(): Promise<{
+  ok: boolean;
+  configured: boolean;
+  status: number;
+  instanceCount: number | null;
+}> {
+  if (!waBase() || !waGlobalKey()) {
+    return { ok: false, configured: false, status: 503, instanceCount: null };
+  }
+  try {
+    const response = await fetch(`${waBase()}/instance/all`, {
+      headers: { apikey: waGlobalKey() },
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    const data =
+      payload && typeof payload === "object" && "data" in payload
+        ? (payload as { data?: unknown }).data
+        : null;
+    return {
+      ok: response.ok,
+      configured: true,
+      status: response.status,
+      instanceCount: Array.isArray(data) ? data.length : null,
+    };
+  } catch (error) {
+    console.error(
+      "wa Evolution GO probe failed",
+      error instanceof Error ? error.name : "network_error",
+    );
+    return { ok: false, configured: true, status: 503, instanceCount: null };
+  }
+}
+
 export type WaInstanciaOrg = {
   id: string;
   orgId: string;

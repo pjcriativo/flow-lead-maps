@@ -19,7 +19,8 @@ const conversationsEdge = readFileSync("supabase/functions/wa-conversations/inde
 
 // 1. Lista por organização (Multi-tenant)
 test("1. Lista por organização: consultas respeitam RLS e escopo da organização ativa", () => {
-  assert.match(waService, /invoke\("wa-conversations"/);
+  assert.match(waService, /invokeWhatsappEdge<Record<string, unknown>>\(/);
+  assert.match(waService, /"wa-conversations"/);
   assert.match(waService, /listarConversas/);
   assert.match(waService, /obterKpisConversasWa/);
   assert.match(waConversas, /obterKpisConversasWa/);
@@ -75,7 +76,10 @@ test("7. Realtime ou fallback: inscrição com cleanup e polling somente em falh
   assert.match(waConversas, /table:\s*"wa_mensagens"/);
   assert.match(waConversas, /removeChannel/);
   assert.match(waConversas, /CHANNEL_ERROR/);
-  assert.match(waConversas, /setInterval\(refresh, 30_000\)/);
+  assert.match(waConversas, /setTimeout\(refresh, delay\)/);
+  assert.match(waConversas, /MAX_FALLBACK_FAILURES/);
+  assert.match(waConversas, /isWhatsappAuthorizationError/);
+  assert.match(waConversas, /new AbortController\(\)/);
 });
 
 // 8. Mensagem recebida

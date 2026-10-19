@@ -13,6 +13,7 @@ const read = (relativePath: string) => fs.readFileSync(path.join(root, relativeP
 const migration = read("supabase/migrations/202610160003_wa_instance_health.sql");
 const monitor = read("supabase/functions/wa-health-monitor/index.ts");
 const chips = read("supabase/functions/wa-chips/index.ts");
+const shared = read("supabase/functions/_shared/wa.ts");
 const worker = read("supabase/functions/wa-send-worker/index.ts");
 const webhook = read("supabase/functions/wa-webhook/index.ts");
 const service = read("src/services/whatsapp.ts");
@@ -141,4 +142,12 @@ test("webhook configuration reports provider network failure without throwing", 
     globalThis.fetch = originalFetch;
     runtime.Deno = originalDeno;
   }
+});
+
+test("Evolution GO probe is read-only, uses the managed global key, and exposes no credential", () => {
+  assert.match(shared, /export async function verificarEvolutionGo/);
+  assert.match(shared, /fetch\(`\$\{waBase\(\)\}\/instance\/all`/);
+  assert.match(shared, /headers:\s*\{ apikey: waGlobalKey\(\) \}/);
+  assert.match(chips, /action === "validar_integracao"/);
+  assert.doesNotMatch(chips, /waGlobalKey/);
 });

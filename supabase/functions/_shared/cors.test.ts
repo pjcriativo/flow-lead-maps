@@ -18,7 +18,7 @@ test("permite o dominio de producao do Flow Business no preflight", () => {
   assert.equal(headers["access-control-allow-methods"], "POST, OPTIONS");
   assert.equal(
     headers["access-control-allow-headers"],
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-region, x-supabase-api-version",
   );
   assert.equal(headers.vary, "Origin");
 });
@@ -66,3 +66,18 @@ test("search-leads aplica o Request em erros e preserva CORS no stream", () => {
   for (const call of jsonCalls) assert.match(call, /,\s*req,?\s*\);$/);
   assert.match(source, /\.\.\.corsHeaders\(req\)[\s\S]*application\/x-ndjson/);
 });
+
+for (const functionName of ["wa-chips", "wa-conversations"]) {
+  test(`${functionName} aplica CORS em toda resposta e captura falhas inesperadas`, () => {
+    const source = readFileSync(new URL(`../${functionName}/index.ts`, import.meta.url), "utf8");
+
+    assert.match(source, /corsPreflightResponse/);
+    assert.match(source, /json as jsonResponse/);
+    assert.match(
+      source,
+      /const json = \(body: unknown, status = 200\) => jsonResponse\(body, status, req\)/,
+    );
+    assert.match(source, /handleRequest\(req\)\.catch/);
+    assert.match(source, /jsonResponse\(\{ error: "Erro interno\." \}, 500, req\)/);
+  });
+}

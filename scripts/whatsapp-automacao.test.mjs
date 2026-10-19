@@ -27,7 +27,8 @@ test("1. Organização ativa: consultas respeitam RLS e escopo da organização 
   assert.match(waAutomacao, /obterDadosAutomacoesWa/);
   // SUT_IS_CORRECT_BECAUSE: conversas agora são lidas pela API autenticada e pela entidade
   // canônica, não por mensagens brutas agrupadas no cliente.
-  assert.match(waService, /invoke\("wa-conversations"/);
+  assert.match(waService, /invokeWhatsappEdge<Record<string, unknown>>\(/);
+  assert.match(waService, /"wa-conversations"/);
   assert.match(waService, /supabase\.from\("leads"\)/);
 });
 

@@ -62,6 +62,7 @@ import {
   criarChip,
   enviarTesteWhatsapp,
   excluirChip,
+  isWhatsappAuthorizationError,
   listarAlertas,
   listarChips,
   marcarChip,
@@ -79,6 +80,8 @@ import {
   type WaRotacaoConfig,
   type WaSaudeConexoes,
 } from "@/services/whatsapp";
+
+const MAX_POLL_FAILURES = 3;
 
 export interface WaNumerosProps {
   onMudou?: () => void;
@@ -150,48 +153,78 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
   const timerQrRef = useRef<number | null>(null);
 
   // Carregar dados reais da tela
-  const carregarDados = useCallback(async () => {
-    try {
-      const dados = await obterDadosNumerosWa();
-      setChips(dados.chips);
-      setKpis(dados.kpis);
-      setSaude(dados.saude);
-      setRotacao(dados.rotacao);
-      setAtividades(dados.atividades);
-      onMudou?.();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao carregar dados dos números");
-    } finally {
-      setCarregando(false);
-    }
-  }, [onMudou]);
+  const carregarDados = useCallback(
+    async ({
+      signal,
+      notifyParent = true,
+    }: { signal?: AbortSignal; notifyParent?: boolean } = {}) => {
+      try {
+        const dados = await obterDadosNumerosWa(signal);
+        if (signal?.aborted) return;
+        setChips(dados.chips);
+        setKpis(dados.kpis);
+        setSaude(dados.saude);
+        setRotacao(dados.rotacao);
+        setAtividades(dados.atividades);
+        if (notifyParent) onMudou?.();
+      } catch (e) {
+        if (signal?.aborted) return;
+        toast.error(e instanceof Error ? e.message : "Falha ao carregar dados dos números");
+      } finally {
+        setCarregando(false);
+      }
+    },
+    [onMudou],
+  );
 
   useEffect(() => {
-    carregarDados();
+    const controller = new AbortController();
+    void carregarDados({ signal: controller.signal, notifyParent: false });
+    return () => controller.abort();
   }, [carregarDados]);
 
   // Polling de status enquanto na Etapa 1 do Assistente
   useEffect(() => {
     if (etapaAssistente !== 1 || !chipAtivoId || (!qrCodeData && !pairingCode)) {
-      if (pollingRef.current) window.clearInterval(pollingRef.current);
+      if (pollingRef.current) window.clearTimeout(pollingRef.current);
       return;
     }
 
-    pollingRef.current = window.setInterval(async () => {
+    const controller = new AbortController();
+    let failures = 0;
+    let stopped = false;
+    const schedule = (delay: number) => {
+      pollingRef.current = window.setTimeout(poll, delay);
+    };
+    const poll = async () => {
       try {
-        const s = await statusChip(chipAtivoId);
+        const s = await statusChip(chipAtivoId, controller.signal);
+        failures = 0;
         if (s.status === "conectado") {
+          stopped = true;
           toast.success("Dispositivo WhatsApp conectado com sucesso!");
           setEtapaAssistente(2);
-          carregarDados();
+          void carregarDados({ notifyParent: true });
+          return;
         }
-      } catch {
-        /* segue tentando em background */
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        failures += 1;
+        if (isWhatsappAuthorizationError(error) || failures >= MAX_POLL_FAILURES) {
+          stopped = true;
+          setQrCodeData(null);
+          setPairingCode(null);
+          return;
+        }
       }
-    }, 3500);
+      if (!stopped) schedule(3_500 * 2 ** failures);
+    };
+    schedule(3_500);
 
     return () => {
-      if (pollingRef.current) window.clearInterval(pollingRef.current);
+      stopped = true;
+      controller.abort();
+      if (pollingRef.current) window.clearTimeout(pollingRef.current);
     };
   }, [etapaAssistente, chipAtivoId, qrCodeData, pairingCode, carregarDados]);
 
@@ -258,6 +291,10 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
         }
       }
     } catch (e) {
+      if (isWhatsappAuthorizationError(e)) {
+        setQrCodeData(null);
+        setPairingCode(null);
+      }
       toast.error(e instanceof Error ? e.message : "Falha ao gerar QR Code");
     } finally {
       setGerandoQr(false);

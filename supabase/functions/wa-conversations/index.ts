@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsPreflightResponse, json as jsonResponse } from "../_shared/cors.ts";
 import {
   authorizeWhatsappRequest,
   whatsappAuthorizationFailure,
@@ -21,8 +21,9 @@ const MUTATIONS = new Set([
 const CONVERSATION_FIELDS =
   "id,org_id,instancia_id,remote_contact_id,normalized_phone,contact_name,lead_id,assigned_to,status,priority,origin,last_message_at,last_message_preview,last_message_type,last_message_direction,last_inbound_at,last_outbound_at,first_response_at,unread_count,version,created_at,updated_at";
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
+async function handleRequest(req: Request): Promise<Response> {
+  const json = (body: unknown, status = 200) => jsonResponse(body, status, req);
+  if (req.method === "OPTIONS") return corsPreflightResponse(req);
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
   const admin = createClient(
@@ -214,4 +215,14 @@ Deno.serve(async (req) => {
     );
   }
   return json({ ok: true, conversation: data });
-});
+}
+
+Deno.serve((req) =>
+  handleRequest(req).catch((error) => {
+    console.error(
+      "wa-conversations unhandled request failure",
+      error instanceof Error ? error.name : "error",
+    );
+    return jsonResponse({ error: "Erro interno." }, 500, req);
+  }),
+);

@@ -53,6 +53,7 @@ import {
   acaoConversaWa,
   atualizarLeadCrm,
   consultarConversasWa,
+  isWhatsappAuthorizationError,
   listarConversas,
   listarLeadsVinculaveisWa,
   listarScripts,
@@ -65,6 +66,9 @@ import {
   type WaLeadVinculavel,
   type WaScript,
 } from "@/services/whatsapp";
+
+const MAX_FALLBACK_FAILURES = 3;
+const FALLBACK_BASE_DELAY_MS = 30_000;
 
 // ==========================================
 // TIPOS E MODELOS DE DADOS DA CENTRAL
@@ -240,13 +244,19 @@ export function WaConversas() {
   }, [contatos, contatoAtivoId]);
 
   // Carregar KPIs e scripts do banco
-  const carregarDadosIniciais = useCallback(async () => {
+  const carregarDadosIniciais = useCallback(async (signal?: AbortSignal) => {
     try {
+      const conversationsPromise = listarConversas(signal);
       const [kpisRes, scriptsRes, conversationsRes] = await Promise.allSettled([
-        obterKpisConversasWa(),
+        conversationsPromise.then((conversations) => obterKpisConversasWa(conversations, signal)),
         listarScripts(),
-        listarConversas(),
+        conversationsPromise,
       ]);
+      if (signal?.aborted) return;
+      const failure = [kpisRes, scriptsRes, conversationsRes].find(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+      if (failure) throw failure.reason;
 
       if (kpisRes.status === "fulfilled") {
         setKpis(kpisRes.value);
@@ -297,12 +307,16 @@ export function WaConversas() {
         setContatoAtivoId((current) => current || mapped[0]?.id || "");
       }
     } catch (error) {
+      if (signal?.aborted) return;
       console.error("Falha ao carregar conversas WhatsApp", error);
+      throw error;
     }
   }, []);
 
   useEffect(() => {
-    carregarDadosIniciais();
+    const controller = new AbortController();
+    void carregarDadosIniciais(controller.signal).catch(() => undefined);
+    return () => controller.abort();
   }, [carregarDadosIniciais]);
 
   useEffect(() => {
@@ -316,9 +330,10 @@ export function WaConversas() {
   }, []);
 
   const carregarDetalhes = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string, signal?: AbortSignal) => {
       try {
-        const snapshot = await consultarConversasWa(conversationId);
+        const snapshot = await consultarConversasWa(conversationId, 0, 200, signal);
+        if (signal?.aborted) return;
         setPapelAtual(snapshot.role);
         const statusMap: Record<string, MensagemChat["statusEnvio"]> = {
           pending: "pendente",
@@ -398,15 +413,20 @@ export function WaConversas() {
           ),
         );
       } catch (error) {
+        if (signal?.aborted) return;
         console.error("Falha ao carregar detalhes da conversa", error);
         toast.error("Não foi possível atualizar esta conversa.");
+        throw error;
       }
     },
     [membros],
   );
 
   useEffect(() => {
-    if (contatoAtivoId) void carregarDetalhes(contatoAtivoId);
+    if (!contatoAtivoId) return;
+    const controller = new AbortController();
+    void carregarDetalhes(contatoAtivoId, controller.signal).catch(() => undefined);
+    return () => controller.abort();
   }, [carregarDetalhes, contatoAtivoId]);
 
   // Scroll automático ao fim do chat
@@ -417,19 +437,48 @@ export function WaConversas() {
   // Supabase Realtime Subscription para novas mensagens recebidas
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
-    let polling: ReturnType<typeof setInterval> | null = null;
+    let polling: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
-    const refresh = () => {
-      void carregarDadosIniciais();
-      if (contatoAtivoId) void carregarDetalhes(contatoAtivoId);
+    let fallbackActive = false;
+    let inFlight = false;
+    let failures = 0;
+    let authenticationSuspended = false;
+    const controller = new AbortController();
+    const stopFallback = () => {
+      fallbackActive = false;
+      if (polling) clearTimeout(polling);
+      polling = null;
+    };
+    const scheduleFallback = () => {
+      if (!fallbackActive || cancelled || authenticationSuspended || polling) return;
+      const delay = Math.min(FALLBACK_BASE_DELAY_MS * 2 ** failures, 120_000);
+      polling = setTimeout(refresh, delay);
+    };
+    const refresh = async () => {
+      polling = null;
+      if (cancelled || authenticationSuspended || inFlight) return;
+      inFlight = true;
+      try {
+        await Promise.all([
+          carregarDadosIniciais(controller.signal),
+          contatoAtivoId ? carregarDetalhes(contatoAtivoId, controller.signal) : Promise.resolve(),
+        ]);
+        failures = 0;
+      } catch (error) {
+        failures += 1;
+        if (isWhatsappAuthorizationError(error) || failures >= MAX_FALLBACK_FAILURES) {
+          authenticationSuspended = true;
+          stopFallback();
+        }
+      } finally {
+        inFlight = false;
+      }
+      scheduleFallback();
     };
     const startFallback = () => {
-      if (polling) return;
-      polling = setInterval(refresh, 30_000);
-    };
-    const stopFallback = () => {
-      if (polling) clearInterval(polling);
-      polling = null;
+      if (fallbackActive || authenticationSuspended) return;
+      fallbackActive = true;
+      scheduleFallback();
     };
     void getActiveOrganizationContext().then((context) => {
       if (cancelled) return;
@@ -465,6 +514,7 @@ export function WaConversas() {
 
     return () => {
       cancelled = true;
+      controller.abort();
       stopFallback();
       if (channel) supabase.removeChannel(channel);
     };

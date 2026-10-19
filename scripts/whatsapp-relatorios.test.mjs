@@ -173,7 +173,8 @@ test("22. Isolamento multi-tenant: consultas respeitam RLS e org_id ativo", () =
   // SUT_IS_CORRECT_BECAUSE: a API autenticada aplica organização, papel e atribuição antes de
   // devolver a entidade canônica; consultar mensagens brutas voltaria a agrupar por telefone.
   assert.ok(
-    code.includes('invoke("wa-conversations"'),
+    code.includes('invokeWhatsappEdge<Record<string, unknown>>(') &&
+      code.includes('"wa-conversations"'),
     "Deve consultar conversas com escopo ativo",
   );
   assert.ok(code.includes('supabase.from("propostas")'), "Deve consultar propostas vinculadas");

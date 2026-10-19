@@ -9,6 +9,70 @@ import {
 
 const WHATSAPP_ADMIN_ROLES = new Set(["admin", "gerente", "super_admin"]);
 
+export class WhatsappEdgeRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number | null,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "WhatsappEdgeRequestError";
+  }
+}
+
+function edgeResponseStatus(error: unknown): number | null {
+  if (!error || typeof error !== "object" || !("context" in error)) return null;
+  const context = (error as { context?: unknown }).context;
+  return context instanceof Response ? context.status : null;
+}
+
+export function isWhatsappAuthorizationError(error: unknown): boolean {
+  const status =
+    error instanceof WhatsappEdgeRequestError ? error.status : edgeResponseStatus(error);
+  return status === 401 || status === 403;
+}
+
+async function invokeWhatsappEdge<T>(
+  functionName: "wa-chips" | "wa-conversations",
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<T> {
+  const sessionResult = await supabase.auth.getSession();
+  let session = sessionResult.data.session;
+  if (sessionResult.error || !session) {
+    throw new WhatsappEdgeRequestError("Sessão expirada. Entre novamente.", 401, {
+      cause: sessionResult.error,
+    });
+  }
+  if ((session.expires_at ?? 0) * 1000 <= Date.now() + 30_000) {
+    const refreshed = await supabase.auth.refreshSession();
+    session = refreshed.data.session;
+    if (refreshed.error || !session) {
+      throw new WhatsappEdgeRequestError("Sessão expirada. Entre novamente.", 401, {
+        cause: refreshed.error,
+      });
+    }
+  }
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    body,
+    signal,
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  if (error) {
+    const status = edgeResponseStatus(error);
+    throw new WhatsappEdgeRequestError(
+      status === 401
+        ? "Sessão expirada. Entre novamente."
+        : status === 403
+          ? "Sem permissão para esta operação."
+          : "Falha ao consultar o serviço WhatsApp.",
+      status,
+      { cause: error },
+    );
+  }
+  return data as T;
+}
+
 async function activeWhatsappOrganization(): Promise<ActiveOrganizationContext> {
   return getActiveOrganizationContext();
 }
@@ -68,18 +132,14 @@ export type WaChip = {
   health_error_code: string | null;
 };
 
-async function waChips<T>(body: Record<string, unknown>): Promise<T> {
+async function waChips<T>(body: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
   const context = await activeWhatsappOrganization();
-  const { data, error } = await supabase.functions.invoke("wa-chips", {
-    body: { ...body, org_id: context.orgId },
-  });
-  if (error) throw error;
-  return data as T;
+  return invokeWhatsappEdge<T>("wa-chips", { ...body, org_id: context.orgId }, signal);
 }
 
 /** Lista os chips (instâncias) da org. */
-export async function listarChips(): Promise<WaChip[]> {
-  const r = await waChips<{ chips: WaChip[] }>({ acao: "listar" });
+export async function listarChips(signal?: AbortSignal): Promise<WaChip[]> {
+  const r = await waChips<{ chips: WaChip[] }>({ acao: "listar" }, signal);
   return r.chips ?? [];
 }
 
@@ -102,11 +162,14 @@ export async function qrChip(instancia_id: string) {
 }
 
 /** Lê o status real de um chip (sincroniza numero/status). */
-export async function statusChip(instancia_id: string) {
-  return waChips<{ status: string; numero: string | null; instancia_id?: string }>({
-    acao: "status",
-    instancia_id,
-  });
+export async function statusChip(instancia_id: string, signal?: AbortSignal) {
+  return waChips<{ status: string; numero: string | null; instancia_id?: string }>(
+    {
+      acao: "status",
+      instancia_id,
+    },
+    signal,
+  );
 }
 
 export async function reconectarChip(instancia_id: string) {
@@ -188,8 +251,8 @@ export type WaAlerta = {
 };
 
 /** Alertas não lidos da org (chip queimado, rotação, sem chip, graduação). */
-export async function listarAlertas(): Promise<WaAlerta[]> {
-  const result = await waChips<{ alertas: WaAlerta[] }>({ acao: "listar_alertas" });
+export async function listarAlertas(signal?: AbortSignal): Promise<WaAlerta[]> {
+  const result = await waChips<{ alertas: WaAlerta[] }>({ acao: "listar_alertas" }, signal);
   return result.alertas ?? [];
 }
 
@@ -447,7 +510,7 @@ export function salvarConfigRotacaoWa(config: Partial<WaRotacaoConfig>): WaRotac
 }
 
 /** Carrega os dados reais de números, KPIs e saúde da organização ativa */
-export async function obterDadosNumerosWa(): Promise<{
+export async function obterDadosNumerosWa(signal?: AbortSignal): Promise<{
   chips: WaNumeroItem[];
   kpis: WaNumerosKpis;
   saude: WaSaudeConexoes;
@@ -457,8 +520,8 @@ export async function obterDadosNumerosWa(): Promise<{
   const context = await activeWhatsappOrganization();
   try {
     const [rawChips, alertas, enviosHojeRes, contingenciasRes] = await Promise.all([
-      listarChips(),
-      listarAlertas(),
+      listarChips(signal),
+      listarAlertas(signal),
       supabase
         .from("wa_envios")
         .select("instancia_id, enviado_em")
@@ -466,7 +529,7 @@ export async function obterDadosNumerosWa(): Promise<{
         .gte("enviado_em", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
       waChips<{
         contingencia: { id: string; backup_instance_id: string; status: string } | null;
-      }>({ acao: "listar_contingencia" }),
+      }>({ acao: "listar_contingencia" }, signal),
     ]);
     if (enviosHojeRes.error) throw enviosHojeRes.error;
     const enviosHoje = (enviosHojeRes.data ?? []) as Array<{
@@ -810,38 +873,44 @@ export type WaConversaSnapshot = {
 
 async function invokeConversations(
   body: Record<string, unknown>,
+  signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const context = await activeWhatsappOrganization();
-  const { data, error } = await supabase.functions.invoke("wa-conversations", {
-    body: { ...body, org_id: context.orgId },
-  });
-  if (error) throw error;
+  const data = await invokeWhatsappEdge<Record<string, unknown>>(
+    "wa-conversations",
+    { ...body, org_id: context.orgId },
+    signal,
+  );
   if (!data || typeof data !== "object")
     throw new Error("Resposta inválida da central de conversas.");
-  return data as Record<string, unknown>;
+  return data;
 }
 
 export async function consultarConversasWa(
   conversaId?: string,
   page = 0,
   pageSize = 200,
+  signal?: AbortSignal,
 ): Promise<WaConversaSnapshot> {
-  const data = await invokeConversations({
-    acao: "snapshot",
-    conversa_id: conversaId,
-    page,
-    page_size: pageSize,
-  });
+  const data = await invokeConversations(
+    {
+      acao: "snapshot",
+      conversa_id: conversaId,
+      page,
+      page_size: pageSize,
+    },
+    signal,
+  );
   return data as unknown as WaConversaSnapshot;
 }
 
 /** Lista entidades de conversa canônicas; nunca agrupa números no cliente. */
-export async function listarConversas(): Promise<WaConversa[]> {
+export async function listarConversas(signal?: AbortSignal): Promise<WaConversa[]> {
   const values: Array<Record<string, unknown>> = [];
   let page = 0;
   let hasMore = false;
   do {
-    const snapshot = await consultarConversasWa(undefined, page);
+    const snapshot = await consultarConversasWa(undefined, page, 200, signal);
     values.push(...snapshot.conversations);
     hasMore = snapshot.pagination.has_more;
     page += 1;
@@ -958,12 +1027,15 @@ export type WaConversaKpis = {
   fechamentosHoje: number;
 };
 
-export async function obterKpisConversasWa(): Promise<WaConversaKpis> {
+export async function obterKpisConversasWa(
+  providedConversations?: WaConversa[],
+  signal?: AbortSignal,
+): Promise<WaConversaKpis> {
   const context = await activeWhatsappOrganization();
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const [allConversations, winsResult] = await Promise.all([
-    listarConversas(),
+    providedConversations ?? listarConversas(signal),
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })

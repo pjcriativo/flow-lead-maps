@@ -211,3 +211,13 @@ test("22. Preservação dos serviços existentes: reusa listarChips, criarChip, 
   assert.match(waSection, /<WaNumeros/);
   assert.match(waSection, /Números e Conexões/);
 });
+
+test("23. Rede controlada: envio explícito do JWT, cancelamento e suspensão do polling em 401/403", () => {
+  assert.match(waService, /getSession\(\)/);
+  assert.match(waService, /Authorization:\s*`Bearer \$\{session\.access_token\}`/);
+  assert.match(waService, /signal,/);
+  assert.match(waNumeros, /new AbortController\(\)/);
+  assert.match(waNumeros, /isWhatsappAuthorizationError/);
+  assert.match(waNumeros, /MAX_POLL_FAILURES/);
+  assert.doesNotMatch(waNumeros, /setInterval\(async \(\) => \{[\s\S]*statusChip/);
+});
