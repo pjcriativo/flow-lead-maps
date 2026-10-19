@@ -118,3 +118,27 @@ test("webhook derives organization from the stored instance and service never ex
   assert.match(webhook, /p_org: inst\.org_id/);
   assert.doesNotMatch(service, /wa_instancia_tokens|select\([^)]*token/);
 });
+
+test("webhook configuration reports provider network failure without throwing", async () => {
+  const runtime = globalThis as typeof globalThis & {
+    Deno?: { env: { get(name: string): string | undefined } };
+  };
+  const originalDeno = runtime.Deno;
+  const originalFetch = globalThis.fetch;
+  runtime.Deno = {
+    env: { get: (name) => (name === "EVOLUTION_URL" ? "https://evolution.invalid" : undefined) },
+  };
+  globalThis.fetch = async () => {
+    throw new TypeError("provider unavailable");
+  };
+  try {
+    const { definirWebhookInstancia } = await import("./wa.ts");
+    assert.deepEqual(await definirWebhookInstancia("instance-token", "https://webhook.invalid"), {
+      ok: false,
+      status: 503,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    runtime.Deno = originalDeno;
+  }
+});

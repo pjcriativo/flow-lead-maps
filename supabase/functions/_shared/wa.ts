@@ -886,13 +886,21 @@ export async function definirWebhookInstancia(
   webhookUrl: string,
   eventos: string[] = ["MESSAGE"], // Evolution GO usa nomes MAIÚSCULOS (MESSAGE/CONNECTION/QRCODE)
 ): Promise<{ ok: boolean; status: number; body?: string }> {
-  const r = await fetch(`${waBase()}/instance/connect`, {
-    method: "POST",
-    headers: { apikey: token, "Content-Type": "application/json" },
-    body: JSON.stringify({ webhookUrl, subscribe: eventos, immediate: false }),
-  });
-  const body = await r.text().catch(() => "");
-  return { ok: r.ok, status: r.status, body: body.slice(0, 300) };
+  try {
+    const r = await fetch(`${waBase()}/instance/connect`, {
+      method: "POST",
+      headers: { apikey: token, "Content-Type": "application/json" },
+      body: JSON.stringify({ webhookUrl, subscribe: eventos, immediate: false }),
+    });
+    const body = await r.text().catch(() => "");
+    return { ok: r.ok, status: r.status, body: body.slice(0, 300) };
+  } catch (error) {
+    console.error(
+      "wa webhook configuration failed",
+      error instanceof Error ? error.name : "network_error",
+    );
+    return { ok: false, status: 503 };
+  }
 }
 
 /** Registra o envio (base da graduação, do histórico e do revezamento). */

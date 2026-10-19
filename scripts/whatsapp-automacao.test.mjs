@@ -20,6 +20,7 @@ const automacaoService = readFileSync("src/services/automacao.ts", "utf8");
 const automationEngine = readFileSync("supabase/functions/_shared/whatsapp-automation.ts", "utf8");
 const automationEdge = readFileSync("supabase/functions/wa-automations/index.ts", "utf8");
 const migration = readFileSync("supabase/migrations/202610160005_wa_automation_engine.sql", "utf8");
+const tenantTriggerFixPath = "supabase/migrations/202610190001_wa_tenant_trigger_record_safety.sql";
 
 // 1. Organização ativa
 test("1. Organização ativa: consultas respeitam RLS e escopo da organização autenticada", () => {
@@ -327,4 +328,12 @@ test("37. Preservação: migration 005 não altera migrations aplicadas nem cria
   assert.ok(existsSync("supabase/migrations/202610160004_wa_conversations_crm.sql"));
   assert.doesNotMatch(migration, /create table if not exists public\.(leads|propostas|wa_envios)/);
   assert.doesNotMatch(migration, /delete from public\.(wa_mensagens|leads)/);
+});
+
+test("38. Integridade multi-tenant: trigger compartilhado não acessa campos ausentes do NEW", () => {
+  assert.ok(existsSync(tenantTriggerFixPath));
+  const tenantTriggerFix = readFileSync(tenantTriggerFixPath, "utf8");
+  assert.match(tenantTriggerFix, /v_new jsonb := to_jsonb\(new\)/);
+  assert.doesNotMatch(tenantTriggerFix, /new\.canal|new\.campanha_id|new\.receita_id/);
+  assert.match(tenantTriggerFix, /resource does not belong to organization/);
 });
