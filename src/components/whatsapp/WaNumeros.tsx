@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
-  AlertCircle,
   AlertTriangle,
   ArrowDown,
   ArrowUp,
@@ -203,7 +202,6 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
               "QR Code ainda não está disponível. Tente novamente em alguns segundos.";
             setQrCodeData(null);
             setErroPareamento(message);
-            toast.info(message);
           }
           return;
         }
@@ -212,7 +210,6 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
         if (phone.length < 12) {
           const message = "Informe o número completo com DDI + DDD.";
           setErroPareamento(message);
-          toast.error(message);
           return;
         }
         const result = await parearChip(cId, phone);
@@ -228,7 +225,6 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
         setQrCodeData(null);
         setPairingCode(null);
         setErroPareamento(message);
-        toast.error(message);
       } finally {
         setGerandoQr(false);
       }
@@ -1227,16 +1223,6 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   </button>
                 </div>
 
-                {erroPareamento ? (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-[11px] leading-relaxed text-rose-200"
-                  >
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
-                    <span>{erroPareamento}</span>
-                  </div>
-                ) : null}
-
                 {metodoConexao === "qr" ? (
                   <div className="flex flex-col items-center gap-3">
                     {/* Container do QR Code Autêntico */}
@@ -1907,6 +1893,47 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(erroPareamento)}
+        onOpenChange={(open) => {
+          if (!open) setErroPareamento(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm border border-destructive/30 bg-popover text-popover-foreground">
+          <DialogHeader className="items-center text-center sm:text-center">
+            <div className="mb-1 flex size-11 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertTriangle className="size-5" aria-hidden="true" />
+            </div>
+            <DialogTitle className="text-base font-bold">
+              Não foi possível gerar o pareamento
+            </DialogTitle>
+            <DialogDescription className="text-center text-xs leading-relaxed text-muted-foreground">
+              {erroPareamento}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setErroPareamento(null)}
+              className="min-w-24"
+            >
+              Fechar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setErroPareamento(null);
+                void gerarQrInstancia(chipAtivoId, metodoConexao);
+              }}
+              className="min-w-24 bg-home-orange text-white hover:bg-home-orange/90"
+            >
+              Tentar novamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL: EDITAR CONFIGURAÇÕES DO CHIP */}
       <Dialog open={modalEditarAberto} onOpenChange={setModalEditarAberto}>

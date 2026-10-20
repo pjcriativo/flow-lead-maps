@@ -93,6 +93,10 @@ test("9. QR Code: exibição com WhatsApp logo central e suporte a código de 8 
   assert.match(waNumeros, /qrCodeData/);
   assert.match(waNumeros, /Atualizar QR Code/);
   assert.match(waNumeros, /Código 8 Dígitos/);
+  assert.match(waNumeros, /open=\{Boolean\(erroPareamento\)\}/);
+  assert.match(waNumeros, /Não foi possível gerar o pareamento/);
+  assert.match(waNumeros, /Tentar novamente/);
+  assert.doesNotMatch(waNumeros, /role="alert"/);
 });
 
 // 10. Expiração de QR

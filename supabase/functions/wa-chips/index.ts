@@ -8,16 +8,17 @@ import type { WhatsappPermission } from "../_shared/whatsapp-policy.ts";
 import {
   atualizarChip,
   checarSaudeChip,
-  criarInstanciaDaOrg,
   definirWebhookInstancia,
   excluirInstanciaDaOrg,
   graduarChipDoLead,
   inicializarCofreWa,
   instanciaDaOrgComToken,
   listarInstanciasDaOrg,
+  logsPareamentoEvolution,
   pairInstancia,
   qrInstancia,
   observarStatusInstancia,
+  obterOuCriarInstanciaParaPareamento,
   verificarEvolutionGo,
   waBase,
   EvolutionGoPairingError,
@@ -194,7 +195,7 @@ async function handleRequest(req: Request): Promise<Response> {
   }
   if (action === "criar") {
     const funcao = body.funcao === "conversa" ? "conversa" : "disparo";
-    const instance = await criarInstanciaDaOrg(admin, scope, funcao);
+    const instance = await obterOuCriarInstanciaParaPareamento(admin, scope, funcao);
     if (!instance) return json({ error: "Não foi possível criar o chip." }, 409);
     return json({
       id: instance.id,
@@ -237,7 +238,19 @@ async function handleRequest(req: Request): Promise<Response> {
       qr = await qrInstancia(instance.token);
     } catch (error) {
       if (error instanceof EvolutionGoPairingError) {
-        return json({ error: error.message }, error.status);
+        const providerLogs = await logsPareamentoEvolution(instance.nome);
+        console.error("wa QR pairing failed", error.message, providerLogs);
+        const databaseOverloaded = providerLogs.some((log) =>
+          log.includes("too many clients already"),
+        );
+        return json(
+          {
+            error: databaseOverloaded
+              ? "O serviço do WhatsApp está temporariamente sobrecarregado. Tente novamente em alguns minutos."
+              : error.message,
+          },
+          databaseOverloaded ? 503 : error.status,
+        );
       }
       throw error;
     }

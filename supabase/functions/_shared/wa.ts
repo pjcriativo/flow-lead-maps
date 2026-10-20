@@ -23,7 +23,6 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any;
 import { resolverChave } from "./chaves.ts";
-import { normalizeEvolutionGoQr } from "../../../src/lib/evolution-go-qr.ts";
 import {
   calculateOperationalHealth,
   parseEvolutionGoStatus,
@@ -136,6 +135,25 @@ async function idNaEvolution(nome: string): Promise<string | null> {
   return inst?.id ?? null;
 }
 
+/** Logs recentes e sanitizados da instância para diagnóstico operacional do pareamento. */
+export async function logsPareamentoEvolution(nome: string): Promise<string[]> {
+  const id = await idNaEvolution(nome);
+  if (!id) return ["instance_not_found"];
+  const response = await fetch(`${waBase()}/instance/logs/${encodeURIComponent(id)}?limit=20`, {
+    headers: { apikey: waGlobalKey() },
+  });
+  if (!response.ok) return [`logs_http_${response.status}`];
+  const payload: unknown = await response.json().catch(() => null);
+  if (!Array.isArray(payload)) return ["logs_invalid_payload"];
+  return payload.slice(0, 20).map((entry) => {
+    if (!entry || typeof entry !== "object") return "invalid_log_entry";
+    const record = entry as Record<string, unknown>;
+    const level = typeof record.level === "string" ? record.level : "LOG";
+    const message = typeof record.message === "string" ? record.message : "unknown";
+    return `${level}:${message}`.slice(0, 500);
+  });
+}
+
 /** Cria a instância na Evolution com um nome dado; devolve o token dela. */
 async function criarNaEvolution(nome: string): Promise<string | null> {
   const token = crypto.randomUUID();
@@ -185,13 +203,14 @@ async function garantirTokenDaLinha(
   admin: Admin,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   row: any,
+  verificarRemoto = false,
 ): Promise<WaInstanciaOrg | null> {
   const { data: tk } = await admin
     .from("wa_instancia_tokens")
     .select("token")
     .eq("instancia_id", row.id)
     .maybeSingle();
-  if (tk?.token)
+  if (tk?.token && !verificarRemoto)
     return {
       id: row.id,
       orgId: row.org_id,
@@ -202,7 +221,7 @@ async function garantirTokenDaLinha(
       funcao: row.funcao,
     };
 
-  let token = await tokenNaEvolution(row.nome);
+  let token = verificarRemoto || !tk?.token ? await tokenNaEvolution(row.nome) : tk.token;
   let numero: string | null = row.numero;
   let status: string = row.status;
   if (!token) {
@@ -215,9 +234,11 @@ async function garantirTokenDaLinha(
       .update({ numero: null, status, atualizado_em: new Date().toISOString() })
       .eq("id", row.id);
   }
-  await admin
-    .from("wa_instancia_tokens")
-    .upsert({ instancia_id: row.id, token, atualizado_em: new Date().toISOString() });
+  if (tk?.token !== token) {
+    await admin
+      .from("wa_instancia_tokens")
+      .upsert({ instancia_id: row.id, token, atualizado_em: new Date().toISOString() });
+  }
   return {
     id: row.id,
     orgId: row.org_id,
@@ -370,6 +391,22 @@ export class EvolutionGoPairingError extends Error {
   }
 }
 
+function normalizeEvolutionGoQr(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || !("data" in payload)) return null;
+  const data = (payload as { data?: unknown }).data;
+  if (!data || typeof data !== "object") return null;
+  const record = data as Record<string, unknown>;
+  for (const candidate of [record.Qrcode, record.qrcode, record.Code, record.code]) {
+    if (typeof candidate !== "string") continue;
+    const value = candidate.trim();
+    if (/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return value;
+    if (/^iVBORw0KGgo[A-Za-z0-9+/]*={0,2}$/.test(value)) {
+      return `data:image/png;base64,${value}`;
+    }
+  }
+  return null;
+}
+
 function evolutionGoError(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== "object" || !("error" in payload)) return fallback;
   const error = (payload as { error?: unknown }).error;
@@ -436,6 +473,7 @@ export async function sincronizarInstancia(
 
 /** Código de pareamento (POST /instance/pair com o token DA ORG). */
 export async function pairInstancia(token: string, phone: string): Promise<string | null> {
+  await iniciarPareamentoInstancia(token);
   const r = await fetch(`${waBase()}/instance/pair`, {
     method: "POST",
     headers: { apikey: token, "Content-Type": "application/json" },
@@ -459,8 +497,24 @@ export async function pairInstancia(token: string, phone: string): Promise<strin
   return typeof code === "string" && code.trim() ? code.trim() : null;
 }
 
+async function iniciarPareamentoInstancia(token: string): Promise<void> {
+  const connect = await fetch(`${waBase()}/instance/connect`, {
+    method: "POST",
+    headers: { apikey: token, "Content-Type": "application/json" },
+    body: JSON.stringify({ subscribe: ["MESSAGE", "CONNECTION", "QRCODE"] }),
+  });
+  const payload: unknown = await connect.json().catch(() => null);
+  if (!connect.ok) {
+    throw new EvolutionGoPairingError(
+      evolutionGoError(payload, "A Evolution GO não iniciou a sessão de pareamento."),
+      pairingHttpStatus(connect.status),
+    );
+  }
+}
+
 /** QR da instância DA ORG (GET /instance/qr com o token dela). */
 export async function qrInstancia(token: string): Promise<string | null> {
+  await iniciarPareamentoInstancia(token);
   const q = await fetch(`${waBase()}/instance/qr`, { headers: { apikey: token } });
   const payload: unknown = await q.json().catch(() => null);
   if (!q.ok) {
@@ -470,13 +524,8 @@ export async function qrInstancia(token: string): Promise<string | null> {
     );
   }
   const qr = normalizeEvolutionGoQr(payload);
-  if (!qr) {
-    throw new EvolutionGoPairingError(
-      "A Evolution GO retornou um QR Code ausente ou em formato inválido.",
-      502,
-    );
-  }
-  return qr;
+  if (qr) return qr;
+  throw new EvolutionGoPairingError("A Evolution GO não retornou um QR Code válido.", 502);
 }
 
 /* ------------------------------ N CHIPS por org ------------------------------ */
@@ -559,6 +608,35 @@ export async function criarInstanciaDaOrg(
     status: "desconectado",
     funcao: nova.funcao,
   };
+}
+
+/**
+ * Reutiliza a tentativa de pareamento ainda sem número da organização. Isso torna o botão
+ * "Conectar número" idempotente: atualizar/tentar novamente não cria chips órfãos em sequência.
+ */
+export async function obterOuCriarInstanciaParaPareamento(
+  admin: Admin,
+  scope: WaTenantScope,
+  funcao = "disparo",
+): Promise<WaInstanciaOrg | null> {
+  const { data: pending, error } = await admin
+    .from("wa_instancias")
+    .select("id, org_id, nome, numero, status, funcao")
+    .eq("org_id", scope.orgId)
+    .eq("funcao", funcao === "conversa" ? "conversa" : "disparo")
+    .is("numero", null)
+    .in("status", ["desconectado", "aguardando"])
+    .order("criada_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  // Uma tentativa sem número pode ter ficado com um token local cuja sessão já foi
+  // descarregada pela Evolution. Confirme a existência remota antes de reutilizá-la; se ela
+  // sumiu, garantirTokenDaLinha recria a sessão com o mesmo nome e atualiza o token da mesma
+  // linha, evitando tanto `not authorized` quanto novos chips órfãos.
+  if (pending) return garantirTokenDaLinha(admin, pending, true);
+  return criarInstanciaDaOrg(admin, scope, funcao);
 }
 
 /** RECRIA a sessão Evolution de UM chip da organização autorizada. */
