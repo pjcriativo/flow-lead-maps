@@ -206,7 +206,7 @@ async function handleRequest(req: Request): Promise<Response> {
   }
   if (action === "parear") {
     if (phone.length < 12) return json({ error: "Número inválido (DDI+DDD)." }, 422);
-    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId, true);
     if (!instance) return json({ error: "Chip não encontrado." }, 404);
     let code: string | null;
     try {
@@ -231,7 +231,7 @@ async function handleRequest(req: Request): Promise<Response> {
     return json({ status: "code", instancia_id: instance.id, code });
   }
   if (action === "qr") {
-    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
+    const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId, true);
     if (!instance) return json({ error: "Chip não encontrado." }, 404);
     let qr: string | null;
     try {

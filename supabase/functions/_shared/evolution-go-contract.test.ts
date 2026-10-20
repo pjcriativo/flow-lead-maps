@@ -262,6 +262,83 @@ test("pairing preparation recreates a missing remote session in the same databas
   }
 });
 
+test("direct QR retry recreates an authorized instance whose remote session disappeared", async () => {
+  const runtime = globalThis as typeof globalThis & {
+    Deno?: { env: { get(name: string): string | undefined } };
+  };
+  const originalDeno = runtime.Deno;
+  const originalFetch = globalThis.fetch;
+  const instance = {
+    id: "authorized-instance-id",
+    org_id: "authorized-org-id",
+    nome: "org-authorized-existing",
+    numero: null,
+    status: "desconectado",
+    funcao: "disparo",
+  };
+  const upserts: unknown[] = [];
+  const updates: unknown[] = [];
+  const queryFor = (table: string) => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      update: (value: unknown) => {
+        updates.push(value);
+        return query;
+      },
+      upsert: (value: unknown) => {
+        upserts.push(value);
+        return query;
+      },
+      maybeSingle: async () =>
+        table === "wa_instancias"
+          ? { data: instance, error: null }
+          : { data: { token: "stale-instance-token" }, error: null },
+    };
+    return query;
+  };
+  const admin = { from: (table: string) => queryFor(table) };
+  const requests: Array<{ url: string; method: string }> = [];
+
+  runtime.Deno = {
+    env: {
+      get: (name) =>
+        name === "EVOLUTION_URL"
+          ? "https://evolution.invalid"
+          : name === "EVOLUTION_API_KEY"
+            ? "global-key"
+            : undefined,
+    },
+  };
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), method: init?.method ?? "GET" });
+    if ((init?.method ?? "GET") === "GET") return Response.json({ data: [] });
+    return Response.json({ data: { token: "fresh-instance-token" } });
+  };
+
+  try {
+    const { instanciaDaOrgComToken } = await import("./wa.ts");
+    const result = await instanciaDaOrgComToken(
+      admin,
+      "authorized-org-id",
+      "authorized-instance-id",
+      true,
+    );
+
+    assert.equal(result?.id, instance.id);
+    assert.equal(result?.token, "fresh-instance-token");
+    assert.deepEqual(requests, [
+      { url: "https://evolution.invalid/instance/all", method: "GET" },
+      { url: "https://evolution.invalid/instance/create", method: "POST" },
+    ]);
+    assert.equal(upserts.length, 1);
+    assert.equal(updates.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    runtime.Deno = originalDeno;
+  }
+});
+
 test("pairInstancia starts the instance before requesting the eight-digit code", async () => {
   const runtime = globalThis as typeof globalThis & {
     Deno?: { env: { get(name: string): string | undefined } };

@@ -552,6 +552,7 @@ export async function instanciaDaOrgComToken(
   admin: Admin,
   orgId: string,
   id: string,
+  verificarRemoto = false,
 ): Promise<WaInstanciaOrg | null> {
   if (!id) return null;
   const { data: row } = await admin
@@ -561,7 +562,7 @@ export async function instanciaDaOrgComToken(
     .eq("org_id", orgId)
     .maybeSingle();
   if (!row) return null;
-  return await garantirTokenDaLinha(admin, row);
+  return await garantirTokenDaLinha(admin, row, verificarRemoto);
 }
 
 /** Cria um chip NOVO para a org (Evolution + linha + token). ordem = próxima da fila. */
