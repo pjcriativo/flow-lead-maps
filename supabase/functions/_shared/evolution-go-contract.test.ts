@@ -369,3 +369,99 @@ test("pairInstancia starts the instance before requesting the eight-digit code",
     runtime.Deno = originalDeno;
   }
 });
+
+test("listing chips fetches instance info and persists the connected number when inventory omits it", async () => {
+  const runtime = globalThis as typeof globalThis & {
+    Deno?: { env: { get(name: string): string | undefined } };
+  };
+  const originalDeno = runtime.Deno;
+  const originalFetch = globalThis.fetch;
+  const updates: Array<Record<string, unknown>> = [];
+  const local = {
+    id: "local-instance-id",
+    nome: "org-authorized-connected",
+    numero: null,
+    status: "conectado",
+    funcao: "disparo",
+    ordem: 1,
+    provider_status: "connected",
+    operational_health: "healthy",
+    last_health_check_at: "2026-10-20T12:00:00.000Z",
+    last_provider_success_at: "2026-10-20T12:00:00.000Z",
+    health_failure_count: 0,
+    health_error_code: null,
+  };
+
+  const selectQuery = {
+    select: () => selectQuery,
+    eq: () => selectQuery,
+    order: () => selectQuery,
+    then: (resolve: (value: unknown) => unknown) => resolve({ data: [local], error: null }),
+  };
+  const updateQuery = {
+    eq: () => updateQuery,
+    then: (resolve: (value: unknown) => unknown) => resolve({ data: null, error: null }),
+  };
+  const admin = {
+    from: () => ({
+      ...selectQuery,
+      update: (value: Record<string, unknown>) => {
+        updates.push(value);
+        return updateQuery;
+      },
+    }),
+  };
+
+  runtime.Deno = {
+    env: {
+      get: (name) =>
+        name === "EVOLUTION_URL"
+          ? "https://evolution.invalid"
+          : name === "EVOLUTION_API_KEY"
+            ? "global-key"
+            : undefined,
+    },
+  };
+  const requests: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    requests.push(url);
+    if (url.endsWith("/instance/all")) {
+      return Response.json({
+        message: "success",
+        data: [
+          {
+            id: "remote-instance-id",
+            name: local.nome,
+            connected: true,
+            jid: null,
+          },
+        ],
+      });
+    }
+    return Response.json({
+      message: "success",
+      data: {
+        id: "remote-instance-id",
+        name: local.nome,
+        jid: "5511987654321:4@s.whatsapp.net",
+      },
+    });
+  };
+
+  try {
+    const { listarInstanciasDaOrg } = await import("./wa.ts");
+    const result = await listarInstanciasDaOrg(admin, "authorized-org-id");
+
+    assert.equal(result[0]?.numero, "5511987654321");
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0]?.numero, "5511987654321");
+    assert.deepEqual(requests, [
+      "https://evolution.invalid/instance/all",
+      "https://evolution.invalid/instance/info/remote-instance-id",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    runtime.Deno = originalDeno;
+  }
+});

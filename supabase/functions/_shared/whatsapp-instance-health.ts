@@ -49,7 +49,9 @@ export function parseEvolutionGoStatus(
 ): WaProviderObservation {
   const root = record(payload);
   const data = record(root?.data);
-  if (!data || typeof data.Connected !== "boolean" || typeof data.LoggedIn !== "boolean") {
+  const connected = data?.Connected ?? data?.connected;
+  const loggedIn = data?.LoggedIn ?? data?.loggedIn;
+  if (!data || typeof connected !== "boolean" || typeof loggedIn !== "boolean") {
     return {
       ok: false,
       observedAt,
@@ -59,16 +61,16 @@ export function parseEvolutionGoStatus(
     };
   }
 
-  const connected = data.Connected;
-  const loggedIn = data.LoggedIn;
   return {
     ok: true,
     observedAt,
     providerState: loggedIn ? "connected" : connected ? "pairing" : "disconnected",
     connected,
     loggedIn,
-    name: text(data.Name),
-    jid: normalizeWhatsappOwner(data.Jid ?? data.jid ?? data.Owner ?? data.owner),
+    name: text(data.Name ?? data.name),
+    jid: normalizeWhatsappOwner(
+      data.Jid ?? data.jid ?? data.MyJid ?? data.myJid ?? data.Owner ?? data.owner,
+    ),
   };
 }
 

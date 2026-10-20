@@ -238,3 +238,10 @@ test("25. Responsividade: 3 colunas em desktop e suporte a viewMobile em telas m
   assert.match(waConversas, /lg:col-span-4/);
   assert.match(waConversas, /viewMobile/);
 });
+
+test("26. Avatares: imagem ausente ou inválida sempre possui fallback textual", () => {
+  assert.match(waConversas, /AvatarImage/);
+  assert.match(waConversas, /AvatarFallback/);
+  assert.match(waConversas, /iniciaisDoContato/);
+  assert.doesNotMatch(waConversas, /avatar:\s*"\/placeholder\.svg"/);
+});

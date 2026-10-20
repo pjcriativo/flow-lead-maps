@@ -43,6 +43,26 @@ test("normalizes the connected owner number and removes the device suffix", () =
   assert.equal(result.ok && result.jid, "554197844716");
 });
 
+test("parses the lowercase status payload and myJid documented by Evolution GO", () => {
+  const result = parseEvolutionGoStatus(
+    {
+      data: {
+        connected: true,
+        loggedIn: true,
+        name: "org-a",
+        myJid: "5511987654321:7@s.whatsapp.net",
+      },
+    },
+    now.toISOString(),
+  );
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.providerState, "connected");
+    assert.equal(result.jid, "5511987654321");
+  }
+});
+
 test("distinguishes disconnected from awaiting pairing", () => {
   const disconnected = parseEvolutionGoStatus({ data: { Connected: false, LoggedIn: false } });
   const pairing = parseEvolutionGoStatus({ data: { Connected: true, LoggedIn: false } });

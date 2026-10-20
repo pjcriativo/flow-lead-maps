@@ -245,3 +245,11 @@ test("26. Inventário: registros locais órfãos são removidos da listagem quan
   assert.match(waShared, /remoteNames\.has/);
   assert.match(waShared, /normalizeWhatsappOwner/);
 });
+
+test("27. Novo pareamento: null cria uma instância e nunca reutiliza o chip ativo anterior", () => {
+  assert.match(
+    waNumeros,
+    /instanciaIdTarget === undefined\s*\?\s*chipAtivoId\s*:\s*instanciaIdTarget/,
+  );
+  assert.match(waNumeros, /gerarQrInstancia\(null,\s*"qr"\)/);
+});

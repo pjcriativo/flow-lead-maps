@@ -218,7 +218,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
       setGerandoQr(true);
       setErroPareamento(null);
       try {
-        let cId = instanciaIdTarget ?? chipAtivoId;
+        // `null` é intencional: força um novo chip. Apenas `undefined` reutiliza o chip ativo.
+        let cId = instanciaIdTarget === undefined ? chipAtivoId : instanciaIdTarget;
         if (!cId) {
           const novo = await criarChip("disparo");
           cId = novo.id;

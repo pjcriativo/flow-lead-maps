@@ -41,6 +41,7 @@ import {
 import { SiWhatsapp } from "react-icons/si";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -125,7 +126,7 @@ export interface ContatoConversa {
   id: string;
   numero: string;
   nome: string;
-  avatar: string;
+  avatar?: string;
   crmAvatar?: string;
   ultimaMensagem: string;
   ultimaMensagemTipo?: "texto" | "imagem" | "documento" | "audio";
@@ -156,6 +157,39 @@ export interface ContatoConversa {
     valor: number | null;
     status: string;
   };
+}
+
+function iniciaisDoContato(nome: string, numero: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length > 0) {
+    return partes
+      .slice(0, 2)
+      .map((parte) => parte[0])
+      .join("")
+      .toUpperCase();
+  }
+  return numero.slice(-2) || "WA";
+}
+
+function ContactAvatar({
+  nome,
+  numero,
+  src,
+  className,
+}: {
+  nome: string;
+  numero: string;
+  src?: string;
+  className?: string;
+}) {
+  return (
+    <Avatar className={cn("ring-1 ring-border", className)}>
+      {src ? <AvatarImage src={src} alt={nome} className="object-cover" /> : null}
+      <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
+        {iniciaisDoContato(nome, numero)}
+      </AvatarFallback>
+    </Avatar>
+  );
 }
 
 function crmStatusFromLead(status: unknown): StatusComercial {
@@ -269,7 +303,7 @@ export function WaConversas() {
           id: conversation.id,
           numero: conversation.numero,
           nome: conversation.nome_contato || conversation.numero,
-          avatar: "/placeholder.svg",
+          avatar: undefined,
           ultimaMensagem: conversation.ultima || "",
           horario: new Date(conversation.ultima_em).toLocaleTimeString("pt-BR", {
             hour: "2-digit",
@@ -289,7 +323,7 @@ export function WaConversas() {
                     : "nao_atribuida",
           statusComercial: "Lead",
           pipelineEtapa: "Prospecção",
-          responsavel: { nome: "Equipe", avatar: "/placeholder.svg" },
+          responsavel: { nome: "Equipe", avatar: "" },
           tags: [],
           email: "",
           empresa: "",
@@ -1156,11 +1190,7 @@ export function WaConversas() {
                   >
                     {/* Avatar com badge WhatsApp verde oficial */}
                     <div className="relative shrink-0">
-                      <img
-                        src={c.avatar}
-                        alt={c.nome}
-                        className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10"
-                      />
+                      <ContactAvatar nome={c.nome} numero={c.numero} src={c.avatar} />
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#22c55e] text-white ring-2 ring-[#0c101a]">
                         <SiWhatsapp className="h-2 w-2" />
                       </span>
@@ -1233,10 +1263,10 @@ export function WaConversas() {
 
                   {/* Avatar do Contato */}
                   <div className="relative shrink-0">
-                    <img
+                    <ContactAvatar
+                      nome={contatoAtivo.nome}
+                      numero={contatoAtivo.numero}
                       src={contatoAtivo.avatar}
-                      alt={contatoAtivo.nome}
-                      className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10"
                     />
                     <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#22c55e] text-white ring-2 ring-[#0c101a]">
                       <SiWhatsapp className="h-2 w-2" />
@@ -1644,10 +1674,11 @@ export function WaConversas() {
               <div className="flex items-center justify-between gap-3 border-b border-[#1b2334] pb-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="relative shrink-0">
-                    <img
+                    <ContactAvatar
+                      nome={contatoAtivo.nome}
+                      numero={contatoAtivo.numero}
                       src={contatoAtivo.crmAvatar || contatoAtivo.avatar}
-                      alt={contatoAtivo.nome}
-                      className="h-12 w-12 rounded-full object-cover ring-2 ring-emerald-500/30"
+                      className="h-12 w-12 ring-2 ring-emerald-500/30"
                     />
                     <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#22c55e] text-white ring-2 ring-[#0c101a]">
                       <SiWhatsapp className="h-2.5 w-2.5" />

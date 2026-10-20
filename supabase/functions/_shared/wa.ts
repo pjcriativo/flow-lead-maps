@@ -119,6 +119,7 @@ type WaRemoteInstance = {
   name: string;
   token: string | null;
   owner: string;
+  connected: boolean;
 };
 
 function remoteText(record: Record<string, unknown>, ...keys: string[]): string {
@@ -127,6 +128,43 @@ function remoteText(record: Record<string, unknown>, ...keys: string[]): string 
     if (typeof value === "string" && value.trim()) return value.trim();
   }
   return "";
+}
+
+async function numeroNaInstanciaRemota(id: string): Promise<string> {
+  if (!id) return "";
+  try {
+    const response = await fetch(`${waBase()}/instance/info/${encodeURIComponent(id)}`, {
+      headers: { apikey: waGlobalKey() },
+    });
+    if (!response.ok) {
+      console.warn(
+        JSON.stringify({
+          event: "wa_instance_info_failed",
+          instance_id: id,
+          status: response.status,
+        }),
+      );
+      return "";
+    }
+    const payload: unknown = await response.json().catch(() => null);
+    const root =
+      payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+    const data =
+      root?.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : root;
+    if (!data) return "";
+    return normalizeWhatsappOwner(
+      data.owner ?? data.Owner ?? data.jid ?? data.Jid ?? data.myJid ?? data.MyJid,
+    );
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        event: "wa_instance_info_unavailable",
+        instance_id: id,
+        error: error instanceof Error ? error.name : "unknown_error",
+      }),
+    );
+    return "";
+  }
 }
 
 async function listarInstanciasRemotas(): Promise<WaRemoteInstance[] | null> {
@@ -141,7 +179,7 @@ async function listarInstanciasRemotas(): Promise<WaRemoteInstance[] | null> {
         ? (payload as { data?: unknown }).data
         : null;
     if (!Array.isArray(data)) return null;
-    return data.flatMap((value) => {
+    const instances = data.flatMap((value) => {
       if (!value || typeof value !== "object") return [];
       const item = value as Record<string, unknown>;
       const name = remoteText(item, "name", "Name");
@@ -151,10 +189,20 @@ async function listarInstanciasRemotas(): Promise<WaRemoteInstance[] | null> {
           id: remoteText(item, "id", "Id", "ID"),
           name,
           token: remoteText(item, "token", "Token") || null,
-          owner: normalizeWhatsappOwner(item.owner ?? item.Owner ?? item.jid ?? item.Jid),
+          owner: normalizeWhatsappOwner(
+            item.owner ?? item.Owner ?? item.jid ?? item.Jid ?? item.myJid ?? item.MyJid,
+          ),
+          connected: (item.connected ?? item.Connected) === true,
         },
       ];
     });
+    await Promise.all(
+      instances.map(async (instance) => {
+        if (!instance.connected || instance.owner || !instance.id) return;
+        instance.owner = await numeroNaInstanciaRemota(instance.id);
+      }),
+    );
+    return instances;
   } catch {
     return null;
   }
