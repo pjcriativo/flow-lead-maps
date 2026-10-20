@@ -60,6 +60,7 @@ import {
   alterarContingencia,
   checarChip,
   criarChip,
+  criarEQrChip,
   enviarTesteWhatsapp,
   excluirChip,
   formatarNumeroWhatsapp,
@@ -218,15 +219,23 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
       setGerandoQr(true);
       setErroPareamento(null);
       try {
-        // `null` é intencional: força um novo chip. Apenas `undefined` reutiliza o chip ativo.
+        // Para QR sem chip existente: usa criarEQrChip (atômico) que faz rollback se o QR falhar.
+        // Para QR com chip existente (reconexão): usa qrChip normalmente.
+        // Para código de pareamento: cria chip se necessário, depois solicita o código.
         let cId = instanciaIdTarget === undefined ? chipAtivoId : instanciaIdTarget;
-        if (!cId) {
-          const novo = await criarChip("disparo");
-          cId = novo.id;
-          setChipAtivoId(novo.id);
-        }
 
         if (requestedMethod === "qr") {
+          if (!cId) {
+            // Sem chip: cria + QR em operação atômica. Rollback automático se QR falhar.
+            const result = await criarEQrChip("disparo");
+            setChipAtivoId(result.instancia_id);
+            setQrCodeData(result.qr);
+            setPairingCode(null);
+            setTempoExpiracaoQr(result.expires_in || QR_EXPIRATION_SECONDS);
+            toast.success("QR Code gerado com sucesso.");
+            return;
+          }
+          // Chip já existente: renova QR.
           const result = await qrChip(cId);
           if (result.status === "qr") {
             setQrCodeData(result.qr);
@@ -240,6 +249,13 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
             setErroPareamento(message);
           }
           return;
+        }
+
+        // Método "code": precisa de chip criado antes de solicitar o código.
+        if (!cId) {
+          const novo = await criarChip("disparo");
+          cId = novo.id;
+          setChipAtivoId(novo.id);
         }
 
         const phone = telefonePareamento.replace(/\D/g, "");

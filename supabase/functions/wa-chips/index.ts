@@ -15,6 +15,7 @@ import {
   instanciaDaOrgComToken,
   listarInstanciasDaOrg,
   logsPareamentoEvolution,
+  obterOuCriarEObterQr,
   pairInstancia,
   qrInstancia,
   observarStatusInstancia,
@@ -22,6 +23,7 @@ import {
   verificarEvolutionGo,
   waBase,
   EvolutionGoPairingError,
+  type WaInstanciaOrg,
 } from "../_shared/wa.ts";
 
 async function handleRequest(req: Request): Promise<Response> {
@@ -201,6 +203,39 @@ async function handleRequest(req: Request): Promise<Response> {
       id: instance.id,
       nome: instance.nome,
       status: instance.status,
+      funcao: instance.funcao,
+    });
+  }
+  if (action === "criar_e_qr") {
+    // Operação atômica: cria/reutiliza instância + gera QR em um único passo com rollback automático.
+    // O diagnóstico de "too many clients" e o rollback são feitos dentro de obterOuCriarEObterQr.
+    const funcao = body.funcao === "conversa" ? "conversa" : "disparo";
+    let result: { instance: WaInstanciaOrg; qr: string };
+    try {
+      result = await obterOuCriarEObterQr(admin, scope, funcao);
+    } catch (error) {
+      if (error instanceof EvolutionGoPairingError) {
+        return json({ error: error.message }, error.status);
+      }
+      throw error;
+    }
+    const { instance, qr } = result;
+    await admin.rpc("wa_record_instance_event", {
+      p_org: context.orgId,
+      p_instance: instance.id,
+      p_event_type: "qr_requested",
+      p_source: "manual",
+      p_actor: context.userId,
+      p_occurred_at: new Date().toISOString(),
+      p_event_key: `qr:${instance.id}:${Date.now()}`,
+      p_details: {},
+    });
+    return json({
+      status: "qr",
+      instancia_id: instance.id,
+      qr,
+      expires_in: 40,
+      nome: instance.nome,
       funcao: instance.funcao,
     });
   }

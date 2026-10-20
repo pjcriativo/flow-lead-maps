@@ -193,6 +193,27 @@ export async function qrChip(instancia_id: string) {
   return { ...result, qr, expires_in: result.expires_in || 40 };
 }
 
+/**
+ * Operação atômica: cria/reutiliza instância E gera QR em um único pedido ao backend.
+ * Substitui o padrão criarChip() + qrChip() que deixava chips órfãos (sem número) quando o QR
+ * falhava (ex: Evolution sobrecarregada -> 503). O backend faz rollback automático da instância
+ * recém-criada se o QR não for entregue pela Evolution.
+ */
+export async function criarEQrChip(funcao: "disparo" | "conversa" = "disparo") {
+  const result = await waChips<{
+    status: "qr";
+    instancia_id: string;
+    qr: string;
+    expires_in?: number;
+    nome: string;
+    funcao?: string;
+  }>({ acao: "criar_e_qr", funcao });
+
+  const qr = normalizeEvolutionGoQr({ data: { Qrcode: result.qr } });
+  if (!qr) throw new Error("O serviço de conexão retornou um QR Code inválido. Tente novamente.");
+  return { ...result, qr, expires_in: result.expires_in || 40 };
+}
+
 /** Lê o status real de um chip (sincroniza numero/status). */
 export async function statusChip(instancia_id: string, signal?: AbortSignal) {
   return waChips<{ status: string; numero: string | null; instancia_id?: string }>(
@@ -1249,7 +1270,7 @@ export type WaCampaignEngineSnapshot = {
 
 function campaignEngineItem(value: unknown): WaCampaignEngineItem {
   if (!value || typeof value !== "object")
-    throw new Error("Campanha invÃ¡lida no motor de envios.");
+    throw new Error("Campanha inválida no motor de envios.");
   const row = value as Record<string, unknown>;
   if (
     typeof row.id !== "string" ||
@@ -1261,7 +1282,7 @@ function campaignEngineItem(value: unknown): WaCampaignEngineItem {
     !row.counts ||
     typeof row.counts !== "object"
   ) {
-    throw new Error("Campanha invÃ¡lida no motor de envios.");
+    throw new Error("Campanha inválida no motor de envios.");
   }
   const counts = Object.fromEntries(
     Object.entries(row.counts as Record<string, unknown>).map(([key, count]) => [
@@ -1291,14 +1312,14 @@ async function invokeCampaignControl(
   });
   if (error) throw error;
   if (!data || typeof data !== "object")
-    throw new Error("Resposta invÃ¡lida do motor de campanhas.");
+    throw new Error("Resposta inválida do motor de campanhas.");
   return data as Record<string, unknown>;
 }
 
 export async function consultarMotorCampanhasWa(): Promise<WaCampaignEngineSnapshot> {
   const value = await invokeCampaignControl({ action: "list" });
   if (!Array.isArray(value.campaigns) || !value.metrics || typeof value.metrics !== "object") {
-    throw new Error("Resposta invÃ¡lida do motor de campanhas.");
+    throw new Error("Resposta inválida do motor de campanhas.");
   }
   const metrics = value.metrics as Record<string, unknown>;
   const rawChipMetrics =
@@ -1359,7 +1380,7 @@ export async function criarRascunhoCampanhaWa(input: {
     timezone: input.timezone,
   });
   const campaign = value.campaign;
-  if (!campaign || typeof campaign !== "object") throw new Error("Rascunho nÃ£o persistido.");
+  if (!campaign || typeof campaign !== "object") throw new Error("Rascunho não persistido.");
   const row = campaign as Record<string, unknown>;
   return {
     id: String(row.campaign_id),
