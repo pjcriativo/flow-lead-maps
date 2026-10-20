@@ -23,6 +23,7 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Admin = any;
 import { resolverChave } from "./chaves.ts";
+import { normalizeEvolutionGoQr } from "../../../src/lib/evolution-go-qr.ts";
 import {
   calculateOperationalHealth,
   parseEvolutionGoStatus,
@@ -359,6 +360,27 @@ export async function excluirInstanciaDaOrg(
 
 export type WaStatus = { connected: boolean; loggedIn: boolean; name: string; jid: string };
 
+export class EvolutionGoPairingError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "EvolutionGoPairingError";
+    this.status = status;
+  }
+}
+
+function evolutionGoError(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object" || !("error" in payload)) return fallback;
+  const error = (payload as { error?: unknown }).error;
+  return typeof error === "string" && error.trim() ? error.trim().slice(0, 200) : fallback;
+}
+
+function pairingHttpStatus(providerStatus: number): number {
+  if (providerStatus === 400 || providerStatus === 404 || providerStatus === 409) return 409;
+  return 502;
+}
+
 /** Typed provider observation. Transport failures are never treated as disconnections. */
 export async function observarStatusInstancia(
   token: string,
@@ -419,19 +441,42 @@ export async function pairInstancia(token: string, phone: string): Promise<strin
     headers: { apikey: token, "Content-Type": "application/json" },
     body: JSON.stringify({ phone }),
   });
-  if (!r.ok) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const j: any = await r.json().catch(() => ({}));
-  return j?.data?.PairingCode || null;
+  const payload: unknown = await r.json().catch(() => null);
+  if (!r.ok) {
+    throw new EvolutionGoPairingError(
+      evolutionGoError(payload, "A Evolution GO recusou o código de pareamento."),
+      pairingHttpStatus(r.status),
+    );
+  }
+  const data =
+    payload && typeof payload === "object" && "data" in payload
+      ? (payload as { data?: unknown }).data
+      : null;
+  const code =
+    data && typeof data === "object" && "PairingCode" in data
+      ? (data as { PairingCode?: unknown }).PairingCode
+      : null;
+  return typeof code === "string" && code.trim() ? code.trim() : null;
 }
 
 /** QR da instância DA ORG (GET /instance/qr com o token dela). */
 export async function qrInstancia(token: string): Promise<string | null> {
   const q = await fetch(`${waBase()}/instance/qr`, { headers: { apikey: token } });
-  if (!q.ok) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const qj: any = await q.json().catch(() => ({}));
-  return qj?.data?.Qrcode || null;
+  const payload: unknown = await q.json().catch(() => null);
+  if (!q.ok) {
+    throw new EvolutionGoPairingError(
+      evolutionGoError(payload, "A Evolution GO não disponibilizou um QR Code."),
+      pairingHttpStatus(q.status),
+    );
+  }
+  const qr = normalizeEvolutionGoQr(payload);
+  if (!qr) {
+    throw new EvolutionGoPairingError(
+      "A Evolution GO retornou um QR Code ausente ou em formato inválido.",
+      502,
+    );
+  }
+  return qr;
 }
 
 /* ------------------------------ N CHIPS por org ------------------------------ */

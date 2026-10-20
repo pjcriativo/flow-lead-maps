@@ -82,6 +82,7 @@ import {
 } from "@/services/whatsapp";
 
 const MAX_POLL_FAILURES = 3;
+const QR_EXPIRATION_SECONDS = 40;
 
 export interface WaNumerosProps {
   onMudou?: () => void;
@@ -118,7 +119,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [telefonePareamento, setTelefonePareamento] = useState("");
   const [gerandoQr, setGerandoQr] = useState(false);
-  const [tempoExpiracaoQr, setTempoExpiracaoQr] = useState(60);
+  const [tempoExpiracaoQr, setTempoExpiracaoQr] = useState(QR_EXPIRATION_SECONDS);
+  const [erroPareamento, setErroPareamento] = useState<string | null>(null);
 
   // Configuração do Chip no Assistente (Etapa 2)
   const [novoNome, setNovoNome] = useState("Chip Comercial");
@@ -177,6 +179,63 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
     [onMudou],
   );
 
+  const gerarQrInstancia = useCallback(
+    async (instanciaIdTarget?: string | null, requestedMethod: "qr" | "code" = metodoConexao) => {
+      setGerandoQr(true);
+      setErroPareamento(null);
+      try {
+        let cId = instanciaIdTarget ?? chipAtivoId;
+        if (!cId) {
+          const novo = await criarChip("disparo");
+          cId = novo.id;
+          setChipAtivoId(novo.id);
+        }
+
+        if (requestedMethod === "qr") {
+          const result = await qrChip(cId);
+          if (result.status === "qr") {
+            setQrCodeData(result.qr);
+            setPairingCode(null);
+            setTempoExpiracaoQr(result.expires_in || QR_EXPIRATION_SECONDS);
+            toast.success("QR Code atualizado pela Evolution GO");
+          } else {
+            const message =
+              "QR Code ainda não está disponível. Tente novamente em alguns segundos.";
+            setQrCodeData(null);
+            setErroPareamento(message);
+            toast.info(message);
+          }
+          return;
+        }
+
+        const phone = telefonePareamento.replace(/\D/g, "");
+        if (phone.length < 12) {
+          const message = "Informe o número completo com DDI + DDD.";
+          setErroPareamento(message);
+          toast.error(message);
+          return;
+        }
+        const result = await parearChip(cId, phone);
+        if (result.status === "code" && "code" in result) {
+          setPairingCode(result.code);
+          setQrCodeData(null);
+          toast.success("Código de pareamento gerado.");
+        } else {
+          throw new Error("A Evolution GO não retornou um código de pareamento válido.");
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Falha ao gerar QR Code";
+        setQrCodeData(null);
+        setPairingCode(null);
+        setErroPareamento(message);
+        toast.error(message);
+      } finally {
+        setGerandoQr(false);
+      }
+    },
+    [chipAtivoId, metodoConexao, telefonePareamento],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
     void carregarDados({ signal: controller.signal, notifyParent: false });
@@ -202,6 +261,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
         failures = 0;
         if (s.status === "conectado") {
           stopped = true;
+          setErroPareamento(null);
           toast.success("Dispositivo WhatsApp conectado com sucesso!");
           setEtapaAssistente(2);
           void carregarDados({ notifyParent: true });
@@ -214,6 +274,11 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           stopped = true;
           setQrCodeData(null);
           setPairingCode(null);
+          setErroPareamento(
+            error instanceof Error
+              ? error.message
+              : "Não foi possível confirmar o estado da conexão.",
+          );
           return;
         }
       }
@@ -228,86 +293,50 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
     };
   }, [etapaAssistente, chipAtivoId, qrCodeData, pairingCode, carregarDados]);
 
-  // Contador de expiração do QR Code (~60s)
+  // A Evolution GO renova o QR aproximadamente a cada 40 segundos.
   useEffect(() => {
     if (etapaAssistente !== 1 || !qrCodeData) {
       if (timerQrRef.current) window.clearInterval(timerQrRef.current);
       return;
     }
 
-    setTempoExpiracaoQr(60);
-    timerQrRef.current = window.setInterval(() => {
-      setTempoExpiracaoQr((prev) => {
-        if (prev <= 1) {
-          // Quando expirar, recria o QR se ainda estiver aguardando
-          gerarQrInstancia(chipAtivoId);
-          return 60;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (timerQrRef.current) window.clearInterval(timerQrRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapaAssistente, qrCodeData, chipAtivoId]);
-
-  // Gerar QR Code ou Código de Pareamento
-  const gerarQrInstancia = async (instanciaIdTarget?: string | null) => {
-    setGerandoQr(true);
-    try {
-      let cId = instanciaIdTarget ?? chipAtivoId;
-      if (!cId) {
-        // Cria chip com função inicial 'disparo'
-        const novo = await criarChip("disparo");
-        cId = novo.id;
-        setChipAtivoId(novo.id);
-      }
-
-      if (metodoConexao === "qr") {
-        const r = await qrChip(cId);
-        if (r.status === "qr" && "qr" in r) {
-          setQrCodeData(r.qr);
-          setPairingCode(null);
-          toast.success("QR Code atualizado pela Evolution API");
-        } else {
-          setQrCodeData(null);
-          toast.info("QR Code ainda não está disponível. Tente atualizar em alguns segundos.");
-        }
-      } else {
-        if (telefonePareamento.replace(/\D/g, "").length < 12) {
-          toast.error("Informe o número completo com DDI + DDD.");
-          setGerandoQr(false);
+    let stopped = false;
+    let remaining = QR_EXPIRATION_SECONDS;
+    setTempoExpiracaoQr(remaining);
+    const tick = () => {
+      timerQrRef.current = window.setTimeout(() => {
+        if (stopped) return;
+        remaining -= 1;
+        setTempoExpiracaoQr(remaining);
+        if (remaining <= 0) {
+          void gerarQrInstancia(chipAtivoId).finally(() => {
+            if (stopped) return;
+            remaining = QR_EXPIRATION_SECONDS;
+            setTempoExpiracaoQr(remaining);
+            tick();
+          });
           return;
         }
-        const r = await parearChip(cId, telefonePareamento.replace(/\D/g, ""));
-        if (r.status === "code" && "code" in r) {
-          setPairingCode(r.code);
-          setQrCodeData(null);
-          toast.success("Código de pareamento gerado.");
-        } else {
-          toast.error("Falha ao gerar código de pareamento.");
-        }
-      }
-    } catch (e) {
-      if (isWhatsappAuthorizationError(e)) {
-        setQrCodeData(null);
-        setPairingCode(null);
-      }
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar QR Code");
-    } finally {
-      setGerandoQr(false);
-    }
-  };
+        tick();
+      }, 1000);
+    };
+    tick();
+
+    return () => {
+      stopped = true;
+      if (timerQrRef.current) window.clearTimeout(timerQrRef.current);
+    };
+  }, [etapaAssistente, qrCodeData, chipAtivoId, gerarQrInstancia]);
 
   // Iniciar Assistente com foco
   const iniciarNovoPareamento = () => {
+    setMetodoConexao("qr");
     setChipAtivoId(null);
     setQrCodeData(null);
     setPairingCode(null);
+    setErroPareamento(null);
     setEtapaAssistente(1);
-    gerarQrInstancia(null);
+    void gerarQrInstancia(null, "qr");
   };
 
   // Salvar Configuração da Etapa 2
@@ -1166,7 +1195,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                     type="button"
                     onClick={() => {
                       setMetodoConexao("qr");
-                      gerarQrInstancia(chipAtivoId);
+                      setPairingCode(null);
+                      void gerarQrInstancia(chipAtivoId, "qr");
                     }}
                     className={cn(
                       "flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs font-medium transition-all cursor-pointer",
@@ -1180,7 +1210,11 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMetodoConexao("code")}
+                    onClick={() => {
+                      setMetodoConexao("code");
+                      setQrCodeData(null);
+                      setErroPareamento(null);
+                    }}
                     className={cn(
                       "flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs font-medium transition-all cursor-pointer",
                       metodoConexao === "code"
@@ -1192,6 +1226,16 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                     Código 8 Dígitos
                   </button>
                 </div>
+
+                {erroPareamento ? (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-[11px] leading-relaxed text-rose-200"
+                  >
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+                    <span>{erroPareamento}</span>
+                  </div>
+                ) : null}
 
                 {metodoConexao === "qr" ? (
                   <div className="flex flex-col items-center gap-3">

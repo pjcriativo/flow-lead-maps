@@ -20,6 +20,7 @@ import {
   observarStatusInstancia,
   verificarEvolutionGo,
   waBase,
+  EvolutionGoPairingError,
 } from "../_shared/wa.ts";
 
 async function handleRequest(req: Request): Promise<Response> {
@@ -206,7 +207,15 @@ async function handleRequest(req: Request): Promise<Response> {
     if (phone.length < 12) return json({ error: "Número inválido (DDI+DDD)." }, 422);
     const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
     if (!instance) return json({ error: "Chip não encontrado." }, 404);
-    const code = await pairInstancia(instance.token, phone);
+    let code: string | null;
+    try {
+      code = await pairInstancia(instance.token, phone);
+    } catch (error) {
+      if (error instanceof EvolutionGoPairingError) {
+        return json({ error: error.message }, error.status);
+      }
+      throw error;
+    }
     if (!code) return json({ error: "Não foi possível gerar o código." }, 409);
     await admin.rpc("wa_record_instance_event", {
       p_org: context.orgId,
@@ -223,7 +232,15 @@ async function handleRequest(req: Request): Promise<Response> {
   if (action === "qr") {
     const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
     if (!instance) return json({ error: "Chip não encontrado." }, 404);
-    const qr = await qrInstancia(instance.token);
+    let qr: string | null;
+    try {
+      qr = await qrInstancia(instance.token);
+    } catch (error) {
+      if (error instanceof EvolutionGoPairingError) {
+        return json({ error: error.message }, error.status);
+      }
+      throw error;
+    }
     if (qr) {
       await admin.rpc("wa_record_instance_event", {
         p_org: context.orgId,
@@ -237,7 +254,7 @@ async function handleRequest(req: Request): Promise<Response> {
       });
     }
     return qr
-      ? json({ status: "qr", instancia_id: instance.id, qr })
+      ? json({ status: "qr", instancia_id: instance.id, qr, expires_in: 40 })
       : json({ status: "aguardando", instancia_id: instance.id });
   }
   if (action === "reconectar") {

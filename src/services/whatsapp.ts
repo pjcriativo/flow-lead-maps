@@ -6,6 +6,7 @@ import {
   getActiveOrganizationContext,
   type ActiveOrganizationContext,
 } from "@/lib/active-organization";
+import { normalizeEvolutionGoQr } from "@/lib/evolution-go-qr";
 
 const WHATSAPP_ADMIN_ROLES = new Set(["admin", "gerente", "super_admin"]);
 
@@ -24,6 +25,20 @@ function edgeResponseStatus(error: unknown): number | null {
   if (!error || typeof error !== "object" || !("context" in error)) return null;
   const context = (error as { context?: unknown }).context;
   return context instanceof Response ? context.status : null;
+}
+
+async function edgeResponseMessage(error: unknown): Promise<string | null> {
+  if (!error || typeof error !== "object" || !("context" in error)) return null;
+  const context = (error as { context?: unknown }).context;
+  if (!(context instanceof Response)) return null;
+  try {
+    const payload: unknown = await context.clone().json();
+    if (!payload || typeof payload !== "object" || !("error" in payload)) return null;
+    const message = (payload as { error?: unknown }).error;
+    return typeof message === "string" && message.trim() ? message.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 export function isWhatsappAuthorizationError(error: unknown): boolean {
@@ -60,12 +75,13 @@ async function invokeWhatsappEdge<T>(
   });
   if (error) {
     const status = edgeResponseStatus(error);
+    const providerMessage = await edgeResponseMessage(error);
     throw new WhatsappEdgeRequestError(
       status === 401
         ? "Sessão expirada. Entre novamente."
         : status === 403
           ? "Sem permissão para esta operação."
-          : "Falha ao consultar o serviço WhatsApp.",
+          : (providerMessage ?? "Falha ao consultar o serviço WhatsApp."),
       status,
       { cause: error },
     );
@@ -158,7 +174,15 @@ export async function parearChip(instancia_id: string, phone: string) {
 
 /** Gera o QR de um chip (recria a sessão dele). */
 export async function qrChip(instancia_id: string) {
-  return waChips<WaConnect & { instancia_id?: string }>({ acao: "qr", instancia_id });
+  const result = await waChips<
+    | { status: "qr"; instancia_id: string; qr: string; expires_in?: number }
+    | { status: "aguardando"; instancia_id: string }
+  >({ acao: "qr", instancia_id });
+  if (result.status !== "qr") return result;
+
+  const qr = normalizeEvolutionGoQr({ data: { Qrcode: result.qr } });
+  if (!qr) throw new Error("A Evolution GO retornou um QR Code em formato inválido.");
+  return { ...result, qr, expires_in: result.expires_in || 40 };
 }
 
 /** Lê o status real de um chip (sincroniza numero/status). */

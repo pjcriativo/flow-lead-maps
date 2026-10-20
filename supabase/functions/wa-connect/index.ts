@@ -6,6 +6,7 @@ import {
 } from "../_shared/whatsapp-authorization.ts";
 import {
   inicializarCofreWa,
+  EvolutionGoPairingError,
   pairInstancia,
   qrInstancia,
   resolverInstanciaDaOrg,
@@ -62,7 +63,15 @@ Deno.serve(async (req) => {
   if (phone) {
     const instance = await resolverInstanciaDaOrg(admin, scope, true);
     if (!instance) return json({ error: "Não foi possível preparar a instância." }, 409);
-    const code = await pairInstancia(instance.token, phone);
+    let code: string | null;
+    try {
+      code = await pairInstancia(instance.token, phone);
+    } catch (error) {
+      if (error instanceof EvolutionGoPairingError) {
+        return json({ error: error.message }, error.status);
+      }
+      throw error;
+    }
     if (!code) return json({ error: "Não foi possível gerar o código de pareamento." }, 409);
     return json({ status: "code", instancia: instance.nome, code });
   }
@@ -70,9 +79,17 @@ Deno.serve(async (req) => {
   if (fresh) {
     const instance = await resolverInstanciaDaOrg(admin, scope, true);
     if (!instance) return json({ error: "Não foi possível preparar a instância." }, 409);
-    const qr = await qrInstancia(instance.token);
+    let qr: string | null;
+    try {
+      qr = await qrInstancia(instance.token);
+    } catch (error) {
+      if (error instanceof EvolutionGoPairingError) {
+        return json({ error: error.message }, error.status);
+      }
+      throw error;
+    }
     return qr
-      ? json({ status: "qr", instancia: instance.nome, qr })
+      ? json({ status: "qr", instancia: instance.nome, qr, expires_in: 40 })
       : json({ status: "aguardando", instancia: instance.nome });
   }
 
@@ -90,8 +107,16 @@ Deno.serve(async (req) => {
       numero: numero ?? instance.numero,
     });
   }
-  const qr = await qrInstancia(instance.token);
+  let qr: string | null;
+  try {
+    qr = await qrInstancia(instance.token);
+  } catch (error) {
+    if (error instanceof EvolutionGoPairingError) {
+      return json({ error: error.message }, error.status);
+    }
+    throw error;
+  }
   return qr
-    ? json({ status: "qr", instancia: instance.nome, qr })
+    ? json({ status: "qr", instancia: instance.nome, qr, expires_in: 40 })
     : json({ status: "aguardando", instancia: instance.nome });
 });
