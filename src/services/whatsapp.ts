@@ -235,13 +235,11 @@ export async function marcarChip(
   return waChips<{ ok: boolean; error?: string }>({ acao: "marcar", instancia_id, ...patch });
 }
 
-/** EXCLUI um chip (irreversível). Recusa se o chip já enviou (histórico) e pede confirmação
- * explícita se ele tem número pareado (excluir mata a sessão do WhatsApp). */
+/** Remove a conexão e arquiva seus metadados, preservando histórico e auditoria. */
 export async function excluirChip(instancia_id: string, confirmar = false) {
   return waChips<{
     ok: boolean;
-    motivo?: "nao_encontrado" | "tem_historico" | "pareado_precisa_confirmar" | string;
-    envios?: number;
+    motivo?: "nao_encontrado" | "pareado_precisa_confirmar" | string;
     numero?: string | null;
   }>({ acao: "excluir", instancia_id, confirmar });
 }

@@ -42,9 +42,13 @@ test("foreign chip QR and pairing requests resolve the instance inside the autho
   assert.doesNotMatch(chips, /recriarInstanciaPorId/);
 });
 
-test("foreign chip deletion is scoped and returns not found without deleting history", () => {
+test("foreign chip deletion is scoped and archives without deleting history", () => {
   assert.match(wa, /excluirInstanciaDaOrg[\s\S]*?\.eq\("org_id", scope\.orgId\)/);
-  assert.match(wa, /motivo: "tem_historico"/);
+  assert.match(wa, /deleted_at: new Date\(\)\.toISOString\(\)/);
+  assert.doesNotMatch(
+    wa,
+    /\.from\("wa_instancias"\)[\s\S]{0,80}\.delete\(\)[\s\S]{0,80}scope\.orgId/,
+  );
 });
 
 test("chip management requires the manage_numbers backend permission", () => {

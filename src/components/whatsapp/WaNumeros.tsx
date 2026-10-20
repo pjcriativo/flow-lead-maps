@@ -526,13 +526,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
     try {
       const r = await excluirChip(chipParaExcluir.id, true);
       if (!r.ok) {
-        if (r.motivo === "tem_historico") {
-          toast.error(
-            `Este chip possui ${r.envios} envios registrados. Marque como "Queimado" ou "Reserva" para não perder a rastreabilidade.`,
-          );
-        } else {
-          toast.error(`Falha ao excluir: ${r.motivo}`);
-        }
+        toast.error(`Falha ao excluir: ${r.motivo}`);
       } else {
         toast.success(`Chip ${chipParaExcluir.nome} excluído com sucesso.`);
         setModalExcluirAberto(false);
@@ -2017,8 +2011,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           </DialogHeader>
 
           <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-200">
-            Esta ação desvincula a sessão do WhatsApp. Se o chip possuir mensagens já enviadas, o
-            sistema impedirá a exclusão para preservar o histórico.
+            Esta ação desvincula a sessão do WhatsApp e remove a conexão desta lista. Mensagens,
+            envios e registros de auditoria serão preservados.
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

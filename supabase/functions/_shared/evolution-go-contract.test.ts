@@ -326,6 +326,7 @@ test("direct QR retry recreates an authorized instance whose remote session disa
     const query = {
       select: () => query,
       eq: () => query,
+      is: () => query,
       update: (value: unknown) => {
         updates.push(value);
         return query;
@@ -414,7 +415,7 @@ test("pairInstancia starts the instance before requesting the eight-digit code",
   }
 });
 
-test("listing chips fetches instance info and persists the connected number when inventory omits it", async () => {
+test("listing chips fetches instance info for disconnected sessions and reconciles stale local state", async () => {
   const runtime = globalThis as typeof globalThis & {
     Deno?: { env: { get(name: string): string | undefined } };
   };
@@ -439,6 +440,7 @@ test("listing chips fetches instance info and persists the connected number when
   const selectQuery = {
     select: () => selectQuery,
     eq: () => selectQuery,
+    is: () => selectQuery,
     order: () => selectQuery,
     then: (resolve: (value: unknown) => unknown) => resolve({ data: [local], error: null }),
   };
@@ -477,7 +479,7 @@ test("listing chips fetches instance info and persists the connected number when
           {
             id: "remote-instance-id",
             name: local.nome,
-            connected: true,
+            connected: false,
             jid: null,
           },
         ],
@@ -498,8 +500,12 @@ test("listing chips fetches instance info and persists the connected number when
     const result = await listarInstanciasDaOrg(admin, "authorized-org-id");
 
     assert.equal(result[0]?.numero, "5511987654321");
+    assert.equal(result[0]?.status, "desconectado");
+    assert.equal(result[0]?.provider_status, "disconnected");
+    assert.equal(result[0]?.operational_health, "unavailable");
     assert.equal(updates.length, 1);
     assert.equal(updates[0]?.numero, "5511987654321");
+    assert.equal(updates[0]?.status, "desconectado");
     assert.deepEqual(requests, [
       "https://evolution.invalid/instance/all",
       "https://evolution.invalid/instance/info/remote-instance-id",

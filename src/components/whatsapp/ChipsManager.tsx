@@ -161,20 +161,13 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
     }
   };
 
-  // EXCLUIR o chip de vez. O servidor recusa se houver histórico de envios (a prova do que foi
-  // enviado sumiria junto) e pede confirmação extra se o chip tem número pareado (mata a sessão).
+  // Remove a sessão e arquiva a linha; o histórico permanece íntegro no servidor.
   const excluir = async (chip: WaChip) => {
     const nome = chip.numero ? `+${chip.numero}` : chip.nome;
     if (!confirm(`Excluir o chip ${nome}? Esta ação não pode ser desfeita.`)) return;
     setExcluindo(chip.id);
     try {
       let r = await excluirChip(chip.id, false);
-      if (!r.ok && r.motivo === "tem_historico") {
-        toast.error(
-          `Este chip já enviou ${r.envios} mensagem(ns). Excluir apagaria esse histórico — marque como "Queimado" para tirá-lo do rodízio sem perder a prova dos envios.`,
-        );
-        return;
-      }
       if (!r.ok && r.motivo === "pareado_precisa_confirmar") {
         if (
           !confirm(
@@ -492,7 +485,7 @@ export function ChipsManager({ onMudou }: { onMudou?: () => void } = {}) {
                   </Button>
                 )}
 
-                {/* excluir de vez (o servidor recusa se houver histórico de envios) */}
+                {/* remove a conexão; o servidor preserva o histórico por arquivamento */}
                 <Button
                   variant="ghost"
                   size="icon"

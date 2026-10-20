@@ -198,7 +198,10 @@ async function listarInstanciasRemotas(): Promise<WaRemoteInstance[] | null> {
     });
     await Promise.all(
       instances.map(async (instance) => {
-        if (!instance.connected || instance.owner || !instance.id) return;
+        // A Evolution GO mantém o proprietário mesmo depois de a sessão desconectar.
+        // Consultar apenas instâncias conectadas fazia o telefone desaparecer justamente
+        // nos casos em que o usuário precisava identificar e excluir uma conexão antiga.
+        if (instance.owner || !instance.id) return;
         instance.owner = await numeroNaInstanciaRemota(instance.id);
       }),
     );
@@ -347,6 +350,7 @@ export async function resolverInstanciaDaOrg(
     .from("wa_instancias")
     .select("id, org_id, nome, numero, status, funcao")
     .eq("org_id", scope.orgId)
+    .is("deleted_at", null)
     .order("criada_em", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -415,13 +419,8 @@ export async function recriarInstanciaDaOrg(
 }
 
 /**
- * EXCLUI um chip DA PRÓPRIA ORG (apaga na Evolution e remove a linha).
- * Duas travas, porque excluir é irreversível:
- *  1) HISTÓRICO: wa_envios tem ON DELETE CASCADE — excluir um chip que já enviou APAGARIA a prova
- *     do que foi enviado. Nesse caso recusamos e mandamos marcar como 'queimado' (mantém o
- *     histórico e tira o chip do rodízio).
- *  2) PAREADO: se o chip tem número pareado, excluir MATA o pareamento na Evolution (perde a
- *     sessão do WhatsApp). Só prossegue com confirmação explícita do dono.
+ * EXCLUI uma conexão DA PRÓPRIA ORG. A sessão remota e seu token são removidos, mas a linha é
+ * arquivada para preservar mensagens, envios, incidentes e auditoria ligados a ela.
  */
 export async function excluirInstanciaDaOrg(
   admin: Admin,
@@ -434,15 +433,9 @@ export async function excluirInstanciaDaOrg(
     .select("id, org_id, nome, numero, status")
     .eq("id", instanciaId)
     .eq("org_id", scope.orgId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (!row) return { ok: false, motivo: "nao_encontrado" };
-
-  const { count } = await admin
-    .from("wa_envios")
-    .select("id", { count: "exact", head: true })
-    .eq("instancia_id", row.id)
-    .eq("org_id", scope.orgId);
-  if ((count ?? 0) > 0) return { ok: false, motivo: "tem_historico", envios: count ?? 0 };
 
   if (row.numero && !confirmado)
     return { ok: false, motivo: "pareado_precisa_confirmar", numero: row.numero };
@@ -452,11 +445,19 @@ export async function excluirInstanciaDaOrg(
     return { ok: false, motivo: "conflito" };
   }
 
+  await admin.from("wa_instancia_tokens").delete().eq("instancia_id", row.id);
   const { error } = await admin
     .from("wa_instancias")
-    .delete()
+    .update({
+      deleted_at: new Date().toISOString(),
+      status: "desconectado",
+      provider_status: "disconnected",
+      operational_health: "unavailable",
+      atualizado_em: new Date().toISOString(),
+    })
     .eq("id", row.id)
-    .eq("org_id", scope.orgId);
+    .eq("org_id", scope.orgId)
+    .is("deleted_at", null);
   if (error) {
     console.error("wa instance delete failed", error.code);
     return { ok: false, motivo: "conflito" };
@@ -559,7 +560,8 @@ export async function obterAvatarInstancia(
       signal: controller.signal,
     });
     const payload: unknown = await response.json().catch(() => null);
-    const root = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+    const root =
+      payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
     const data =
       root?.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : null;
     const rawUrl = data?.URL ?? data?.url;
@@ -662,6 +664,7 @@ export async function listarInstanciasDaOrg(admin: Admin, orgId: string): Promis
       "id, nome, numero, status, funcao, ordem, provider_status, operational_health, last_health_check_at, last_provider_success_at, health_failure_count, health_error_code",
     )
     .eq("org_id", orgId)
+    .is("deleted_at", null)
     .order("funcao", { ascending: true })
     .order("ordem", { ascending: true })
     .order("criada_em", { ascending: true });
@@ -673,15 +676,36 @@ export async function listarInstanciasDaOrg(admin: Admin, orgId: string): Promis
   const remoteNames = new Set(remoteByName.keys());
   const visible = local.filter((instance) => remoteNames.has(instance.nome));
   const updates: PromiseLike<unknown>[] = [];
+  const now = new Date().toISOString();
 
   for (const instance of visible) {
     const remoteInstance = remoteByName.get(instance.nome);
-    if (!remoteInstance?.owner || remoteInstance.owner === instance.numero) continue;
-    instance.numero = remoteInstance.owner;
+    if (!remoteInstance) continue;
+    const providerStatus: WaProviderState = remoteInstance.connected ? "connected" : "disconnected";
+    const status = remoteInstance.connected ? "conectado" : "desconectado";
+    const operationalHealth = remoteInstance.connected ? "healthy" : "unavailable";
+    if (remoteInstance.owner) instance.numero = remoteInstance.owner;
+    instance.status = status;
+    instance.provider_status = providerStatus;
+    instance.operational_health = operationalHealth;
+    instance.last_health_check_at = now;
+    instance.last_provider_success_at = now;
+    instance.health_failure_count = 0;
+    instance.health_error_code = null;
     updates.push(
       admin
         .from("wa_instancias")
-        .update({ numero: remoteInstance.owner, atualizado_em: new Date().toISOString() })
+        .update({
+          ...(remoteInstance.owner ? { numero: remoteInstance.owner } : {}),
+          status,
+          provider_status: providerStatus,
+          operational_health: operationalHealth,
+          last_health_check_at: now,
+          last_provider_success_at: now,
+          health_failure_count: 0,
+          health_error_code: null,
+          atualizado_em: now,
+        })
         .eq("id", instance.id)
         .eq("org_id", orgId),
     );
@@ -706,6 +730,7 @@ export async function instanciaDaOrgComToken(
     .select("id, org_id, nome, numero, status, funcao")
     .eq("id", id)
     .eq("org_id", orgId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (!row) return null;
   return await garantirTokenDaLinha(admin, row, verificarRemoto);
@@ -723,6 +748,7 @@ export async function criarInstanciaDaOrg(
     .from("wa_instancias")
     .select("ordem")
     .eq("org_id", scope.orgId)
+    .is("deleted_at", null)
     .order("ordem", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -771,8 +797,8 @@ export async function obterOuCriarInstanciaParaPareamento(
     .select("id, org_id, nome, numero, status, funcao")
     .eq("org_id", scope.orgId)
     .eq("funcao", funcao === "conversa" ? "conversa" : "disparo")
+    .is("deleted_at", null)
     .is("numero", null)
-    .in("status", ["desconectado", "aguardando"])
     .order("criada_em", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -819,6 +845,7 @@ export async function proximaInstanciaDisparo(
     .from("wa_instancias")
     .select("id, org_id, nome, numero, status, funcao")
     .eq("org_id", orgId)
+    .is("deleted_at", null)
     .eq("funcao", "disparo")
     .eq("status", "conectado")
     .eq("provider_status", "connected")
@@ -848,7 +875,12 @@ export async function atualizarChip(
   if (patch.funcao === "disparo" || patch.funcao === "conversa") set.funcao = patch.funcao;
   if (patch.status && STATUS_VALIDOS.includes(patch.status)) set.status = patch.status;
   if (typeof patch.ordem === "number" && patch.ordem >= 0) set.ordem = patch.ordem;
-  const { error } = await admin.from("wa_instancias").update(set).eq("id", id).eq("org_id", orgId);
+  const { error } = await admin
+    .from("wa_instancias")
+    .update(set)
+    .eq("id", id)
+    .eq("org_id", orgId)
+    .is("deleted_at", null);
   return !error;
 }
 
