@@ -28,6 +28,21 @@ test("parses a connected Evolution GO instance", () => {
   if (result.ok) assert.equal(result.providerState, "connected");
 });
 
+test("normalizes the connected owner number and removes the device suffix", () => {
+  const result = parseEvolutionGoStatus(
+    {
+      data: {
+        Connected: true,
+        LoggedIn: true,
+        Name: "org-a",
+        Owner: "554197844716:15@s.whatsapp.net",
+      },
+    },
+    now.toISOString(),
+  );
+  assert.equal(result.ok && result.jid, "554197844716");
+});
+
 test("distinguishes disconnected from awaiting pairing", () => {
   const disconnected = parseEvolutionGoStatus({ data: { Connected: false, LoggedIn: false } });
   const pairing = parseEvolutionGoStatus({ data: { Connected: true, LoggedIn: false } });

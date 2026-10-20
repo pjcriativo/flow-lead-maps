@@ -36,6 +36,13 @@ function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+export function normalizeWhatsappOwner(value: unknown): string {
+  const raw = text(value).trim();
+  if (!raw) return "";
+  const account = raw.split("@")[0]?.split(":")[0] ?? "";
+  return account.replace(/\D/g, "");
+}
+
 export function parseEvolutionGoStatus(
   payload: unknown,
   observedAt = new Date().toISOString(),
@@ -61,7 +68,7 @@ export function parseEvolutionGoStatus(
     connected,
     loggedIn,
     name: text(data.Name),
-    jid: text(data.Jid) || text(data.jid),
+    jid: normalizeWhatsappOwner(data.Jid ?? data.jid ?? data.Owner ?? data.owner),
   };
 }
 

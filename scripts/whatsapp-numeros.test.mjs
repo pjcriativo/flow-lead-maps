@@ -149,23 +149,24 @@ test("15. Saúde: card 'Saúde das conexões' com gráfico donut circular e perc
 });
 
 // 16. Contingência indisponível / Configuração
-test("16. Contingência: card central com seleção de estratégia, intervalo, backup e toggle", () => {
-  assert.match(waNumeros, /Rotação e contingência/);
+test("16. Contingência: tela descreve somente prioridade e contingência realmente ativas", () => {
+  assert.match(waNumeros, /Prioridade e contingência/);
   assert.match(waNumeros, /Continuidade autorizada para falhas técnicas/);
   assert.match(waNumeros, /não migra envios aceitos ou incertos/);
-  assert.match(waNumeros, /Estratégia de rotação/);
-  assert.match(waNumeros, /Por prioridade/);
-  assert.match(waNumeros, /Intervalo entre números/);
   assert.match(waNumeros, /Número de backup/);
   assert.match(waNumeros, /Contingência ativa/);
   assert.match(waNumeros, /handleToggleContingencia/);
+  assert.doesNotMatch(waNumeros, /setRotacao\(\(current\) => \(\{ \.\.\.current, estrategia:/);
+  assert.doesNotMatch(waNumeros, /setRotacao\(\(current\) => \(\{ \.\.\.current, intervalo:/);
 });
 
-// 17. Pausa
-test("17. Pausa: controle de pausa automática com feedback explicativo", () => {
-  assert.match(waNumeros, /Pausa automática/);
-  assert.match(waNumeros, /Pausa números com alta taxa de falhas/);
-  assert.match(waNumeros, /handleTogglePausa/);
+// 17. Ajuda contextual
+test("17. Ajuda contextual: explica prioridade, backup, contingência e pareamento", () => {
+  assert.match(waNumeros, /function HelpTip/);
+  assert.match(waNumeros, /aria-label=\{`Ajuda:/);
+  assert.match(waNumeros, /A prioridade define a ordem/);
+  assert.match(waNumeros, /O backup só assume/);
+  assert.match(waNumeros, /No WhatsApp do celular/);
 });
 
 // 18. Atividade recente
@@ -224,4 +225,23 @@ test("23. Rede controlada: envio explícito do JWT, cancelamento e suspensão do
   assert.match(waNumeros, /isWhatsappAuthorizationError/);
   assert.match(waNumeros, /MAX_POLL_FAILURES/);
   assert.doesNotMatch(waNumeros, /setInterval\(async \(\) => \{[\s\S]*statusChip/);
+});
+
+test("24. Interface privada: não expõe fornecedor nem usa notificações flutuantes", () => {
+  assert.doesNotMatch(waNumeros, /from "sonner"/);
+  assert.doesNotMatch(waNumeros, />[^<{]*Evolution[^<{]*</);
+  assert.doesNotMatch(waService, /new Error\("A Evolution/);
+  assert.match(waNumeros, /feedback/);
+});
+
+test("25. Identificação: usa metadados salvos e formata o telefone conectado", () => {
+  assert.match(waService, /const metas = obterMetaChipsWa\(\)/);
+  assert.match(waService, /meta\?\.alias/);
+  assert.match(waNumeros, /formatarNumeroWhatsapp\(chip\.numero\)/);
+});
+
+test("26. Inventário: registros locais órfãos são removidos da listagem quando o remoto responde", () => {
+  assert.match(waShared, /listarInstanciasRemotas/);
+  assert.match(waShared, /remoteNames\.has/);
+  assert.match(waShared, /normalizeWhatsappOwner/);
 });

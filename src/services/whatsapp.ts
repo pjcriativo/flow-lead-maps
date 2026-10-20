@@ -41,6 +41,14 @@ async function edgeResponseMessage(error: unknown): Promise<string | null> {
   }
 }
 
+function publicWhatsappError(message: string | null): string {
+  if (!message) return "Falha ao consultar o serviço WhatsApp.";
+  if (/evolution|api\b|provider|apikey|token/i.test(message)) {
+    return "O serviço de conexão do WhatsApp não respondeu como esperado. Tente novamente.";
+  }
+  return message;
+}
+
 export function isWhatsappAuthorizationError(error: unknown): boolean {
   const status =
     error instanceof WhatsappEdgeRequestError ? error.status : edgeResponseStatus(error);
@@ -81,7 +89,7 @@ async function invokeWhatsappEdge<T>(
         ? "Sessão expirada. Entre novamente."
         : status === 403
           ? "Sem permissão para esta operação."
-          : (providerMessage ?? "Falha ao consultar o serviço WhatsApp."),
+          : publicWhatsappError(providerMessage),
       status,
       { cause: error },
     );
@@ -181,7 +189,7 @@ export async function qrChip(instancia_id: string) {
   if (result.status !== "qr") return result;
 
   const qr = normalizeEvolutionGoQr({ data: { Qrcode: result.qr } });
-  if (!qr) throw new Error("A Evolution GO retornou um QR Code em formato inválido.");
+  if (!qr) throw new Error("O serviço de conexão retornou um QR Code inválido. Tente novamente.");
   return { ...result, qr, expires_in: result.expires_in || 40 };
 }
 
@@ -474,7 +482,7 @@ export const ATIVIDADES_REFERENCIA_PREMIUM: WaAtividadeRecenteItem[] = [
     id: "ativ-6",
     tipo: "configuracao",
     titulo: "Atualização de configuração",
-    subtitulo: "Estratégia de rotação alterada",
+    subtitulo: "Prioridade de atendimento alterada",
     horario: "12/03",
     icone: "config",
     cor: "gray",
@@ -502,6 +510,17 @@ export function salvarMetaChipWa(
   } catch {
     /* localStorage indisponível */
   }
+}
+
+export function formatarNumeroWhatsapp(numero: string): string {
+  const digits = numero.replace(/\D/g, "");
+  if (digits.length === 13 && digits.startsWith("55")) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  }
+  if (digits.length === 12 && digits.startsWith("55")) {
+    return `+55 (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`;
+  }
+  return digits ? `+${digits}` : "—";
 }
 
 /** Configurações de rotação e contingência */
@@ -568,13 +587,11 @@ export async function obterDadosNumerosWa(signal?: AbortSignal): Promise<{
     let chips: WaNumeroItem[] = [];
 
     if (rawChips.length > 0) {
-      chips = rawChips.map((c: WaChip, idx: number) => {
+      const metas = obterMetaChipsWa();
+      chips = rawChips.map((c: WaChip) => {
+        const meta = metas[c.id];
         const role: WaFuncaoOperacional =
-          c.nome === "flowleads" || idx === 0
-            ? "principal"
-            : c.funcao === "conversa"
-              ? "suporte"
-              : "comercial";
+          meta?.role ?? (c.funcao === "conversa" ? "suporte" : "comercial");
         const status =
           c.operational_health === "healthy"
             ? "conectado"
@@ -587,7 +604,9 @@ export async function obterDadosNumerosWa(signal?: AbortSignal): Promise<{
                   : "desconhecido";
         return {
           id: c.id,
-          nome: c.nome === "flowleads" ? "Chip Principal" : c.nome,
+          nome:
+            meta?.alias?.trim() ||
+            (c.numero ? `WhatsApp ${formatarNumeroWhatsapp(c.numero)}` : "Conexão pendente"),
           numero: c.numero,
           status,
           funcao: c.funcao,
@@ -597,7 +616,7 @@ export async function obterDadosNumerosWa(signal?: AbortSignal): Promise<{
           ultimaVerificacao: c.last_health_check_at
             ? new Date(c.last_health_check_at).toLocaleString("pt-BR")
             : "Nunca verificado",
-          isPrincipal: c.nome === "flowleads" || idx === 0 || role === "principal",
+          isPrincipal: role === "principal",
           falhasLogin: c.health_failure_count,
         };
       });
@@ -711,7 +730,7 @@ export const WA_MOTIVO_LABEL: Record<string, string> = {
   teto_dia: "teto diário do chip atingido",
   ja_enviado: "já enviado nesta campanha",
   sem_variacao: "nenhuma variação elegível",
-  envio_falhou: "falha no envio (Evolution)",
+  envio_falhou: "falha no envio pelo serviço do WhatsApp",
   canal_errado: "campanha não é de WhatsApp",
   campanha_concluida: "campanha concluída",
   limite_plano: "limite de mensagens do plano atingido — faça upgrade",

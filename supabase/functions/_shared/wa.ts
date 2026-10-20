@@ -25,6 +25,7 @@ type Admin = any;
 import { resolverChave } from "./chaves.ts";
 import {
   calculateOperationalHealth,
+  normalizeWhatsappOwner,
   parseEvolutionGoStatus,
   providerFailure,
   type WaProviderObservation,
@@ -113,26 +114,62 @@ export type WaChip = {
 
 /* ----------------------- gerência na Evolution (key global) ----------------------- */
 
+type WaRemoteInstance = {
+  id: string;
+  name: string;
+  token: string | null;
+  owner: string;
+};
+
+function remoteText(record: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+async function listarInstanciasRemotas(): Promise<WaRemoteInstance[] | null> {
+  try {
+    const response = await fetch(`${waBase()}/instance/all`, {
+      headers: { apikey: waGlobalKey() },
+    });
+    if (!response.ok) return null;
+    const payload: unknown = await response.json().catch(() => null);
+    const data =
+      payload && typeof payload === "object" && "data" in payload
+        ? (payload as { data?: unknown }).data
+        : null;
+    if (!Array.isArray(data)) return null;
+    return data.flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      const item = value as Record<string, unknown>;
+      const name = remoteText(item, "name", "Name");
+      if (!name) return [];
+      return [
+        {
+          id: remoteText(item, "id", "Id", "ID"),
+          name,
+          token: remoteText(item, "token", "Token") || null,
+          owner: normalizeWhatsappOwner(item.owner ?? item.Owner ?? item.jid ?? item.Jid),
+        },
+      ];
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Token de uma instância pelo NOME (usado p/ adotar o legado sem re-parear). */
 async function tokenNaEvolution(nome: string): Promise<string | null> {
-  const r = await fetch(`${waBase()}/instance/all`, { headers: { apikey: waGlobalKey() } });
-  if (!r.ok) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const j: any = await r.json().catch(() => ({}));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const inst = (j.data || []).find((i: any) => i.name === nome);
-  return inst?.token ?? null;
+  const instances = await listarInstanciasRemotas();
+  return instances?.find((instance) => instance.name === nome)?.token ?? null;
 }
 
 /** Id (da Evolution) de uma instância pelo NOME — necessário p/ deletar. */
 async function idNaEvolution(nome: string): Promise<string | null> {
-  const r = await fetch(`${waBase()}/instance/all`, { headers: { apikey: waGlobalKey() } });
-  if (!r.ok) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const j: any = await r.json().catch(() => ({}));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const inst = (j.data || []).find((i: any) => i.name === nome);
-  return inst?.id ?? null;
+  const instances = await listarInstanciasRemotas();
+  return instances?.find((instance) => instance.name === nome)?.id || null;
 }
 
 /** Logs recentes e sanitizados da instância para diagnóstico operacional do pareamento. */
@@ -407,10 +444,8 @@ function normalizeEvolutionGoQr(payload: unknown): string | null {
   return null;
 }
 
-function evolutionGoError(payload: unknown, fallback: string): string {
-  if (!payload || typeof payload !== "object" || !("error" in payload)) return fallback;
-  const error = (payload as { error?: unknown }).error;
-  return typeof error === "string" && error.trim() ? error.trim().slice(0, 200) : fallback;
+function evolutionGoError(_payload: unknown, fallback: string): string {
+  return fallback;
 }
 
 function pairingHttpStatus(providerStatus: number): number {
@@ -482,7 +517,7 @@ export async function pairInstancia(token: string, phone: string): Promise<strin
   const payload: unknown = await r.json().catch(() => null);
   if (!r.ok) {
     throw new EvolutionGoPairingError(
-      evolutionGoError(payload, "A Evolution GO recusou o código de pareamento."),
+      evolutionGoError(payload, "O serviço de conexão recusou o código de pareamento."),
       pairingHttpStatus(r.status),
     );
   }
@@ -506,7 +541,7 @@ async function iniciarPareamentoInstancia(token: string): Promise<void> {
   const payload: unknown = await connect.json().catch(() => null);
   if (!connect.ok) {
     throw new EvolutionGoPairingError(
-      evolutionGoError(payload, "A Evolution GO não iniciou a sessão de pareamento."),
+      evolutionGoError(payload, "O serviço de conexão não iniciou a sessão de pareamento."),
       pairingHttpStatus(connect.status),
     );
   }
@@ -519,13 +554,13 @@ export async function qrInstancia(token: string): Promise<string | null> {
   const payload: unknown = await q.json().catch(() => null);
   if (!q.ok) {
     throw new EvolutionGoPairingError(
-      evolutionGoError(payload, "A Evolution GO não disponibilizou um QR Code."),
+      evolutionGoError(payload, "O serviço de conexão não disponibilizou um QR Code."),
       pairingHttpStatus(q.status),
     );
   }
   const qr = normalizeEvolutionGoQr(payload);
   if (qr) return qr;
-  throw new EvolutionGoPairingError("A Evolution GO não retornou um QR Code válido.", 502);
+  throw new EvolutionGoPairingError("O serviço de conexão não retornou um QR Code válido.", 502);
 }
 
 /* ------------------------------ N CHIPS por org ------------------------------ */
@@ -541,7 +576,29 @@ export async function listarInstanciasDaOrg(admin: Admin, orgId: string): Promis
     .order("funcao", { ascending: true })
     .order("ordem", { ascending: true })
     .order("criada_em", { ascending: true });
-  return (data ?? []) as WaChip[];
+  const local = (data ?? []) as WaChip[];
+  const remote = await listarInstanciasRemotas();
+  if (!remote) return local;
+
+  const remoteByName = new Map(remote.map((instance) => [instance.name, instance]));
+  const remoteNames = new Set(remoteByName.keys());
+  const visible = local.filter((instance) => remoteNames.has(instance.nome));
+  const updates: PromiseLike<unknown>[] = [];
+
+  for (const instance of visible) {
+    const remoteInstance = remoteByName.get(instance.nome);
+    if (!remoteInstance?.owner || remoteInstance.owner === instance.numero) continue;
+    instance.numero = remoteInstance.owner;
+    updates.push(
+      admin
+        .from("wa_instancias")
+        .update({ numero: remoteInstance.owner, atualizado_em: new Date().toISOString() })
+        .eq("id", instance.id)
+        .eq("org_id", orgId),
+    );
+  }
+  if (updates.length) await Promise.all(updates);
+  return visible;
 }
 
 /**
@@ -1011,7 +1068,7 @@ export function interpretarEnvio(
   if (erroCorpo) return { ok: false, error: String(erroCorpo), data };
   const txt = JSON.stringify(data ?? {});
   if (/doesn't contain a device jid|not logged in|not connected|disconnected/i.test(txt))
-    return { ok: false, error: "chip não pareado/deslogado na Evolution", data };
+    return { ok: false, error: "número não pareado ou desconectado do WhatsApp", data };
   // Marcador de sucesso quando existir (Id/Key/message id). Se a Evolution não devolve nada
   // identificável, aceitamos o 200 limpo (sem sinal de erro) — mas nunca um 200 com erro.
   return { ok: true, data };

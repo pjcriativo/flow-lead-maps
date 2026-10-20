@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  CircleHelp,
   Clock,
   Crown,
   ExternalLink,
@@ -33,7 +34,6 @@ import {
   Zap,
 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   ativarRecebimentoChip,
@@ -61,6 +62,7 @@ import {
   criarChip,
   enviarTesteWhatsapp,
   excluirChip,
+  formatarNumeroWhatsapp,
   isWhatsappAuthorizationError,
   listarAlertas,
   listarChips,
@@ -83,6 +85,29 @@ import {
 const MAX_POLL_FAILURES = 3;
 const QR_EXPIRATION_SECONDS = 40;
 
+type FeedbackTone = "success" | "error" | "warning" | "info";
+
+function HelpTip({ label, children }: { label: string; children: string }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Ajuda: ${label}`}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/15 text-home-muted transition-colors hover:border-home-orange/50 hover:text-home-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-home-orange"
+          >
+            <CircleHelp className="h-3 w-3" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-72 border border-white/10 bg-[#121724] text-white">
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export interface WaNumerosProps {
   onMudou?: () => void;
   onConectarNovo?: () => void;
@@ -103,6 +128,16 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
   });
   const [atividades, setAtividades] = useState<WaAtividadeRecenteItem[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [feedback, setFeedback] = useState<{ tone: FeedbackTone; message: string } | null>(null);
+  const toast = useMemo(
+    () => ({
+      success: (message: string) => setFeedback({ tone: "success", message }),
+      error: (message: string) => setFeedback({ tone: "error", message }),
+      warning: (message: string) => setFeedback({ tone: "warning", message }),
+      info: (message: string) => setFeedback({ tone: "info", message }),
+    }),
+    [],
+  );
 
   // Busca e Filtros da Tabela
   const [busca, setBusca] = useState("");
@@ -175,7 +210,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
         setCarregando(false);
       }
     },
-    [onMudou],
+    [onMudou, toast],
   );
 
   const gerarQrInstancia = useCallback(
@@ -196,7 +231,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
             setQrCodeData(result.qr);
             setPairingCode(null);
             setTempoExpiracaoQr(result.expires_in || QR_EXPIRATION_SECONDS);
-            toast.success("QR Code atualizado pela Evolution GO");
+            toast.success("QR Code atualizado com segurança.");
           } else {
             const message =
               "QR Code ainda não está disponível. Tente novamente em alguns segundos.";
@@ -218,7 +253,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           setQrCodeData(null);
           toast.success("Código de pareamento gerado.");
         } else {
-          throw new Error("A Evolution GO não retornou um código de pareamento válido.");
+          throw new Error("O serviço de conexão não retornou um código de pareamento válido.");
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Falha ao gerar QR Code";
@@ -229,7 +264,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
         setGerandoQr(false);
       }
     },
-    [chipAtivoId, metodoConexao, telefonePareamento],
+    [chipAtivoId, metodoConexao, telefonePareamento, toast],
   );
 
   useEffect(() => {
@@ -287,9 +322,9 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
       controller.abort();
       if (pollingRef.current) window.clearTimeout(pollingRef.current);
     };
-  }, [etapaAssistente, chipAtivoId, qrCodeData, pairingCode, carregarDados]);
+  }, [etapaAssistente, chipAtivoId, qrCodeData, pairingCode, carregarDados, toast]);
 
-  // A Evolution GO renova o QR aproximadamente a cada 40 segundos.
+  // O serviço de conexão renova o QR aproximadamente a cada 40 segundos.
   useEffect(() => {
     if (etapaAssistente !== 1 || !qrCodeData) {
       if (timerQrRef.current) window.clearInterval(timerQrRef.current);
@@ -554,11 +589,6 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
     }
   };
 
-  const handleTogglePausa = (val: boolean) => {
-    setRotacao((current) => ({ ...current, pausaAutomatica: val }));
-    toast.info("A pausa automática permanece local até existir uma política aprovada.");
-  };
-
   // Filtros e Seleção
   const chipsFiltrados = useMemo(() => {
     return chips.filter((c) => {
@@ -675,6 +705,25 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
 
   return (
     <div className="w-full space-y-4 pb-12 animate-in fade-in duration-200">
+      {feedback && (
+        <div
+          className={cn(
+            "flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm",
+            feedback.tone === "error"
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : feedback.tone === "warning"
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                : feedback.tone === "success"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                  : "border-blue-500/30 bg-blue-500/10 text-blue-200",
+          )}
+        >
+          <span>{feedback.message}</span>
+          <button type="button" aria-label="Fechar aviso" onClick={() => setFeedback(null)}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       {/* 5 INDICADORES SUPERIORES (ETAPA 4 — REPRODUÇÃO FIEL AO LAYOUT APROVADO) */}
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
         {/* KPI 1: Números conectados */}
@@ -901,7 +950,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                           </td>
 
                           <td className="px-3 py-3.5 font-mono text-gray-300 whitespace-nowrap">
-                            {chip.numero ? `+${chip.numero}` : "—"}
+                            {chip.numero ? formatarNumeroWhatsapp(chip.numero) : "—"}
                           </td>
 
                           <td className="px-3 py-3.5 whitespace-nowrap">
@@ -1042,7 +1091,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
             </div>
             <div className="flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>Sincronização com Evolution API ativa</span>
+              <span>Sincronização segura com o WhatsApp ativa</span>
             </div>
           </div>
         </div>
@@ -1056,9 +1105,15 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                 <SiWhatsapp className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Conectar novo número</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-white">Conectar novo número</h3>
+                  <HelpTip label="como conectar um número">
+                    No WhatsApp do celular, abra Aparelhos conectados, toque em Conectar aparelho e
+                    escaneie o QR Code. Como alternativa, use o código de 8 dígitos.
+                  </HelpTip>
+                </div>
                 <p className="text-xs text-home-muted">
-                  Adicione uma nova instância via Evolution API
+                  Adicione e configure um número do WhatsApp
                 </p>
               </div>
             </div>
@@ -1179,7 +1234,13 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
             {etapaAssistente === 1 && (
               <div className="space-y-3.5">
                 <div>
-                  <h4 className="text-sm font-bold text-white">Escaneie o QR Code</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-white">Escaneie o QR Code</h4>
+                    <HelpTip label="pareamento por QR Code">
+                      No WhatsApp do celular, abra Aparelhos conectados e aponte a câmera para este
+                      código antes do contador terminar.
+                    </HelpTip>
+                  </div>
                   <p className="text-xs text-home-muted">
                     Abra o WhatsApp no seu celular, acesse Aparelhos conectados e escaneie o código.
                   </p>
@@ -1230,7 +1291,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                       {gerandoQr ? (
                         <div className="flex flex-col items-center gap-2 text-center text-xs text-gray-700">
                           <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
-                          <span>Solicitando QR à Evolution...</span>
+                          <span>Solicitando QR Code com segurança...</span>
                         </div>
                       ) : qrCodeData ? (
                         <div className="relative flex h-full w-full items-center justify-center">
@@ -1408,14 +1469,14 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                 <div>
                   <h4 className="text-sm font-bold text-white">Validação e Teste</h4>
                   <p className="text-xs text-home-muted">
-                    Valide a conexão em tempo real com a Evolution API
+                    Valide a conexão do aparelho em tempo real
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-[#121724] p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-home-muted">Status do Motor:</span>
-                    <span className="font-bold text-emerald-400">Evolution GO Ativa</span>
+                    <span className="font-bold text-emerald-400">Serviço ativo</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-home-muted">Latência:</span>
@@ -1433,7 +1494,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                     disabled={testandoConexao}
                     className="w-full rounded-xl border-white/10 bg-[#161c28] text-xs text-white mt-1"
                   >
-                    {testandoConexao ? "Verificando..." : "Testar Conexão com a Evolution"}
+                    {testandoConexao ? "Verificando..." : "Testar conexão"}
                   </Button>
                 </div>
 
@@ -1688,65 +1749,34 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   <RefreshCw className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Rotação e contingência</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-white">Prioridade e contingência</h3>
+                    <HelpTip label="prioridade e contingência">
+                      A prioridade define a ordem preferencial dos números. A troca só ocorre após
+                      autorização explícita de contingência; não há rodízio automático ativo.
+                    </HelpTip>
+                  </div>
                   <p className="text-[11px] text-home-muted">
                     Continuidade autorizada para falhas técnicas
                   </p>
                 </div>
               </div>
 
-              <span className="rounded-full border border-emerald-500/30 bg-[#0d2218] px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
-                Configurada
+              <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-300">
+                Manual
               </span>
             </div>
 
             {/* Campos de Configuração */}
             <div className="space-y-2 pt-1 text-xs">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-home-muted whitespace-nowrap">Estratégia de rotação</span>
-                <div className="relative flex-1 max-w-[180px]">
-                  <select
-                    value={rotacao.estrategia}
-                    onChange={(e) =>
-                      setRotacao((current) => ({
-                        ...current,
-                        estrategia: e.target.value as WaRotacaoConfig["estrategia"],
-                      }))
-                    }
-                    className="h-8 w-full cursor-pointer appearance-none rounded-xl border border-white/10 bg-[#161c28] px-2.5 pr-6 text-xs text-white focus:outline-none"
-                  >
-                    <option value="prioridade">Por prioridade</option>
-                    <option value="equilibrado">Rodízio equilibrado</option>
-                    <option value="menor_volume">Menor volume</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-home-muted" />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-home-muted whitespace-nowrap">Intervalo entre números</span>
-                <div className="relative flex-1 max-w-[180px]">
-                  <select
-                    value={rotacao.intervalo}
-                    onChange={(e) =>
-                      setRotacao((current) => ({
-                        ...current,
-                        intervalo: Number(e.target.value),
-                      }))
-                    }
-                    className="h-8 w-full cursor-pointer appearance-none rounded-xl border border-white/10 bg-[#161c28] px-2.5 pr-6 text-xs text-white focus:outline-none"
-                  >
-                    <option value={10}>A cada 10 mensagens</option>
-                    <option value={20}>A cada 20 mensagens</option>
-                    <option value={40}>A cada 40 mensagens</option>
-                    <option value={50}>A cada 50 mensagens</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-home-muted" />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-home-muted whitespace-nowrap">Número de backup</span>
+                <span className="flex items-center gap-1.5 text-home-muted whitespace-nowrap">
+                  Número de backup
+                  <HelpTip label="número de backup">
+                    O backup só assume quando está conectado, uma origem está indisponível e você
+                    ativa a contingência manualmente.
+                  </HelpTip>
+                </span>
                 <div className="relative flex-1 max-w-[180px]">
                   <select
                     value={rotacao.backupChipId ?? ""}
@@ -1776,7 +1806,13 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                 <div className="flex items-start gap-2">
                   <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
                   <div>
-                    <div className="text-xs font-bold text-white">Contingência ativa</div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                      Contingência ativa
+                      <HelpTip label="contingência ativa">
+                        Autoriza o uso do backup para continuidade técnica. Mensagens já aceitas ou
+                        com resultado incerto nunca são reenviadas automaticamente.
+                      </HelpTip>
+                    </div>
                     <div className="text-[10px] text-home-muted leading-tight">
                       Requer aprovação e não migra envios aceitos ou incertos.
                     </div>
@@ -1795,35 +1831,6 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                     className={cn(
                       "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
                       rotacao.contingenciaAtiva ? "translate-x-4" : "translate-x-0",
-                    )}
-                  />
-                </button>
-              </div>
-
-              {/* Toggle 2: Pausa automática */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
-                  <div>
-                    <div className="text-xs font-bold text-white">Pausa automática</div>
-                    <div className="text-[10px] text-home-muted leading-tight">
-                      Pausa números com alta taxa de falhas.
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleTogglePausa(!rotacao.pausaAutomatica)}
-                  className={cn(
-                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                    rotacao.pausaAutomatica ? "bg-amber-500" : "bg-[#1f293d]",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                      rotacao.pausaAutomatica ? "translate-x-4" : "translate-x-0",
                     )}
                   />
                 </button>
@@ -2009,8 +2016,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
           </DialogHeader>
 
           <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-200">
-            Esta ação desvincula a sessão da Evolution API. Se o chip possuir mensagens já enviadas,
-            o sistema impedirá a exclusão para preservar o histórico.
+            Esta ação desvincula a sessão do WhatsApp. Se o chip possuir mensagens já enviadas, o
+            sistema impedirá a exclusão para preservar o histórico.
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
