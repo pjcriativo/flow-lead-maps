@@ -39,6 +39,50 @@ test("does not mistake data.Code for the PNG returned by the installed API", () 
   assert.equal(normalizeEvolutionGoQr({ data: { Code: "2@ref,key,secret,adv" } }), null);
 });
 
+test("obtains the real contact avatar from the installed Evolution GO endpoint", async () => {
+  const runtime = globalThis as typeof globalThis & {
+    Deno?: { env: { get(name: string): string | undefined } };
+  };
+  const originalDeno = runtime.Deno;
+  const originalFetch = globalThis.fetch;
+  let request: { url: string; apiKey: string | null; body: unknown } | null = null;
+  runtime.Deno = {
+    env: { get: (name) => (name === "EVOLUTION_URL" ? "https://evolution.invalid" : undefined) },
+  };
+  globalThis.fetch = async (input, init) => {
+    request = {
+      url: String(input),
+      apiKey: new Headers(init?.headers).get("apikey"),
+      body: JSON.parse(String(init?.body)),
+    };
+    return Response.json({
+      message: "success",
+      data: {
+        URL: "https://pps.whatsapp.net/v/contact-photo.jpg",
+        ID: "picture-42",
+        Type: "image",
+      },
+    });
+  };
+
+  try {
+    const { obterAvatarInstancia } = await import("./wa.ts");
+    assert.deepEqual(await obterAvatarInstancia("tenant-instance-token", "5511999999999"), {
+      url: "https://pps.whatsapp.net/v/contact-photo.jpg",
+      id: "picture-42",
+      found: true,
+    });
+    assert.deepEqual(request, {
+      url: "https://evolution.invalid/user/avatar",
+      apiKey: "tenant-instance-token",
+      body: { number: "5511999999999", preview: true },
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    runtime.Deno = originalDeno;
+  }
+});
+
 test("qrInstancia starts the instance before requesting its QR", async () => {
   const runtime = globalThis as typeof globalThis & {
     Deno?: { env: { get(name: string): string | undefined } };

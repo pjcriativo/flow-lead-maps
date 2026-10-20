@@ -61,6 +61,7 @@ import {
   marcarConversaLida,
   obterKpisConversasWa,
   responderConversa,
+  sincronizarAvataresConversas,
   type WaConversa,
   type WaConversaKpis,
   type WaMensagem,
@@ -176,15 +177,19 @@ function ContactAvatar({
   numero,
   src,
   className,
+  onError,
 }: {
   nome: string;
   numero: string;
   src?: string;
   className?: string;
+  onError?: () => void;
 }) {
   return (
     <Avatar className={cn("ring-1 ring-border", className)}>
-      {src ? <AvatarImage src={src} alt={nome} className="object-cover" /> : null}
+      {src ? (
+        <AvatarImage src={src} alt={nome} className="object-cover" onError={onError} />
+      ) : null}
       <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
         {iniciaisDoContato(nome, numero)}
       </AvatarFallback>
@@ -276,6 +281,23 @@ export function WaConversas() {
   const contatoAtivo = useMemo(() => {
     return contatos.find((c) => c.id === contatoAtivoId) ?? contatos[0] ?? null;
   }, [contatos, contatoAtivoId]);
+  const avatarRefreshesRef = useRef(new Set<string>());
+
+  const renovarAvatar = useCallback(async (conversaId: string) => {
+    if (avatarRefreshesRef.current.has(conversaId)) return;
+    avatarRefreshesRef.current.add(conversaId);
+    try {
+      const avatars = await sincronizarAvataresConversas([conversaId], true);
+      const avatar = avatars[conversaId];
+      setContatos((current) =>
+        current.map((contato) =>
+          contato.id === conversaId ? { ...contato, avatar: avatar || undefined } : contato,
+        ),
+      );
+    } catch (error) {
+      console.warn("Falha ao renovar foto do contato WhatsApp", error);
+    }
+  }, []);
 
   // Carregar KPIs e scripts do banco
   const carregarDadosIniciais = useCallback(async (signal?: AbortSignal) => {
@@ -303,7 +325,7 @@ export function WaConversas() {
           id: conversation.id,
           numero: conversation.numero,
           nome: conversation.nome_contato || conversation.numero,
-          avatar: undefined,
+          avatar: conversation.avatar_url || undefined,
           ultimaMensagem: conversation.ultima || "",
           horario: new Date(conversation.ultima_em).toLocaleTimeString("pt-BR", {
             hour: "2-digit",
@@ -339,6 +361,22 @@ export function WaConversas() {
         }));
         setContatos(mapped);
         setContatoAtivoId((current) => current || mapped[0]?.id || "");
+        try {
+          const avatars = await sincronizarAvataresConversas(
+            mapped.map((contact) => contact.id),
+            false,
+            signal,
+          );
+          if (signal?.aborted) return;
+          setContatos((current) =>
+            current.map((contact) => ({
+              ...contact,
+              avatar: avatars[contact.id] || contact.avatar,
+            })),
+          );
+        } catch (error) {
+          if (!signal?.aborted) console.warn("Falha ao sincronizar fotos dos contatos", error);
+        }
       }
     } catch (error) {
       if (signal?.aborted) return;
@@ -1190,7 +1228,12 @@ export function WaConversas() {
                   >
                     {/* Avatar com badge WhatsApp verde oficial */}
                     <div className="relative shrink-0">
-                      <ContactAvatar nome={c.nome} numero={c.numero} src={c.avatar} />
+                      <ContactAvatar
+                        nome={c.nome}
+                        numero={c.numero}
+                        src={c.avatar}
+                        onError={() => void renovarAvatar(c.id)}
+                      />
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#22c55e] text-white ring-2 ring-[#0c101a]">
                         <SiWhatsapp className="h-2 w-2" />
                       </span>
@@ -1267,6 +1310,7 @@ export function WaConversas() {
                       nome={contatoAtivo.nome}
                       numero={contatoAtivo.numero}
                       src={contatoAtivo.avatar}
+                      onError={() => void renovarAvatar(contatoAtivo.id)}
                     />
                     <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#22c55e] text-white ring-2 ring-[#0c101a]">
                       <SiWhatsapp className="h-2 w-2" />
@@ -1678,6 +1722,7 @@ export function WaConversas() {
                       nome={contatoAtivo.nome}
                       numero={contatoAtivo.numero}
                       src={contatoAtivo.crmAvatar || contatoAtivo.avatar}
+                      onError={() => void renovarAvatar(contatoAtivo.id)}
                       className="h-12 w-12 ring-2 ring-emerald-500/30"
                     />
                     <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#22c55e] text-white ring-2 ring-[#0c101a]">

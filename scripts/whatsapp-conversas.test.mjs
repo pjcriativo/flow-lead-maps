@@ -13,6 +13,10 @@ const migration = readFileSync("supabase/migrations/202610160004_wa_conversation
 const webhook = readFileSync("supabase/functions/wa-webhook/index.ts", "utf8");
 const responder = readFileSync("supabase/functions/wa-responder/index.ts", "utf8");
 const conversationsEdge = readFileSync("supabase/functions/wa-conversations/index.ts", "utf8");
+const avatarMigration = readFileSync(
+  "supabase/migrations/202610200001_wa_contact_avatars.sql",
+  "utf8",
+);
 
 // SUT_IS_CORRECT_BECAUSE: a Correção 04 substitui fixtures visuais e agrupamento por telefone
 // por entidades persistidas e auditáveis; estes contratos verificam o comportamento de produção.
@@ -25,6 +29,18 @@ test("1. Lista por organização: consultas respeitam RLS e escopo da organizaç
   assert.match(waService, /obterKpisConversasWa/);
   assert.match(waConversas, /obterKpisConversasWa/);
   assert.match(migration, /unique \(org_id, instancia_id, remote_contact_id\)/);
+});
+
+test("1b. Fotos reais dos contatos atravessam provider, cache, serviço e interface", () => {
+  assert.match(avatarMigration, /contact_avatar_url\s+text/i);
+  assert.match(avatarMigration, /contact_avatar_checked_at\s+timestamptz/i);
+  assert.match(conversationsEdge, /contact_avatars/);
+  assert.match(conversationsEdge, /obterAvatarInstancia/);
+  assert.match(conversationsEdge, /contact_avatar_url/);
+  assert.match(conversationsEdge, /\.eq\("status", "conectado"\)/);
+  assert.match(conversationsEdge, /candidateIds/);
+  assert.match(waService, /avatar_url:\s*typeof row\.contact_avatar_url/);
+  assert.match(waConversas, /avatar:\s*conversation\.avatar_url/);
 });
 
 // 2. Busca

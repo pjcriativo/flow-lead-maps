@@ -537,6 +537,47 @@ export async function statusInstancia(token: string): Promise<WaStatus | null> {
   return observation.ok ? observation : null;
 }
 
+export type WaContactAvatar = {
+  url: string | null;
+  id: string | null;
+  found: boolean;
+};
+
+/** Obtém a foto real do contato. A Evolution GO autentica esta rota com o token da instância. */
+export async function obterAvatarInstancia(
+  token: string,
+  number: string,
+  timeoutMs = 6_000,
+): Promise<WaContactAvatar> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${waBase()}/user/avatar`, {
+      method: "POST",
+      headers: { apikey: token, "Content-Type": "application/json" },
+      body: JSON.stringify({ number, preview: true }),
+      signal: controller.signal,
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    const root = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+    const data =
+      root?.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : null;
+    const rawUrl = data?.URL ?? data?.url;
+    const url = typeof rawUrl === "string" && /^https:\/\//i.test(rawUrl) ? rawUrl : null;
+    const rawId = data?.ID ?? data?.id;
+    const id = typeof rawId === "string" && rawId.trim() ? rawId.trim() : null;
+    if (response.ok && url) return { url, id, found: true };
+
+    const errorText = String(root?.error ?? root?.message ?? "");
+    if (/no profile picture|profile picture not found|not found/i.test(errorText)) {
+      return { url: null, id: null, found: false };
+    }
+    throw new Error(`Evolution GO avatar HTTP ${response.status}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /** Sincroniza numero/status da org na tabela a partir do estado real na Evolution. */
 export async function sincronizarInstancia(
   admin: Admin,

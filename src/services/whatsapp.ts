@@ -865,6 +865,7 @@ export type WaConversa = {
   assigned_to: string | null;
   numero: string;
   nome_contato: string | null;
+  avatar_url: string | null;
   ultima: string | null;
   ultima_em: string;
   nao_lidas: number;
@@ -968,6 +969,7 @@ export async function listarConversas(signal?: AbortSignal): Promise<WaConversa[
       assigned_to: typeof row.assigned_to === "string" ? row.assigned_to : null,
       numero: String(row.normalized_phone ?? row.remote_contact_id ?? ""),
       nome_contato: typeof row.contact_name === "string" ? row.contact_name : null,
+      avatar_url: typeof row.contact_avatar_url === "string" ? row.contact_avatar_url : null,
       ultima: typeof row.last_message_preview === "string" ? row.last_message_preview : null,
       ultima_em: String(row.last_message_at ?? row.updated_at),
       nao_lidas: Number(row.unread_count ?? 0),
@@ -977,6 +979,35 @@ export async function listarConversas(signal?: AbortSignal): Promise<WaConversa[
       criada_em: String(row.created_at ?? row.updated_at),
     };
   });
+}
+
+/** Atualiza fotos ausentes/expiradas no provider e devolve o cache por conversa. */
+export async function sincronizarAvataresConversas(
+  conversaIds: string[],
+  force = false,
+  signal?: AbortSignal,
+): Promise<Record<string, string | null>> {
+  if (!conversaIds.length) return {};
+  const chunks = Array.from({ length: Math.ceil(conversaIds.length / 80) }, (_, index) =>
+    conversaIds.slice(index * 80, index * 80 + 80),
+  );
+  const responses = await Promise.all(
+    chunks.map((ids) =>
+      invokeConversations(
+        { acao: "contact_avatars", conversa_ids: ids, force },
+        signal,
+      ),
+    ),
+  );
+  const values = responses.flatMap((data) => (Array.isArray(data.avatars) ? data.avatars : []));
+  return Object.fromEntries(
+    values.flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      const row = value as Record<string, unknown>;
+      if (typeof row.conversa_id !== "string") return [];
+      return [[row.conversa_id, typeof row.url === "string" ? row.url : null]];
+    }),
+  );
 }
 
 /** Mensagens da entidade de conversa, em ordem cronológica. */

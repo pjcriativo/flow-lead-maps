@@ -4,6 +4,11 @@ import {
   authorizeWhatsappRequest,
   whatsappAuthorizationFailure,
 } from "../_shared/whatsapp-authorization.ts";
+import {
+  inicializarCofreWa,
+  instanciaDaOrgComToken,
+  obterAvatarInstancia,
+} from "../_shared/wa.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MUTATIONS = new Set([
@@ -18,8 +23,9 @@ const MUTATIONS = new Set([
   "add_tag",
   "remove_tag",
 ]);
+const READ_ACTIONS = new Set(["snapshot", "contact_avatars"]);
 const CONVERSATION_FIELDS =
-  "id,org_id,instancia_id,remote_contact_id,normalized_phone,contact_name,lead_id,assigned_to,status,priority,origin,last_message_at,last_message_preview,last_message_type,last_message_direction,last_inbound_at,last_outbound_at,first_response_at,unread_count,version,created_at,updated_at";
+  "id,org_id,instancia_id,remote_contact_id,normalized_phone,contact_name,contact_avatar_url,contact_avatar_id,contact_avatar_checked_at,lead_id,assigned_to,status,priority,origin,last_message_at,last_message_preview,last_message_type,last_message_direction,last_inbound_at,last_outbound_at,first_response_at,unread_count,version,created_at,updated_at";
 
 async function handleRequest(req: Request): Promise<Response> {
   const json = (body: unknown, status = 200) => jsonResponse(body, status, req);
@@ -43,7 +49,7 @@ async function handleRequest(req: Request): Promise<Response> {
     return json({ error: "Dados inválidos." }, 422);
   }
   const action = String(body.acao || "snapshot");
-  if (action !== "snapshot" && !MUTATIONS.has(action)) {
+  if (!READ_ACTIONS.has(action) && !MUTATIONS.has(action)) {
     return json({ error: "Ação inválida." }, 422);
   }
 
@@ -53,11 +59,115 @@ async function handleRequest(req: Request): Promise<Response> {
       admin,
       userClient,
       requestedOrgId: body.org_id,
-      permission: action === "snapshot" ? "view_conversations" : "reply_conversations",
+      permission: READ_ACTIONS.has(action) ? "view_conversations" : "reply_conversations",
     });
   } catch (error) {
     const failure = whatsappAuthorizationFailure(error);
     return json({ error: failure.message }, failure.status);
+  }
+
+  if (action === "contact_avatars") {
+    const ids = Array.isArray(body.conversa_ids)
+      ? [...new Set(body.conversa_ids.filter((id): id is string => typeof id === "string" && UUID.test(id)))]
+          .slice(0, 80)
+      : [];
+    if (!ids.length) return json({ avatars: [] });
+
+    const { data: rows, error: rowsError } = await admin
+      .from("wa_conversas")
+      .select(
+        "id,instancia_id,remote_contact_id,normalized_phone,contact_avatar_url,contact_avatar_id,contact_avatar_checked_at",
+      )
+      .eq("org_id", context.orgId)
+      .in("id", ids);
+    if (rowsError) return json({ error: "Não foi possível carregar as fotos dos contatos." }, 503);
+
+    const force = body.force === true;
+    const staleBefore = Date.now() - 24 * 60 * 60 * 1_000;
+    const pending = (rows ?? []).filter((row) => {
+      if (force) return true;
+      const checkedAt = row.contact_avatar_checked_at
+        ? new Date(row.contact_avatar_checked_at).getTime()
+        : 0;
+      return !Number.isFinite(checkedAt) || checkedAt < staleBefore;
+    });
+
+    if (pending.length) {
+      await inicializarCofreWa(admin);
+      const { data: connectedRows } = await admin
+        .from("wa_instancias")
+        .select("id")
+        .eq("org_id", context.orgId)
+        .eq("status", "conectado")
+        .order("ordem", { ascending: true });
+      const connectedInstanceIds = (connectedRows ?? []).map((row) => String(row.id));
+      const instances = new Map<
+        string,
+        Promise<Awaited<ReturnType<typeof instanciaDaOrgComToken>>>
+      >();
+      const resolveInstance = (instanceId: string) => {
+        let resolution = instances.get(instanceId);
+        if (!resolution) {
+          resolution = instanciaDaOrgComToken(admin, context.orgId, instanceId);
+          instances.set(instanceId, resolution);
+        }
+        return resolution;
+      };
+      const queue = [...pending];
+      const workers = Array.from({ length: Math.min(6, queue.length) }, async () => {
+        while (queue.length) {
+          const row = queue.shift();
+          if (!row) return;
+          try {
+            const number = String(row.normalized_phone || row.remote_contact_id || "").trim();
+            if (!number) continue;
+            const candidateIds = [...new Set([row.instancia_id, ...connectedInstanceIds])];
+            let avatar: Awaited<ReturnType<typeof obterAvatarInstancia>> | null = null;
+            let providerAnswered = false;
+            for (const instanceId of candidateIds) {
+              try {
+                const instance = await resolveInstance(instanceId);
+                if (!instance) continue;
+                avatar = await obterAvatarInstancia(instance.token, number);
+                providerAnswered = true;
+                if (avatar.found) break;
+              } catch {
+                // O chip original pode ter sido desconectado; tenta outro chip conectado da org.
+              }
+            }
+            if (!providerAnswered || !avatar) throw new Error("avatar_provider_unavailable");
+            await admin
+              .from("wa_conversas")
+              .update({
+                contact_avatar_url: avatar.url,
+                contact_avatar_id: avatar.id,
+                contact_avatar_checked_at: new Date().toISOString(),
+              })
+              .eq("org_id", context.orgId)
+              .eq("id", row.id);
+            row.contact_avatar_url = avatar.url;
+            row.contact_avatar_id = avatar.id;
+            row.contact_avatar_checked_at = new Date().toISOString();
+          } catch (error) {
+            console.warn(
+              JSON.stringify({
+                event: "wa_contact_avatar_refresh_failed",
+                conversation_id: row.id,
+                error: error instanceof Error ? error.name : "unknown_error",
+              }),
+            );
+          }
+        }
+      });
+      await Promise.all(workers);
+    }
+
+    return json({
+      avatars: (rows ?? []).map((row) => ({
+        conversa_id: row.id,
+        url: row.contact_avatar_url ?? null,
+      })),
+    });
   }
 
   if (action === "snapshot") {
