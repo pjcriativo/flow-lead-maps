@@ -214,7 +214,7 @@ test("inbound responses are attributed to an exact organization delivery", () =>
   assert.match(webhook, /\.eq\("org_id", inst\.org_id\)/);
   // SUT_IS_CORRECT_BECAUSE: attribution now belongs to the same PostgreSQL transaction that
   // persists the inbound message; the webhook only supplies the instance-derived tenant.
-  assert.match(webhook, /rpc\("wa_ingest_inbound_message"/);
+  assert.match(webhook, /rpc\(\s*"wa_ingest_inbound_message"/);
   assert.match(conversationMigration, /e\.org_id=p_org and e\.instancia_id=p_instance/);
   assert.match(conversationMigration, /v_conversation\.lead_id,v_envio,v_campanha/);
 });

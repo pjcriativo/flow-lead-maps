@@ -7,6 +7,7 @@ import {
   type ActiveOrganizationContext,
 } from "@/lib/active-organization";
 import { normalizeEvolutionGoQr } from "@/lib/evolution-go-qr";
+import type { WaInstanciaAtendimento } from "@/lib/whatsapp-numero-atendimento";
 
 const WHATSAPP_ADMIN_ROLES = new Set(["admin", "gerente", "super_admin"]);
 
@@ -881,6 +882,8 @@ export type WaMensagem = {
 export type WaConversa = {
   id: string;
   instancia_id: string;
+  /** Vínculo REAL conversa -> instância (null se a instância não existe mais na organização). */
+  instancia: WaInstanciaAtendimento | null;
   lead_id: string | null;
   assigned_to: string | null;
   numero: string;
@@ -900,6 +903,14 @@ export type WaConversaSnapshot = {
   role: string;
   conversations: Array<Record<string, unknown>>;
   selected_id: string | null;
+  instances?: Array<{
+    id: string;
+    nome: string;
+    numero: string | null;
+    status: string;
+    provider_status: string | null;
+    deleted: boolean;
+  }>;
   pagination: {
     page: number;
     page_size: number;
@@ -971,11 +982,22 @@ export async function consultarConversasWa(
 /** Lista entidades de conversa canônicas; nunca agrupa números no cliente. */
 export async function listarConversas(signal?: AbortSignal): Promise<WaConversa[]> {
   const values: Array<Record<string, unknown>> = [];
+  const instancias = new Map<string, WaInstanciaAtendimento>();
   let page = 0;
   let hasMore = false;
   do {
     const snapshot = await consultarConversasWa(undefined, page, 200, signal);
     values.push(...snapshot.conversations);
+    for (const instance of snapshot.instances ?? []) {
+      instancias.set(instance.id, {
+        id: instance.id,
+        nome: instance.nome,
+        numero: instance.numero,
+        status: instance.status,
+        provider_status: instance.provider_status,
+        arquivada: instance.deleted,
+      });
+    }
     hasMore = snapshot.pagination.has_more;
     page += 1;
   } while (hasMore);
@@ -985,6 +1007,7 @@ export async function listarConversas(signal?: AbortSignal): Promise<WaConversa[
     return {
       id: String(row.id),
       instancia_id: String(row.instancia_id),
+      instancia: instancias.get(String(row.instancia_id)) ?? null,
       lead_id: typeof row.lead_id === "string" ? row.lead_id : null,
       assigned_to: typeof row.assigned_to === "string" ? row.assigned_to : null,
       numero: String(row.normalized_phone ?? row.remote_contact_id ?? ""),

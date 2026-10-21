@@ -138,7 +138,14 @@ export function normalizeInboundWhatsappMessage(
       ? contactNameValue.trim().slice(0, 160)
       : null;
   const occurredAt = normalizeWhatsappTimestamp(
-    pickWhatsappValue(root, ["data.timestamp", "data.Timestamp", "timestamp", "date_time"]),
+    pickWhatsappValue(root, [
+      "data.Info.Timestamp",
+      "data.info.timestamp",
+      "data.timestamp",
+      "data.Timestamp",
+      "timestamp",
+      "date_time",
+    ]),
     receivedAt,
   );
 
@@ -150,6 +157,29 @@ export function normalizeInboundWhatsappMessage(
     type: messageTypeOf(data),
     text: textOf(data),
     occurredAt,
+  };
+}
+
+/**
+ * Parâmetros EXATOS de wa_ingest_inbound_message para uma mensagem normalizada. Mantidos aqui,
+ * num módulo tipado e testado, porque um acesso a campo inexistente no webhook (inbound.contact)
+ * derrubou todo recebimento individual com um 500 opaco — o runtime Deno não checa tipos.
+ */
+export function inboundIngestParams(
+  orgId: string,
+  instanceId: string,
+  inbound: NormalizedInboundMessage,
+) {
+  return {
+    p_org: orgId,
+    p_instance: instanceId,
+    p_remote_contact_id: inbound.remoteId,
+    p_phone: inbound.phone,
+    p_contact_name: inbound.contactName,
+    p_external_id: inbound.externalId,
+    p_message_type: inbound.type,
+    p_text: inbound.text,
+    p_occurred_at: inbound.occurredAt,
   };
 }
 

@@ -46,6 +46,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  descreverChipAtendimento,
+  type EstadoChipAtendimento,
+  type WaInstanciaAtendimento,
+} from "@/lib/whatsapp-numero-atendimento";
 import { dashboardUrlForSection } from "@/lib/dashboard-navigation";
 import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { supabase } from "@/integrations/supabase/client";
@@ -124,6 +129,84 @@ export interface InteracaoLead {
   cor: "rose" | "emerald" | "blue" | "amber" | "purple";
 }
 
+const COR_ESTADO_CHIP: Record<EstadoChipAtendimento, string> = {
+  conectado: "bg-emerald-400",
+  aguardando: "bg-amber-400",
+  desconectado: "bg-rose-400",
+  arquivado: "bg-slate-500",
+  desconhecido: "bg-slate-500",
+};
+
+/** Linha discreta na lista: por qual número a empresa atende esta conversa. */
+function ChipAtendimentoLinha({ chip }: { chip?: WaInstanciaAtendimento | null }) {
+  const d = descreverChipAtendimento(chip);
+  return (
+    <div
+      className="flex items-center gap-1 pt-0.5 text-[10px] text-home-muted/80"
+      title={`${d.rotuloNumero}${d.nomeInstancia ? ` · ${d.nomeInstancia}` : ""} · ${d.estadoRotulo}`}
+    >
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COR_ESTADO_CHIP[d.estado])} />
+      <span className="truncate">via {d.rotuloNumero}</span>
+    </div>
+  );
+}
+
+/** Cabeçalho da conversa: "Atendendo pelo número" + instância. */
+function ChipAtendimentoCabecalho({ chip }: { chip?: WaInstanciaAtendimento | null }) {
+  const d = descreverChipAtendimento(chip);
+  return (
+    <div className="flex items-center gap-1.5 text-[11px] text-home-muted">
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COR_ESTADO_CHIP[d.estado])} />
+      <span className="truncate">
+        {d.numeroFormatado ? (
+          <>
+            Atendendo pelo número:{" "}
+            <span className="font-semibold text-white">{d.numeroFormatado}</span>
+          </>
+        ) : (
+          <span className="font-semibold text-amber-300">{d.rotuloNumero}</span>
+        )}
+        {d.nomeInstancia ? ` · ${d.nomeInstancia}` : ""}
+      </span>
+    </div>
+  );
+}
+
+/** Painel direito: Número WhatsApp utilizado (número, instância e status). */
+function ChipAtendimentoPainel({ chip }: { chip?: WaInstanciaAtendimento | null }) {
+  const d = descreverChipAtendimento(chip);
+  return (
+    <>
+      <div className="flex items-center justify-between text-home-muted">
+        <span className="flex items-center gap-1.5">
+          <SiWhatsapp className="h-3.5 w-3.5" /> Número WhatsApp utilizado
+        </span>
+        <span
+          className={cn(
+            "max-w-[150px] truncate text-right font-semibold",
+            d.numeroFormatado ? "text-white" : "text-amber-300",
+          )}
+        >
+          {d.rotuloNumero}
+        </span>
+      </div>
+      <div className="flex items-center justify-between text-home-muted">
+        <span className="pl-5">Instância</span>
+        <span className="max-w-[150px] truncate font-semibold text-white">
+          {d.nomeInstancia ?? "—"}
+        </span>
+      </div>
+      <div className="flex items-center justify-between text-home-muted">
+        <span className="pl-5">Status</span>
+        <span className="flex items-center gap-1.5 font-semibold text-white">
+          <span className={cn("h-1.5 w-1.5 rounded-full", COR_ESTADO_CHIP[d.estado])} />
+          {d.estadoRotulo}
+        </span>
+      </div>
+    </>
+  );
+}
+
 export interface ContatoConversa {
   id: string;
   numero: string;
@@ -153,6 +236,8 @@ export interface ContatoConversa {
   mensagens: MensagemChat[];
   leadId?: string;
   assignedTo?: string;
+  /** Instância (chip) que atende a conversa — vínculo real, nunca inferido. */
+  chip?: WaInstanciaAtendimento | null;
   proposal?: {
     id: string;
     assunto: string;
@@ -357,6 +442,7 @@ export function WaConversas() {
           mensagens: [],
           leadId: conversation.lead_id ?? undefined,
           assignedTo: conversation.assigned_to ?? undefined,
+          chip: conversation.instancia,
         }));
         setContatos(mapped);
         setContatoAtivoId((current) => current || mapped[0]?.id || "");
@@ -1275,6 +1361,7 @@ export function WaConversas() {
                           </span>
                         )}
                       </div>
+                      <ChipAtendimentoLinha chip={c.chip} />
                     </div>
                   </button>
                 );
@@ -1357,6 +1444,7 @@ export function WaConversas() {
                       </div>
                     </div>
                     <div className="text-xs text-home-muted">{contatoAtivo.numero}</div>
+                    <ChipAtendimentoCabecalho chip={contatoAtivo.chip} />
                   </div>
                 </div>
 
@@ -1851,6 +1939,8 @@ export function WaConversas() {
                       <SiWhatsapp className="h-3 w-3 text-[#22c55e]" />
                     </span>
                   </div>
+
+                  <ChipAtendimentoPainel chip={contatoAtivo.chip} />
 
                   <div className="flex items-center justify-between text-home-muted">
                     <span className="flex items-center gap-1.5">

@@ -4,11 +4,7 @@ import {
   authorizeWhatsappRequest,
   whatsappAuthorizationFailure,
 } from "../_shared/whatsapp-authorization.ts";
-import {
-  inicializarCofreWa,
-  instanciaDaOrgComToken,
-  obterAvatarInstancia,
-} from "../_shared/wa.ts";
+import { inicializarCofreWa, instanciaDaOrgComToken, obterAvatarInstancia } from "../_shared/wa.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MUTATIONS = new Set([
@@ -68,8 +64,11 @@ async function handleRequest(req: Request): Promise<Response> {
 
   if (action === "contact_avatars") {
     const ids = Array.isArray(body.conversa_ids)
-      ? [...new Set(body.conversa_ids.filter((id): id is string => typeof id === "string" && UUID.test(id)))]
-          .slice(0, 80)
+      ? [
+          ...new Set(
+            body.conversa_ids.filter((id): id is string => typeof id === "string" && UUID.test(id)),
+          ),
+        ].slice(0, 80)
       : [];
     if (!ids.length) return json({ avatars: [] });
 
@@ -253,6 +252,36 @@ async function handleRequest(req: Request): Promise<Response> {
       (result) => "error" in result && result.error,
     );
     if (detailError) return json({ error: "Não foi possível carregar a conversa." }, 503);
+    // Número de atendimento: SOMENTE o vínculo real conversa -> instância, na mesma organização.
+    // Nunca expõe token; instância arquivada continua aparecendo (com deleted=true) para que a
+    // tela mostre o estado real em vez de inventar ou trocar de número.
+    const instanceIds = [
+      ...new Set(
+        [...(conversations ?? []), ...(detail ? [detail] : [])]
+          .map((conversation) => String(conversation.instancia_id ?? ""))
+          .filter(Boolean),
+      ),
+    ];
+    const instancesResult = instanceIds.length
+      ? await admin
+          .from("wa_instancias")
+          .select("id,nome,numero,status,provider_status,operational_health,funcao,deleted_at")
+          .eq("org_id", context.orgId)
+          .in("id", instanceIds)
+      : { data: [], error: null };
+    if (instancesResult.error) {
+      return json({ error: "Não foi possível carregar os números de atendimento." }, 503);
+    }
+    const instances = (instancesResult.data ?? []).map((instance) => ({
+      id: instance.id,
+      nome: instance.nome,
+      numero: instance.numero ?? null,
+      status: instance.status,
+      provider_status: instance.provider_status,
+      operational_health: instance.operational_health,
+      funcao: instance.funcao,
+      deleted: Boolean(instance.deleted_at),
+    }));
     let lead = null;
     let proposal = null;
     if (detail?.lead_id) {
@@ -289,6 +318,7 @@ async function handleRequest(req: Request): Promise<Response> {
         has_more: (page + 1) * pageSize < (count ?? 0),
       },
       selected_id: detailId,
+      instances,
       messages: messagesResult.data ?? [],
       notes: notesResult.data ?? [],
       events: eventsResult.data ?? [],

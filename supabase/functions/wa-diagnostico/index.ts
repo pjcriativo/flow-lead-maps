@@ -15,6 +15,7 @@ import {
   instanciaDaOrgComToken,
   jidCanonicoWhatsapp,
   reconciliarWebhooks,
+  urlWebhookRecebimento,
   selecionarChipParaEnvio,
   waBase,
   waGlobalKey,
@@ -301,6 +302,114 @@ Deno.serve(async (request) => {
     .clone()
     .json()
     .catch(() => ({}));
+  if (body.modo === "webhook_sintetico") {
+    // Prova o caminho webhook -> wa_ingest_inbound_message NO AMBIENTE REAL com um evento
+    // sintético no formato da Evolution GO 0.7.2, para um contato de teste inexistente.
+    // Cria 1 conversa + 1 mensagem, repete o mesmo evento (idempotência), APAGA tudo pelo id
+    // da conversa criada (cascata) e devolve contagens antes/depois. Não toca em dados reais.
+    const alvo = urlWebhookRecebimento();
+    const nomeInstancia = String(body.instancia ?? "");
+    if (!alvo || !nomeInstancia) return json({ erro: "webhook_ou_instancia_ausente" }, 422);
+    const { data: instancia } = await admin
+      .from("wa_instancias")
+      .select("id,org_id,nome")
+      .eq("nome", nomeInstancia)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!instancia) return json({ erro: "instancia_nao_encontrada" }, 404);
+    const remote = "5500000000001@s.whatsapp.net";
+    const contar = async (tabela: string, filtro: Record<string, string>) => {
+      let consulta = admin.from(tabela).select("id", { count: "exact", head: true });
+      for (const [coluna, valor] of Object.entries(filtro)) consulta = consulta.eq(coluna, valor);
+      const { count } = await consulta;
+      return count ?? 0;
+    };
+    const existentes = await contar("wa_conversas", {
+      org_id: instancia.org_id,
+      instancia_id: instancia.id,
+      remote_contact_id: remote,
+    });
+    if (existentes > 0) return json({ erro: "contato_de_teste_ja_existe" }, 409);
+    const externalId = `DIAGTEST${Date.now()}`;
+    const evento = {
+      event: "Message",
+      instanceId: instancia.id,
+      instanceName: instancia.nome,
+      data: {
+        Info: {
+          Chat: remote,
+          Sender: remote,
+          IsFromMe: false,
+          IsGroup: false,
+          AddressingMode: "lid",
+          SenderAlt: "53000000000042@lid",
+          ID: externalId,
+          Type: "text",
+          PushName: "Teste Diagnostico",
+          Timestamp: new Date().toISOString(),
+        },
+        Message: { conversation: "mensagem sintetica de diagnostico" },
+      },
+    };
+    const enviar = async () => {
+      const resposta = await fetch(alvo, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(evento),
+      });
+      const texto = await resposta.text().catch(() => "");
+      return { http: resposta.status, corpo: redigir(texto) };
+    };
+    const primeira = await enviar();
+    const { data: conversa } = await admin
+      .from("wa_conversas")
+      .select("id,unread_count,status,instancia_id")
+      .eq("org_id", instancia.org_id)
+      .eq("instancia_id", instancia.id)
+      .eq("remote_contact_id", remote)
+      .maybeSingle();
+    const apos1 = {
+      conversas: await contar("wa_conversas", {
+        org_id: instancia.org_id,
+        remote_contact_id: remote,
+      }),
+      mensagens: await contar("wa_mensagens", { org_id: instancia.org_id, externo_id: externalId }),
+    };
+    const segunda = await enviar();
+    const apos2 = {
+      mensagens: await contar("wa_mensagens", { org_id: instancia.org_id, externo_id: externalId }),
+    };
+    let limpeza: Record<string, number> | null = null;
+    if (conversa?.id) {
+      await admin
+        .from("wa_conversas")
+        .delete()
+        .eq("id", conversa.id)
+        .eq("org_id", instancia.org_id);
+      limpeza = {
+        conversas_restantes: await contar("wa_conversas", { id: conversa.id }),
+        mensagens_restantes: await contar("wa_mensagens", {
+          org_id: instancia.org_id,
+          externo_id: externalId,
+        }),
+        eventos_restantes: await contar("wa_conversa_eventos", { conversa_id: conversa.id }),
+        eventos_automacao_restantes: await contar("wa_automation_events", {
+          conversation_id: conversa.id,
+        }),
+      };
+    }
+    return json({
+      configurado: true,
+      primeira_entrega: primeira,
+      conversa_criada: Boolean(conversa),
+      vinculada_a_instancia_correta: conversa?.instancia_id === instancia.id,
+      nao_lidas_apos_primeira: conversa?.unread_count ?? null,
+      apos_primeira: apos1,
+      segunda_entrega_identica: segunda,
+      mensagens_apos_segunda: apos2.mensagens,
+      limpeza,
+    });
+  }
   if (body.modo === "webhooks") {
     // aplicar=false só relata; aplicar=true reaplica o webhook nos chips CONECTADOS sem ele.
     // Nunca desconecta, nunca envia mensagem, nunca cria/exclui instância.

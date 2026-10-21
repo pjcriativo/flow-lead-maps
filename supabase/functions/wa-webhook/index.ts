@@ -13,6 +13,7 @@ import {
 } from "../_shared/whatsapp-delivery-engine.ts";
 import {
   canAdvanceConversationMessageStatus,
+  inboundIngestParams,
   normalizeInboundWhatsappMessage,
   normalizeWhatsappTimestamp,
 } from "../_shared/whatsapp-conversation.ts";
@@ -50,7 +51,7 @@ function deliveryStatus(
   return null;
 }
 
-Deno.serve(async (req) => {
+async function handleWebhook(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ ok: false }, 405);
   const url = new URL(req.url);
@@ -264,17 +265,10 @@ Deno.serve(async (req) => {
   const inbound = normalizeInboundWhatsappMessage(body);
   if (!inbound) return json({ ok: true, ignored: "not-supported-inbound", evento });
 
-  const { data: ingested, error: ingestError } = await admin.rpc("wa_ingest_inbound_message", {
-    p_org: inst.org_id,
-    p_instance: inst.id,
-    p_remote_contact_id: inbound.contact.remoteId,
-    p_phone: inbound.contact.phone,
-    p_contact_name: inbound.contactName,
-    p_external_id: inbound.externalId,
-    p_message_type: inbound.type,
-    p_text: inbound.text,
-    p_occurred_at: inbound.occurredAt,
-  });
+  const { data: ingested, error: ingestError } = await admin.rpc(
+    "wa_ingest_inbound_message",
+    inboundIngestParams(inst.org_id, inst.id, inbound),
+  );
   if (ingestError) {
     console.error("wa-webhook conversation persistence failed", ingestError.code);
     return json({ ok: false, stored: false }, 503);
@@ -282,4 +276,21 @@ Deno.serve(async (req) => {
 
   const persisted = Array.isArray(ingested) ? ingested[0] : ingested;
   return json({ ok: true, stored: true, duplicate: !persisted?.inserted });
+}
+
+// Qualquer exceção inesperada vira 503 explícito: a Evolution GO repete o evento (5 tentativas)
+// e o motivo fica no log da função, em vez de um 500 opaco do runtime.
+Deno.serve(async (req) => {
+  try {
+    return await handleWebhook(req);
+  } catch (error) {
+    // Só nome + mensagem truncados (sem segredo, payload ou dados pessoais): o corpo vai apenas
+    // para a Evolution GO, autenticada pelo segredo da URL, e permite diagnosticar sem logs.
+    const detalhe =
+      error instanceof Error
+        ? `${error.name}: ${error.message}`.replace(/k=[^s&"]+/g, "k=<redigido>").slice(0, 200)
+        : "unknown_error";
+    console.error("wa-webhook unexpected failure", detalhe);
+    return json({ ok: false, stored: false, error: "internal", detail: detalhe }, 503);
+  }
 });
