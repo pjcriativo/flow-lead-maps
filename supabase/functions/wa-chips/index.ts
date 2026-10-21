@@ -8,6 +8,7 @@ import type { WhatsappPermission } from "../_shared/whatsapp-policy.ts";
 import {
   atualizarChip,
   checarSaudeChip,
+  comSessaoRecuperavel,
   definirWebhookInstancia,
   excluirInstanciaDaOrg,
   graduarChipDoLead,
@@ -22,7 +23,6 @@ import {
   obterOuCriarInstanciaParaPareamento,
   verificarEvolutionGo,
   waBase,
-  waGlobalKey,
   EvolutionGoPairingError,
   type WaInstanciaOrg,
 } from "../_shared/wa.ts";
@@ -246,7 +246,10 @@ async function handleRequest(req: Request): Promise<Response> {
     if (!instance) return json({ error: "Chip não encontrado." }, 404);
     let code: string | null;
     try {
-      code = await pairInstancia(instance.token, phone);
+      // Sessão morta/token rejeitado → recria a sessão remota UMA vez na mesma linha e repete.
+      ({ result: code } = await comSessaoRecuperavel(admin, instance, (inst) =>
+        pairInstancia(inst.token, phone),
+      ));
     } catch (error) {
       if (error instanceof EvolutionGoPairingError) {
         return json({ error: error.message }, error.status);
@@ -271,11 +274,14 @@ async function handleRequest(req: Request): Promise<Response> {
     if (!instance) return json({ error: "Chip não encontrado." }, 404);
     let qr: string | null;
     try {
-      qr = await qrInstancia(instance.token);
+      // Sessão morta/token rejeitado → recria a sessão remota UMA vez na mesma linha e repete.
+      ({ result: qr } = await comSessaoRecuperavel(admin, instance, (inst) =>
+        qrInstancia(inst.token),
+      ));
     } catch (error) {
       if (error instanceof EvolutionGoPairingError) {
-        const providerLogs = await logsPareamentoEvolution(instance.nome);
-        console.error("wa QR pairing failed", error.message, providerLogs);
+        const providerLogs = await logsPareamentoEvolution(instance.nome).catch(() => []);
+        console.error("wa QR pairing failed", error.code, error.message, providerLogs);
         const databaseOverloaded = providerLogs.some((log) =>
           log.includes("too many clients already"),
         );

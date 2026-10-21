@@ -15,6 +15,8 @@
 //   POST /instance/create        (apikey: global)        body {name, token}
 //   DELETE /instance/delete/{id} (apikey: global)
 //   GET  /instance/status        (apikey: token da org)  -> {data:{Connected,LoggedIn,Name}}
+//   POST /instance/connect       (apikey: token da org)  body {subscribe:[...]} -> inicia o cliente
+//                                 em goroutine (NÃO devolve QR; o QR só aparece após Connected)
 //   GET  /instance/qr            (apikey: token da org)  -> {data:{Qrcode:"data:image/png;base64,..."}}
 //   POST /instance/pair          (apikey: token da org)  body {phone} -> {data:{PairingCode}}
 //   POST /send/text              (apikey: token da org)  body {number, text}
@@ -211,16 +213,15 @@ async function listarInstanciasRemotas(): Promise<WaRemoteInstance[] | null> {
   }
 }
 
-/** Token de uma instância pelo NOME (usado p/ adotar o legado sem re-parear). */
-async function tokenNaEvolution(nome: string): Promise<string | null> {
+/** Instância remota pelo NOME (o nome é o vínculo estável entre a linha local e a Evolution). */
+async function instanciaRemotaPorNome(nome: string): Promise<WaRemoteInstance | null> {
   const instances = await listarInstanciasRemotas();
-  return instances?.find((instance) => instance.name === nome)?.token ?? null;
+  return instances?.find((instance) => instance.name === nome) ?? null;
 }
 
 /** Id (da Evolution) de uma instância pelo NOME — necessário p/ deletar. */
 async function idNaEvolution(nome: string): Promise<string | null> {
-  const instances = await listarInstanciasRemotas();
-  return instances?.find((instance) => instance.name === nome)?.id || null;
+  return (await instanciaRemotaPorNome(nome))?.id || null;
 }
 
 /** Logs recentes e sanitizados da instância para diagnóstico operacional do pareamento. */
@@ -311,14 +312,32 @@ async function garantirTokenDaLinha(
     };
   }
 
-  // Verifica se a instância existe na Evolution
-  const evoId = await idNaEvolution(row.nome);
-  let token = tk?.token ?? null;
+  // A instância existe na Evolution? (pelo NOME — o id remoto pode não vir na listagem)
+  const remota = await instanciaRemotaPorNome(row.nome);
+  let token: string | null = null;
 
-  // Se a instância já existe na Evolution e temos um token salvo, testa se o token é aceito
-  if (evoId && token) {
-    const observation = await observarStatusInstancia(token, 4000);
-    if (!observation.transportFailure) {
+  if (remota) {
+    // Candidatos a token: o gravado localmente e o que a própria Evolution expõe na listagem.
+    // Um token só é DESCARTADO quando a Evolution o rejeita explicitamente (401/403). Falha de
+    // transporte ou resposta inesperada não autoriza destruir uma sessão possivelmente viva.
+    const candidatos = [tk?.token ?? null, remota.token].filter(
+      (value, index, all): value is string => Boolean(value) && all.indexOf(value) === index,
+    );
+    for (const candidato of candidatos) {
+      const observation = await observarStatusInstancia(candidato, 4000);
+      if (!observation.ok && observation.failureKind === "authentication") continue;
+      token = candidato;
+      break;
+    }
+    if (token) {
+      if (token !== tk?.token) {
+        await admin
+          .from("wa_instancia_tokens")
+          .upsert(
+            { instancia_id: row.id, token, atualizado_em: new Date().toISOString() },
+            { onConflict: "instancia_id" },
+          );
+      }
       return {
         id: row.id,
         orgId: row.org_id,
@@ -329,12 +348,8 @@ async function garantirTokenDaLinha(
         funcao: row.funcao,
       };
     }
-  }
-
-  // Se a instância existe na Evolution mas não temos token válido ou ela não responde,
-  // remove a remota antiga para evitar conflito de 409 ao recriar
-  if (evoId) {
-    await excluirNaEvolution(evoId).catch(() => false);
+    // Existe remotamente, mas nenhum token é aceito: remove a antiga para recriar sem 409.
+    if (remota.id) await excluirNaEvolution(remota.id).catch(() => false);
   }
 
   // Cria a instância na Evolution
@@ -345,12 +360,20 @@ async function garantirTokenDaLinha(
   const status = "desconectado";
   await admin
     .from("wa_instancias")
-    .update({ numero: null, status, provider_status: "desconectado", atualizado_em: new Date().toISOString() })
+    .update({
+      numero: null,
+      status,
+      provider_status: "desconectado",
+      atualizado_em: new Date().toISOString(),
+    })
     .eq("id", row.id);
 
   await admin
     .from("wa_instancia_tokens")
-    .upsert({ instancia_id: row.id, token, atualizado_em: new Date().toISOString() }, { onConflict: "instancia_id" });
+    .upsert(
+      { instancia_id: row.id, token, atualizado_em: new Date().toISOString() },
+      { onConflict: "instancia_id" },
+    );
 
   return {
     id: row.id,
@@ -492,14 +515,62 @@ export async function excluirInstanciaDaOrg(
 
 export type WaStatus = { connected: boolean; loggedIn: boolean; name: string; jid: string };
 
+/**
+ * Classificação do erro de pareamento — decide se vale RECRIAR a sessão remota.
+ * - provider_rejected: a Evolution recusou a chamada de forma explícita (não recuperável aqui).
+ * - already_logged_in: a sessão já está pareada; não há QR/código a gerar (nunca recriar!).
+ * - session_unauthorized: o token da instância não é mais aceito (recriar).
+ * - session_not_connected: o cliente não ficou Connected no prazo — cliente morto no mapa da
+ *   Evolution GO; só delete+create limpa esse estado (recriar).
+ * - qr_unavailable: conectado, mas o WhatsApp não emitiu QR no prazo (recriar).
+ */
+export type EvolutionGoPairingCode =
+  | "provider_rejected"
+  | "already_logged_in"
+  | "session_unauthorized"
+  | "session_not_connected"
+  | "qr_unavailable";
+
 export class EvolutionGoPairingError extends Error {
   readonly status: number;
+  readonly code: EvolutionGoPairingCode;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code: EvolutionGoPairingCode = "provider_rejected") {
     super(message);
     this.name = "EvolutionGoPairingError";
     this.status = status;
+    this.code = code;
   }
+}
+
+/** Erros em que recriar a sessão remota (delete + create) é a única saída conhecida. */
+export function pareamentoRecuperavel(error: unknown): error is EvolutionGoPairingError {
+  return (
+    error instanceof EvolutionGoPairingError &&
+    (error.code === "session_not_connected" ||
+      error.code === "qr_unavailable" ||
+      error.code === "session_unauthorized")
+  );
+}
+
+/** Prazos do protocolo de pareamento (ajustáveis nos testes). */
+export type WaPairingTiming = {
+  /** Quanto esperar o cliente ficar Connected após o /instance/connect. */
+  prazoSessaoMs: number;
+  /** Quanto esperar o WhatsApp emitir o QR depois de Connected. */
+  prazoQrMs: number;
+  /** Intervalo entre consultas de status/QR. */
+  intervaloMs: number;
+};
+
+export const PAIRING_TIMING: WaPairingTiming = {
+  prazoSessaoMs: 10_000,
+  prazoQrMs: 12_000,
+  intervaloMs: 1_000,
+};
+
+function dormir(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
 
 function normalizeEvolutionGoQr(payload: unknown): string | null {
@@ -524,7 +595,9 @@ function evolutionGoError(payload: unknown, fallback: string): string {
     const msg =
       record.message ||
       record.error ||
-      (record.response && typeof record.response === "object" && (record.response as Record<string, unknown>).message);
+      (record.response &&
+        typeof record.response === "object" &&
+        (record.response as Record<string, unknown>).message);
     if (typeof msg === "string" && msg.trim()) return msg.trim();
     if (Array.isArray(msg) && msg.length && typeof msg[0] === "string") return msg[0];
   }
@@ -631,9 +704,59 @@ export async function sincronizarInstancia(
   return numero;
 }
 
-/** Código de pareamento (POST /instance/pair com o token DA ORG). */
-export async function pairInstancia(token: string, phone: string): Promise<string | null> {
+/**
+ * Garante que a sessão da instância está CONECTADA ao WhatsApp antes de pedir QR ou código.
+ *
+ * Por quê (lido no fonte da Evolution GO 0.7.x): /instance/connect só agenda o StartClient em
+ * goroutine e responde na hora, sem QR. Se /instance/qr ou /instance/pair chegam antes de o
+ * cliente ser registrado, o servidor inicia um SEGUNDO cliente para a mesma instância — cada
+ * um abre um pool próprio de Postgres (daí "too many clients already") e o perdedor da corrida
+ * vira um cliente morto no mapa, que faz todo /instance/qr seguinte responder "no QR code
+ * available" indefinidamente. Logo: status → connect (só se preciso) → esperar Connected=true
+ * → só então QR/código. Se nunca conecta, o erro sai classificado para a camada acima RECRIAR.
+ */
+export async function prepararSessaoPareamento(
+  token: string,
+  timing: WaPairingTiming = PAIRING_TIMING,
+): Promise<void> {
+  const classificar = (observation: WaProviderObservation): "pronta" | "aguardando" => {
+    if (!observation.ok && observation.failureKind === "authentication") {
+      throw new EvolutionGoPairingError(
+        "O serviço de conexão não reconhece mais esta instância.",
+        409,
+        "session_unauthorized",
+      );
+    }
+    if (observation.ok && observation.loggedIn) {
+      throw new EvolutionGoPairingError("Este número já está conectado.", 409, "already_logged_in");
+    }
+    return observation.ok && observation.connected ? "pronta" : "aguardando";
+  };
+
+  if (classificar(await observarStatusInstancia(token, 4_000)) === "pronta") return;
+
   await iniciarPareamentoInstancia(token);
+  const limite = Date.now() + timing.prazoSessaoMs;
+  for (;;) {
+    await dormir(timing.intervaloMs);
+    if (classificar(await observarStatusInstancia(token, 4_000)) === "pronta") return;
+    if (Date.now() >= limite) {
+      throw new EvolutionGoPairingError(
+        "A sessão do WhatsApp não respondeu a tempo.",
+        409,
+        "session_not_connected",
+      );
+    }
+  }
+}
+
+/** Código de pareamento (POST /instance/pair com o token DA ORG). */
+export async function pairInstancia(
+  token: string,
+  phone: string,
+  timing: WaPairingTiming = PAIRING_TIMING,
+): Promise<string | null> {
+  await prepararSessaoPareamento(token, timing);
   const r = await fetch(`${waBase()}/instance/pair`, {
     method: "POST",
     headers: { apikey: token, "Content-Type": "application/json" },
@@ -657,7 +780,8 @@ export async function pairInstancia(token: string, phone: string): Promise<strin
   return typeof code === "string" && code.trim() ? code.trim() : null;
 }
 
-async function iniciarPareamentoInstancia(token: string): Promise<string | null> {
+/** POST /instance/connect: grava as assinaturas de eventos e agenda o StartClient no servidor. */
+async function iniciarPareamentoInstancia(token: string): Promise<void> {
   const connect = await fetch(`${waBase()}/instance/connect`, {
     method: "POST",
     headers: { apikey: token, "Content-Type": "application/json" },
@@ -670,65 +794,61 @@ async function iniciarPareamentoInstancia(token: string): Promise<string | null>
       pairingHttpStatus(connect.status),
     );
   }
-  return normalizeEvolutionGoQr(payload);
 }
 
-/** QR da instância DA ORG (GET /instance/qr com o token dela). */
+/**
+ * QR da instância DA ORG (GET /instance/qr com o token dela), só depois de a sessão estar
+ * Connected (ver prepararSessaoPareamento). O servidor guarda o QR no banco ao receber o evento
+ * do WhatsApp; enquanto não chega, responde 400 "no QR code available" — é transitório até o
+ * prazo. Nunca devolve null: ou entrega o QR ou lança um erro classificado.
+ */
 export async function qrInstancia(
   token: string,
-  maxTentativas = 6,
-  intervaloMs = 1500,
-): Promise<string | null> {
-  const qrFromConnect = await iniciarPareamentoInstancia(token);
-  if (qrFromConnect) return qrFromConnect;
+  timing: WaPairingTiming = PAIRING_TIMING,
+): Promise<string> {
+  await prepararSessaoPareamento(token, timing);
 
-  let ultimoErro: EvolutionGoPairingError | null = null;
+  const limite = Date.now() + timing.prazoQrMs;
+  for (;;) {
+    const q = await fetch(`${waBase()}/instance/qr`, { headers: { apikey: token } });
+    const payload: unknown = await q.json().catch(() => null);
+    if (q.ok) {
+      const qr = normalizeEvolutionGoQr(payload);
+      if (qr) return qr;
+    }
 
-  for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
-    // Pausa para dar tempo da Evolution GO sincronizar com o WebSocket do WhatsApp
-    await new Promise((resolve) => setTimeout(resolve, intervaloMs));
-
-    try {
-      const q = await fetch(`${waBase()}/instance/qr`, { headers: { apikey: token } });
-      const payload: unknown = await q.json().catch(() => null);
-
-      if (q.ok) {
-        const qr = normalizeEvolutionGoQr(payload);
-        if (qr) return qr;
-      }
-
-      const errText = evolutionGoError(payload, "");
-      const isTransitory =
-        q.status === 400 ||
-        q.status === 404 ||
-        q.status === 409 ||
-        errText.toLowerCase().includes("no qr code available") ||
-        errText.toLowerCase().includes("wait a moment");
-
-      if (!isTransitory) {
-        throw new EvolutionGoPairingError(
-          errText || "O serviço de conexão não disponibilizou um QR Code.",
-          pairingHttpStatus(q.status),
-        );
-      }
-
-      ultimoErro = new EvolutionGoPairingError(
-        errText || "O QR Code ainda está sendo gerado. Aguarde um instante.",
+    const errText = evolutionGoError(payload, "");
+    if (q.status === 401 || q.status === 403) {
+      throw new EvolutionGoPairingError(
+        "O serviço de conexão não reconhece mais esta instância.",
+        409,
+        "session_unauthorized",
+      );
+    }
+    if (/already logged in/i.test(errText)) {
+      throw new EvolutionGoPairingError("Este número já está conectado.", 409, "already_logged_in");
+    }
+    const transitorio =
+      q.ok ||
+      q.status === 400 ||
+      q.status === 404 ||
+      q.status === 409 ||
+      /no qr code available|wait a moment|invalid qr code format/i.test(errText);
+    if (!transitorio) {
+      throw new EvolutionGoPairingError(
+        errText || "O serviço de conexão não disponibilizou um QR Code.",
         pairingHttpStatus(q.status),
       );
-    } catch (err) {
-      if (err instanceof EvolutionGoPairingError && err.status !== 409 && err.status !== 400) {
-        throw err;
-      }
-      ultimoErro =
-        err instanceof EvolutionGoPairingError
-          ? err
-          : new EvolutionGoPairingError(String(err), 502);
     }
+    if (Date.now() >= limite) break;
+    await dormir(timing.intervaloMs);
   }
 
-  if (ultimoErro) throw ultimoErro;
-  throw new EvolutionGoPairingError("O serviço de conexão não retornou um QR Code válido.", 502);
+  throw new EvolutionGoPairingError(
+    "O WhatsApp não liberou o QR Code a tempo.",
+    409,
+    "qr_unavailable",
+  );
 }
 
 /* ------------------------------ N CHIPS por org ------------------------------ */
@@ -902,6 +1022,7 @@ export async function obterOuCriarEObterQr(
   admin: Admin,
   scope: WaTenantScope,
   funcao = "disparo",
+  timing: WaPairingTiming = PAIRING_TIMING,
 ): Promise<{ instance: WaInstanciaOrg; qr: string }> {
   const func = funcao === "conversa" ? "conversa" : "disparo";
 
@@ -920,7 +1041,11 @@ export async function obterOuCriarEObterQr(
   // Se houver mais de uma linha pendente, arquiva as excedentes para manter a tabela limpa
   if (pendingRows && pendingRows.length > 1) {
     const extraIds = pendingRows.slice(1).map((r) => r.id);
-    await admin.from("wa_instancias").update({ deleted_at: new Date().toISOString() }).in("id", extraIds).eq("org_id", scope.orgId);
+    await admin
+      .from("wa_instancias")
+      .update({ deleted_at: new Date().toISOString() })
+      .in("id", extraIds)
+      .eq("org_id", scope.orgId);
   }
 
   const wasExisting = Boolean(pendingRow);
@@ -937,26 +1062,42 @@ export async function obterOuCriarEObterQr(
     );
   }
 
-  // 3. Tenta gerar o QR. Se falhar e a instância era nova, faz rollback completo.
+  // 3. Gera o QR (com UMA recriação da sessão remota se ela estiver morta). Se ainda assim
+  //    falhar e a instância era nova, faz rollback completo para não deixar chip órfão.
   try {
-    const qr = await qrInstancia(instance.token);
-    if (!qr) {
+    const { instance: ativa, result: qr } = await comSessaoRecuperavel(admin, instance, (inst) =>
+      qrInstancia(inst.token, timing),
+    );
+    return { instance: ativa, qr };
+  } catch (error) {
+    // Logs do provedor ANTES de qualquer rollback (depois a instância remota já não existe).
+    const providerLogs =
+      error instanceof EvolutionGoPairingError
+        ? await logsPareamentoEvolution(instance.nome).catch(() => [])
+        : [];
+    if (error instanceof EvolutionGoPairingError && error.code === "already_logged_in") {
+      // A linha estava "sem número", mas a sessão remota já está pareada: sincroniza e avisa.
+      await sincronizarInstancia(admin, instance, await statusInstancia(instance.token));
       throw new EvolutionGoPairingError(
-        "O serviço de conexão não retornou um QR Code válido.",
-        502,
+        "Este número já está conectado. A lista de números foi atualizada.",
+        409,
+        "already_logged_in",
       );
     }
-    return { instance, qr };
-  } catch (error) {
     if (!wasExisting) {
       const evoId = await idNaEvolution(instance.nome).catch(() => null);
       if (evoId) await excluirNaEvolution(evoId).catch(() => false);
-      await admin.from("wa_instancias").update({ deleted_at: new Date().toISOString() }).eq("id", instance.id).eq("org_id", scope.orgId);
+      await admin
+        .from("wa_instancias")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", instance.id)
+        .eq("org_id", scope.orgId);
     }
     if (error instanceof EvolutionGoPairingError) {
-      const providerLogs = await logsPareamentoEvolution(instance.nome).catch(() => []);
-      console.error("wa criar_e_qr pairing failed", error.message, providerLogs);
-      const databaseOverloaded = providerLogs.some((log) => log.includes("too many clients already"));
+      console.error("wa criar_e_qr pairing failed", error.code, error.message, providerLogs);
+      const databaseOverloaded = providerLogs.some((log) =>
+        log.includes("too many clients already"),
+      );
       if (databaseOverloaded) {
         throw new EvolutionGoPairingError(
           "O serviço do WhatsApp está temporariamente sobrecarregado. Tente novamente em alguns minutos.",
@@ -968,6 +1109,63 @@ export async function obterOuCriarEObterQr(
   }
 }
 
+/**
+ * Recria a sessão remota de UMA linha (delete + create com o MESMO nome) e grava o token novo.
+ * É o único jeito conhecido de limpar um cliente morto do mapa da Evolution GO: /instance/connect
+ * em cliente existente só "atualiza configurações", e /instance/disconnect exige Connected.
+ * A linha local é preservada (mesmo id, mesma ordem) — nada de chip órfão.
+ */
+export async function recriarSessaoDaLinha(
+  admin: Admin,
+  instance: WaInstanciaOrg,
+): Promise<WaInstanciaOrg | null> {
+  const remota = await instanciaRemotaPorNome(instance.nome);
+  if (remota?.id && !(await excluirNaEvolution(remota.id))) return null;
+  const token = await criarNaEvolution(instance.nome);
+  if (!token) return null;
+  const agora = new Date().toISOString();
+  await admin
+    .from("wa_instancia_tokens")
+    .upsert(
+      { instancia_id: instance.id, token, atualizado_em: agora },
+      { onConflict: "instancia_id" },
+    );
+  await admin
+    .from("wa_instancias")
+    .update({ status: "aguardando", numero: null, atualizado_em: agora })
+    .eq("id", instance.id)
+    .eq("org_id", instance.orgId);
+  return { ...instance, token, numero: null, status: "aguardando" };
+}
+
+/**
+ * Executa uma operação de pareamento (QR ou código) e, se a sessão remota estiver morta ou
+ * com token rejeitado, recria-a UMA vez e repete. Sessão já pareada NUNCA é recriada
+ * (already_logged_in não é recuperável) — preserva a conexão viva do cliente.
+ */
+export async function comSessaoRecuperavel<T>(
+  admin: Admin,
+  instance: WaInstanciaOrg,
+  operacao: (inst: WaInstanciaOrg) => Promise<T>,
+): Promise<{ instance: WaInstanciaOrg; result: T; recuperada: boolean }> {
+  try {
+    return { instance, result: await operacao(instance), recuperada: false };
+  } catch (error) {
+    if (!pareamentoRecuperavel(error)) throw error;
+    const logs = await logsPareamentoEvolution(instance.nome).catch(() => []);
+    console.warn(
+      JSON.stringify({
+        event: "wa_pairing_session_reset",
+        instance: instance.nome,
+        code: error.code,
+        provider_logs: logs.slice(0, 5),
+      }),
+    );
+    const nova = await recriarSessaoDaLinha(admin, instance);
+    if (!nova) throw error;
+    return { instance: nova, result: await operacao(nova), recuperada: true };
+  }
+}
 
 /** RECRIA a sessão Evolution de UM chip da organização autorizada. */
 export async function recriarInstanciaPorId(
@@ -977,20 +1175,7 @@ export async function recriarInstanciaPorId(
 ): Promise<WaInstanciaOrg | null> {
   const atual = await instanciaDaOrgComToken(admin, orgId, id);
   if (!atual) return null;
-  const evoId = await idNaEvolution(atual.nome);
-  if (evoId && !(await excluirNaEvolution(evoId))) return null;
-  const token = await criarNaEvolution(atual.nome);
-  if (!token) return null;
-  const agora = new Date().toISOString();
-  await admin
-    .from("wa_instancia_tokens")
-    .upsert({ instancia_id: atual.id, token, atualizado_em: agora });
-  await admin
-    .from("wa_instancias")
-    .update({ status: "aguardando", numero: null, atualizado_em: agora })
-    .eq("id", atual.id)
-    .eq("org_id", orgId);
-  return { id: atual.id, orgId, nome: atual.nome, token, numero: null, status: "aguardando" };
+  return recriarSessaoDaLinha(admin, atual);
 }
 
 /** Próximo chip de DISPARO da org: funcao='disparo' + status='conectado', por ordem. */

@@ -83,43 +83,98 @@ test("obtains the real contact avatar from the installed Evolution GO endpoint",
   }
 });
 
-test("qrInstancia starts the instance before requesting its QR", async () => {
+// Protocolo de pareamento (lido no fonte da Evolution GO 0.7.x): /instance/connect só agenda o
+// StartClient em goroutine; /instance/qr e /instance/pair chamados antes de o cliente existir
+// iniciam um SEGUNDO cliente (pool de Postgres duplicado → "too many clients already" → cliente
+// morto → "no QR code available" para sempre). Invariantes abaixo: status → connect (só se
+// preciso) → esperar Connected → só então QR/código; sessão morta é classificada como
+// recuperável; sessão logada NUNCA é reiniciada.
+const FAST_TIMING = { prazoSessaoMs: 40, prazoQrMs: 40, intervaloMs: 0 };
+
+type EvolutionRequest = { url: string; method: string; apiKey: string | null; body: string | null };
+
+function captureEvolution(
+  responder: (url: string, request: EvolutionRequest) => Response,
+): EvolutionRequest[] {
+  const requests: EvolutionRequest[] = [];
+  globalThis.fetch = async (input, init) => {
+    const request: EvolutionRequest = {
+      url: String(input),
+      method: init?.method ?? "GET",
+      apiKey: new Headers(init?.headers).get("apikey"),
+      body: typeof init?.body === "string" ? init.body : null,
+    };
+    requests.push(request);
+    return responder(request.url, request);
+  };
+  return requests;
+}
+
+function statusResponse(connected: boolean, loggedIn = false): Response {
+  return Response.json({ message: "success", data: { Connected: connected, LoggedIn: loggedIn } });
+}
+
+function withEvolutionEnv() {
   const runtime = globalThis as typeof globalThis & {
     Deno?: { env: { get(name: string): string | undefined } };
   };
   const originalDeno = runtime.Deno;
   const originalFetch = globalThis.fetch;
-  const requests: Array<{
-    url: string;
-    method: string;
-    apiKey: string | null;
-    body: string | null;
-  }> = [];
   runtime.Deno = {
-    env: { get: (name) => (name === "EVOLUTION_URL" ? "https://evolution.invalid" : undefined) },
+    env: {
+      get: (name) =>
+        name === "EVOLUTION_URL"
+          ? "https://evolution.invalid"
+          : name === "EVOLUTION_API_KEY"
+            ? "global-key"
+            : undefined,
+    },
   };
-  globalThis.fetch = async (input, init) => {
-    requests.push({
-      url: String(input),
-      method: init?.method ?? "GET",
-      apiKey: new Headers(init?.headers).get("apikey"),
-      body: typeof init?.body === "string" ? init.body : null,
-    });
-    if (String(input).endsWith("/instance/connect")) {
-      return Response.json({ message: "success", data: {} });
+  return () => {
+    globalThis.fetch = originalFetch;
+    runtime.Deno = originalDeno;
+  };
+}
+
+test("qrInstancia only requests the QR after the session reports Connected", async () => {
+  const restore = withEvolutionEnv();
+  let connectCalled = false;
+  const requests = captureEvolution((url) => {
+    if (url.endsWith("/instance/status")) return statusResponse(connectCalled);
+    if (url.endsWith("/instance/connect")) {
+      connectCalled = true;
+      return Response.json({ message: "success", data: { jid: "", eventString: "MESSAGE" } });
     }
-    return Response.json({ message: "success", data: { Qrcode: PNG_BASE64 } });
-  };
+    if (url.endsWith("/instance/qr")) {
+      return Response.json({ message: "success", data: { Qrcode: PNG_BASE64 } });
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
 
   try {
     const { qrInstancia } = await import("./wa.ts");
-    assert.equal(await qrInstancia("tenant-instance-token"), `data:image/png;base64,${PNG_BASE64}`);
+    assert.equal(
+      await qrInstancia("tenant-instance-token", FAST_TIMING),
+      `data:image/png;base64,${PNG_BASE64}`,
+    );
     assert.deepEqual(requests, [
+      {
+        url: "https://evolution.invalid/instance/status",
+        method: "GET",
+        apiKey: "tenant-instance-token",
+        body: null,
+      },
       {
         url: "https://evolution.invalid/instance/connect",
         method: "POST",
         apiKey: "tenant-instance-token",
         body: JSON.stringify({ subscribe: ["MESSAGE", "CONNECTION", "QRCODE"] }),
+      },
+      {
+        url: "https://evolution.invalid/instance/status",
+        method: "GET",
+        apiKey: "tenant-instance-token",
+        body: null,
       },
       {
         url: "https://evolution.invalid/instance/qr",
@@ -129,8 +184,211 @@ test("qrInstancia starts the instance before requesting its QR", async () => {
       },
     ]);
   } finally {
-    globalThis.fetch = originalFetch;
-    runtime.Deno = originalDeno;
+    restore();
+  }
+});
+
+test("qrInstancia reuses a live pairing session instead of starting a second client", async () => {
+  const restore = withEvolutionEnv();
+  const requests = captureEvolution((url) => {
+    if (url.endsWith("/instance/status")) return statusResponse(true);
+    if (url.endsWith("/instance/qr")) {
+      return Response.json({ message: "success", data: { Qrcode: PNG_BASE64 } });
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+
+  try {
+    const { qrInstancia } = await import("./wa.ts");
+    assert.equal(
+      await qrInstancia("tenant-instance-token", FAST_TIMING),
+      `data:image/png;base64,${PNG_BASE64}`,
+    );
+    assert.deepEqual(
+      requests.map((request) => request.url),
+      ["https://evolution.invalid/instance/status", "https://evolution.invalid/instance/qr"],
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("qrInstancia never touches /instance/qr while the session stays disconnected and flags it as recoverable", async () => {
+  const restore = withEvolutionEnv();
+  const requests = captureEvolution((url) => {
+    if (url.endsWith("/instance/status")) return statusResponse(false);
+    if (url.endsWith("/instance/connect")) {
+      return Response.json({ message: "success", data: { jid: "", eventString: "MESSAGE" } });
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+
+  try {
+    const { qrInstancia, EvolutionGoPairingError, pareamentoRecuperavel } = await import("./wa.ts");
+    await assert.rejects(qrInstancia("tenant-instance-token", FAST_TIMING), (error: unknown) => {
+      assert.ok(error instanceof EvolutionGoPairingError);
+      assert.equal(error.code, "session_not_connected");
+      assert.equal(error.status, 409);
+      assert.equal(pareamentoRecuperavel(error), true);
+      return true;
+    });
+    assert.equal(requests.filter((request) => request.url.endsWith("/instance/qr")).length, 0);
+    assert.equal(requests.filter((request) => request.url.endsWith("/instance/connect")).length, 1);
+  } finally {
+    restore();
+  }
+});
+
+test("qrInstancia refuses to restart a session that is already logged in", async () => {
+  const restore = withEvolutionEnv();
+  const requests = captureEvolution((url) => {
+    if (url.endsWith("/instance/status")) return statusResponse(true, true);
+    throw new Error(`unexpected request ${url}`);
+  });
+
+  try {
+    const { qrInstancia, EvolutionGoPairingError, pareamentoRecuperavel } = await import("./wa.ts");
+    await assert.rejects(qrInstancia("tenant-instance-token", FAST_TIMING), (error: unknown) => {
+      assert.ok(error instanceof EvolutionGoPairingError);
+      assert.equal(error.code, "already_logged_in");
+      assert.equal(pareamentoRecuperavel(error), false);
+      return true;
+    });
+    assert.deepEqual(
+      requests.map((request) => request.url),
+      ["https://evolution.invalid/instance/status"],
+    );
+  } finally {
+    restore();
+  }
+});
+
+test("obterOuCriarEObterQr recreates a dead remote session once and keeps the same local row", async () => {
+  const restore = withEvolutionEnv();
+  const pending = {
+    id: "pending-instance-id",
+    org_id: "authorized-org-id",
+    nome: "org-authorized-pending",
+    numero: null,
+    status: "aguardando",
+    funcao: "disparo",
+  };
+  const updates: Array<{ table: string; value: Record<string, unknown> }> = [];
+  const upserts: Array<{ table: string; value: Record<string, unknown> }> = [];
+  const queryFor = (table: string) => {
+    const query = {
+      select: () => query,
+      eq: () => query,
+      is: () => query,
+      in: () => query,
+      order: () => query,
+      limit: () => query,
+      update: (value: Record<string, unknown>) => {
+        updates.push({ table, value });
+        return query;
+      },
+      upsert: (value: Record<string, unknown>) => {
+        upserts.push({ table, value });
+        return query;
+      },
+      maybeSingle: async () =>
+        table === "wa_instancia_tokens"
+          ? { data: { token: "stale-instance-token" }, error: null }
+          : { data: pending, error: null },
+      then: (resolve: (value: unknown) => unknown) =>
+        resolve(
+          table === "wa_instancias"
+            ? { data: [pending], error: null }
+            : { data: null, error: null },
+        ),
+    };
+    return query;
+  };
+  const admin = { from: (table: string) => queryFor(table) };
+
+  const connectedTokens = new Set<string>();
+  const requests = captureEvolution((url, request) => {
+    if (url.endsWith("/instance/all")) {
+      return Response.json({
+        message: "success",
+        data: [{ id: "remote-old", name: pending.nome, token: "stale-instance-token" }],
+      });
+    }
+    if (url.includes("/instance/info/")) {
+      return Response.json({ message: "success", data: { id: "remote-old", jid: null } });
+    }
+    if (url.includes("/instance/logs/")) return Response.json([]);
+    if (url.endsWith("/instance/status")) {
+      return statusResponse(connectedTokens.has(request.apiKey ?? ""));
+    }
+    if (url.endsWith("/instance/connect")) {
+      // A sessão antiga é um cliente morto: nunca fica Connected. A recriada conecta normalmente.
+      if (request.apiKey === "fresh-instance-token") connectedTokens.add(request.apiKey);
+      return Response.json({ message: "success", data: { jid: "", eventString: "MESSAGE" } });
+    }
+    if (url.endsWith("/instance/delete/remote-old")) return Response.json({ message: "success" });
+    if (url.endsWith("/instance/create")) {
+      return Response.json({ message: "success", data: { token: "fresh-instance-token" } });
+    }
+    if (url.endsWith("/instance/qr")) {
+      return Response.json({ message: "success", data: { Qrcode: PNG_BASE64 } });
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+
+  try {
+    const { obterOuCriarEObterQr } = await import("./wa.ts");
+    const result = await obterOuCriarEObterQr(
+      admin,
+      { userId: "authorized-user-id", orgId: "authorized-org-id" },
+      "disparo",
+      FAST_TIMING,
+    );
+
+    assert.equal(result.qr, `data:image/png;base64,${PNG_BASE64}`);
+    assert.equal(result.instance.id, pending.id);
+    assert.equal(result.instance.token, "fresh-instance-token");
+
+    const deleteIndex = requests.findIndex((request) =>
+      request.url.endsWith("/instance/delete/remote-old"),
+    );
+    const createIndex = requests.findIndex((request) => request.url.endsWith("/instance/create"));
+    assert.ok(
+      deleteIndex >= 0 && createIndex > deleteIndex,
+      "recreates after deleting the dead session",
+    );
+    assert.equal(requests[deleteIndex].method, "DELETE");
+    assert.equal(requests[deleteIndex].apiKey, "global-key");
+    assert.equal(JSON.parse(requests[createIndex].body ?? "{}").name, pending.nome);
+    // Um único connect por sessão: nunca empilha StartClient na mesma instância.
+    assert.deepEqual(
+      requests
+        .filter((request) => request.url.endsWith("/instance/connect"))
+        .map((request) => request.apiKey),
+      ["stale-instance-token", "fresh-instance-token"],
+    );
+    // QR só foi pedido à sessão recriada, com o token novo.
+    assert.deepEqual(
+      requests.filter((request) => request.url.endsWith("/instance/qr")).map((r) => r.apiKey),
+      ["fresh-instance-token"],
+    );
+    // Mesma linha local: token trocado, nada arquivado.
+    assert.deepEqual(
+      upserts.map((entry) => [entry.table, entry.value.instancia_id, entry.value.token]),
+      [["wa_instancia_tokens", pending.id, "fresh-instance-token"]],
+    );
+    assert.equal(
+      updates.some((entry) => "deleted_at" in entry.value),
+      false,
+    );
+    assert.equal(
+      updates.some(
+        (entry) => entry.table === "wa_instancias" && entry.value.status === "aguardando",
+      ),
+      true,
+    );
+  } finally {
+    restore();
   }
 });
 
@@ -384,34 +642,39 @@ test("direct QR retry recreates an authorized instance whose remote session disa
   }
 });
 
-test("pairInstancia starts the instance before requesting the eight-digit code", async () => {
-  const runtime = globalThis as typeof globalThis & {
-    Deno?: { env: { get(name: string): string | undefined } };
-  };
-  const originalDeno = runtime.Deno;
-  const originalFetch = globalThis.fetch;
-  const requests: Array<{ url: string; method: string }> = [];
-  runtime.Deno = {
-    env: { get: (name) => (name === "EVOLUTION_URL" ? "https://evolution.invalid" : undefined) },
-  };
-  globalThis.fetch = async (input, init) => {
-    requests.push({ url: String(input), method: init?.method ?? "GET" });
-    if (String(input).endsWith("/instance/connect")) {
-      return Response.json({ message: "success", data: {} });
+test("pairInstancia requests the eight-digit code only after the session reports Connected", async () => {
+  const restore = withEvolutionEnv();
+  let connectCalled = false;
+  const requests = captureEvolution((url) => {
+    if (url.endsWith("/instance/status")) return statusResponse(connectCalled);
+    if (url.endsWith("/instance/connect")) {
+      connectCalled = true;
+      return Response.json({ message: "success", data: { jid: "", eventString: "MESSAGE" } });
     }
-    return Response.json({ message: "success", data: { PairingCode: "ABCD1234" } });
-  };
+    if (url.endsWith("/instance/pair")) {
+      return Response.json({ message: "success", data: { PairingCode: "ABCD1234" } });
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
 
   try {
     const { pairInstancia } = await import("./wa.ts");
-    assert.equal(await pairInstancia("tenant-instance-token", "5511999999999"), "ABCD1234");
-    assert.deepEqual(requests, [
-      { url: "https://evolution.invalid/instance/connect", method: "POST" },
-      { url: "https://evolution.invalid/instance/pair", method: "POST" },
-    ]);
+    assert.equal(
+      await pairInstancia("tenant-instance-token", "5511999999999", FAST_TIMING),
+      "ABCD1234",
+    );
+    assert.deepEqual(
+      requests.map((request) => [request.method, request.url, request.apiKey]),
+      [
+        ["GET", "https://evolution.invalid/instance/status", "tenant-instance-token"],
+        ["POST", "https://evolution.invalid/instance/connect", "tenant-instance-token"],
+        ["GET", "https://evolution.invalid/instance/status", "tenant-instance-token"],
+        ["POST", "https://evolution.invalid/instance/pair", "tenant-instance-token"],
+      ],
+    );
+    assert.equal(JSON.parse(requests[3].body ?? "{}").phone, "5511999999999");
   } finally {
-    globalThis.fetch = originalFetch;
-    runtime.Deno = originalDeno;
+    restore();
   }
 });
 
