@@ -33,6 +33,12 @@ import {
   type WaProviderObservation,
   type WaProviderState,
 } from "./whatsapp-instance-health.ts";
+import {
+  chipsParaRevalidar,
+  escolherChipParaEnvio,
+  type ChipRotacao,
+  type EscolhaChip,
+} from "./whatsapp-chip-rotation.ts";
 
 // 🔐 Cofre de chaves: cada edge que importa wa.ts chama inicializarCofreWa(admin) 1x no início
 // do handler — Deno.env.set não funciona no runtime das Edges, por isso o cache de módulo
@@ -1349,6 +1355,7 @@ export async function checarSaudeChip(
   admin: Admin,
   orgId: string,
   chipId: string,
+  origem: "manual" | "worker" | "monitor" = "manual",
 ): Promise<ResultadoChecagem> {
   const inst = await instanciaDaOrgComToken(admin, orgId, chipId);
   if (!inst) return { resultado: "erro" };
@@ -1375,7 +1382,7 @@ export async function checarSaudeChip(
   const { data: applied, error } = await admin.rpc("wa_apply_instance_observation", {
     p_org: orgId,
     p_instance: chipId,
-    p_source: "manual",
+    p_source: origem,
     p_observed_at: observation.observedAt,
     p_provider_status: providerState,
     p_operational_health: health,
@@ -1485,6 +1492,76 @@ export async function graduarChipDoLead(
 export const WA_TETO_DIARIO_CHIP = 40;
 
 /** Quantos envios ESTE chip já fez hoje (dia UTC) — consumo do teto diário por chip. */
+/**
+ * Seleciona, NA HORA DO ENVIO, o chip que vai disparar uma mensagem vinculada a
+ * `chipOriginalId` (ver regras em whatsapp-chip-rotation.ts). Revalida ao vivo a saúde dos
+ * chips velhos/caídos antes de decidir, para que nem a falta de monitor periódico nem uma queda
+ * já recuperada travem a fila.
+ */
+export async function selecionarChipParaEnvio(
+  admin: Admin,
+  orgId: string,
+  chipOriginalId: string,
+  agora = Date.now(),
+): Promise<{ escolha: EscolhaChip; chips: ChipRotacao[]; revalidados: string[] }> {
+  const carregar = async (): Promise<ChipRotacao[]> => {
+    const { data, error } = await admin
+      .from("wa_instancias")
+      .select(
+        "id,status,funcao,numero,provider_status,operational_health,last_provider_success_at,last_health_check_at,ordem",
+      )
+      .eq("org_id", orgId)
+      .is("deleted_at", null);
+    if (error) throw new Error("chips_indisponiveis");
+    const inicioDia = new Date(agora);
+    inicioDia.setUTCHours(0, 0, 0, 0);
+    const { data: enviados } = await admin
+      .from("wa_envios")
+      .select("instancia_id")
+      .eq("org_id", orgId)
+      .in("status", ["accepted", "sent", "delivered", "read"])
+      .gte("enviado_em", inicioDia.toISOString());
+    const porChip = new Map<string, number>();
+    for (const row of (enviados ?? []) as Array<{ instancia_id: string }>) {
+      porChip.set(row.instancia_id, (porChip.get(row.instancia_id) ?? 0) + 1);
+    }
+    return ((data ?? []) as Array<Omit<ChipRotacao, "enviosHoje">>).map((row) => ({
+      ...row,
+      ordem: Number(row.ordem ?? 0),
+      enviosHoje: porChip.get(row.id) ?? 0,
+    }));
+  };
+
+  const { data: contingencia } = await admin
+    .from("wa_contingencias")
+    .select("backup_instance_id")
+    .eq("org_id", orgId)
+    .eq("source_instance_id", chipOriginalId)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  const backupContingenciaId = contingencia?.backup_instance_id
+    ? String(contingencia.backup_instance_id)
+    : null;
+
+  let chips = await carregar();
+  const revalidados = chipsParaRevalidar(chips, WA_TETO_DIARIO_CHIP, agora);
+  if (revalidados.length) {
+    for (const id of revalidados) {
+      await checarSaudeChip(admin, orgId, id, "worker").catch(() => null);
+    }
+    chips = await carregar();
+  }
+  const escolha = escolherChipParaEnvio({
+    chipOriginalId,
+    backupContingenciaId,
+    chips,
+    teto: WA_TETO_DIARIO_CHIP,
+    agora: Math.max(agora, Date.now()),
+  });
+  return { escolha, chips, revalidados };
+}
+
 export async function enviosHojeDoChip(
   admin: Admin,
   orgId: string,

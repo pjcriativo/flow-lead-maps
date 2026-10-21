@@ -14,6 +14,7 @@ import {
   inicializarCofreWa,
   instanciaDaOrgComToken,
   jidCanonicoWhatsapp,
+  selecionarChipParaEnvio,
   waBase,
   waGlobalKey,
 } from "../_shared/wa.ts";
@@ -299,6 +300,48 @@ Deno.serve(async (request) => {
     .clone()
     .json()
     .catch(() => ({}));
+  if (body.modo === "rodizio") {
+    // Simulação SEM ENVIO: para cada chip ativo, qual chip assumiria um envio preso a ele agora.
+    // Pode revalidar a saúde ao vivo (GET /instance/status), que não inicia sessão nem envia nada.
+    const { data: chips } = await admin
+      .from("wa_instancias")
+      .select("id,org_id,funcao,status,ordem")
+      .is("deleted_at", null)
+      .order("ordem", { ascending: true });
+    const curto = (id: string | null) => (id ? id.slice(0, 8) : null);
+    const simulacoes = [];
+    for (const chip of chips ?? []) {
+      const {
+        escolha,
+        chips: estado,
+        revalidados,
+      } = await selecionarChipParaEnvio(admin, chip.org_id, chip.id);
+      simulacoes.push({
+        org: curto(chip.org_id),
+        chip_original: curto(chip.id),
+        funcao: chip.funcao,
+        escolhido: curto(escolha.chipId),
+        motivo: escolha.motivo,
+        bloqueios:
+          escolha.chipId === null
+            ? Object.fromEntries(Object.entries(escolha.bloqueios).map(([k, v]) => [curto(k), v]))
+            : undefined,
+        revalidados: revalidados.map(curto),
+        estado: estado.map((c) => ({
+          chip: curto(c.id),
+          status: c.status,
+          funcao: c.funcao,
+          provider: c.provider_status,
+          saude: c.operational_health,
+          envios_hoje: c.enviosHoje,
+          sucesso_ha_s: c.last_provider_success_at
+            ? Math.round((Date.now() - Date.parse(c.last_provider_success_at)) / 1000)
+            : null,
+        })),
+      });
+    }
+    return json({ configurado: true, simulacoes });
+  }
   if (body.modo === "avatares") {
     const limite = Math.min(Math.max(Number(body.limite) || 8, 1), 20);
     return json({ configurado: true, ...(await sondarAvatares(admin, limite)) });

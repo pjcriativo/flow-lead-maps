@@ -15,6 +15,7 @@ const monitor = read("supabase/functions/wa-health-monitor/index.ts");
 const chips = read("supabase/functions/wa-chips/index.ts");
 const shared = read("supabase/functions/_shared/wa.ts");
 const worker = read("supabase/functions/wa-send-worker/index.ts");
+const rotation = read("supabase/functions/_shared/whatsapp-chip-rotation.ts");
 const webhook = read("supabase/functions/wa-webhook/index.ts");
 const service = read("src/services/whatsapp.ts");
 const numbersUi = read("src/components/whatsapp/WaNumeros.tsx");
@@ -93,12 +94,16 @@ test("contingency requires explicit persisted authorization and distinct instanc
 
 test("worker defers unavailable or stale instances without sending", () => {
   const healthGate = worker.slice(
-    worker.indexOf("const healthIsFresh"),
-    worker.indexOf("const sentToday"),
+    worker.indexOf("selecionarChipParaEnvio("),
+    worker.indexOf("const resolvedInstance"),
   );
-  assert.match(healthGate, /operational_health !== "healthy"/);
+  assert.ok(healthGate.length > 0);
+  assert.match(healthGate, /escolha\.chipId === null/);
   assert.match(healthGate, /wa_defer_delivery_for_instance_health/);
   assert.doesNotMatch(healthGate, /enviarTextoInstancia/);
+  // A regra de saúde vive no módulo de rodízio (saudável + evidência com menos de 5 min).
+  assert.match(rotation, /chip\.operational_health !== "healthy"/);
+  assert.match(rotation, /WA_SAUDE_FRESCA_MS = 5 \* 60_000/);
 });
 
 test("deferred health failures preserve the queue and uncertain items remain protected", () => {

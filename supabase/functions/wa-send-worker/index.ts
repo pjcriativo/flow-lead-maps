@@ -3,8 +3,7 @@ import { json } from "../_shared/cors.ts";
 import {
   enviarTextoInstancia,
   instanciaDaOrgComToken,
-  WA_TETO_DIARIO_CHIP,
-  enviosHojeDoChip,
+  selecionarChipParaEnvio,
 } from "../_shared/wa.ts";
 import {
   classifyProviderFailure,
@@ -118,11 +117,11 @@ function retryAt(attemptCount: number): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return json({ error: "MÃ©todo nÃ£o permitido." }, 405);
+  if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
   const configuredSecret = Deno.env.get("WA_WORKER_SECRET") ?? "";
   const suppliedSecret = req.headers.get("x-wa-worker-secret") ?? "";
   if (!configuredSecret || !constantTimeEqual(configuredSecret, suppliedSecret)) {
-    return json({ error: "NÃ£o autorizado." }, 401);
+    return json({ error: "Não autorizado." }, 401);
   }
 
   const admin = createClient(
@@ -158,6 +157,7 @@ Deno.serve(async (req) => {
     uncertain: 0,
     blocked: 0,
     deferred: 0,
+    rotated: 0,
   };
   for (const delivery of (data ?? []) as ReservedDelivery[]) {
     const [{ data: campaign }, { data: lead }, { data: instance }] = await Promise.all([
@@ -218,59 +218,104 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const healthIsFresh = Boolean(
-      instance?.last_provider_success_at &&
-      Date.now() - Date.parse(instance.last_provider_success_at) <= 5 * 60_000,
-    );
-    const instanceUnavailable =
-      !instance ||
-      instance.status !== "conectado" ||
-      instance.funcao !== "disparo" ||
-      !instance.numero ||
-      instance.provider_status !== "connected" ||
-      instance.operational_health !== "healthy" ||
-      !healthIsFresh;
-    if (instanceUnavailable) {
+    // Rodízio: o chip é escolhido AGORA (contingência → chip original → chip menos usado).
+    let selecao: Awaited<ReturnType<typeof selecionarChipParaEnvio>>;
+    try {
+      selecao = await selecionarChipParaEnvio(admin, delivery.org_id, delivery.instancia_id);
+    } catch {
       await admin.rpc("wa_defer_delivery_for_instance_health", {
         p_delivery: delivery.id,
         p_worker: workerId,
-        p_reason: healthIsFresh ? "instance_health_unavailable" : "instance_health_stale",
+        p_reason: "chips_indisponiveis",
       });
       summary.deferred++;
       continue;
     }
+    const { escolha } = selecao;
 
-    const sentToday = await enviosHojeDoChip(admin, delivery.org_id, delivery.instancia_id);
-    if (sentToday >= WA_TETO_DIARIO_CHIP) {
-      await admin
-        .from("wa_envios")
-        .update({
-          status: "queued",
-          worker_id: null,
-          reserved_at: null,
-          lease_expires_at: null,
-          next_attempt_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-          last_error_code: "daily_limit",
-          last_error: "Limite diÃ¡rio operacional atingido.",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", delivery.id)
-        .eq("worker_id", workerId)
-        .eq("status", "processing");
-      await completeAttempt(admin, delivery, {
-        outcome: "deferred",
-        retryable: true,
-        errorCode: "daily_limit",
-        errorMessage: "Limite diÃ¡rio operacional atingido.",
-      });
+    if (escolha.chipId === null) {
+      const bloqueios = Object.values(escolha.bloqueios);
+      const todosNoTeto = bloqueios.length > 0 && bloqueios.every((m) => m === "teto_diario");
+      if (todosNoTeto) {
+        // Todos os chips de disparo bateram o teto diário: retoma em 1 h, sem estourar o limite.
+        await admin
+          .from("wa_envios")
+          .update({
+            status: "queued",
+            worker_id: null,
+            reserved_at: null,
+            lease_expires_at: null,
+            next_attempt_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            last_error_code: "daily_limit",
+            last_error: "Limite diário operacional atingido em todos os chips de disparo.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", delivery.id)
+          .eq("worker_id", workerId)
+          .eq("status", "processing");
+        await completeAttempt(admin, delivery, {
+          outcome: "deferred",
+          retryable: true,
+          errorCode: "daily_limit",
+          errorMessage: "Limite diário operacional atingido em todos os chips de disparo.",
+        });
+      } else {
+        await admin.rpc("wa_defer_delivery_for_instance_health", {
+          p_delivery: delivery.id,
+          p_worker: workerId,
+          p_reason: "sem_chip_disponivel",
+        });
+        // Um aviso aberto por org (dedup) — sem inundar a central de alertas a cada envio.
+        await admin.from("wa_alertas").insert({
+          user_id: delivery.user_id,
+          org_id: delivery.org_id,
+          instancia_id: delivery.instancia_id,
+          tipo: "sem_chip",
+          mensagem:
+            "Nenhum chip de disparo saudável disponível. Os envios estão preservados na fila e retomam quando um chip voltar.",
+          lido: false,
+          dedup_key: "dispatch:sem_chip_disponivel",
+          first_seen_at: new Date().toISOString(),
+          last_seen_at: new Date().toISOString(),
+        });
+      }
+      summary.deferred++;
       continue;
     }
 
-    const resolvedInstance = await instanciaDaOrgComToken(
-      admin,
-      delivery.org_id,
-      delivery.instancia_id,
-    );
+    if (escolha.trocou) {
+      const { data: reassigned } = await admin
+        .from("wa_envios")
+        .update({ instancia_id: escolha.chipId, updated_at: new Date().toISOString() })
+        .eq("id", delivery.id)
+        .eq("org_id", delivery.org_id)
+        .eq("worker_id", workerId)
+        .eq("status", "processing")
+        .is("provider_requested_at", null)
+        .select("id")
+        .maybeSingle();
+      if (!reassigned) {
+        await completeAttempt(admin, delivery, {
+          outcome: "deferred",
+          retryable: true,
+          errorCode: "lease_invalid_before_rotation",
+        });
+        continue;
+      }
+      await admin.rpc("wa_record_instance_event", {
+        p_org: delivery.org_id,
+        p_instance: delivery.instancia_id,
+        p_event_type: "dispatch_rotated",
+        p_source: "worker",
+        p_actor: null,
+        p_occurred_at: new Date().toISOString(),
+        p_event_key: `rotation:${delivery.id}:${delivery.attempt_count}`,
+        p_details: { to_instance_id: escolha.chipId, motivo: escolha.motivo },
+      });
+      summary.rotated++;
+    }
+
+    const resolvedInstance = await instanciaDaOrgComToken(admin, delivery.org_id, escolha.chipId);
     if (!resolvedInstance) {
       await admin.rpc("wa_defer_delivery_for_instance_health", {
         p_delivery: delivery.id,
@@ -391,7 +436,7 @@ Deno.serve(async (req) => {
       const persistenceFailure =
         caught instanceof Error && caught.message === "persistence_after_send";
       if (persistenceFailure) {
-        // O lease expirado serÃ¡ reconciliado como uncertain; nÃ£o arriscamos um segundo envio.
+        // O lease expirado será reconciliado como uncertain; não arriscamos um segundo envio.
         summary.uncertain++;
         continue;
       }

@@ -9,6 +9,8 @@ import { readFileSync } from "node:fs";
 const read = (path: string) => readFileSync(path, "utf8");
 const migration = read("supabase/migrations/202610160002_wa_delivery_engine.sql");
 const conversationMigration = read("supabase/migrations/202610160004_wa_conversations_crm.sql");
+const rotationMigration = read("supabase/migrations/202610210001_wa_chip_rotation.sql");
+const rotation = read("supabase/functions/_shared/whatsapp-chip-rotation.ts");
 const control = read("supabase/functions/wa-campaign-control/index.ts");
 const worker = read("supabase/functions/wa-send-worker/index.ts");
 const webhook = read("supabase/functions/wa-webhook/index.ts");
@@ -164,10 +166,20 @@ test("failure after provider dispatch is recovered as uncertain after restart", 
   assert.match(migration, /provider_requested_at is null then 'queued' else 'uncertain'/);
 });
 
-test("disconnected instances are excluded both at reservation and immediately before send", () => {
-  assert.match(migration, /i\.status='conectado'/);
-  assert.match(worker, /instance\.status !== "conectado"/);
-  assert.match(worker, /instancia_indisponivel/);
+test("unusable instances are excluded both at reservation and immediately before send", () => {
+  // Reserva: só quando a org tem um chip capaz de assumir (pareado, não queimado, não arquivado).
+  assert.match(rotationMigration, /d\.deleted_at is null/);
+  assert.match(rotationMigration, /d\.numero is not null/);
+  assert.match(rotationMigration, /d\.status <> 'queimada'/);
+  // Envio: o chip é escolhido e validado antes de qualquer chamada ao provedor.
+  assert.match(rotation, /chip\.status !== "conectado"/);
+  assert.match(rotation, /chip\.provider_status !== "connected"/);
+  assert.ok(
+    worker.indexOf("selecionarChipParaEnvio(") < worker.indexOf("enviarTextoInstancia("),
+    "chip selection must happen before the provider call",
+  );
+  assert.match(worker, /sem_chip_disponivel/);
+  assert.match(worker, /token_instancia_indisponivel/);
 });
 
 test("attempt history is append-only per logical attempt", () => {
@@ -177,11 +189,17 @@ test("attempt history is append-only per logical attempt", () => {
   assert.doesNotMatch(worker, /from\("wa_envio_tentativas"\)\s*\.delete/);
 });
 
-test("repeated critical failures auto-pause instead of rotating instances", () => {
+test("repeated critical failures still auto-pause; rotation never re-sends a dispatched message", () => {
   assert.match(migration, /failure_pause_threshold/);
   assert.match(migration, /wa_register_campaign_health/);
   assert.match(worker, /critical: true/);
-  assert.doesNotMatch(worker, /rotate|rotation|rod[ií]zio/i);
+  // O rodízio decide só ANTES do despacho e só troca o chip de envio ainda não requisitado.
+  const dispatchedAt = worker.indexOf('rpc("wa_mark_delivery_dispatched"');
+  assert.ok(dispatchedAt > 0);
+  assert.ok(worker.indexOf("selecionarChipParaEnvio(") < dispatchedAt);
+  assert.ok(worker.indexOf('"dispatch_rotated"') < dispatchedAt);
+  assert.match(worker, /\.is\("provider_requested_at", null\)/);
+  assert.equal(worker.indexOf("selecionarChipParaEnvio(", dispatchedAt), -1);
 });
 
 test("real metrics distinguish accepted, delivered, failed, uncertain, and responses", () => {
