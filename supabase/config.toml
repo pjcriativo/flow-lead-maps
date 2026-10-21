@@ -146,3 +146,8 @@ verify_jwt = false
 [functions.wa-health-monitor]
 # Backend-only: protegido por WA_WORKER_SECRET. Nenhum cron é criado pela Correção 03.
 verify_jwt = false
+
+[functions.wa-diagnostico]
+# Backend-only: sonda o pareamento real numa instância temporária (sempre apagada).
+# Protegida por CRON_SECRET; disparada pelo banco via pg_net.
+verify_jwt = false

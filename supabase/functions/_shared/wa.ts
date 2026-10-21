@@ -529,7 +529,21 @@ export type EvolutionGoPairingCode =
   | "already_logged_in"
   | "session_unauthorized"
   | "session_not_connected"
-  | "qr_unavailable";
+  | "qr_unavailable"
+  | "provider_overloaded";
+
+/** Mensagem única para o esgotamento de conexões do Postgres interno da Evolution GO. */
+export const MENSAGEM_EVOLUTION_SOBRECARREGADA =
+  "O serviço do WhatsApp está temporariamente sobrecarregado. Tente novamente em alguns minutos.";
+
+/**
+ * A Evolution GO 0.7.x abre um pool de Postgres NOVO a cada início de cliente e nunca o fecha;
+ * com o banco dela esgotado, nenhum cliente sobe até o processo ser reiniciado. Detectado pelos
+ * logs da própria instância.
+ */
+export function evolutionSemConexoesDeBanco(logs: string[]): boolean {
+  return logs.some((log) => log.includes("too many clients already"));
+}
 
 export class EvolutionGoPairingError extends Error {
   readonly status: number;
@@ -1095,13 +1109,11 @@ export async function obterOuCriarEObterQr(
     }
     if (error instanceof EvolutionGoPairingError) {
       console.error("wa criar_e_qr pairing failed", error.code, error.message, providerLogs);
-      const databaseOverloaded = providerLogs.some((log) =>
-        log.includes("too many clients already"),
-      );
-      if (databaseOverloaded) {
+      if (error.code !== "provider_overloaded" && evolutionSemConexoesDeBanco(providerLogs)) {
         throw new EvolutionGoPairingError(
-          "O serviço do WhatsApp está temporariamente sobrecarregado. Tente novamente em alguns minutos.",
+          MENSAGEM_EVOLUTION_SOBRECARREGADA,
           503,
+          "provider_overloaded",
         );
       }
     }
@@ -1153,6 +1165,16 @@ export async function comSessaoRecuperavel<T>(
   } catch (error) {
     if (!pareamentoRecuperavel(error)) throw error;
     const logs = await logsPareamentoEvolution(instance.nome).catch(() => []);
+    // Recriar a sessão abriria MAIS um pool no Postgres já esgotado da Evolution e pioraria o
+    // incidente para todos os clientes. Falha rápida e honesta em vez disso.
+    if (evolutionSemConexoesDeBanco(logs)) {
+      console.error(JSON.stringify({ event: "wa_provider_db_exhausted", instance: instance.nome }));
+      throw new EvolutionGoPairingError(
+        MENSAGEM_EVOLUTION_SOBRECARREGADA,
+        503,
+        "provider_overloaded",
+      );
+    }
     console.warn(
       JSON.stringify({
         event: "wa_pairing_session_reset",

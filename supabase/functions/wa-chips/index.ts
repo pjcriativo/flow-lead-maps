@@ -9,6 +9,8 @@ import {
   atualizarChip,
   checarSaudeChip,
   comSessaoRecuperavel,
+  evolutionSemConexoesDeBanco,
+  MENSAGEM_EVOLUTION_SOBRECARREGADA,
   definirWebhookInstancia,
   excluirInstanciaDaOrg,
   graduarChipDoLead,
@@ -282,15 +284,9 @@ async function handleRequest(req: Request): Promise<Response> {
       if (error instanceof EvolutionGoPairingError) {
         const providerLogs = await logsPareamentoEvolution(instance.nome).catch(() => []);
         console.error("wa QR pairing failed", error.code, error.message, providerLogs);
-        const databaseOverloaded = providerLogs.some((log) =>
-          log.includes("too many clients already"),
-        );
+        const databaseOverloaded = evolutionSemConexoesDeBanco(providerLogs);
         return json(
-          {
-            error: databaseOverloaded
-              ? "O serviço do WhatsApp está temporariamente sobrecarregado. Tente novamente em alguns minutos."
-              : error.message,
-          },
+          { error: databaseOverloaded ? MENSAGEM_EVOLUTION_SOBRECARREGADA : error.message },
           databaseOverloaded ? 503 : error.status,
         );
       }

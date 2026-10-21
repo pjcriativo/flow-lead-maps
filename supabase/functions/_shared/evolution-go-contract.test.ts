@@ -778,3 +778,69 @@ test("listing chips fetches instance info for disconnected sessions and reconcil
     runtime.Deno = originalDeno;
   }
 });
+
+test("session recovery fails fast instead of recreating when the Evolution GO database is exhausted", async () => {
+  const restore = withEvolutionEnv();
+  const requests = captureEvolution((url) => {
+    if (url.endsWith("/instance/status")) return statusResponse(false);
+    if (url.endsWith("/instance/connect")) {
+      return Response.json({ message: "success", data: { jid: "", eventString: "MESSAGE" } });
+    }
+    if (url.endsWith("/instance/all")) {
+      return Response.json({
+        message: "success",
+        data: [{ id: "remote-exhausted", name: "org-authorized-exhausted", connected: false }],
+      });
+    }
+    if (url.includes("/instance/info/")) {
+      return Response.json({ message: "success", data: { id: "remote-exhausted", jid: null } });
+    }
+    if (url.includes("/instance/logs/remote-exhausted")) {
+      return Response.json([
+        {
+          level: "ERROR",
+          message:
+            "[x] Failed to create container: failed to upgrade database: pq: sorry, too many clients already",
+        },
+      ]);
+    }
+    throw new Error(`unexpected request ${url}`);
+  });
+  const admin = {
+    from: () => {
+      throw new Error("database must not be touched when the provider is exhausted");
+    },
+  };
+  const instance = {
+    id: "authorized-instance-id",
+    orgId: "authorized-org-id",
+    nome: "org-authorized-exhausted",
+    token: "tenant-instance-token",
+    numero: null,
+    status: "desconectado",
+  };
+
+  try {
+    const { comSessaoRecuperavel, qrInstancia, EvolutionGoPairingError } = await import("./wa.ts");
+    await assert.rejects(
+      comSessaoRecuperavel(admin, instance, (inst) => qrInstancia(inst.token, FAST_TIMING)),
+      (error: unknown) => {
+        assert.ok(error instanceof EvolutionGoPairingError);
+        assert.equal(error.code, "provider_overloaded");
+        assert.equal(error.status, 503);
+        return true;
+      },
+    );
+    assert.equal(
+      requests.some(
+        (request) =>
+          request.url.endsWith("/instance/create") || request.url.includes("/instance/delete/"),
+      ),
+      false,
+      "never recreates (and never opens another Postgres pool) on an exhausted provider",
+    );
+    assert.equal(requests.filter((r) => r.url.endsWith("/instance/connect")).length, 1);
+  } finally {
+    restore();
+  }
+});
