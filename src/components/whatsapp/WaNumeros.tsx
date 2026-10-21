@@ -276,6 +276,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
         const message = error instanceof Error ? error.message : "Falha ao gerar QR Code";
         setQrCodeData(null);
         setPairingCode(null);
+        setChipAtivoId(null);
         setErroPareamento(message);
       } finally {
         setGerandoQr(false);
@@ -1943,7 +1944,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
               type="button"
               onClick={() => {
                 setErroPareamento(null);
-                void gerarQrInstancia(chipAtivoId, metodoConexao);
+                setChipAtivoId(null);
+                void gerarQrInstancia(null, "qr");
               }}
               className="min-w-24 bg-home-orange text-white hover:bg-home-orange/90"
             >

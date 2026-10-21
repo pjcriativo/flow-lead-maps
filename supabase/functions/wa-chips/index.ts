@@ -22,6 +22,7 @@ import {
   obterOuCriarInstanciaParaPareamento,
   verificarEvolutionGo,
   waBase,
+  waGlobalKey,
   EvolutionGoPairingError,
   type WaInstanciaOrg,
 } from "../_shared/wa.ts";

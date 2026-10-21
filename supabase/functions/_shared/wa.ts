@@ -657,7 +657,7 @@ export async function pairInstancia(token: string, phone: string): Promise<strin
   return typeof code === "string" && code.trim() ? code.trim() : null;
 }
 
-async function iniciarPareamentoInstancia(token: string): Promise<void> {
+async function iniciarPareamentoInstancia(token: string): Promise<string | null> {
   const connect = await fetch(`${waBase()}/instance/connect`, {
     method: "POST",
     headers: { apikey: token, "Content-Type": "application/json" },
@@ -670,21 +670,64 @@ async function iniciarPareamentoInstancia(token: string): Promise<void> {
       pairingHttpStatus(connect.status),
     );
   }
+  return normalizeEvolutionGoQr(payload);
 }
 
 /** QR da instância DA ORG (GET /instance/qr com o token dela). */
-export async function qrInstancia(token: string): Promise<string | null> {
-  await iniciarPareamentoInstancia(token);
-  const q = await fetch(`${waBase()}/instance/qr`, { headers: { apikey: token } });
-  const payload: unknown = await q.json().catch(() => null);
-  if (!q.ok) {
-    throw new EvolutionGoPairingError(
-      evolutionGoError(payload, "O serviço de conexão não disponibilizou um QR Code."),
-      pairingHttpStatus(q.status),
-    );
+export async function qrInstancia(
+  token: string,
+  maxTentativas = 6,
+  intervaloMs = 1500,
+): Promise<string | null> {
+  const qrFromConnect = await iniciarPareamentoInstancia(token);
+  if (qrFromConnect) return qrFromConnect;
+
+  let ultimoErro: EvolutionGoPairingError | null = null;
+
+  for (let tentativa = 1; tentativa <= maxTentativas; tentativa++) {
+    // Pausa para dar tempo da Evolution GO sincronizar com o WebSocket do WhatsApp
+    await new Promise((resolve) => setTimeout(resolve, intervaloMs));
+
+    try {
+      const q = await fetch(`${waBase()}/instance/qr`, { headers: { apikey: token } });
+      const payload: unknown = await q.json().catch(() => null);
+
+      if (q.ok) {
+        const qr = normalizeEvolutionGoQr(payload);
+        if (qr) return qr;
+      }
+
+      const errText = evolutionGoError(payload, "");
+      const isTransitory =
+        q.status === 400 ||
+        q.status === 404 ||
+        q.status === 409 ||
+        errText.toLowerCase().includes("no qr code available") ||
+        errText.toLowerCase().includes("wait a moment");
+
+      if (!isTransitory) {
+        throw new EvolutionGoPairingError(
+          errText || "O serviço de conexão não disponibilizou um QR Code.",
+          pairingHttpStatus(q.status),
+        );
+      }
+
+      ultimoErro = new EvolutionGoPairingError(
+        errText || "O QR Code ainda está sendo gerado. Aguarde um instante.",
+        pairingHttpStatus(q.status),
+      );
+    } catch (err) {
+      if (err instanceof EvolutionGoPairingError && err.status !== 409 && err.status !== 400) {
+        throw err;
+      }
+      ultimoErro =
+        err instanceof EvolutionGoPairingError
+          ? err
+          : new EvolutionGoPairingError(String(err), 502);
+    }
   }
-  const qr = normalizeEvolutionGoQr(payload);
-  if (qr) return qr;
+
+  if (ultimoErro) throw ultimoErro;
   throw new EvolutionGoPairingError("O serviço de conexão não retornou um QR Code válido.", 502);
 }
 
