@@ -75,8 +75,64 @@ test("obtains the real contact avatar from the installed Evolution GO endpoint",
     assert.deepEqual(request, {
       url: "https://evolution.invalid/user/avatar",
       apiKey: "tenant-instance-token",
-      body: { number: "5511999999999", preview: true },
+      // JID canônico: número cru faria a Evolution montar "+55...@s.whatsapp.net" e o
+      // WhatsApp nunca responder ("info query timed out").
+      body: { number: "5511999999999@s.whatsapp.net", preview: true },
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+    runtime.Deno = originalDeno;
+  }
+});
+
+test("canonical WhatsApp JID never carries the leading plus that breaks raw protocol queries", async () => {
+  const { jidCanonicoWhatsapp } = await import("./wa.ts");
+  assert.equal(jidCanonicoWhatsapp("554195404998"), "554195404998@s.whatsapp.net");
+  assert.equal(jidCanonicoWhatsapp("+55 (41) 9540-4998"), "554195404998@s.whatsapp.net");
+  assert.equal(jidCanonicoWhatsapp("+554195404998@s.whatsapp.net"), "554195404998@s.whatsapp.net");
+  assert.equal(
+    jidCanonicoWhatsapp("554195404998:12@s.whatsapp.net"),
+    "554195404998@s.whatsapp.net",
+  );
+  assert.equal(jidCanonicoWhatsapp("123456789012345@lid"), "123456789012345@lid");
+  assert.equal(jidCanonicoWhatsapp("   "), null);
+});
+
+test("a contact who hides the profile picture is a definitive 'no photo', not a provider failure", async () => {
+  const runtime = globalThis as typeof globalThis & {
+    Deno?: { env: { get(name: string): string | undefined } };
+  };
+  const originalDeno = runtime.Deno;
+  const originalFetch = globalThis.fetch;
+  runtime.Deno = {
+    env: { get: (name) => (name === "EVOLUTION_URL" ? "https://evolution.invalid" : undefined) },
+  };
+  try {
+    const { obterAvatarInstancia } = await import("./wa.ts");
+    globalThis.fetch = async () =>
+      Response.json(
+        { error: "the user has hidden their profile picture from you" },
+        { status: 500 },
+      );
+    assert.deepEqual(await obterAvatarInstancia("tenant-instance-token", "5511999999999"), {
+      url: null,
+      id: null,
+      found: false,
+    });
+    // Texto real devolvido pela Evolution GO 0.7.2 em produção para contato sem foto.
+    globalThis.fetch = async () =>
+      Response.json(
+        { error: "that user or group does not have a profile picture" },
+        { status: 500 },
+      );
+    assert.deepEqual(await obterAvatarInstancia("tenant-instance-token", "5511999999999"), {
+      url: null,
+      id: null,
+      found: false,
+    });
+    globalThis.fetch = async () =>
+      Response.json({ error: "info query timed out" }, { status: 500 });
+    await assert.rejects(obterAvatarInstancia("tenant-instance-token", "5511999999999"));
   } finally {
     globalThis.fetch = originalFetch;
     runtime.Deno = originalDeno;

@@ -665,19 +665,46 @@ export type WaContactAvatar = {
   found: boolean;
 };
 
+/**
+ * JID canônico do WhatsApp (só dígitos + servidor) para rotas da Evolution GO que consultam o
+ * protocolo direto, sem usync — caso de /user/avatar.
+ *
+ * Por quê (fonte da Evolution GO 0.7.x, utils.CreateJID): número "cru" vira "+5541...@s.whatsapp.net".
+ * O envio de mensagens tolera o "+" (o servidor o remove com CanonicalJID), mas a rota de foto
+ * NÃO remove: o WhatsApp ignora a consulta e ela morre em "info query timed out". Um JID já
+ * completo é repassado sem alteração, então enviamos sempre o canônico.
+ */
+export function jidCanonicoWhatsapp(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  if (raw.includes("@")) {
+    const [user, server] = raw.split("@");
+    const cleanUser = user.split(":")[0].replace(/^\+/, "");
+    return cleanUser && server ? `${cleanUser}@${server}` : null;
+  }
+  const digits = raw.split(":")[0].replace(/\D/g, "");
+  return digits ? `${digits}@s.whatsapp.net` : null;
+}
+
+/** Respostas do WhatsApp que significam "não há foto visível" (não é falha do provedor). */
+const SEM_FOTO_VISIVEL =
+  /no profile picture|does not have a profile picture|profile picture not found|hidden their profile picture|not found/i;
+
 /** Obtém a foto real do contato. A Evolution GO autentica esta rota com o token da instância. */
 export async function obterAvatarInstancia(
   token: string,
   number: string,
   timeoutMs = 6_000,
 ): Promise<WaContactAvatar> {
+  const jid = jidCanonicoWhatsapp(number);
+  if (!jid) return { url: null, id: null, found: false };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${waBase()}/user/avatar`, {
       method: "POST",
       headers: { apikey: token, "Content-Type": "application/json" },
-      body: JSON.stringify({ number, preview: true }),
+      body: JSON.stringify({ number: jid, preview: true }),
       signal: controller.signal,
     });
     const payload: unknown = await response.json().catch(() => null);
@@ -692,7 +719,7 @@ export async function obterAvatarInstancia(
     if (response.ok && url) return { url, id, found: true };
 
     const errorText = String(root?.error ?? root?.message ?? "");
-    if (/no profile picture|profile picture not found|not found/i.test(errorText)) {
+    if (SEM_FOTO_VISIVEL.test(errorText)) {
       return { url: null, id: null, found: false };
     }
     throw new Error(`Evolution GO avatar HTTP ${response.status}`);

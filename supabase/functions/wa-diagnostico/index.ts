@@ -10,7 +10,13 @@
 // próprio banco, então o segredo nunca transita fora da infraestrutura.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { json } from "../_shared/cors.ts";
-import { inicializarCofreWa, waBase, waGlobalKey } from "../_shared/wa.ts";
+import {
+  inicializarCofreWa,
+  instanciaDaOrgComToken,
+  jidCanonicoWhatsapp,
+  waBase,
+  waGlobalKey,
+} from "../_shared/wa.ts";
 
 const PRAZO_SESSAO_MS = 20_000;
 const PRAZO_QR_MS = 20_000;
@@ -200,6 +206,74 @@ async function sondarPareamento(nomesAtivos: Set<string>) {
   }
 }
 
+/**
+ * Sonda de fotos: para conversas ativas, chama /user/avatar exatamente como a Edge de conversas
+ * faz e devolve SÓ o formato do identificador, o HTTP e a mensagem do provedor (dígitos
+ * redigidos). Nenhum telefone, nome ou URL de foto sai daqui. Somente leitura.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function sondarAvatares(admin: any, limite: number) {
+  const { data: conversas } = await admin
+    .from("wa_conversas")
+    .select("org_id,instancia_id,remote_contact_id,normalized_phone")
+    .neq("status", "archived")
+    .order("last_message_at", { ascending: false })
+    .limit(limite);
+  const { data: conectadas } = await admin
+    .from("wa_instancias")
+    .select("id,org_id")
+    .is("deleted_at", null)
+    .eq("status", "conectado")
+    .order("ordem", { ascending: true });
+  const semDigitos = (value: string) => value.replace(/\d{5,}/g, "<num>");
+  const formato = (value: string) =>
+    !value
+      ? "vazio"
+      : value.includes("@")
+        ? `jid@${value.split("@")[1]}`
+        : `digitos_${value.replace(/\D/g, "").length}`;
+  const resultados = [];
+  for (const conversa of conversas ?? []) {
+    const numero = String(conversa.normalized_phone || conversa.remote_contact_id || "").trim();
+    const candidatos = [
+      conversa.instancia_id,
+      ...(conectadas ?? [])
+        .filter((row: { org_id: string }) => row.org_id === conversa.org_id)
+        .map((row: { id: string }) => row.id),
+    ];
+    const tentativas = [];
+    for (const instanceId of [...new Set(candidatos)]) {
+      const instance = await instanciaDaOrgComToken(admin, conversa.org_id, String(instanceId));
+      if (!instance) {
+        tentativas.push({ chip: "sem_token_ou_arquivado" });
+        continue;
+      }
+      const r = await chamar("/user/avatar", {
+        method: "POST",
+        apikey: instance.token,
+        body: { number: jidCanonicoWhatsapp(numero), preview: true },
+      });
+      const d = dados(r.payload);
+      const url = String(d?.URL ?? d?.url ?? "");
+      tentativas.push({
+        chip: instance.status,
+        http: r.status,
+        ms: r.ms,
+        url_https: url.startsWith("https://"),
+        msg: semDigitos(r.erro || mensagem(r.payload)),
+      });
+      if (r.status === 200 && url) break;
+    }
+    resultados.push({
+      formato_numero: formato(numero),
+      fonte: conversa.normalized_phone ? "normalized_phone" : "remote_contact_id",
+      formato_remote: formato(String(conversa.remote_contact_id ?? "")),
+      tentativas,
+    });
+  }
+  return { conversas: resultados.length, resultados };
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Método não permitido." }, 405);
   const secret = Deno.env.get("CRON_SECRET");
@@ -221,6 +295,14 @@ Deno.serve(async (request) => {
   const nomesAtivos = new Set<string>((ativas ?? []).map((row: { nome: string }) => row.nome));
 
   const started = Date.now();
+  const body: Record<string, unknown> = await request
+    .clone()
+    .json()
+    .catch(() => ({}));
+  if (body.modo === "avatares") {
+    const limite = Math.min(Math.max(Number(body.limite) || 8, 1), 20);
+    return json({ configurado: true, ...(await sondarAvatares(admin, limite)) });
+  }
   const relatorio = await sondarPareamento(nomesAtivos);
   return json({ configurado: true, duracao_ms: Date.now() - started, ...relatorio });
 });
