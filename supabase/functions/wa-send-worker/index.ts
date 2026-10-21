@@ -118,9 +118,19 @@ function retryAt(attemptCount: number): string {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
-  const configuredSecret = Deno.env.get("WA_WORKER_SECRET") ?? "";
-  const suppliedSecret = req.headers.get("x-wa-worker-secret") ?? "";
-  if (!configuredSecret || !constantTimeEqual(configuredSecret, suppliedSecret)) {
+  // Dois segredos aceitos: WA_WORKER_SECRET (chamadas operacionais) e CRON_SECRET, que é o
+  // segredo guardado no vault e usado pelo pg_cron (agendamento autorizado pelo dono em
+  // 2026-10-21). Nenhum dos dois transita fora da infraestrutura.
+  const workerSecret = Deno.env.get("WA_WORKER_SECRET") ?? "";
+  const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+  const suppliedWorker = req.headers.get("x-wa-worker-secret") ?? "";
+  const suppliedCron = req.headers.get("x-cron-secret") ?? "";
+  const authorized =
+    (workerSecret !== "" &&
+      suppliedWorker !== "" &&
+      constantTimeEqual(workerSecret, suppliedWorker)) ||
+    (cronSecret !== "" && suppliedCron !== "" && constantTimeEqual(cronSecret, suppliedCron));
+  if (!authorized) {
     return json({ error: "Não autorizado." }, 401);
   }
 
