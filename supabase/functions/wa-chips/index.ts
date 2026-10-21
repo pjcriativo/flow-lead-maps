@@ -12,6 +12,7 @@ import {
   evolutionSemConexoesDeBanco,
   MENSAGEM_EVOLUTION_SOBRECARREGADA,
   definirWebhookInstancia,
+  urlWebhookRecebimento,
   excluirInstanciaDaOrg,
   graduarChipDoLead,
   inicializarCofreWa,
@@ -385,13 +386,47 @@ async function handleRequest(req: Request): Promise<Response> {
   if (action === "ativar_recebimento") {
     const instance = await instanciaDaOrgComToken(admin, context.orgId, instanceId);
     if (!instance) return json({ error: "Chip não encontrado." }, 404);
-    const secret = Deno.env.get("WA_WEBHOOK_SECRET") ?? "";
-    if (!secret) return json({ error: "Webhook indisponível." }, 503);
-    const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/wa-webhook?k=${secret}`;
-    const events =
-      Array.isArray(body.eventos) && body.eventos.length ? body.eventos.map(String) : ["MESSAGE"];
-    const result = await definirWebhookInstancia(instance.token, url, events);
+    const url = urlWebhookRecebimento();
+    if (!url) return json({ error: "Webhook indisponível." }, 503);
+    const result =
+      Array.isArray(body.eventos) && body.eventos.length
+        ? await definirWebhookInstancia(instance.token, url, body.eventos.map(String))
+        : await definirWebhookInstancia(instance.token, url);
     return json({ ok: result.ok, status: result.status });
+  }
+  if (action === "reatribuir_conversas") {
+    // Ação explícita de administrador (permissão manage_numbers): move as conversas de um número
+    // ARQUIVADO para um número ativo. Exige confirmação e motivo; o histórico de mensagens fica
+    // preservado com o chip de origem. O sistema nunca faz isso sozinho.
+    const origem = String(body.instancia_origem_id || "");
+    const destino = String(body.instancia_destino_id || "");
+    const motivo = String(body.motivo || "").trim();
+    if (body.confirmar !== true || !origem || !destino || motivo.length < 10) {
+      return json(
+        { error: "Confirmação, origem, destino e motivo (mínimo 10 caracteres) são obrigatórios." },
+        422,
+      );
+    }
+    const { data, error } = await admin.rpc("wa_reassign_conversations", {
+      p_org: context.orgId,
+      p_actor: context.userId,
+      p_from: origem,
+      p_to: destino,
+      p_reason: motivo,
+    });
+    if (error) {
+      const invalid = error.code === "P0002" || error.code === "22023";
+      return json(
+        { error: invalid ? error.message : "Não foi possível reatribuir as conversas." },
+        invalid ? 409 : 503,
+      );
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    return json({
+      ok: true,
+      movidas: Number(row?.moved ?? 0),
+      ignoradas: Number(row?.skipped ?? 0),
+    });
   }
   if (action === "graduar_lead") {
     const leadId = String(body.lead_id || "");

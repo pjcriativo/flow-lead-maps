@@ -11,23 +11,9 @@ import {
   type WaAutomationDefinition,
   type WaAutomationEvent,
 } from "../_shared/whatsapp-automation.ts";
+import { definitionFromRow } from "../_shared/whatsapp-automation-runtime.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function definitionFromRow(row: Record<string, unknown>): WaAutomationDefinition {
-  return {
-    id: String(row.id),
-    name: String(row.name),
-    description: String(row.description ?? ""),
-    type: row.automation_type as WaAutomationDefinition["type"],
-    status: row.status as WaAutomationDefinition["status"],
-    version: Number(row.version),
-    trigger: row.trigger as WaAutomationDefinition["trigger"],
-    conditions: row.conditions as WaAutomationDefinition["conditions"],
-    actions: row.actions as WaAutomationDefinition["actions"],
-    config: row.config as Record<string, unknown>,
-  };
-}
 
 async function snapshotScript(
   admin: ReturnType<typeof createClient>,

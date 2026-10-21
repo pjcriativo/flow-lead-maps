@@ -8,6 +8,7 @@ import { isAssignedConversationAllowed } from "../_shared/whatsapp-policy.ts";
 import { extractProviderMessageId } from "../_shared/whatsapp-delivery-engine.ts";
 import { canDispatchWithInstance } from "../_shared/whatsapp-instance-health.ts";
 import {
+  checarSaudeChip,
   enviarTextoInstancia,
   inicializarCofreWa,
   instanciaDaOrgComToken,
@@ -83,21 +84,53 @@ Deno.serve(async (req) => {
   if (!conversation.normalized_phone) {
     return json({ error: "Este contato não possui número confirmado para resposta manual." }, 409);
   }
-  const { data: health } = await admin
-    .from("wa_instancias")
-    .select("provider_status,operational_health,last_provider_success_at")
-    .eq("id", conversation.instancia_id)
-    .eq("org_id", context.orgId)
-    .maybeSingle();
-  if (
-    !health ||
-    !canDispatchWithInstance({
-      providerState: health.provider_status,
-      operationalHealth: health.operational_health,
-      lastSuccessfulCheckAt: health.last_provider_success_at,
-    })
-  )
-    return json({ error: "Número de atendimento sem saúde confirmada." }, 409);
+  const carregarSaude = async () => {
+    const { data } = await admin
+      .from("wa_instancias")
+      .select("provider_status,operational_health,last_provider_success_at,deleted_at")
+      .eq("id", conversation.instancia_id)
+      .eq("org_id", context.orgId)
+      .maybeSingle();
+    return data;
+  };
+  let health = await carregarSaude();
+  if (!health) return json({ error: "Número de atendimento indisponível." }, 409);
+  if (health.deleted_at) {
+    // O número que atendia esta conversa foi arquivado. Nunca redirecionamos a conversa para
+    // outro número por conta própria: só um administrador autoriza a reatribuição (wa-chips,
+    // ação reatribuir_conversas), preservando o histórico.
+    return json(
+      {
+        error:
+          "Esta conversa pertence a um número arquivado. Um administrador precisa reatribuí-la a um número ativo para responder.",
+        code: "chip_arquivado",
+      },
+      409,
+    );
+  }
+  const podeEnviar = (value: typeof health) =>
+    Boolean(
+      value &&
+      canDispatchWithInstance({
+        providerState: value.provider_status,
+        operationalHealth: value.operational_health,
+        lastSuccessfulCheckAt: value.last_provider_success_at,
+      }),
+    );
+  if (!podeEnviar(health)) {
+    // A evidência de saúde vale 5 min e ninguém a renova sozinho sem o monitor agendado.
+    // Antes de recusar a resposta, consulta o provedor AO VIVO (GET /instance/status) e relê.
+    await checarSaudeChip(admin, context.orgId, conversation.instancia_id, "manual").catch(
+      () => null,
+    );
+    health = await carregarSaude();
+  }
+  if (!podeEnviar(health)) {
+    return json(
+      { error: "Número de atendimento sem saúde confirmada.", code: "saude_nao_confirmada" },
+      409,
+    );
+  }
 
   const instance = await instanciaDaOrgComToken(admin, context.orgId, conversation.instancia_id);
   if (!instance || instance.status !== "conectado") {

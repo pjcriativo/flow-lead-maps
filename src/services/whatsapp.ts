@@ -830,6 +830,7 @@ export async function listarScripts(): Promise<WaScript[]> {
     .from("wa_scripts")
     .select("id, nome, tipo, mensagem, media_url, criado_em")
     .eq("org_id", context.orgId)
+    .eq("ativo", true)
     .order("criado_em", { ascending: false });
   if (error) throw error;
   return (data ?? []) as WaScript[];
@@ -1012,10 +1013,7 @@ export async function sincronizarAvataresConversas(
   );
   const responses = await Promise.all(
     chunks.map((ids) =>
-      invokeConversations(
-        { acao: "contact_avatars", conversa_ids: ids, force },
-        signal,
-      ),
+      invokeConversations({ acao: "contact_avatars", conversa_ids: ids, force }, signal),
     ),
   );
   const values = responses.flatMap((data) => (Array.isArray(data.avatars) ? data.avatars : []));
@@ -1269,8 +1267,7 @@ export type WaCampaignEngineSnapshot = {
 };
 
 function campaignEngineItem(value: unknown): WaCampaignEngineItem {
-  if (!value || typeof value !== "object")
-    throw new Error("Campanha inválida no motor de envios.");
+  if (!value || typeof value !== "object") throw new Error("Campanha inválida no motor de envios.");
   const row = value as Record<string, unknown>;
   if (
     typeof row.id !== "string" ||
@@ -1417,6 +1414,23 @@ export async function controlarCampanhaWa(
   reason?: string,
 ): Promise<void> {
   await invokeCampaignControl({ action, campaign_id: campaignId, reason });
+}
+
+/**
+ * Autoriza o envio de uma campanha JÁ APROVADA (fila preparada). O motivo fica registrado com
+ * quem liberou e quando. O worker continua aplicando consentimento, opt-out, janela e teto.
+ */
+export async function liberarDisparoCampanhaWa(campaignId: string, motivo: string): Promise<void> {
+  await invokeCampaignControl({
+    action: "release_dispatch",
+    campaign_id: campaignId,
+    reason: motivo,
+  });
+}
+
+/** Suspende o envio da campanha a qualquer momento, sem perder fila nem histórico. */
+export async function segurarDisparoCampanhaWa(campaignId: string): Promise<void> {
+  await invokeCampaignControl({ action: "hold_dispatch", campaign_id: campaignId });
 }
 
 export async function reagendarCampanhaWa(
@@ -3001,7 +3015,62 @@ export const ATIVIDADES_SCRIPTS_PREMIUM: WaScriptAtividadeItem[] = [
   },
 ];
 
-const localStorageWaScripts = (orgId: string) => `flow_wa_scripts_meta_v1.${orgId}`;
+// Scripts: o Supabase é a fonte única (categoria, status, uso). O localStorage antigo
+// (flow_wa_scripts_meta_v1.<org>) só é lido UMA vez para migrar metadados já editados e depois
+// é apagado — ver migrarMetadadosLocaisScripts.
+const CHAVE_LEGADA_SCRIPTS = (orgId: string) => `flow_wa_scripts_meta_v1.${orgId}`;
+const CATEGORIAS_SCRIPT: WaScriptCategoria[] = [
+  "boas_vindas",
+  "qualificacao",
+  "agendamento",
+  "follow_up",
+  "recuperacao",
+  "atendimento",
+];
+const COLUNAS_SCRIPT =
+  "id, nome, tipo, mensagem, media_url, criado_em, categoria, ativo, usos, atualizado_em, ultimo_uso_em";
+
+type WaScriptRow = {
+  id: string;
+  nome: string | null;
+  tipo: string | null;
+  mensagem: string | null;
+  media_url: string | null;
+  criado_em: string;
+  categoria: string | null;
+  ativo: boolean | null;
+  usos: number | null;
+  atualizado_em: string | null;
+};
+
+function categoriaValida(value: unknown): WaScriptCategoria {
+  return CATEGORIAS_SCRIPT.includes(value as WaScriptCategoria)
+    ? (value as WaScriptCategoria)
+    : "atendimento";
+}
+
+function scriptDoBanco(row: WaScriptRow): WaScriptItem {
+  const mensagem = row.mensagem ?? "";
+  const { lista, count } = extrairVariaveis(mensagem);
+  const ativo = row.ativo !== false;
+  return {
+    id: row.id,
+    nome: row.nome || "Script sem nome",
+    categoria: categoriaValida(row.categoria),
+    mensagem,
+    textoPrev: mensagem.length > 22 ? `${mensagem.substring(0, 22)}...` : mensagem,
+    variaveisCount: count,
+    variaveis: lista,
+    usos: Math.max(0, Number(row.usos ?? 0)),
+    ativo,
+    status: ativo ? "ativo" : "inativo",
+    tipo: row.tipo || "texto",
+    media_url: row.media_url,
+    criado_em: row.criado_em,
+    atualizado_em: row.atualizado_em ?? undefined,
+    origem: "db",
+  };
+}
 
 export function extrairVariaveis(texto: string): { lista: string[]; count: number } {
   if (!texto) return { lista: [], count: 0 };
@@ -3011,106 +3080,83 @@ export function extrairVariaveis(texto: string): { lista: string[]; count: numbe
   return { lista: unicas, count: unicas.length };
 }
 
-export function listarScriptsLocais(orgId: string): WaScriptItem[] {
-  if (typeof window === "undefined") return [];
+/**
+ * Migração única: categoria/status editados quando a tela ainda gravava no navegador são
+ * levados ao banco (só para scripts que existem no banco) e a chave local é removida.
+ * Sem permissão de edição (RLS admin/gerente), nada é gravado e a chave é mantida.
+ */
+async function migrarMetadadosLocaisScripts(orgId: string, rows: WaScriptRow[]): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  let legado: unknown;
   try {
-    const raw = localStorage.getItem(localStorageWaScripts(orgId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    console.error("Falha ao ler scripts locais", error);
-    return [];
+    const raw = localStorage.getItem(CHAVE_LEGADA_SCRIPTS(orgId));
+    if (!raw) return false;
+    legado = JSON.parse(raw);
+  } catch {
+    return false;
   }
+  if (!Array.isArray(legado)) return false;
+  const porId = new Map(rows.map((row) => [row.id, row]));
+  let alterou = false;
+  for (const item of legado as Array<Partial<WaScriptItem>>) {
+    const row = item?.id ? porId.get(item.id) : undefined;
+    if (!row) continue;
+    const categoria = categoriaValida(item.categoria ?? row.categoria);
+    const ativo = typeof item.ativo === "boolean" ? item.ativo : row.ativo !== false;
+    if (categoria === row.categoria && ativo === (row.ativo !== false)) continue;
+    const { error } = await supabase
+      .from("wa_scripts")
+      .update({ categoria, ativo, atualizado_em: new Date().toISOString() })
+      .eq("id", row.id)
+      .eq("org_id", orgId);
+    if (error) return false;
+    alterou = true;
+  }
+  try {
+    localStorage.removeItem(CHAVE_LEGADA_SCRIPTS(orgId));
+  } catch {
+    // Navegador sem acesso ao storage: o banco já é a fonte; nada a fazer.
+  }
+  return alterou;
 }
 
-export function salvarScriptsLocais(orgId: string, itens: WaScriptItem[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(localStorageWaScripts(orgId), JSON.stringify(itens));
-  } catch (err) {
-    console.error("Falha ao salvar scripts locais:", err);
-  }
+async function carregarScriptsDoBanco(orgId: string): Promise<WaScriptRow[]> {
+  const { data, error } = await supabase
+    .from("wa_scripts")
+    .select(COLUNAS_SCRIPT)
+    .eq("org_id", orgId)
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as WaScriptRow[];
 }
 
 export async function salvarScriptWa(s: Partial<WaScriptItem>): Promise<WaScriptItem> {
   const context = await requireWhatsappAdministrator();
-  const lista = listarScriptsLocais(context.orgId);
-  const agora = new Date();
-  const dataFormatada = `${String(agora.getDate()).padStart(2, "0")}/${String(
-    agora.getMonth() + 1,
-  ).padStart(2, "0")}/${agora.getFullYear()} ${String(agora.getHours()).padStart(
-    2,
-    "0",
-  )}:${String(agora.getMinutes()).padStart(2, "0")}`;
-
-  const { lista: vars, count: varsCount } = extrairVariaveis(s.mensagem || "");
-
-  let dbId = s.id;
-  if (s.id && !s.id.startsWith("sc-")) {
-    const { error } = await supabase
-      .from("wa_scripts")
-      .update({
-        nome: s.nome?.trim(),
-        mensagem: s.mensagem ?? null,
-        tipo: s.tipo ?? "texto",
-      })
-      .eq("id", s.id)
-      .eq("org_id", context.orgId);
-    if (error) throw error;
-  } else {
-    const { data: novoDb, error } = await supabase
-      .from("wa_scripts")
-      .insert({
-        user_id: context.userId,
-        org_id: context.orgId,
-        nome: s.nome?.trim() || "Novo Script",
-        mensagem: s.mensagem ?? null,
-        tipo: s.tipo ?? "texto",
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    if (novoDb?.id) dbId = novoDb.id;
-  }
-
-  if (s.id) {
-    const index = lista.findIndex((item) => item.id === s.id);
-    if (index >= 0) {
-      const atualizado: WaScriptItem = {
-        ...lista[index],
-        ...s,
-        variaveis: vars,
-        variaveisCount: varsCount,
-        textoPrev: (s.mensagem || lista[index].mensagem).substring(0, 22) + "...",
-        atualizado_em: dataFormatada,
-      };
-      lista[index] = atualizado;
-      salvarScriptsLocais(context.orgId, lista);
-      return atualizado;
-    }
-  }
-
-  const novo: WaScriptItem = {
-    id: dbId || `sc-${Date.now()}`,
-    nome: s.nome || "Novo Script",
-    categoria: s.categoria || "boas_vindas",
-    mensagem: s.mensagem || "",
-    textoPrev: (s.mensagem || "").substring(0, 22) + "...",
-    variaveisCount: varsCount,
-    variaveis: vars,
-    usos: s.usos || 0,
-    ativo: s.ativo ?? true,
-    status: s.status || ((s.ativo ?? true) ? "ativo" : "inativo"),
-    tipo: s.tipo || "texto",
-    criado_em: new Date().toISOString(),
-    atualizado_em: dataFormatada,
-    origem: "custom",
+  const campos = {
+    nome: s.nome?.trim() || "Novo Script",
+    mensagem: s.mensagem ?? null,
+    tipo: s.tipo ?? "texto",
+    categoria: categoriaValida(s.categoria),
+    ativo: s.ativo ?? s.status !== "inativo",
+    atualizado_em: new Date().toISOString(),
   };
-
-  const novaLista = [novo, ...lista];
-  salvarScriptsLocais(context.orgId, novaLista);
-  return novo;
+  const existente = s.id && !s.id.startsWith("sc-") ? s.id : null;
+  const consulta = existente
+    ? supabase
+        .from("wa_scripts")
+        .update(campos)
+        .eq("id", existente)
+        .eq("org_id", context.orgId)
+        .select(COLUNAS_SCRIPT)
+        .single()
+    : supabase
+        .from("wa_scripts")
+        .insert({ ...campos, user_id: context.userId, org_id: context.orgId })
+        .select(COLUNAS_SCRIPT)
+        .single();
+  const { data, error } = await consulta;
+  if (error) throw error;
+  return scriptDoBanco(data as WaScriptRow);
 }
 
 export async function alternarStatusScriptWa(
@@ -3118,49 +3164,61 @@ export async function alternarStatusScriptWa(
   ativo: boolean,
 ): Promise<{ ok: boolean; status: WaScriptStatus }> {
   const context = await requireWhatsappAdministrator();
-  const lista = listarScriptsLocais(context.orgId);
-  const index = lista.findIndex((s) => s.id === id);
-  if (index < 0) return { ok: false, status: "inativo" };
-
-  const novoStatus: WaScriptStatus = ativo ? "ativo" : "inativo";
-  lista[index].ativo = ativo;
-  lista[index].status = novoStatus;
-  salvarScriptsLocais(context.orgId, lista);
-
-  return { ok: true, status: novoStatus };
+  const { data, error } = await supabase
+    .from("wa_scripts")
+    .update({ ativo, atualizado_em: new Date().toISOString() })
+    .eq("id", id)
+    .eq("org_id", context.orgId)
+    .select("ativo")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return { ok: false, status: ativo ? "inativo" : "ativo" };
+  return { ok: true, status: data.ativo ? "ativo" : "inativo" };
 }
 
 export async function excluirScriptWa(id: string): Promise<boolean> {
   const context = await requireWhatsappAdministrator();
-  const lista = listarScriptsLocais(context.orgId);
-  const novaLista = lista.filter((s) => s.id !== id);
-  salvarScriptsLocais(context.orgId, novaLista);
-
-  if (!id.startsWith("sc-")) {
-    const { error } = await supabase
-      .from("wa_scripts")
-      .delete()
-      .eq("id", id)
-      .eq("org_id", context.orgId);
-    if (error) throw error;
-  }
+  const { error } = await supabase
+    .from("wa_scripts")
+    .delete()
+    .eq("id", id)
+    .eq("org_id", context.orgId);
+  if (error) throw error;
   return true;
 }
 
 export async function duplicarScriptWa(id: string): Promise<WaScriptItem | null> {
   const context = await requireWhatsappAdministrator();
-  const lista = listarScriptsLocais(context.orgId);
-  const original = lista.find((s) => s.id === id);
-  if (!original) return null;
-
+  const { data, error } = await supabase
+    .from("wa_scripts")
+    .select(COLUNAS_SCRIPT)
+    .eq("id", id)
+    .eq("org_id", context.orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const original = scriptDoBanco(data as WaScriptRow);
   return salvarScriptWa({
-    ...original,
-    id: undefined,
     nome: `${original.nome} (Cópia)`,
-    usos: 0,
+    mensagem: original.mensagem,
+    tipo: original.tipo,
+    categoria: original.categoria,
     ativo: true,
-    status: "ativo",
   });
+}
+
+/** Registra no banco que um script foi usado (resposta rápida). Qualquer atendente da org. */
+export async function registrarUsoScriptWa(id: string): Promise<number | null> {
+  const context = await activeWhatsappOrganization();
+  const { data, error } = await supabase.rpc("wa_register_script_use", {
+    p_org: context.orgId,
+    p_script: id,
+  });
+  if (error) {
+    console.warn("Falha ao registrar uso do script", error.code);
+    return null;
+  }
+  return typeof data === "number" ? data : null;
 }
 
 export async function obterDadosScriptsWa(): Promise<{
@@ -3172,64 +3230,11 @@ export async function obterDadosScriptsWa(): Promise<{
   conectado: boolean;
 }> {
   const context = await activeWhatsappOrganization();
-  let scripts = listarScriptsLocais(context.orgId);
-
-  // Buscar scripts do Supabase para unificar
-  try {
-    const { data: dbScripts } = await supabase
-      .from("wa_scripts")
-      .select("id, nome, tipo, mensagem, media_url, criado_em")
-      .eq("org_id", context.orgId)
-      .order("criado_em", { ascending: false });
-
-    if (dbScripts && dbScripts.length > 0) {
-      // Mesclar sem duplicar IDs
-      const mapDb = new Map(dbScripts.map((s) => [s.id, s]));
-      const mesclados = scripts.map((local) => {
-        const fromDb = mapDb.get(local.id);
-        if (fromDb) {
-          const { lista: v, count: c } = extrairVariaveis(fromDb.mensagem || "");
-          return {
-            ...local,
-            nome: fromDb.nome || local.nome,
-            mensagem: fromDb.mensagem || local.mensagem,
-            tipo: fromDb.tipo || local.tipo,
-            media_url: fromDb.media_url,
-            variaveis: v,
-            variaveisCount: c,
-          };
-        }
-        return local;
-      });
-
-      // Adicionar novos do banco que não estavam no local
-      for (const d of dbScripts) {
-        if (!scripts.some((l) => l.id === d.id)) {
-          const { lista: v, count: c } = extrairVariaveis(d.mensagem || "");
-          mesclados.push({
-            id: d.id,
-            nome: d.nome || "Script Sem Nome",
-            categoria: "atendimento",
-            mensagem: d.mensagem || "",
-            textoPrev: (d.mensagem || "").substring(0, 22) + "...",
-            variaveisCount: c,
-            variaveis: v,
-            usos: 1,
-            ativo: true,
-            status: "ativo",
-            tipo: d.tipo || "texto",
-            media_url: d.media_url,
-            criado_em: d.criado_em,
-            origem: "db",
-          });
-        }
-      }
-      scripts = mesclados;
-    }
-  } catch (error) {
-    console.error("Falha ao carregar scripts WhatsApp", error);
-    throw error;
+  let rows = await carregarScriptsDoBanco(context.orgId);
+  if (await migrarMetadadosLocaisScripts(context.orgId, rows)) {
+    rows = await carregarScriptsDoBanco(context.orgId);
   }
+  const scripts = rows.map(scriptDoBanco);
 
   let conectado = false;
   try {
@@ -3755,7 +3760,10 @@ export async function obterDadosRelatoriosWa(
     daily.set(date, point);
     return point;
   };
-  for (const row of envios) ensureDay(row.enviado_em).enviadas += 1;
+  for (const row of envios) {
+    // Envio sem data de envio ainda não saiu do provedor: não conta como enviado no dia.
+    if (row.enviado_em) ensureDay(row.enviado_em).enviadas += 1;
+  }
   const leadsPerDay = new Map<string, Set<string>>();
   for (const row of recebidas) {
     const point = ensureDay(row.criado_em);

@@ -6,6 +6,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5";
   };
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
       activity_log: {
@@ -775,43 +800,103 @@ export type Database = {
       };
       campanhas: {
         Row: {
+          approved_at: string | null;
+          approved_by: string | null;
           atualizado_em: string;
+          auto_paused_reason: string | null;
           canal: string;
+          cancellation_reason: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          consecutive_failures: number;
           criada_em: string;
+          dispatch_enabled: boolean;
+          dispatch_release_reason: string | null;
+          dispatch_released_at: string | null;
+          dispatch_released_by: string | null;
+          failure_pause_threshold: number;
           id: string;
           ig_config: Json | null;
           list_id: string | null;
+          max_attempts: number;
+          max_batch_size: number;
           nome: string;
           org_id: string | null;
+          paused_at: string | null;
+          paused_by: string | null;
           revisao: number;
+          schedule_timezone: string;
+          scheduled_at: string | null;
+          send_window_end: string;
+          send_window_start: string;
           status: string;
           user_id: string;
           wa_config: Json | null;
         };
         Insert: {
+          approved_at?: string | null;
+          approved_by?: string | null;
           atualizado_em?: string;
+          auto_paused_reason?: string | null;
           canal?: string;
+          cancellation_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          consecutive_failures?: number;
           criada_em?: string;
+          dispatch_enabled?: boolean;
+          dispatch_release_reason?: string | null;
+          dispatch_released_at?: string | null;
+          dispatch_released_by?: string | null;
+          failure_pause_threshold?: number;
           id?: string;
           ig_config?: Json | null;
           list_id?: string | null;
+          max_attempts?: number;
+          max_batch_size?: number;
           nome: string;
           org_id?: string | null;
+          paused_at?: string | null;
+          paused_by?: string | null;
           revisao?: number;
+          schedule_timezone?: string;
+          scheduled_at?: string | null;
+          send_window_end?: string;
+          send_window_start?: string;
           status?: string;
           user_id: string;
           wa_config?: Json | null;
         };
         Update: {
+          approved_at?: string | null;
+          approved_by?: string | null;
           atualizado_em?: string;
+          auto_paused_reason?: string | null;
           canal?: string;
+          cancellation_reason?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          consecutive_failures?: number;
           criada_em?: string;
+          dispatch_enabled?: boolean;
+          dispatch_release_reason?: string | null;
+          dispatch_released_at?: string | null;
+          dispatch_released_by?: string | null;
+          failure_pause_threshold?: number;
           id?: string;
           ig_config?: Json | null;
           list_id?: string | null;
+          max_attempts?: number;
+          max_batch_size?: number;
           nome?: string;
           org_id?: string | null;
+          paused_at?: string | null;
+          paused_by?: string | null;
           revisao?: number;
+          schedule_timezone?: string;
+          scheduled_at?: string | null;
+          send_window_end?: string;
+          send_window_start?: string;
           status?: string;
           user_id?: string;
           wa_config?: Json | null;
@@ -4626,6 +4711,12 @@ export type Database = {
           user_id: string;
           website: string | null;
           whatsapp: string | null;
+          whatsapp_consent_purpose: string | null;
+          whatsapp_consent_source: string | null;
+          whatsapp_opt_in: boolean;
+          whatsapp_opt_in_at: string | null;
+          whatsapp_opt_out: boolean;
+          whatsapp_opt_out_at: string | null;
           zip: string | null;
         };
         Insert: {
@@ -4676,6 +4767,12 @@ export type Database = {
           user_id: string;
           website?: string | null;
           whatsapp?: string | null;
+          whatsapp_consent_purpose?: string | null;
+          whatsapp_consent_source?: string | null;
+          whatsapp_opt_in?: boolean;
+          whatsapp_opt_in_at?: string | null;
+          whatsapp_opt_out?: boolean;
+          whatsapp_opt_out_at?: string | null;
           zip?: string | null;
         };
         Update: {
@@ -4726,6 +4823,12 @@ export type Database = {
           user_id?: string;
           website?: string | null;
           whatsapp?: string | null;
+          whatsapp_consent_purpose?: string | null;
+          whatsapp_consent_source?: string | null;
+          whatsapp_opt_in?: boolean;
+          whatsapp_opt_in_at?: string | null;
+          whatsapp_opt_out?: boolean;
+          whatsapp_opt_out_at?: string | null;
           zip?: string | null;
         };
         Relationships: [
@@ -5748,33 +5851,70 @@ export type Database = {
       };
       wa_alertas: {
         Row: {
+          acknowledged_at: string | null;
+          acknowledged_by: string | null;
           criado_em: string;
+          dedup_key: string | null;
+          details: Json;
+          first_seen_at: string | null;
           id: string;
+          instancia_id: string | null;
+          last_seen_at: string | null;
           lido: boolean;
           mensagem: string;
+          occurrences: number;
           org_id: string | null;
+          resolved_at: string | null;
+          resolved_by: string | null;
           tipo: string;
           user_id: string;
         };
         Insert: {
+          acknowledged_at?: string | null;
+          acknowledged_by?: string | null;
           criado_em?: string;
+          dedup_key?: string | null;
+          details?: Json;
+          first_seen_at?: string | null;
           id?: string;
+          instancia_id?: string | null;
+          last_seen_at?: string | null;
           lido?: boolean;
           mensagem: string;
+          occurrences?: number;
           org_id?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
           tipo: string;
           user_id?: string;
         };
         Update: {
+          acknowledged_at?: string | null;
+          acknowledged_by?: string | null;
           criado_em?: string;
+          dedup_key?: string | null;
+          details?: Json;
+          first_seen_at?: string | null;
           id?: string;
+          instancia_id?: string | null;
+          last_seen_at?: string | null;
           lido?: boolean;
           mensagem?: string;
+          occurrences?: number;
           org_id?: string | null;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
           tipo?: string;
           user_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "wa_alertas_instancia_id_fkey";
+            columns: ["instancia_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "wa_alertas_org_id_fkey";
             columns: ["org_id"];
@@ -5784,41 +5924,1042 @@ export type Database = {
           },
         ];
       };
-      wa_envios: {
+      wa_automation_events: {
         Row: {
-          campanha_id: string | null;
-          enviado_em: string;
+          causation_id: string | null;
+          conversation_id: string | null;
+          correlation_id: string;
+          created_at: string;
+          depth: number;
+          event_key: string;
+          event_type: string;
           id: string;
-          instancia_id: string;
-          lead_id: string;
-          mensagem: string | null;
-          org_id: string | null;
-          user_id: string;
-          variacao_id: string | null;
+          lead_id: string | null;
+          occurred_at: string;
+          org_id: string;
+          payload: Json;
+          resource_type: string;
+          source: string;
         };
         Insert: {
-          campanha_id?: string | null;
-          enviado_em?: string;
+          causation_id?: string | null;
+          conversation_id?: string | null;
+          correlation_id?: string;
+          created_at?: string;
+          depth?: number;
+          event_key: string;
+          event_type: string;
           id?: string;
-          instancia_id: string;
-          lead_id: string;
-          mensagem?: string | null;
-          org_id?: string | null;
-          user_id?: string;
-          variacao_id?: string | null;
+          lead_id?: string | null;
+          occurred_at: string;
+          org_id: string;
+          payload?: Json;
+          resource_type: string;
+          source: string;
         };
         Update: {
-          campanha_id?: string | null;
-          enviado_em?: string;
+          causation_id?: string | null;
+          conversation_id?: string | null;
+          correlation_id?: string;
+          created_at?: string;
+          depth?: number;
+          event_key?: string;
+          event_type?: string;
           id?: string;
-          instancia_id?: string;
-          lead_id?: string;
-          mensagem?: string | null;
-          org_id?: string | null;
-          user_id?: string;
-          variacao_id?: string | null;
+          lead_id?: string | null;
+          occurred_at?: string;
+          org_id?: string;
+          payload?: Json;
+          resource_type?: string;
+          source?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "wa_automation_events_causation_id_fkey";
+            columns: ["causation_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_automation_events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_automation_events_conversation_id_org_id_fkey";
+            columns: ["conversation_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_events_lead_id_org_id_fkey";
+            columns: ["lead_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_events_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_automation_followups: {
+        Row: {
+          automation_id: string;
+          automation_version: number;
+          conversation_id: string;
+          created_at: string;
+          due_at: string;
+          eligibility: Json;
+          id: string;
+          idempotency_key: string;
+          lead_id: string | null;
+          org_id: string;
+          state: string;
+          timezone: string;
+          updated_at: string;
+        };
+        Insert: {
+          automation_id: string;
+          automation_version: number;
+          conversation_id: string;
+          created_at?: string;
+          due_at: string;
+          eligibility?: Json;
+          id?: string;
+          idempotency_key: string;
+          lead_id?: string | null;
+          org_id: string;
+          state?: string;
+          timezone: string;
+          updated_at?: string;
+        };
+        Update: {
+          automation_id?: string;
+          automation_version?: number;
+          conversation_id?: string;
+          created_at?: string;
+          due_at?: string;
+          eligibility?: Json;
+          id?: string;
+          idempotency_key?: string;
+          lead_id?: string | null;
+          org_id?: string;
+          state?: string;
+          timezone?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_automation_followups_automation_id_org_id_fkey";
+            columns: ["automation_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_automations";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_followups_conversation_id_org_id_fkey";
+            columns: ["conversation_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_followups_lead_id_org_id_fkey";
+            columns: ["lead_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_followups_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_automation_org_settings: {
+        Row: {
+          engine_enabled: boolean;
+          org_id: string;
+          timezone: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          engine_enabled?: boolean;
+          org_id: string;
+          timezone?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          engine_enabled?: boolean;
+          org_id?: string;
+          timezone?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_automation_org_settings_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: true;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_automation_platform_controls: {
+        Row: {
+          automation_execution_enabled: boolean;
+          legacy_backfill_execution_enabled: boolean;
+          singleton: boolean;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          automation_execution_enabled?: boolean;
+          legacy_backfill_execution_enabled?: boolean;
+          singleton?: boolean;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          automation_execution_enabled?: boolean;
+          legacy_backfill_execution_enabled?: boolean;
+          singleton?: boolean;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      wa_automation_runs: {
+        Row: {
+          automation_id: string;
+          automation_version: number;
+          blockers: Json;
+          condition_results: Json;
+          conversation_id: string | null;
+          event_id: string | null;
+          executed_actions: Json;
+          finished_at: string | null;
+          id: string;
+          lead_id: string | null;
+          mode: string;
+          org_id: string;
+          planned_actions: Json;
+          run_key: string;
+          sanitized_error: string | null;
+          started_at: string;
+          state: string;
+        };
+        Insert: {
+          automation_id: string;
+          automation_version: number;
+          blockers?: Json;
+          condition_results?: Json;
+          conversation_id?: string | null;
+          event_id?: string | null;
+          executed_actions?: Json;
+          finished_at?: string | null;
+          id?: string;
+          lead_id?: string | null;
+          mode: string;
+          org_id: string;
+          planned_actions?: Json;
+          run_key: string;
+          sanitized_error?: string | null;
+          started_at?: string;
+          state: string;
+        };
+        Update: {
+          automation_id?: string;
+          automation_version?: number;
+          blockers?: Json;
+          condition_results?: Json;
+          conversation_id?: string | null;
+          event_id?: string | null;
+          executed_actions?: Json;
+          finished_at?: string | null;
+          id?: string;
+          lead_id?: string | null;
+          mode?: string;
+          org_id?: string;
+          planned_actions?: Json;
+          run_key?: string;
+          sanitized_error?: string | null;
+          started_at?: string;
+          state?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_automation_runs_automation_id_org_id_fkey";
+            columns: ["automation_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_automations";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_runs_conversation_id_org_id_fkey";
+            columns: ["conversation_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_runs_event_id_org_id_fkey";
+            columns: ["event_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_automation_events";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_runs_lead_id_org_id_fkey";
+            columns: ["lead_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_runs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_automation_versions: {
+        Row: {
+          automation_id: string;
+          changed_at: string;
+          changed_by: string;
+          definition: Json;
+          id: string;
+          org_id: string;
+          version: number;
+        };
+        Insert: {
+          automation_id: string;
+          changed_at?: string;
+          changed_by: string;
+          definition: Json;
+          id?: string;
+          org_id: string;
+          version: number;
+        };
+        Update: {
+          automation_id?: string;
+          changed_at?: string;
+          changed_by?: string;
+          definition?: Json;
+          id?: string;
+          org_id?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_automation_versions_automation_id_org_id_fkey";
+            columns: ["automation_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_automations";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_automation_versions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_automations: {
+        Row: {
+          actions: Json;
+          archived_at: string | null;
+          automation_type: string;
+          conditions: Json;
+          config: Json;
+          created_at: string;
+          created_by: string;
+          description: string;
+          id: string;
+          name: string;
+          org_id: string;
+          status: string;
+          trigger: Json;
+          updated_at: string;
+          updated_by: string;
+          version: number;
+        };
+        Insert: {
+          actions: Json;
+          archived_at?: string | null;
+          automation_type: string;
+          conditions?: Json;
+          config?: Json;
+          created_at?: string;
+          created_by: string;
+          description?: string;
+          id?: string;
+          name: string;
+          org_id: string;
+          status?: string;
+          trigger: Json;
+          updated_at?: string;
+          updated_by: string;
+          version?: number;
+        };
+        Update: {
+          actions?: Json;
+          archived_at?: string | null;
+          automation_type?: string;
+          conditions?: Json;
+          config?: Json;
+          created_at?: string;
+          created_by?: string;
+          description?: string;
+          id?: string;
+          name?: string;
+          org_id?: string;
+          status?: string;
+          trigger?: Json;
+          updated_at?: string;
+          updated_by?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_automations_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_contingencias: {
+        Row: {
+          authorized_at: string;
+          authorized_by: string;
+          backup_instance_id: string;
+          created_at: string;
+          ended_at: string | null;
+          ended_by: string | null;
+          id: string;
+          org_id: string;
+          purpose: string;
+          reason: string;
+          source_instance_id: string;
+          status: string;
+        };
+        Insert: {
+          authorized_at?: string;
+          authorized_by: string;
+          backup_instance_id: string;
+          created_at?: string;
+          ended_at?: string | null;
+          ended_by?: string | null;
+          id?: string;
+          org_id: string;
+          purpose: string;
+          reason: string;
+          source_instance_id: string;
+          status?: string;
+        };
+        Update: {
+          authorized_at?: string;
+          authorized_by?: string;
+          backup_instance_id?: string;
+          created_at?: string;
+          ended_at?: string | null;
+          ended_by?: string | null;
+          id?: string;
+          org_id?: string;
+          purpose?: string;
+          reason?: string;
+          source_instance_id?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_contingencias_backup_instance_id_fkey";
+            columns: ["backup_instance_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_contingencias_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_contingencias_source_instance_id_fkey";
+            columns: ["source_instance_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_conversa_etiquetas: {
+        Row: {
+          added_at: string;
+          added_by: string | null;
+          conversa_id: string;
+          etiqueta_id: string;
+          org_id: string;
+        };
+        Insert: {
+          added_at?: string;
+          added_by?: string | null;
+          conversa_id: string;
+          etiqueta_id: string;
+          org_id: string;
+        };
+        Update: {
+          added_at?: string;
+          added_by?: string | null;
+          conversa_id?: string;
+          etiqueta_id?: string;
+          org_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_conversa_etiquetas_conversa_id_org_id_fkey";
+            columns: ["conversa_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_conversa_etiquetas_etiqueta_id_org_id_fkey";
+            columns: ["etiqueta_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_etiquetas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_conversa_etiquetas_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_conversa_eventos: {
+        Row: {
+          actor_id: string | null;
+          conversa_id: string;
+          details: Json;
+          event_key: string | null;
+          event_type: string;
+          id: string;
+          occurred_at: string;
+          org_id: string;
+        };
+        Insert: {
+          actor_id?: string | null;
+          conversa_id: string;
+          details?: Json;
+          event_key?: string | null;
+          event_type: string;
+          id?: string;
+          occurred_at?: string;
+          org_id: string;
+        };
+        Update: {
+          actor_id?: string | null;
+          conversa_id?: string;
+          details?: Json;
+          event_key?: string | null;
+          event_type?: string;
+          id?: string;
+          occurred_at?: string;
+          org_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_conversa_eventos_conversa_id_org_id_fkey";
+            columns: ["conversa_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_conversa_eventos_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_conversa_notas: {
+        Row: {
+          author_id: string;
+          body: string;
+          conversa_id: string;
+          created_at: string;
+          id: string;
+          org_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          author_id: string;
+          body: string;
+          conversa_id: string;
+          created_at?: string;
+          id?: string;
+          org_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          author_id?: string;
+          body?: string;
+          conversa_id?: string;
+          created_at?: string;
+          id?: string;
+          org_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_conversa_notas_conversa_id_org_id_fkey";
+            columns: ["conversa_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_conversa_notas_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_conversas: {
+        Row: {
+          assigned_to: string | null;
+          contact_avatar_checked_at: string | null;
+          contact_avatar_id: string | null;
+          contact_avatar_url: string | null;
+          contact_name: string | null;
+          created_at: string;
+          first_response_at: string | null;
+          id: string;
+          instancia_id: string;
+          last_inbound_at: string | null;
+          last_message_at: string | null;
+          last_message_direction: string | null;
+          last_message_preview: string | null;
+          last_message_type: string | null;
+          last_outbound_at: string | null;
+          lead_id: string | null;
+          normalized_phone: string | null;
+          org_id: string;
+          origin: string;
+          priority: string;
+          remote_contact_id: string;
+          status: string;
+          unread_count: number;
+          updated_at: string;
+          version: number;
+        };
+        Insert: {
+          assigned_to?: string | null;
+          contact_avatar_checked_at?: string | null;
+          contact_avatar_id?: string | null;
+          contact_avatar_url?: string | null;
+          contact_name?: string | null;
+          created_at?: string;
+          first_response_at?: string | null;
+          id?: string;
+          instancia_id: string;
+          last_inbound_at?: string | null;
+          last_message_at?: string | null;
+          last_message_direction?: string | null;
+          last_message_preview?: string | null;
+          last_message_type?: string | null;
+          last_outbound_at?: string | null;
+          lead_id?: string | null;
+          normalized_phone?: string | null;
+          org_id: string;
+          origin?: string;
+          priority?: string;
+          remote_contact_id: string;
+          status?: string;
+          unread_count?: number;
+          updated_at?: string;
+          version?: number;
+        };
+        Update: {
+          assigned_to?: string | null;
+          contact_avatar_checked_at?: string | null;
+          contact_avatar_id?: string | null;
+          contact_avatar_url?: string | null;
+          contact_name?: string | null;
+          created_at?: string;
+          first_response_at?: string | null;
+          id?: string;
+          instancia_id?: string;
+          last_inbound_at?: string | null;
+          last_message_at?: string | null;
+          last_message_direction?: string | null;
+          last_message_preview?: string | null;
+          last_message_type?: string | null;
+          last_outbound_at?: string | null;
+          lead_id?: string | null;
+          normalized_phone?: string | null;
+          org_id?: string;
+          origin?: string;
+          priority?: string;
+          remote_contact_id?: string;
+          status?: string;
+          unread_count?: number;
+          updated_at?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_conversas_instance_org_fk";
+            columns: ["instancia_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_conversas_instancia_id_fkey";
+            columns: ["instancia_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_conversas_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_conversas_lead_org_fk";
+            columns: ["lead_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_conversas_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_envio_eventos: {
+        Row: {
+          envio_id: string;
+          event_key: string;
+          event_type: string;
+          id: string;
+          instancia_id: string;
+          occurred_at: string | null;
+          org_id: string;
+          payload: Json;
+          provider_message_id: string;
+          received_at: string;
+          status: string;
+        };
+        Insert: {
+          envio_id: string;
+          event_key: string;
+          event_type: string;
+          id?: string;
+          instancia_id: string;
+          occurred_at?: string | null;
+          org_id: string;
+          payload?: Json;
+          provider_message_id: string;
+          received_at?: string;
+          status: string;
+        };
+        Update: {
+          envio_id?: string;
+          event_key?: string;
+          event_type?: string;
+          id?: string;
+          instancia_id?: string;
+          occurred_at?: string | null;
+          org_id?: string;
+          payload?: Json;
+          provider_message_id?: string;
+          received_at?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_envio_eventos_envio_id_fkey";
+            columns: ["envio_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_envios";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_envio_eventos_envio_id_org_id_fkey";
+            columns: ["envio_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_envios";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_envio_eventos_instancia_id_fkey";
+            columns: ["instancia_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_envio_eventos_instancia_id_org_id_fkey";
+            columns: ["instancia_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_envio_eventos_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_envio_tentativas: {
+        Row: {
+          attempt_number: number;
+          completed_at: string | null;
+          envio_id: string;
+          error_code: string | null;
+          error_message: string | null;
+          http_status: number | null;
+          id: string;
+          org_id: string;
+          outcome: string | null;
+          provider_message_id: string | null;
+          provider_response: Json | null;
+          request_dispatched_at: string | null;
+          retryable: boolean;
+          started_at: string;
+          worker_id: string;
+        };
+        Insert: {
+          attempt_number: number;
+          completed_at?: string | null;
+          envio_id: string;
+          error_code?: string | null;
+          error_message?: string | null;
+          http_status?: number | null;
+          id?: string;
+          org_id: string;
+          outcome?: string | null;
+          provider_message_id?: string | null;
+          provider_response?: Json | null;
+          request_dispatched_at?: string | null;
+          retryable?: boolean;
+          started_at?: string;
+          worker_id: string;
+        };
+        Update: {
+          attempt_number?: number;
+          completed_at?: string | null;
+          envio_id?: string;
+          error_code?: string | null;
+          error_message?: string | null;
+          http_status?: number | null;
+          id?: string;
+          org_id?: string;
+          outcome?: string | null;
+          provider_message_id?: string | null;
+          provider_response?: Json | null;
+          request_dispatched_at?: string | null;
+          retryable?: boolean;
+          started_at?: string;
+          worker_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_envio_tentativas_envio_id_org_id_fkey";
+            columns: ["envio_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_envios";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_envio_tentativas_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_envios: {
+        Row: {
+          accepted_at: string | null;
+          attempt_count: number;
+          blocked_reason: string | null;
+          campanha_id: string | null;
+          campanha_lead_id: string | null;
+          cancelled_at: string | null;
+          communication_purpose: string | null;
+          consent_source: string | null;
+          consented_at: string | null;
+          delivered_at: string | null;
+          enviado_em: string | null;
+          failed_at: string | null;
+          id: string;
+          idempotency_key: string;
+          instancia_id: string;
+          last_error: string | null;
+          last_error_code: string | null;
+          lead_id: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          mensagem: string | null;
+          next_attempt_at: string | null;
+          org_id: string | null;
+          processed_at: string | null;
+          processing_at: string | null;
+          provider_attempt_count: number;
+          provider_message_id: string | null;
+          provider_requested_at: string | null;
+          provider_response: Json | null;
+          queue_created_at: string;
+          read_at: string | null;
+          recipient: string | null;
+          reserved_at: string | null;
+          retryable: boolean;
+          scheduled_at: string | null;
+          sent_at: string | null;
+          stage: string;
+          status: string;
+          uncertain_at: string | null;
+          updated_at: string;
+          user_id: string;
+          variacao_id: string | null;
+          worker_id: string | null;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          attempt_count?: number;
+          blocked_reason?: string | null;
+          campanha_id?: string | null;
+          campanha_lead_id?: string | null;
+          cancelled_at?: string | null;
+          communication_purpose?: string | null;
+          consent_source?: string | null;
+          consented_at?: string | null;
+          delivered_at?: string | null;
+          enviado_em?: string | null;
+          failed_at?: string | null;
+          id?: string;
+          idempotency_key: string;
+          instancia_id: string;
+          last_error?: string | null;
+          last_error_code?: string | null;
+          lead_id: string;
+          lease_expires_at?: string | null;
+          max_attempts?: number;
+          mensagem?: string | null;
+          next_attempt_at?: string | null;
+          org_id?: string | null;
+          processed_at?: string | null;
+          processing_at?: string | null;
+          provider_attempt_count?: number;
+          provider_message_id?: string | null;
+          provider_requested_at?: string | null;
+          provider_response?: Json | null;
+          queue_created_at?: string;
+          read_at?: string | null;
+          recipient?: string | null;
+          reserved_at?: string | null;
+          retryable?: boolean;
+          scheduled_at?: string | null;
+          sent_at?: string | null;
+          stage?: string;
+          status?: string;
+          uncertain_at?: string | null;
+          updated_at?: string;
+          user_id?: string;
+          variacao_id?: string | null;
+          worker_id?: string | null;
+        };
+        Update: {
+          accepted_at?: string | null;
+          attempt_count?: number;
+          blocked_reason?: string | null;
+          campanha_id?: string | null;
+          campanha_lead_id?: string | null;
+          cancelled_at?: string | null;
+          communication_purpose?: string | null;
+          consent_source?: string | null;
+          consented_at?: string | null;
+          delivered_at?: string | null;
+          enviado_em?: string | null;
+          failed_at?: string | null;
+          id?: string;
+          idempotency_key?: string;
+          instancia_id?: string;
+          last_error?: string | null;
+          last_error_code?: string | null;
+          lead_id?: string;
+          lease_expires_at?: string | null;
+          max_attempts?: number;
+          mensagem?: string | null;
+          next_attempt_at?: string | null;
+          org_id?: string | null;
+          processed_at?: string | null;
+          processing_at?: string | null;
+          provider_attempt_count?: number;
+          provider_message_id?: string | null;
+          provider_requested_at?: string | null;
+          provider_response?: Json | null;
+          queue_created_at?: string;
+          read_at?: string | null;
+          recipient?: string | null;
+          reserved_at?: string | null;
+          retryable?: boolean;
+          scheduled_at?: string | null;
+          sent_at?: string | null;
+          stage?: string;
+          status?: string;
+          uncertain_at?: string | null;
+          updated_at?: string;
+          user_id?: string;
+          variacao_id?: string | null;
+          worker_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_envios_campanha_lead_id_fkey";
+            columns: ["campanha_lead_id"];
+            isOneToOne: false;
+            referencedRelation: "campanha_leads";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "wa_envios_instancia_id_fkey";
             columns: ["instancia_id"];
@@ -5835,6 +6976,107 @@ export type Database = {
           },
           {
             foreignKeyName: "wa_envios_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_etiquetas: {
+        Row: {
+          color: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          name: string;
+          org_id: string;
+        };
+        Insert: {
+          color?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name: string;
+          org_id: string;
+        };
+        Update: {
+          color?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          name?: string;
+          org_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_etiquetas_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wa_instancia_incidentes: {
+        Row: {
+          actor_id: string | null;
+          created_at: string;
+          details: Json;
+          event_key: string;
+          event_type: string;
+          id: string;
+          instancia_id: string;
+          occurred_at: string;
+          operational_health: string | null;
+          org_id: string;
+          previous_operational_health: string | null;
+          previous_provider_status: string | null;
+          provider_status: string | null;
+          source: string;
+        };
+        Insert: {
+          actor_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          event_key: string;
+          event_type: string;
+          id?: string;
+          instancia_id: string;
+          occurred_at: string;
+          operational_health?: string | null;
+          org_id: string;
+          previous_operational_health?: string | null;
+          previous_provider_status?: string | null;
+          provider_status?: string | null;
+          source: string;
+        };
+        Update: {
+          actor_id?: string | null;
+          created_at?: string;
+          details?: Json;
+          event_key?: string;
+          event_type?: string;
+          id?: string;
+          instancia_id?: string;
+          occurred_at?: string;
+          operational_health?: string | null;
+          org_id?: string;
+          previous_operational_health?: string | null;
+          previous_provider_status?: string | null;
+          provider_status?: string | null;
+          source?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wa_instancia_incidentes_instancia_id_fkey";
+            columns: ["instancia_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_instancias";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wa_instancia_incidentes_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "orgs";
@@ -5872,13 +7114,24 @@ export type Database = {
         Row: {
           atualizado_em: string;
           criada_em: string;
+          deleted_at: string | null;
           falhas_login: number;
           funcao: string;
+          health_error_code: string | null;
+          health_failure_count: number;
           id: string;
+          last_health_check_at: string | null;
+          last_provider_event_at: string | null;
+          last_provider_success_at: string | null;
+          next_health_check_at: string | null;
           nome: string;
           numero: string | null;
+          operational_health: string;
           ordem: number;
           org_id: string | null;
+          provider_status: string;
+          reconnect_requested_by: string | null;
+          reconnect_started_at: string | null;
           status: string;
           ultima_checagem_em: string | null;
           user_id: string;
@@ -5886,13 +7139,24 @@ export type Database = {
         Insert: {
           atualizado_em?: string;
           criada_em?: string;
+          deleted_at?: string | null;
           falhas_login?: number;
           funcao?: string;
+          health_error_code?: string | null;
+          health_failure_count?: number;
           id?: string;
+          last_health_check_at?: string | null;
+          last_provider_event_at?: string | null;
+          last_provider_success_at?: string | null;
+          next_health_check_at?: string | null;
           nome: string;
           numero?: string | null;
+          operational_health?: string;
           ordem?: number;
           org_id?: string | null;
+          provider_status?: string;
+          reconnect_requested_by?: string | null;
+          reconnect_started_at?: string | null;
           status?: string;
           ultima_checagem_em?: string | null;
           user_id: string;
@@ -5900,13 +7164,24 @@ export type Database = {
         Update: {
           atualizado_em?: string;
           criada_em?: string;
+          deleted_at?: string | null;
           falhas_login?: number;
           funcao?: string;
+          health_error_code?: string | null;
+          health_failure_count?: number;
           id?: string;
+          last_health_check_at?: string | null;
+          last_provider_event_at?: string | null;
+          last_provider_success_at?: string | null;
+          next_health_check_at?: string | null;
           nome?: string;
           numero?: string | null;
+          operational_health?: string;
           ordem?: number;
           org_id?: string | null;
+          provider_status?: string;
+          reconnect_requested_by?: string | null;
+          reconnect_started_at?: string | null;
           status?: string;
           ultima_checagem_em?: string | null;
           user_id?: string;
@@ -5921,10 +7196,66 @@ export type Database = {
           },
         ];
       };
+      wa_legacy_backfill_jobs: {
+        Row: {
+          ambiguous_count: number;
+          batch_size: number;
+          checkpoint: string | null;
+          created_at: string;
+          dry_run: boolean;
+          eligible_count: number;
+          id: string;
+          invalid_count: number;
+          linked_count: number;
+          report: Json;
+          request_key: string;
+          requested_by: string;
+          state: string;
+          updated_at: string;
+        };
+        Insert: {
+          ambiguous_count?: number;
+          batch_size?: number;
+          checkpoint?: string | null;
+          created_at?: string;
+          dry_run?: boolean;
+          eligible_count?: number;
+          id?: string;
+          invalid_count?: number;
+          linked_count?: number;
+          report?: Json;
+          request_key: string;
+          requested_by: string;
+          state?: string;
+          updated_at?: string;
+        };
+        Update: {
+          ambiguous_count?: number;
+          batch_size?: number;
+          checkpoint?: string | null;
+          created_at?: string;
+          dry_run?: boolean;
+          eligible_count?: number;
+          id?: string;
+          invalid_count?: number;
+          linked_count?: number;
+          report?: Json;
+          request_key?: string;
+          requested_by?: string;
+          state?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       wa_mensagens: {
         Row: {
+          author_id: string | null;
+          campanha_id: string | null;
+          client_operation_id: string | null;
+          conversa_id: string | null;
           criado_em: string;
           direcao: string;
+          envio_id: string | null;
           externo_id: string | null;
           id: string;
           instancia_id: string | null;
@@ -5934,13 +7265,22 @@ export type Database = {
           nome_contato: string | null;
           numero: string;
           org_id: string | null;
+          provider_occurred_at: string | null;
+          received_at: string;
+          remote_contact_id: string | null;
+          status: string;
           texto: string | null;
           tipo: string;
           user_id: string;
         };
         Insert: {
+          author_id?: string | null;
+          campanha_id?: string | null;
+          client_operation_id?: string | null;
+          conversa_id?: string | null;
           criado_em?: string;
           direcao: string;
+          envio_id?: string | null;
           externo_id?: string | null;
           id?: string;
           instancia_id?: string | null;
@@ -5950,13 +7290,22 @@ export type Database = {
           nome_contato?: string | null;
           numero: string;
           org_id?: string | null;
+          provider_occurred_at?: string | null;
+          received_at?: string;
+          remote_contact_id?: string | null;
+          status?: string;
           texto?: string | null;
           tipo?: string;
           user_id?: string;
         };
         Update: {
+          author_id?: string | null;
+          campanha_id?: string | null;
+          client_operation_id?: string | null;
+          conversa_id?: string | null;
           criado_em?: string;
           direcao?: string;
+          envio_id?: string | null;
           externo_id?: string | null;
           id?: string;
           instancia_id?: string | null;
@@ -5966,11 +7315,36 @@ export type Database = {
           nome_contato?: string | null;
           numero?: string;
           org_id?: string | null;
+          provider_occurred_at?: string | null;
+          received_at?: string;
+          remote_contact_id?: string | null;
+          status?: string;
           texto?: string | null;
           tipo?: string;
           user_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "wa_mensagens_campanha_org_fk";
+            columns: ["campanha_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "campanhas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_mensagens_conversa_org_fk";
+            columns: ["conversa_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "wa_mensagens_envio_org_fk";
+            columns: ["envio_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "wa_envios";
+            referencedColumns: ["id", "org_id"];
+          },
           {
             foreignKeyName: "wa_mensagens_instancia_id_fkey";
             columns: ["instancia_id"];
@@ -5996,6 +7370,9 @@ export type Database = {
       };
       wa_scripts: {
         Row: {
+          ativo: boolean;
+          atualizado_em: string;
+          categoria: string;
           criado_em: string;
           id: string;
           media_url: string | null;
@@ -6003,9 +7380,14 @@ export type Database = {
           nome: string;
           org_id: string | null;
           tipo: string;
+          ultimo_uso_em: string | null;
           user_id: string;
+          usos: number;
         };
         Insert: {
+          ativo?: boolean;
+          atualizado_em?: string;
+          categoria?: string;
           criado_em?: string;
           id?: string;
           media_url?: string | null;
@@ -6013,9 +7395,14 @@ export type Database = {
           nome: string;
           org_id?: string | null;
           tipo?: string;
+          ultimo_uso_em?: string | null;
           user_id?: string;
+          usos?: number;
         };
         Update: {
+          ativo?: boolean;
+          atualizado_em?: string;
+          categoria?: string;
           criado_em?: string;
           id?: string;
           media_url?: string | null;
@@ -6023,7 +7410,9 @@ export type Database = {
           nome?: string;
           org_id?: string | null;
           tipo?: string;
+          ultimo_uso_em?: string | null;
           user_id?: string;
+          usos?: number;
         };
         Relationships: [
           {
@@ -6422,6 +7811,336 @@ export type Database = {
         };
         Returns: number;
       };
+      wa_apply_instance_observation: {
+        Args: {
+          p_actor?: string;
+          p_error_code?: string;
+          p_instance: string;
+          p_number?: string;
+          p_observed_at: string;
+          p_operational_health: string;
+          p_org: string;
+          p_provider_status: string;
+          p_source: string;
+          p_success: boolean;
+        };
+        Returns: boolean;
+      };
+      wa_automation_controls: {
+        Args: { p_automation: string; p_org: string };
+        Returns: {
+          dispatch_enabled: boolean;
+          organization_enabled: boolean;
+          platform_enabled: boolean;
+          rule_enabled: boolean;
+        }[];
+      };
+      wa_backfill_conversations: { Args: { p_limit?: number }; Returns: number };
+      wa_campaign_is_whatsapp: {
+        Args: { p_campaign: string };
+        Returns: boolean;
+      };
+      wa_control_campaign: {
+        Args: {
+          p_action: string;
+          p_actor: string;
+          p_campaign: string;
+          p_org: string;
+          p_reason?: string;
+        };
+        Returns: string;
+      };
+      wa_conversation_action: {
+        Args: {
+          p_action: string;
+          p_actor: string;
+          p_conversation: string;
+          p_org: string;
+          p_value?: Json;
+        };
+        Returns: Json;
+      };
+      wa_conversation_visible: {
+        Args: { p_assigned: string; p_lead: string; p_org: string };
+        Returns: boolean;
+      };
+      wa_create_campaign_draft: {
+        Args: {
+          p_actor: string;
+          p_campaign_type: string;
+          p_list: string;
+          p_message: string;
+          p_name: string;
+          p_org: string;
+          p_scheduled_at: string;
+          p_timezone: string;
+        };
+        Returns: {
+          campaign_id: string;
+          created_at: string;
+          recipient_count: number;
+        }[];
+      };
+      wa_defer_delivery_for_instance_health: {
+        Args: { p_delivery: string; p_reason: string; p_worker: string };
+        Returns: boolean;
+      };
+      wa_delivery_actor_allowed: {
+        Args: { p_actor: string; p_org: string };
+        Returns: boolean;
+      };
+      wa_finalize_outbound_message: {
+        Args: {
+          p_error?: string;
+          p_external_id: string;
+          p_message: string;
+          p_occurred_at: string;
+          p_org: string;
+          p_status: string;
+        };
+        Returns: undefined;
+      };
+      wa_ingest_inbound_message: {
+        Args: {
+          p_contact_name: string;
+          p_external_id: string;
+          p_instance: string;
+          p_message_type: string;
+          p_occurred_at: string;
+          p_org: string;
+          p_phone: string;
+          p_remote_contact_id: string;
+          p_text: string;
+        };
+        Returns: {
+          conversation_id: string;
+          inserted: boolean;
+          message_id: string;
+        }[];
+      };
+      wa_mark_delivery_dispatched: {
+        Args: { p_delivery: string; p_worker: string };
+        Returns: boolean;
+      };
+      wa_prepare_campaign: {
+        Args: {
+          p_actor: string;
+          p_campaign: string;
+          p_org: string;
+          p_purpose: string;
+          p_scheduled_at: string;
+          p_timezone: string;
+        };
+        Returns: {
+          blocked_count: number;
+          duplicate_count: number;
+          queued_count: number;
+        }[];
+      };
+      wa_prepare_legacy_backfill_dry_run: {
+        Args: {
+          p_batch_size?: number;
+          p_checkpoint?: string;
+          p_dry_run?: boolean;
+          p_requested_by: string;
+        };
+        Returns: {
+          ambiguous_count: number;
+          batch_size: number;
+          checkpoint: string | null;
+          created_at: string;
+          dry_run: boolean;
+          eligible_count: number;
+          id: string;
+          invalid_count: number;
+          linked_count: number;
+          report: Json;
+          request_key: string;
+          requested_by: string;
+          state: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "wa_legacy_backfill_jobs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      wa_preview_legacy_message_backfill: {
+        Args: { p_batch_size?: number; p_checkpoint?: string };
+        Returns: {
+          already_linked_count: number;
+          ambiguous_count: number;
+          eligible_count: number;
+          invalid_count: number;
+          next_checkpoint: string;
+        }[];
+      };
+      wa_reassign_conversations: {
+        Args: {
+          p_actor: string;
+          p_from: string;
+          p_org: string;
+          p_reason: string;
+          p_to: string;
+        };
+        Returns: {
+          moved: number;
+          skipped: number;
+        }[];
+      };
+      wa_recipe_is_whatsapp: { Args: { p_recipe: string }; Returns: boolean };
+      wa_record_instance_event: {
+        Args: {
+          p_actor: string;
+          p_details?: Json;
+          p_event_key: string;
+          p_event_type: string;
+          p_instance: string;
+          p_occurred_at: string;
+          p_org: string;
+          p_source: string;
+        };
+        Returns: boolean;
+      };
+      wa_register_campaign_health: {
+        Args: {
+          p_campaign: string;
+          p_critical: boolean;
+          p_org: string;
+          p_reason?: string;
+          p_success: boolean;
+        };
+        Returns: string;
+      };
+      wa_register_script_use: {
+        Args: { p_org: string; p_script: string };
+        Returns: number;
+      };
+      wa_reschedule_campaign: {
+        Args: {
+          p_actor: string;
+          p_campaign: string;
+          p_org: string;
+          p_scheduled_at: string;
+          p_timezone: string;
+        };
+        Returns: number;
+      };
+      wa_reserve_delivery_batch: {
+        Args: { p_lease_seconds?: number; p_limit?: number; p_worker: string };
+        Returns: {
+          accepted_at: string | null;
+          attempt_count: number;
+          blocked_reason: string | null;
+          campanha_id: string | null;
+          campanha_lead_id: string | null;
+          cancelled_at: string | null;
+          communication_purpose: string | null;
+          consent_source: string | null;
+          consented_at: string | null;
+          delivered_at: string | null;
+          enviado_em: string | null;
+          failed_at: string | null;
+          id: string;
+          idempotency_key: string;
+          instancia_id: string;
+          last_error: string | null;
+          last_error_code: string | null;
+          lead_id: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          mensagem: string | null;
+          next_attempt_at: string | null;
+          org_id: string | null;
+          processed_at: string | null;
+          processing_at: string | null;
+          provider_attempt_count: number;
+          provider_message_id: string | null;
+          provider_requested_at: string | null;
+          provider_response: Json | null;
+          queue_created_at: string;
+          read_at: string | null;
+          recipient: string | null;
+          reserved_at: string | null;
+          retryable: boolean;
+          scheduled_at: string | null;
+          sent_at: string | null;
+          stage: string;
+          status: string;
+          uncertain_at: string | null;
+          updated_at: string;
+          user_id: string;
+          variacao_id: string | null;
+          worker_id: string | null;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "wa_envios";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      wa_reserve_outbound_message: {
+        Args: {
+          p_actor: string;
+          p_conversation: string;
+          p_operation: string;
+          p_org: string;
+          p_text: string;
+        };
+        Returns: {
+          message_id: string;
+          should_send: boolean;
+        }[];
+      };
+      wa_role_allowed: {
+        Args: { p_org: string; p_roles: string[] };
+        Returns: boolean;
+      };
+      wa_save_automation_definition: {
+        Args: {
+          p_actor: string;
+          p_automation?: string;
+          p_definition: Json;
+          p_expected_version?: number;
+          p_org: string;
+        };
+        Returns: {
+          actions: Json;
+          archived_at: string | null;
+          automation_type: string;
+          conditions: Json;
+          config: Json;
+          created_at: string;
+          created_by: string;
+          description: string;
+          id: string;
+          name: string;
+          org_id: string;
+          status: string;
+          trigger: Json;
+          updated_at: string;
+          updated_by: string;
+          version: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "wa_automations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      wa_set_instance_priority: {
+        Args: {
+          p_actor: string;
+          p_instance: string;
+          p_org: string;
+          p_priority: number;
+        };
+        Returns: boolean;
+      };
     };
     Enums: {
       papel_org: "super_admin" | "admin" | "gerente" | "vendedor" | "sdr" | "suporte";
@@ -6546,6 +8265,9 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       papel_org: ["super_admin", "admin", "gerente", "vendedor", "sdr", "suporte"],

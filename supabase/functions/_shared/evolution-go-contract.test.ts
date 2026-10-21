@@ -900,3 +900,150 @@ test("session recovery fails fast instead of recreating when the Evolution GO da
     restore();
   }
 });
+
+function withWebhookEnv() {
+  const runtime = globalThis as typeof globalThis & {
+    Deno?: { env: { get(name: string): string | undefined } };
+  };
+  const originalDeno = runtime.Deno;
+  const originalFetch = globalThis.fetch;
+  const env: Record<string, string> = {
+    EVOLUTION_URL: "https://evolution.invalid",
+    EVOLUTION_API_KEY: "global-key",
+    SUPABASE_URL: "https://project.invalid",
+    WA_WEBHOOK_SECRET: "webhook-secret",
+  };
+  runtime.Deno = { env: { get: (name) => env[name] } };
+  return () => {
+    globalThis.fetch = originalFetch;
+    runtime.Deno = originalDeno;
+  };
+}
+
+test("pairing connect carries the inbound webhook so Evolution GO does not erase it", async () => {
+  const restore = withWebhookEnv();
+  let connectCalled = false;
+  const bodies: unknown[] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    if (url.endsWith("/instance/status")) {
+      return Response.json({ data: { Connected: connectCalled, LoggedIn: false } });
+    }
+    if (url.endsWith("/instance/connect")) {
+      connectCalled = true;
+      bodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ message: "success", data: {} });
+    }
+    if (url.endsWith("/instance/qr")) {
+      return Response.json({ message: "success", data: { Qrcode: PNG_BASE64 } });
+    }
+    throw new Error(`unexpected request ${url}`);
+  };
+  try {
+    const { qrInstancia } = await import("./wa.ts");
+    await qrInstancia("tenant-instance-token", {
+      prazoSessaoMs: 40,
+      prazoQrMs: 40,
+      intervaloMs: 0,
+    });
+    assert.deepEqual(bodies, [
+      {
+        webhookUrl: "https://project.invalid/functions/v1/wa-webhook?k=webhook-secret",
+        subscribe: ["MESSAGE", "CONNECTION", "QRCODE"],
+      },
+    ]);
+  } finally {
+    restore();
+  }
+});
+
+test("webhook reconciliation only touches connected instances that lost the webhook, and proves it", async () => {
+  const restore = withWebhookEnv();
+  const alvo = "https://project.invalid/functions/v1/wa-webhook?k=webhook-secret";
+  const remotas = [
+    {
+      id: "r1",
+      name: "chip-sem-webhook",
+      token: "t1",
+      connected: true,
+      webhook: "",
+      events: "MESSAGE",
+    },
+    {
+      id: "r2",
+      name: "chip-ok",
+      token: "t2",
+      connected: true,
+      webhook: alvo,
+      events: "MESSAGE,CONNECTION",
+    },
+    { id: "r3", name: "chip-desconectado", token: "t3", connected: false, webhook: "", events: "" },
+    {
+      id: "r4",
+      name: "chip-de-outro-sistema",
+      token: "t4",
+      connected: true,
+      webhook: "",
+      events: "",
+    },
+  ];
+  const connects: Array<{ apiKey: string | null; body: unknown }> = [];
+  globalThis.fetch = async (input, init) => {
+    const url = String(input);
+    const apiKey = new Headers(init?.headers).get("apikey");
+    if (url.endsWith("/instance/all")) return Response.json({ message: "success", data: remotas });
+    if (url.includes("/instance/info/")) return Response.json({ data: { jid: null } });
+    if (url.endsWith("/instance/connect")) {
+      connects.push({ apiKey, body: JSON.parse(String(init?.body)) });
+      const remota = remotas.find((item) => item.token === apiKey);
+      if (remota) {
+        remota.webhook = alvo;
+        remota.events = "MESSAGE,CONNECTION";
+      }
+      return Response.json({ message: "success", data: {} });
+    }
+    if (url.endsWith("/instance/status")) {
+      return Response.json({ data: { Connected: true, LoggedIn: true } });
+    }
+    throw new Error(`unexpected request ${url}`);
+  };
+  const admin = {
+    from: () => {
+      const q = {
+        select: () => q,
+        is: () => q,
+        then: (resolve: (value: unknown) => unknown) =>
+          resolve({
+            data: [
+              { nome: "chip-sem-webhook" },
+              { nome: "chip-ok" },
+              { nome: "chip-desconectado" },
+            ],
+            error: null,
+          }),
+      };
+      return q;
+    },
+  };
+  try {
+    const { reconciliarWebhooks } = await import("./wa.ts");
+    const resultado = await reconciliarWebhooks(admin, { aplicar: true });
+    assert.deepEqual(
+      resultado.map((item) => [item.nome, item.situacao]),
+      [
+        ["chip-sem-webhook", "configurado"],
+        ["chip-ok", "ja_configurado"],
+        ["chip-desconectado", "ignorado"],
+      ],
+    );
+    // Só o chip conectado e sem webhook recebeu /instance/connect, com o token dele, sem QRCODE.
+    assert.deepEqual(connects, [
+      {
+        apiKey: "t1",
+        body: { webhookUrl: alvo, subscribe: ["MESSAGE", "CONNECTION"], immediate: false },
+      },
+    ]);
+  } finally {
+    restore();
+  }
+});

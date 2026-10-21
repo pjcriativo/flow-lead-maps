@@ -55,6 +55,8 @@ import {
   consultarElegibilidadeCampanhaWa,
   consultarMotorCampanhasWa,
   controlarCampanhaWa,
+  liberarDisparoCampanhaWa,
+  segurarDisparoCampanhaWa,
   criarRascunhoCampanhaWa,
   prepararCampanhaWa,
   reagendarCampanhaWa,
@@ -458,6 +460,44 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
       await carregarDadosReais();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Falha ao atualizar a campanha.");
+    } finally {
+      setAcaoCampanhaId(null);
+    }
+  };
+
+  const alterarDisparoCampanha = async (campanha: CampanhaItemWa, liberar: boolean) => {
+    if (liberar) {
+      const motivo = window.prompt(
+        `Liberar o envio real da campanha "${campanha.nome}"?
+
+As mensagens serão enviadas pelos seus números para os leads com consentimento. Informe o motivo da liberação (mínimo 10 caracteres):`,
+      );
+      if (motivo === null) return;
+      if (motivo.trim().length < 10) {
+        toast.error("Informe um motivo com pelo menos 10 caracteres.");
+        return;
+      }
+      setAcaoCampanhaId(campanha.id);
+      try {
+        await liberarDisparoCampanhaWa(campanha.id, motivo.trim());
+        toast.success(
+          "Disparo liberado. O envio começa quando o agendador do worker estiver ativo.",
+        );
+        await carregarDadosReais();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Falha ao liberar o disparo.");
+      } finally {
+        setAcaoCampanhaId(null);
+      }
+      return;
+    }
+    setAcaoCampanhaId(campanha.id);
+    try {
+      await segurarDisparoCampanhaWa(campanha.id);
+      toast.success("Disparo suspenso. A fila foi preservada.");
+      await carregarDadosReais();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha ao suspender o disparo.");
     } finally {
       setAcaoCampanhaId(null);
     }
@@ -867,6 +907,25 @@ export function WaCampanhas({ onConectar }: { onConectar?: () => void } = {}) {
                                   ) : (
                                     <>
                                       <Pause className="h-3.5 w-3.5 text-amber-400" /> Pausar
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                              {(c.status === "em_execucao" || c.status === "agendada") && (
+                                <button
+                                  onClick={() => void alterarDisparoCampanha(c, !c.dispatchEnabled)}
+                                  disabled={acaoCampanhaId === c.id}
+                                  className="w-full px-2.5 py-1.5 text-xs text-white hover:bg-white/5 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                                >
+                                  {c.dispatchEnabled ? (
+                                    <>
+                                      <Pause className="h-3.5 w-3.5 text-amber-400" /> Segurar
+                                      disparo
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="h-3.5 w-3.5 text-emerald-400" /> Liberar
+                                      disparo
                                     </>
                                   )}
                                 </button>

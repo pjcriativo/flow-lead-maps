@@ -1,3 +1,5 @@
+-- NÃO APLICAR ANTES DA HOMOLOGAÇÃO DO ENVIO DE CAMPANHAS (movido de migrations/ em 2026-10-21
+-- para não ser aplicado por engano). Liga o disparo automático das campanhas LIBERADAS.
 -- Agendamento do worker de envio de campanhas WhatsApp (2026-10-21).
 --
 -- AUTORIZAÇÃO: ligado por ordem explícita do dono em 2026-10-21 ("sim" ao envio automático),

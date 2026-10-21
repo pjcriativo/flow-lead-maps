@@ -128,6 +128,9 @@ type WaRemoteInstance = {
   token: string | null;
   owner: string;
   connected: boolean;
+  /** URL de webhook gravada na Evolution (vazia = a instância não entrega eventos ao sistema). */
+  webhook: string;
+  events: string;
 };
 
 function remoteText(record: Record<string, unknown>, ...keys: string[]): string {
@@ -201,6 +204,8 @@ async function listarInstanciasRemotas(): Promise<WaRemoteInstance[] | null> {
             item.owner ?? item.Owner ?? item.jid ?? item.Jid ?? item.myJid ?? item.MyJid,
           ),
           connected: (item.connected ?? item.Connected) === true,
+          webhook: remoteText(item, "webhook", "Webhook", "webhookUrl"),
+          events: remoteText(item, "events", "Events"),
         },
       ];
     });
@@ -522,6 +527,34 @@ export async function excluirInstanciaDaOrg(
 export type WaStatus = { connected: boolean; loggedIn: boolean; name: string; jid: string };
 
 /**
+ * Eventos que o sistema consome da Evolution GO. MESSAGE alimenta a Central de Conversas;
+ * CONNECTION mantém a saúde do chip. (READ_RECEIPT fica de fora até o parser de recibos do
+ * wa-webhook ser homologado: o payload de Receipt da Evolution não traz o id no formato que
+ * extractProviderMessageId espera.) QRCODE é necessário só durante o pareamento.
+ */
+export const EVENTOS_RECEBIMENTO = ["MESSAGE", "CONNECTION"] as const;
+export const EVENTOS_PAREAMENTO = [...EVENTOS_RECEBIMENTO, "QRCODE"] as const;
+
+/** URL que a Evolution chama de volta (o segredo vai na própria URL: ela não envia headers). */
+export function urlWebhookRecebimento(): string | null {
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  const secret = Deno.env.get("WA_WEBHOOK_SECRET") ?? "";
+  if (!base || !secret) return null;
+  return `${base}/functions/v1/wa-webhook?k=${encodeURIComponent(secret)}`;
+}
+
+/** Só o host+caminho do webhook, sem o segredo — seguro para relatórios e logs. */
+export function webhookSemSegredo(webhook: string): string {
+  if (!webhook) return "(vazio)";
+  try {
+    const url = new URL(webhook);
+    return `${url.host}${url.pathname}`;
+  } catch {
+    return "(invalido)";
+  }
+}
+
+/**
  * Classificação do erro de pareamento — decide se vale RECRIAR a sessão remota.
  * - provider_rejected: a Evolution recusou a chamada de forma explícita (não recuperável aqui).
  * - already_logged_in: a sessão já está pareada; não há QR/código a gerar (nunca recriar!).
@@ -829,10 +862,17 @@ export async function pairInstancia(
 
 /** POST /instance/connect: grava as assinaturas de eventos e agenda o StartClient no servidor. */
 async function iniciarPareamentoInstancia(token: string): Promise<void> {
+  // Evolution GO grava instance.Webhook = data.WebhookUrl a cada /instance/connect (lido em
+  // instance_service.Connect). Um connect SEM webhookUrl apaga o webhook e a instância passa a
+  // não entregar nenhuma mensagem recebida — foi o que deixou a Central de Conversas muda.
+  const webhookUrl = urlWebhookRecebimento();
   const connect = await fetch(`${waBase()}/instance/connect`, {
     method: "POST",
     headers: { apikey: token, "Content-Type": "application/json" },
-    body: JSON.stringify({ subscribe: ["MESSAGE", "CONNECTION", "QRCODE"] }),
+    body: JSON.stringify({
+      ...(webhookUrl ? { webhookUrl } : {}),
+      subscribe: [...EVENTOS_PAREAMENTO],
+    }),
   });
   const payload: unknown = await connect.json().catch(() => null);
   if (!connect.ok) {
@@ -1687,7 +1727,7 @@ export async function instanciaConversaDaOrg(
 export async function definirWebhookInstancia(
   token: string,
   webhookUrl: string,
-  eventos: string[] = ["MESSAGE"], // Evolution GO usa nomes MAIÚSCULOS (MESSAGE/CONNECTION/QRCODE)
+  eventos: string[] = [...EVENTOS_RECEBIMENTO], // Evolution GO usa nomes MAIÚSCULOS
 ): Promise<{ ok: boolean; status: number; body?: string }> {
   try {
     const r = await fetch(`${waBase()}/instance/connect`, {
@@ -1704,6 +1744,69 @@ export async function definirWebhookInstancia(
     );
     return { ok: false, status: 503 };
   }
+}
+
+export type ResultadoWebhook = {
+  nome: string;
+  situacao: "ja_configurado" | "configurado" | "falhou" | "ignorado";
+  detalhe?: string;
+};
+
+/**
+ * Reaplica o webhook de recebimento nas instâncias CONECTADAS da Evolution que estão sem ele
+ * (ou apontando para outro lugar). Não desconecta nada: com o cliente em execução, o
+ * /instance/connect da Evolution GO só atualiza configurações em memória (UpdateInstanceSettings)
+ * e StartClient retorna de imediato se já há conexão. Depois de aplicar, relê o estado para
+ * provar que a instância continua conectada e com o webhook gravado.
+ */
+export async function reconciliarWebhooks(
+  admin: Admin,
+  opcoes: { apenasNomes?: string[]; aplicar?: boolean } = {},
+): Promise<ResultadoWebhook[]> {
+  const alvo = urlWebhookRecebimento();
+  if (!alvo) return [{ nome: "*", situacao: "ignorado", detalhe: "webhook_indisponivel" }];
+  const remotas = await listarInstanciasRemotas();
+  if (!remotas) return [{ nome: "*", situacao: "ignorado", detalhe: "evolution_indisponivel" }];
+  const { data: locais } = await admin
+    .from("wa_instancias")
+    .select("id, nome")
+    .is("deleted_at", null);
+  const nomesLocais = new Set<string>((locais ?? []).map((row: { nome: string }) => row.nome));
+  const resultados: ResultadoWebhook[] = [];
+  for (const remota of remotas) {
+    if (!nomesLocais.has(remota.name)) continue;
+    if (opcoes.apenasNomes && !opcoes.apenasNomes.includes(remota.name)) continue;
+    if (!remota.connected) {
+      resultados.push({ nome: remota.name, situacao: "ignorado", detalhe: "nao_conectada" });
+      continue;
+    }
+    const eventosOk = EVENTOS_RECEBIMENTO.every((evento) => remota.events.includes(evento));
+    if (remota.webhook === alvo && eventosOk) {
+      resultados.push({ nome: remota.name, situacao: "ja_configurado" });
+      continue;
+    }
+    if (opcoes.aplicar === false) {
+      resultados.push({ nome: remota.name, situacao: "ignorado", detalhe: "somente_leitura" });
+      continue;
+    }
+    const token = remota.token;
+    if (!token) {
+      resultados.push({ nome: remota.name, situacao: "falhou", detalhe: "sem_token" });
+      continue;
+    }
+    const aplicado = await definirWebhookInstancia(token, alvo);
+    const depois = aplicado.ok ? await observarStatusInstancia(token, 6_000) : null;
+    const remotasDepois = aplicado.ok ? await listarInstanciasRemotas() : null;
+    const atual = remotasDepois?.find((item) => item.name === remota.name);
+    const mantevConexao = Boolean(depois && depois.ok && depois.connected);
+    const gravado = atual?.webhook === alvo;
+    resultados.push({
+      nome: remota.name,
+      situacao: aplicado.ok && mantevConexao && gravado ? "configurado" : "falhou",
+      detalhe: `http=${aplicado.status} conectada=${mantevConexao} gravado=${gravado}`,
+    });
+  }
+  return resultados;
 }
 
 /** Registra o envio (base da graduação, do histórico e do revezamento). */

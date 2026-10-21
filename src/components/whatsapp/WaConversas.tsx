@@ -51,6 +51,7 @@ import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { supabase } from "@/integrations/supabase/client";
 import { listarMembrosDaOrg, type Membro } from "@/services/membros";
 import {
+  registrarUsoScriptWa,
   acaoConversaWa,
   atualizarLeadCrm,
   consultarConversasWa,
@@ -187,9 +188,7 @@ function ContactAvatar({
 }) {
   return (
     <Avatar className={cn("ring-1 ring-border", className)}>
-      {src ? (
-        <AvatarImage src={src} alt={nome} className="object-cover" onError={onError} />
-      ) : null}
+      {src ? <AvatarImage src={src} alt={nome} className="object-cover" onError={onError} /> : null}
       <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
         {iniciaisDoContato(nome, numero)}
       </AvatarFallback>
@@ -652,6 +651,8 @@ export function WaConversas() {
     setComposerTab("mensagem");
     textareaRef.current?.focus();
     toast.success(`Script "${script.nome}" carregado na composição.`);
+    // Uso real persistido no banco (alimenta o ranking e os indicadores da tela de Scripts).
+    void registrarUsoScriptWa(script.id);
   };
 
   // Marcar como Cliente

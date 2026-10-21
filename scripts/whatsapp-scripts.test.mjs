@@ -198,8 +198,18 @@ test("24. Atividade: card 'Atividade recente' com 6 eventos cronológicos e badg
 
 // 25. Organização A/B
 test("25. Organização A/B: isolamento de scripts por tenancy", () => {
-  assert.match(waService, /listarScriptsLocais/);
-  assert.match(waService, /salvarScriptsLocais/);
+  // Scripts persistidos no Supabase (RLS por org) — o navegador não é mais a fonte.
+  // Toda leitura e escrita filtra pela organização ativa.
+  const crud = waService.slice(
+    waService.indexOf("async function carregarScriptsDoBanco"),
+    waService.indexOf("export async function obterDadosScriptsWa"),
+  );
+  assert.ok(crud.length > 0);
+  const filtrosOrg = crud.match(/\.eq\("org_id", (orgId|context\.orgId)\)/g) ?? [];
+  assert.ok(filtrosOrg.length >= 5, "cada operação de script filtra pela organização");
+  assert.match(crud, /org_id: context\.orgId/);
+  assert.match(crud, /wa_register_script_use/);
+  assert.doesNotMatch(waService, /listarScriptsLocais|salvarScriptsLocais/);
 });
 
 // 26. Preservação dos scripts legados

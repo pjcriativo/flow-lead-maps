@@ -13,7 +13,17 @@ type CampaignAction =
   | "pause"
   | "resume"
   | "cancel"
-  | "reschedule";
+  | "reschedule"
+  | "release_dispatch"
+  | "hold_dispatch";
+
+/** Mensagens claras para as recusas de liberação de disparo (o resto segue a mensagem genérica). */
+const RECUSAS_LIBERACAO: Record<string, string> = {
+  "campaign is not approved":
+    "A campanha precisa estar aprovada (fila preparada) antes da liberação.",
+  "campaign cannot be released": "Só campanhas ativas ou agendadas podem ter o disparo liberado.",
+  "release reason is required": "Informe o motivo da liberação (mínimo 10 caracteres).",
+};
 
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -32,19 +42,19 @@ function timezone(value: unknown): string {
     new Intl.DateTimeFormat("pt-BR", { timeZone: candidate }).format();
     return candidate;
   } catch {
-    throw new Error("Fuso horÃ¡rio invÃ¡lido.");
+    throw new Error("Fuso horário inválido.");
   }
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
-  if (req.method !== "POST") return json({ error: "MÃ©todo nÃ£o permitido." }, 405, req);
+  if (req.method !== "POST") return json({ error: "Método não permitido." }, 405, req);
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return json({ error: "Dados invÃ¡lidos." }, 422, req);
+    return json({ error: "Dados inválidos." }, 422, req);
   }
   const action = text(body.action) as CampaignAction | null;
   if (
@@ -58,9 +68,11 @@ Deno.serve(async (req) => {
       "resume",
       "cancel",
       "reschedule",
+      "release_dispatch",
+      "hold_dispatch",
     ].includes(action)
   ) {
-    return json({ error: "AÃ§Ã£o invÃ¡lida." }, 422, req);
+    return json({ error: "Ação inválida." }, 422, req);
   }
 
   const admin = createClient(
@@ -176,7 +188,7 @@ Deno.serve(async (req) => {
 
     if (action === "eligibility") {
       const listId = text(body.list_id);
-      if (!listId) return json({ error: "Lista invÃ¡lida." }, 422, req);
+      if (!listId) return json({ error: "Lista inválida." }, 422, req);
       const { data: leads, error } = await admin
         .from("leads")
         .select(
@@ -210,10 +222,10 @@ Deno.serve(async (req) => {
       const campaignType = text(body.campaign_type) ?? "prospeccao";
       const requestedSchedule = body.scheduled_at == null ? null : schedule(body.scheduled_at);
       if (!name || !listId || !message) {
-        return json({ error: "Nome, lista e mensagem sÃ£o obrigatÃ³rios." }, 422, req);
+        return json({ error: "Nome, lista e mensagem são obrigatórios." }, 422, req);
       }
       if (body.scheduled_at != null && !requestedSchedule) {
-        return json({ error: "Agendamento invÃ¡lido." }, 422, req);
+        return json({ error: "Agendamento inválido." }, 422, req);
       }
       const { data, error } = await admin.rpc("wa_create_campaign_draft", {
         p_org: context.orgId,
@@ -230,14 +242,14 @@ Deno.serve(async (req) => {
     }
 
     const campaignId = text(body.campaign_id);
-    if (!campaignId) return json({ error: "Campanha invÃ¡lida." }, 422, req);
+    if (!campaignId) return json({ error: "Campanha inválida." }, 422, req);
 
     if (action === "prepare") {
       const purpose = text(body.purpose);
-      if (!purpose) return json({ error: "Informe a finalidade da comunicaÃ§Ã£o." }, 422, req);
+      if (!purpose) return json({ error: "Informe a finalidade da comunicação." }, 422, req);
       const requestedSchedule = body.scheduled_at == null ? null : schedule(body.scheduled_at);
       if (body.scheduled_at != null && !requestedSchedule) {
-        return json({ error: "Agendamento invÃ¡lido." }, 422, req);
+        return json({ error: "Agendamento inválido." }, 422, req);
       }
       const { data, error } = await admin.rpc("wa_prepare_campaign", {
         p_org: context.orgId,
@@ -253,7 +265,7 @@ Deno.serve(async (req) => {
 
     if (action === "reschedule") {
       const requestedSchedule = schedule(body.scheduled_at);
-      if (!requestedSchedule) return json({ error: "Agendamento invÃ¡lido." }, 422, req);
+      if (!requestedSchedule) return json({ error: "Agendamento inválido." }, 422, req);
       const { data, error } = await admin.rpc("wa_reschedule_campaign", {
         p_org: context.orgId,
         p_campaign: campaignId,
@@ -272,10 +284,14 @@ Deno.serve(async (req) => {
       p_action: action,
       p_reason: text(body.reason),
     });
-    if (error) throw error;
+    if (error) {
+      const recusa = RECUSAS_LIBERACAO[String(error.message ?? "")];
+      if (recusa) return json({ error: recusa }, 409, req);
+      throw error;
+    }
     return json({ ok: true, status: data }, 200, req);
   } catch (error) {
     console.error("wa campaign control failed", error instanceof Error ? error.message : "unknown");
-    return json({ error: "NÃ£o foi possÃ­vel concluir a operaÃ§Ã£o da campanha." }, 409, req);
+    return json({ error: "Não foi possível concluir a operação da campanha." }, 409, req);
   }
 });

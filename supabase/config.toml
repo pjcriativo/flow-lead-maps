@@ -151,3 +151,8 @@ verify_jwt = false
 # Backend-only: sonda o pareamento real numa instância temporária (sempre apagada).
 # Protegida por CRON_SECRET; disparada pelo banco via pg_net.
 verify_jwt = false
+
+[functions.wa-automation-runner]
+# Backend-only: executor das automações WhatsApp. Protegido por CRON_SECRET/WA_WORKER_SECRET.
+# Execução real depende de 3 travas (regra, organização e plataforma); nunca envia WhatsApp.
+verify_jwt = false

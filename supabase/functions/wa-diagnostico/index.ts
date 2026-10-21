@@ -14,6 +14,7 @@ import {
   inicializarCofreWa,
   instanciaDaOrgComToken,
   jidCanonicoWhatsapp,
+  reconciliarWebhooks,
   selecionarChipParaEnvio,
   waBase,
   waGlobalKey,
@@ -300,6 +301,12 @@ Deno.serve(async (request) => {
     .clone()
     .json()
     .catch(() => ({}));
+  if (body.modo === "webhooks") {
+    // aplicar=false só relata; aplicar=true reaplica o webhook nos chips CONECTADOS sem ele.
+    // Nunca desconecta, nunca envia mensagem, nunca cria/exclui instância.
+    const resultados = await reconciliarWebhooks(admin, { aplicar: body.aplicar === true });
+    return json({ configurado: true, resultados });
+  }
   if (body.modo === "rodizio") {
     // Simulação SEM ENVIO: para cada chip ativo, qual chip assumiria um envio preso a ele agora.
     // Pode revalidar a saúde ao vivo (GET /instance/status), que não inicia sessão nem envia nada.

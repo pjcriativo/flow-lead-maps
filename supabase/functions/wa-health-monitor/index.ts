@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { json } from "../_shared/cors.ts";
-import { inicializarCofreWa, observarStatusInstancia } from "../_shared/wa.ts";
+import { inicializarCofreWa, observarStatusInstancia, reconciliarWebhooks } from "../_shared/wa.ts";
 import { calculateOperationalHealth } from "../_shared/whatsapp-instance-health.ts";
 
 type HealthRow = {
@@ -39,9 +39,17 @@ async function mapWithConcurrency<T>(
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Método não permitido." }, 405);
-  const configuredSecret = Deno.env.get("WA_WORKER_SECRET") ?? "";
-  const suppliedSecret = request.headers.get("x-wa-worker-secret") ?? "";
-  if (!configuredSecret || !constantTimeEqual(configuredSecret, suppliedSecret)) {
+  // WA_WORKER_SECRET (chamada operacional) ou CRON_SECRET (pg_cron, segredo guardado no vault).
+  const workerSecret = Deno.env.get("WA_WORKER_SECRET") ?? "";
+  const cronSecret = Deno.env.get("CRON_SECRET") ?? "";
+  const suppliedWorker = request.headers.get("x-wa-worker-secret") ?? "";
+  const suppliedCron = request.headers.get("x-cron-secret") ?? "";
+  const authorized =
+    (workerSecret !== "" &&
+      suppliedWorker !== "" &&
+      constantTimeEqual(workerSecret, suppliedWorker)) ||
+    (cronSecret !== "" && suppliedCron !== "" && constantTimeEqual(cronSecret, suppliedCron));
+  if (!authorized) {
     return json({ error: "Não autorizado." }, 401);
   }
 
@@ -69,6 +77,8 @@ Deno.serve(async (request) => {
     .from("wa_instancias")
     .select("id,org_id,provider_status,last_provider_success_at,health_failure_count")
     .neq("status", "queimada")
+    // Chips arquivados não têm sessão na Evolution: checá-los só gera falhas e alertas falsos.
+    .is("deleted_at", null)
     .or(`next_health_check_at.is.null,next_health_check_at.lte.${new Date().toISOString()}`)
     .order("next_health_check_at", { ascending: true, nullsFirst: true })
     .limit(limit);
@@ -120,5 +130,13 @@ Deno.serve(async (request) => {
     else if (operationalHealth === "unavailable") summary.unavailable++;
     else summary.degraded++;
   });
-  return json(summary);
+  // Webhook: o /instance/connect da Evolution GO sobrescreve o webhook; se uma reconexão ou um
+  // reinício do servidor o apagou, a Central de Conversas para de receber. Reaplica nos chips
+  // CONECTADOS sem webhook (não desconecta nada; ver reconciliarWebhooks).
+  const webhooks = await reconciliarWebhooks(admin).catch(() => []);
+  return json({
+    ...summary,
+    webhooks_reaplicados: webhooks.filter((item) => item.situacao === "configurado").length,
+    webhooks_com_falha: webhooks.filter((item) => item.situacao === "falhou").length,
+  });
 });
