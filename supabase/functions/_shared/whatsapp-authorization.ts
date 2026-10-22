@@ -14,12 +14,12 @@ export type AuthorizedWhatsappContext = {
 };
 
 export class WhatsappAuthorizationError extends Error {
-  constructor(
-    public readonly status: 401 | 403 | 404 | 409 | 422,
-    message: string,
-  ) {
+  readonly status: 401 | 403 | 404 | 409 | 422;
+
+  constructor(status: 401 | 403 | 404 | 409 | 422, message: string) {
     super(message);
     this.name = "WhatsappAuthorizationError";
+    this.status = status;
   }
 }
 
@@ -35,19 +35,32 @@ export async function authorizeWhatsappRequest(input: {
   }
 
   const userId = userData.user.id;
-  if (!(await acessoFerramentaLiberado(input.userClient, userId))) {
-    throw new WhatsappAuthorizationError(403, "Acesso não autorizado.");
-  }
+  // As verificações são independentes: disparam juntas (antes eram 5 viagens em sequência) e as
+  // recusas continuam avaliadas na MESMA ordem de antes (acesso, organização, vínculo, papel).
+  const acessoPromise = acessoFerramentaLiberado(input.userClient, userId);
 
   const orgId = normalizeOrganizationId(input.requestedOrgId);
   if (!orgId) {
+    if (!(await acessoPromise)) throw new WhatsappAuthorizationError(403, "Acesso não autorizado.");
     throw new WhatsappAuthorizationError(422, "Selecione uma organização ativa.");
   }
 
-  const [{ data: organization }, { data: profile }] = await Promise.all([
-    input.admin.from("orgs").select("id").eq("id", orgId).maybeSingle(),
-    input.admin.from("profiles").select("is_super_admin").eq("id", userId).maybeSingle(),
-  ]);
+  const [acessoLiberado, { data: organization }, { data: profile }, { data: membership }, papeis] =
+    await Promise.all([
+      acessoPromise,
+      input.admin.from("orgs").select("id").eq("id", orgId).maybeSingle(),
+      input.admin.from("profiles").select("is_super_admin").eq("id", userId).maybeSingle(),
+      input.admin
+        .from("memberships")
+        .select("papel")
+        .eq("org_id", orgId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+      input.admin.from("org_papeis").select("papel,ativo").eq("org_id", orgId),
+    ]);
+  if (!acessoLiberado) {
+    throw new WhatsappAuthorizationError(403, "Acesso não autorizado.");
+  }
   if (!organization) {
     throw new WhatsappAuthorizationError(404, "Organização não encontrada.");
   }
@@ -55,21 +68,12 @@ export async function authorizeWhatsappRequest(input: {
   const isSuperAdmin = profile?.is_super_admin === true;
   let role = "super_admin";
   if (!isSuperAdmin) {
-    const { data: membership } = await input.admin
-      .from("memberships")
-      .select("papel")
-      .eq("org_id", orgId)
-      .eq("user_id", userId)
-      .maybeSingle();
     if (!membership) {
       throw new WhatsappAuthorizationError(403, "Sem acesso à organização selecionada.");
     }
-    const { data: configuredRole } = await input.admin
-      .from("org_papeis")
-      .select("ativo")
-      .eq("org_id", orgId)
-      .eq("papel", membership.papel)
-      .maybeSingle();
+    const configuredRole = (papeis.data ?? []).find(
+      (item: { papel: string; ativo: boolean | null }) => item.papel === membership.papel,
+    );
     if (configuredRole?.ativo === false) {
       throw new WhatsappAuthorizationError(403, "Papel desativado nesta organização.");
     }

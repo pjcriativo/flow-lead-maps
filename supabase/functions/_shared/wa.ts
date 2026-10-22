@@ -47,9 +47,26 @@ import {
 let _waBaseCache: string | null = null;
 let _waKeyCache: string | null = null;
 
+let _cofreCarregadoEm = 0;
+const COFRE_TTL_MS = 60_000;
+
 export async function inicializarCofreWa(admin: Admin): Promise<void> {
-  _waBaseCache = await resolverChave(admin, "EVOLUTION_URL");
-  _waKeyCache = await resolverChave(admin, "EVOLUTION_API_KEY");
+  // Cada envio pagava duas consultas + decifragem. O isolate é reaproveitado entre requisições:
+  // reutiliza por 60 s (uma chave trocada vale em até 1 minuto) e lê as duas em paralelo.
+  if (
+    _waBaseCache !== null &&
+    _waKeyCache !== null &&
+    Date.now() - _cofreCarregadoEm < COFRE_TTL_MS
+  ) {
+    return;
+  }
+  const [base, chave] = await Promise.all([
+    resolverChave(admin, "EVOLUTION_URL"),
+    resolverChave(admin, "EVOLUTION_API_KEY"),
+  ]);
+  _waBaseCache = base;
+  _waKeyCache = chave;
+  _cofreCarregadoEm = Date.now();
 }
 
 export function waBase(): string {

@@ -54,6 +54,7 @@ import {
   type WaInstanciaAtendimento,
 } from "@/lib/whatsapp-numero-atendimento";
 import { escolherOperacaoEnvio, type OperacaoEnvio } from "@/lib/whatsapp-envio";
+import { leituraAutomatica, mesclarListaComDetalhe } from "@/lib/whatsapp-conversas-estado";
 import { dashboardUrlForSection } from "@/lib/dashboard-navigation";
 import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { supabase } from "@/integrations/supabase/client";
@@ -114,6 +115,8 @@ export interface MensagemChat {
   texto: string;
   horario: string;
   statusEnvio?: "pendente" | "enviado" | "entregue" | "lido" | "falha" | "incerto";
+  /** Chave de idempotência do envio manual: liga o balão local ao registro do servidor. */
+  operationId?: string;
   anexo?: AnexoMsg;
 }
 
@@ -210,6 +213,14 @@ function ChipAtendimentoPainel({ chip }: { chip?: WaInstanciaAtendimento | null 
     </>
   );
 }
+
+type EnvioLocal = {
+  operationId: string;
+  conversaId: string;
+  texto: string;
+  horario: string;
+  statusEnvio: NonNullable<MensagemChat["statusEnvio"]>;
+};
 
 export interface ContatoConversa {
   id: string;
@@ -338,6 +349,15 @@ export function WaConversas() {
   // registrado). Editar o texto cria uma nova operação.
   const operacaoEnvioRef = useRef<OperacaoEnvio | null>(null);
   const [envioNaoConfirmado, setEnvioNaoConfirmado] = useState<string | null>(null);
+  // Erro de envio mostrado NO compositor (nada de notificação flutuante para o envio).
+  const [erroEnvio, setErroEnvio] = useState<string | null>(null);
+  // Balões de envios em andamento/recém-confirmados, exibidos na hora e substituídos pelo
+  // registro do servidor (mesmo operation_id) assim que ele chega — sem duplicar.
+  const [enviosLocais, setEnviosLocais] = useState<EnvioLocal[]>([]);
+  const [abaVisivel, setAbaVisivel] = useState(
+    () => typeof document === "undefined" || document.visibilityState === "visible",
+  );
+  const leituraEnviadaRef = useRef<string | null>(null);
   // Números ativos da organização, para continuar uma conversa cujo número original foi removido.
   const [chipsAtivos, setChipsAtivos] = useState<
     Array<{ id: string; nome: string; numero: string | null }>
@@ -380,8 +400,28 @@ export function WaConversas() {
 
   // Contato Ativo Selecionado
   const contatoAtivo = useMemo(() => {
-    return contatos.find((c) => c.id === contatoAtivoId) ?? contatos[0] ?? null;
+    // Só há conversa aberta quando o atendente escolhe uma. Abrir a primeira sozinha a mostrava
+    // como "vista" (e a leitura automática a marcaria como lida) sem ninguém ter olhado.
+    return contatos.find((c) => c.id === contatoAtivoId) ?? null;
   }, [contatos, contatoAtivoId]);
+  const mensagensExibidas = useMemo<MensagemChat[]>(() => {
+    if (!contatoAtivo) return [];
+    const locais = enviosLocais
+      .filter(
+        (local) =>
+          local.conversaId === contatoAtivo.id &&
+          !contatoAtivo.mensagens.some((mensagem) => mensagem.operationId === local.operationId),
+      )
+      .map((local): MensagemChat => ({
+        id: `local-${local.operationId}`,
+        direcao: "out",
+        texto: local.texto,
+        horario: local.horario,
+        statusEnvio: local.statusEnvio,
+        operationId: local.operationId,
+      }));
+    return [...contatoAtivo.mensagens, ...locais];
+  }, [contatoAtivo, enviosLocais]);
   const avatarRefreshesRef = useRef(new Set<string>());
 
   const renovarAvatar = useCallback(async (conversaId: string) => {
@@ -461,8 +501,7 @@ export function WaConversas() {
           assignedTo: conversation.assigned_to ?? undefined,
           chip: conversation.instancia,
         }));
-        setContatos(mapped);
-        setContatoAtivoId((current) => current || mapped[0]?.id || "");
+        setContatos((anteriores) => mesclarListaComDetalhe(anteriores, mapped));
         try {
           const avatars = await sincronizarAvataresConversas(
             mapped.map((contact) => contact.id),
@@ -510,6 +549,14 @@ export function WaConversas() {
         if (signal?.aborted) return;
         setPapelAtual(snapshot.role);
         setChipsAtivos(snapshot.chips_ativos ?? []);
+        const operacoesNoServidor = new Set(
+          snapshot.messages.flatMap((message) =>
+            message.client_operation_id ? [message.client_operation_id] : [],
+          ),
+        );
+        setEnviosLocais((locais) =>
+          locais.filter((local) => !operacoesNoServidor.has(local.operationId)),
+        );
         const statusMap: Record<string, MensagemChat["statusEnvio"]> = {
           pending: "pendente",
           sent: "enviado",
@@ -583,6 +630,7 @@ export function WaConversas() {
                       message.provider_occurred_at ?? message.criado_em,
                     ).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
                     statusEnvio: statusMap[message.status],
+                    operationId: message.client_operation_id ?? undefined,
                   })),
                 },
           ),
@@ -607,7 +655,7 @@ export function WaConversas() {
   // Scroll automático ao fim do chat
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [contatoAtivo?.mensagens]);
+  }, [mensagensExibidas.length]);
 
   // Supabase Realtime Subscription para novas mensagens recebidas
   useEffect(() => {
@@ -695,6 +743,34 @@ export function WaConversas() {
     };
   }, [carregarDadosIniciais, carregarDetalhes, contatoAtivoId]);
 
+  useEffect(() => {
+    const aoMudarVisibilidade = () => setAbaVisivel(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
+    return () => document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+  }, []);
+
+  // Conversa ABERTA e com a aba visível: as mensagens que chegam nela contam como vistas. Sem isso
+  // o contador continuava subindo (e o selo ficava) em uma conversa que o atendente está lendo.
+  useEffect(() => {
+    const chave = leituraAutomatica({
+      conversaAbertaId: contatoAtivo?.id ?? null,
+      naoLidas: contatoAtivo?.naoLidas ?? 0,
+      abaVisivel,
+      ultimaChaveEnviada: leituraEnviadaRef.current,
+    });
+    if (!contatoAtivo || !chave) return;
+    leituraEnviadaRef.current = chave;
+    const lidas = contatoAtivo.naoLidas;
+    const conversaId = contatoAtivo.id;
+    setContatos((prev) =>
+      prev.map((item) => (item.id === conversaId ? { ...item, naoLidas: 0 } : item)),
+    );
+    setKpis((atual) => ({ ...atual, naoLidas: Math.max(0, atual.naoLidas - lidas) }));
+    void marcarConversaLida(conversaId).catch(() => {
+      leituraEnviadaRef.current = null;
+    });
+  }, [contatoAtivo, abaVisivel]);
+
   // Selecionar conversa
   const selecionarContato = useCallback((c: ContatoConversa) => {
     setContatoAtivoId(c.id);
@@ -738,37 +814,66 @@ export function WaConversas() {
 
     enviandoRef.current = true;
     setEnviando(true);
-    const operacao = escolherOperacaoEnvio(operacaoEnvioRef.current, contatoAtivo.id, texto, () =>
+    setErroEnvio(null);
+    setEnvioNaoConfirmado(null);
+    const conversaId = contatoAtivo.id;
+    const operacao = escolherOperacaoEnvio(operacaoEnvioRef.current, conversaId, texto, () =>
       crypto.randomUUID(),
     );
     operacaoEnvioRef.current = operacao;
     const operationId = operacao.operationId;
+    const atualizarLocal = (statusEnvio: EnvioLocal["statusEnvio"]) =>
+      setEnviosLocais((locais) =>
+        locais.map((local) =>
+          local.operationId === operationId ? { ...local, statusEnvio } : local,
+        ),
+      );
+    // Balão imediato (relógio) — o servidor o substitui pelo registro real com o mesmo operationId.
+    setEnviosLocais((locais) => [
+      ...locais.filter((local) => local.operationId !== operationId),
+      {
+        operationId,
+        conversaId,
+        texto,
+        horario: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        statusEnvio: "pendente",
+      },
+    ]);
 
     try {
-      const desfecho = await enviarRespostaConversa(contatoAtivo.id, texto, operationId);
+      const desfecho = await enviarRespostaConversa(conversaId, texto, operationId);
       if (desfecho.tipo === "confirmado") {
-        // Só limpa o texto depois que o backend CONFIRMOU o registro e o envio.
+        // Só limpa o texto depois que o backend CONFIRMOU o registro e o envio. A confirmação
+        // aparece no próprio balão (1 check); entrega e leitura chegam depois pelo WhatsApp.
         operacaoEnvioRef.current = null;
-        setEnvioNaoConfirmado(null);
         setTextoMensagem("");
-        toast.success("Mensagem enviada. A entrega e a leitura são confirmadas pelo WhatsApp.");
+        atualizarLocal(
+          desfecho.resultado.status === "read"
+            ? "lido"
+            : desfecho.resultado.status === "delivered"
+              ? "entregue"
+              : "enviado",
+        );
       } else if (desfecho.tipo === "recusado") {
         // Nada saiu: a próxima tentativa é uma nova operação.
         operacaoEnvioRef.current = null;
-        setEnvioNaoConfirmado(null);
-        toast.error(desfecho.mensagem);
+        setErroEnvio(desfecho.mensagem);
+        if (desfecho.resultado) atualizarLocal("falha");
+        else
+          setEnviosLocais((locais) => locais.filter((local) => local.operationId !== operationId));
       } else {
         // Pode ter saído: mantém texto e operação. Nunca reenvia sozinho.
         setEnvioNaoConfirmado(desfecho.mensagem);
-        toast.warning(desfecho.mensagem);
+        atualizarLocal("incerto");
       }
-      await carregarDetalhes(contatoAtivo.id).catch(() => undefined);
-      await carregarDadosIniciais().catch(() => undefined);
     } finally {
       enviandoRef.current = false;
       setEnviando(false);
       textareaRef.current?.focus();
     }
+    // Atualiza só ESTA conversa, em segundo plano. A lista inteira é atualizada pelo Realtime
+    // (mudança em wa_conversas); recarregá-la aqui mantinha "Enviando…" na tela por vários segundos.
+    void carregarDetalhes(conversaId).catch(() => undefined);
   };
 
   // Resposta Rápida (Script)
@@ -1597,7 +1702,7 @@ export function WaConversas() {
                 </div>
 
                 {/* Balões de Mensagem */}
-                {contatoAtivo.mensagens.map((m) => {
+                {mensagensExibidas.map((m) => {
                   const ehSaida = m.direcao === "out";
                   return (
                     <div
@@ -1818,6 +1923,7 @@ export function WaConversas() {
                     value={textoMensagem}
                     onChange={(e) => {
                       setTextoMensagem(e.target.value);
+                      setErroEnvio(null);
                       if (operacaoEnvioRef.current?.texto !== e.target.value.trim()) {
                         setEnvioNaoConfirmado(null);
                       }
@@ -1833,6 +1939,15 @@ export function WaConversas() {
                     className="w-full resize-none border-none bg-transparent p-0 text-xs text-white placeholder:text-home-muted/50 focus-visible:ring-0 leading-relaxed"
                   />
 
+                  {erroEnvio && (
+                    <p
+                      className="flex items-center gap-1.5 pt-1 text-[11px] text-rose-400"
+                      role="alert"
+                    >
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      {erroEnvio}
+                    </p>
+                  )}
                   {envioNaoConfirmado && (
                     <p
                       className="flex items-center gap-1.5 pt-1 text-[11px] text-amber-400"

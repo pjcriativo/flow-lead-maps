@@ -10,7 +10,32 @@ export type ActiveOrganizationContext = {
 
 const storageKey = (userId: string) => `flow.activeOrganization.${userId}`;
 
+// Cache curto do contexto: cada chamada ao backend de WhatsApp pedia o contexto de novo (uma
+// verificação de usuário na rede + duas consultas), e a recarga da Central de Conversas faz
+// várias chamadas seguidas. O backend REVALIDA usuário, organização e papel em toda requisição,
+// então o cache só evita viagens repetidas; ele nunca concede acesso.
+const CONTEXT_TTL_MS = 30_000;
+let contextCache: { key: string; expiresAt: number; value: ActiveOrganizationContext } | null =
+  null;
+let authListenerRegistered = false;
+
+export function clearActiveOrganizationCache(): void {
+  contextCache = null;
+}
+
+function registerCacheInvalidation(): void {
+  if (authListenerRegistered || typeof window === "undefined") return;
+  authListenerRegistered = true;
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT" || event === "USER_UPDATED" || event === "SIGNED_IN") {
+      clearActiveOrganizationCache();
+    }
+  });
+  window.addEventListener("flow:active-organization-changed", clearActiveOrganizationCache);
+}
+
 export async function setActiveOrganizationId(orgId: string): Promise<void> {
+  clearActiveOrganizationCache();
   const context = await getActiveOrganizationContext(orgId);
   sessionStorage.setItem(storageKey(context.userId), context.orgId);
   window.dispatchEvent(
@@ -19,6 +44,33 @@ export async function setActiveOrganizationId(orgId: string): Promise<void> {
 }
 
 export async function getActiveOrganizationContext(
+  requestedOrgId?: string,
+): Promise<ActiveOrganizationContext> {
+  registerCacheInvalidation();
+  // A sessão local (sem rede) identifica o usuário para a chave do cache.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const sessionUserId = sessionData.session?.user.id ?? null;
+  const cacheKey = sessionUserId
+    ? `${sessionUserId}|${requestedOrgId ?? ""}|${
+        typeof sessionStorage === "undefined"
+          ? ""
+          : (sessionStorage.getItem(storageKey(sessionUserId)) ?? "")
+      }`
+    : null;
+  if (
+    cacheKey &&
+    contextCache &&
+    contextCache.key === cacheKey &&
+    contextCache.expiresAt > Date.now()
+  ) {
+    return contextCache.value;
+  }
+  const value = await carregarContextoDaOrganizacao(requestedOrgId);
+  if (cacheKey) contextCache = { key: cacheKey, expiresAt: Date.now() + CONTEXT_TTL_MS, value };
+  return value;
+}
+
+async function carregarContextoDaOrganizacao(
   requestedOrgId?: string,
 ): Promise<ActiveOrganizationContext> {
   const { data: auth, error: authError } = await supabase.auth.getUser();

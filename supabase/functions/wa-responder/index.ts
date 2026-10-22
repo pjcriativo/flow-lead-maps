@@ -102,13 +102,39 @@ async function handleRequest(req: Request): Promise<Response> {
       ...(extras.error ? { error: extras.error } : {}),
     });
 
-  const { data: conversation } = await admin
-    .from("wa_conversas")
-    .select("id,org_id,normalized_phone,remote_contact_id,lead_id,assigned_to,instancia_id,status")
-    .eq("id", conversationId)
-    .eq("org_id", context.orgId)
-    .maybeSingle();
+  // Consultas independentes juntas (antes: uma depois da outra). Todas as validações abaixo
+  // seguem na mesma ordem de antes.
+  const [{ data: conversation }, { data: jaRegistrada }] = await Promise.all([
+    admin
+      .from("wa_conversas")
+      .select(
+        "id,org_id,normalized_phone,remote_contact_id,lead_id,assigned_to,instancia_id,status",
+      )
+      .eq("id", conversationId)
+      .eq("org_id", context.orgId)
+      .maybeSingle(),
+    // Repetição da MESMA operação (retry, duplo clique, resposta perdida no navegador): devolve o
+    // estado registrado SEM reenviar e sem depender da saúde atual do chip.
+    admin
+      .from("wa_mensagens")
+      .select("id,status,externo_id,provider_occurred_at")
+      .eq("org_id", context.orgId)
+      .eq("client_operation_id", operationId)
+      .maybeSingle(),
+    inicializarCofreWa(admin),
+  ]);
   if (!conversation) return recusa("Conversa não encontrada.", 404);
+  if (jaRegistrada) {
+    return resultado(
+      {
+        id: jaRegistrada.id,
+        status: jaRegistrada.status,
+        externo_id: jaRegistrada.externo_id,
+        occurred_at: jaRegistrada.provider_occurred_at,
+      },
+      { duplicate: true },
+    );
+  }
   if (conversation.status === "archived") {
     return recusa("Conversa arquivada não aceita novas mensagens.", 409, "conversa_arquivada");
   }
@@ -124,30 +150,9 @@ async function handleRequest(req: Request): Promise<Response> {
     return recusa("Conversa não atribuída a este atendente.", 403);
   }
 
-  await inicializarCofreWa(admin);
   if (!waBase()) return recusa("Integração WhatsApp indisponível.", 503);
   if (!conversation.normalized_phone) {
     return recusa("Este contato não possui número confirmado para resposta manual.", 409);
-  }
-
-  // Repetição da MESMA operação (retry, duplo clique, resposta perdida no navegador): devolve o
-  // estado registrado SEM reenviar e sem depender da saúde atual do chip.
-  const { data: jaRegistrada } = await admin
-    .from("wa_mensagens")
-    .select("id,status,externo_id,provider_occurred_at")
-    .eq("org_id", context.orgId)
-    .eq("client_operation_id", operationId)
-    .maybeSingle();
-  if (jaRegistrada) {
-    return resultado(
-      {
-        id: jaRegistrada.id,
-        status: jaRegistrada.status,
-        externo_id: jaRegistrada.externo_id,
-        occurred_at: jaRegistrada.provider_occurred_at,
-      },
-      { duplicate: true },
-    );
   }
 
   const carregarSaude = async () => {
@@ -159,7 +164,12 @@ async function handleRequest(req: Request): Promise<Response> {
       .maybeSingle();
     return data;
   };
-  let health = await carregarSaude();
+  // Saúde e token da instância em paralelo (são independentes).
+  const [saudeInicial, instance] = await Promise.all([
+    carregarSaude(),
+    instanciaDaOrgComToken(admin, context.orgId, conversation.instancia_id),
+  ]);
+  let health = saudeInicial;
   if (!health) return recusa("Número de atendimento indisponível.", 409);
   if (health.deleted_at) {
     // O número que atendia esta conversa foi removido. Nunca redirecionamos a conversa para outro
@@ -181,7 +191,8 @@ async function handleRequest(req: Request): Promise<Response> {
       }),
     );
   if (!podeEnviar(health)) {
-    // A evidência de saúde vale 5 min. Antes de recusar, consulta o provedor AO VIVO.
+    // A evidência de saúde vale 5 min (o monitor a renova a cada 2 min). Antes de recusar,
+    // consulta o provedor AO VIVO.
     await checarSaudeChip(admin, context.orgId, conversation.instancia_id, "manual").catch(
       () => null,
     );
@@ -191,7 +202,6 @@ async function handleRequest(req: Request): Promise<Response> {
     return recusa("Número de atendimento sem saúde confirmada.", 409, "saude_nao_confirmada");
   }
 
-  const instance = await instanciaDaOrgComToken(admin, context.orgId, conversation.instancia_id);
   if (!instance || instance.status !== "conectado") {
     return recusa("Número de atendimento indisponível.", 409);
   }

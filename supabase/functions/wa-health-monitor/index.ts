@@ -79,7 +79,12 @@ Deno.serve(async (request) => {
     .neq("status", "queimada")
     // Chips arquivados não têm sessão na Evolution: checá-los só gera falhas e alertas falsos.
     .is("deleted_at", null)
-    .or(`next_health_check_at.is.null,next_health_check_at.lte.${new Date().toISOString()}`)
+    // Chips CONECTADOS entram em toda execução: o envio exige evidência de saúde com menos de
+    // 5 min, e o próximo horário de checagem gravado (+5 min) deixava o envio sempre no limite,
+    // forçando uma consulta ao vivo (mais lenta) no meio do atendimento. Os demais seguem o recuo.
+    .or(
+      `status.eq.conectado,next_health_check_at.is.null,next_health_check_at.lte.${new Date().toISOString()}`,
+    )
     .order("next_health_check_at", { ascending: true, nullsFirst: true })
     .limit(limit);
   if (requestedOrg) query = query.eq("org_id", requestedOrg);

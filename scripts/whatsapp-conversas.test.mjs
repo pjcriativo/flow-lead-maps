@@ -107,7 +107,7 @@ test("8. Mensagem recebida: webhook normaliza e persiste por RPC idempotente", (
 
 // 9. Envio manual autorizado
 test("9. Envio manual autorizado: invoca o envio reconciliado e valida parâmetros", () => {
-  assert.match(waConversas, /enviarRespostaConversa\(contatoAtivo\.id, texto, operationId\)/);
+  assert.match(waConversas, /enviarRespostaConversa\(conversaId, texto, operationId\)/);
   assert.match(waConversas, /enviando/);
   assert.match(waConversas, /SendHorizontal/);
 });
@@ -137,17 +137,29 @@ test("11. Prevenção de duplicidade: proteção contra cliques múltiplos e est
 });
 
 // 12. Resultado de envio com estados claros
-test("12. Resultado de envio: estados persistidos e nenhuma confirmação otimista inventada", () => {
-  assert.match(waConversas, /toast\.success\(\s*"Mensagem enviada\./);
-  assert.match(waConversas, /desfecho\.tipo === "confirmado"/);
-  assert.match(waConversas, /desfecho\.tipo === "recusado"/);
+test("12. Resultado de envio: o estado aparece NO CHAT, sem notificação flutuante e sem confirmação inventada", () => {
+  const inicio = waConversas.indexOf("const enviarMensagem = async () => {");
+  const fimEnvio = waConversas.indexOf("// Resposta Rápida (Script)");
+  const envio = waConversas.slice(inicio, fimEnvio);
+  assert.ok(inicio > 0 && fimEnvio > inicio);
+  // O envio não dispara toast: confirmação e erro ficam no balão e no compositor.
+  assert.doesNotMatch(envio, /toast\./);
+  assert.match(envio, /desfecho\.tipo === "confirmado"/);
+  assert.match(envio, /desfecho\.tipo === "recusado"/);
   assert.match(waConversas, /Envio não confirmado/);
+  assert.match(envio, /setErroEnvio\(desfecho\.mensagem\)/);
+  // Balão imediato (relógio) que o registro do servidor substitui pelo MESMO operation_id.
+  assert.match(envio, /statusEnvio: "pendente"/);
+  assert.match(waConversas, /mensagem\.operationId === local\.operationId/);
   assert.doesNotMatch(waConversas, /msg-out-\$\{Date\.now\(\)\}/);
   // O texto só é limpo na ramificação CONFIRMADA — nunca antes de o backend registrar o envio.
-  const confirmado = waConversas.indexOf('desfecho.tipo === "confirmado"');
-  const recusado = waConversas.indexOf('desfecho.tipo === "recusado"');
-  const limpeza = waConversas.indexOf('setTextoMensagem("")', confirmado);
+  const confirmado = envio.indexOf('desfecho.tipo === "confirmado"');
+  const recusado = envio.indexOf('desfecho.tipo === "recusado"');
+  const limpeza = envio.indexOf('setTextoMensagem("")', confirmado);
   assert.ok(confirmado > 0 && limpeza > confirmado && limpeza < recusado);
+  // Depois do envio atualiza só a conversa aberta, sem esperar e sem recarregar a lista inteira.
+  assert.match(envio, /void carregarDetalhes\(conversaId\)/);
+  assert.doesNotMatch(envio, /await carregarDadosIniciais/);
 });
 
 // 13. Respostas rápidas

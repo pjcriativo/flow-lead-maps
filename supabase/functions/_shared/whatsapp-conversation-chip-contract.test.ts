@@ -188,3 +188,22 @@ test("creating a CRM lead from a conversation leads to the pipeline, not to the 
   assert.ok(destinos.includes("pipeline"));
   assert.ok(!destinos.includes("leads"), "nenhum atalho da conversa deve levar à lista de leads");
 });
+
+test("no conversation opens by itself and the list reload merges instead of replacing", () => {
+  // Abrir a primeira sozinha a mostrava como vista; só o atendente abre uma conversa.
+  assert.doesNotMatch(ui, /\?\? contatos\[0\]/);
+  assert.doesNotMatch(ui, /setContatoAtivoId\(\(current\) => current \|\| mapped\[0\]/);
+  // A recarga da lista nunca substitui o detalhe já carregado (era o que deixava o chat em branco).
+  assert.match(ui, /setContatos\(\(anteriores\) => mesclarListaComDetalhe\(anteriores, mapped\)\)/);
+  assert.doesNotMatch(ui, /setContatos\(mapped\)/);
+});
+
+test("only the open, visible conversation is marked read, and its counters drop at once", () => {
+  assert.match(ui, /leituraAutomatica\(\{/);
+  assert.match(ui, /document\.visibilityState === "visible"/);
+  assert.match(
+    ui,
+    /setKpis\(\(atual\) => \(\{ \.\.\.atual, naoLidas: Math\.max\(0, atual\.naoLidas - lidas\) \}\)\)/,
+  );
+  assert.match(ui, /marcarConversaLida\(conversaId\)/);
+});
