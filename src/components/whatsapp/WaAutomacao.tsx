@@ -54,6 +54,7 @@ import {
   type WaAutomacaoControles,
   type WaAutomacaoSimulacao,
 } from "@/services/whatsapp";
+import { AjudaTip } from "./AjudaTip";
 
 interface WaAutomacaoProps {
   onIrParaCampanhas?: () => void;
@@ -517,7 +518,12 @@ export function WaAutomacao({
                 <SiWhatsapp className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white tracking-tight">Minhas automações</h2>
+                <span className="inline-flex items-center gap-1.5">
+                  <h2 className="text-base font-bold text-white tracking-tight">
+                    Minhas automações
+                  </h2>
+                  <AjudaTip id="automacao-lista" />
+                </span>
                 <p className="text-xs text-home-muted mt-0.5">
                   Crie e gerencie regras de automação para atender seus leads 24 horas por dia
                 </p>

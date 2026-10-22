@@ -1919,7 +1919,7 @@ export async function obterDadosPainelWa(): Promise<WaPainelData> {
       listarConversas(),
       supabase
         .from("wa_envios")
-        .select("id, campanha_id, lead_id, enviado_em")
+        .select("id, campanha_id, lead_id, enviado_em, status")
         .eq("org_id", context.orgId)
         .order("enviado_em", { ascending: false })
         .limit(2000),
@@ -1956,17 +1956,25 @@ export async function obterDadosPainelWa(): Promise<WaPainelData> {
 
   // Mapear envios por campanha
   const enviosPorCampanha = new Map<string, number>();
+  const entreguesPorCampanha = new Map<string, number>();
   for (const env of rawEnvios) {
     if (env.campanha_id) {
       enviosPorCampanha.set(env.campanha_id, (enviosPorCampanha.get(env.campanha_id) ?? 0) + 1);
+      // "Entregue" = o WhatsApp confirmou a entrega (ou a leitura) da mensagem da campanha.
+      if (env.status === "delivered" || env.status === "read") {
+        entreguesPorCampanha.set(
+          env.campanha_id,
+          (entreguesPorCampanha.get(env.campanha_id) ?? 0) + 1,
+        );
+      }
     }
   }
 
   // Campanhas com estatísticas consolidadas
   const campanhas: WaPainelCampanha[] = rawCampanhas.map((c) => {
     const enviados = enviosPorCampanha.get(c.id) ?? 0;
-    const entregues = 0;
-    const taxaEntrega = 0;
+    const entregues = entreguesPorCampanha.get(c.id) ?? 0;
+    const taxaEntrega = enviados > 0 ? Math.round((entregues / enviados) * 1000) / 10 : 0;
     const respostas = 0;
     const taxaResposta = 0;
     const listName =
@@ -3755,7 +3763,7 @@ export async function obterDadosRelatoriosWa(
     listarChips(),
     supabase
       .from("wa_envios")
-      .select("instancia_id, campanha_id, lead_id, enviado_em")
+      .select("instancia_id, campanha_id, lead_id, enviado_em, status")
       .eq("org_id", context.orgId)
       .order("enviado_em", { ascending: true })
       .limit(5000),
@@ -3791,12 +3799,22 @@ export async function obterDadosRelatoriosWa(
     )
     .reduce((sum, proposal) => sum + (Number(proposal.valor) || 0), 0);
 
+  // "Entregue" = o WhatsApp confirmou a entrega (ou a leitura) da mensagem de campanha.
+  const foiEntregue = (status: string | null) => status === "delivered" || status === "read";
+  const entreguesTotal = envios.filter((row) => foiEntregue(row.status)).length;
+  const deliveredByInstance = new Map<string, number>();
   const sentByInstance = new Map<string, number>();
   const repliesByInstance = new Map<string, number>();
   const leadsByInstance = new Map<string, Set<string>>();
   for (const row of envios) {
     if (!row.instancia_id) continue;
     sentByInstance.set(row.instancia_id, (sentByInstance.get(row.instancia_id) ?? 0) + 1);
+    if (foiEntregue(row.status)) {
+      deliveredByInstance.set(
+        row.instancia_id,
+        (deliveredByInstance.get(row.instancia_id) ?? 0) + 1,
+      );
+    }
   }
   for (const row of recebidas) {
     if (!row.instancia_id) continue;
@@ -3817,7 +3835,7 @@ export async function obterDadosRelatoriosWa(
         nome: chip.nome,
         numero: chip.numero ?? "—",
         enviadas,
-        entregues: 0,
+        entregues: deliveredByInstance.get(chip.id) ?? 0,
         respostas,
         leads: leadsByInstance.get(chip.id)?.size ?? 0,
         taxaResposta: enviadas > 0 ? (respostas / enviadas) * 100 : 0,
@@ -3846,7 +3864,10 @@ export async function obterDadosRelatoriosWa(
   };
   for (const row of envios) {
     // Envio sem data de envio ainda não saiu do provedor: não conta como enviado no dia.
-    if (row.enviado_em) ensureDay(row.enviado_em).enviadas += 1;
+    if (!row.enviado_em) continue;
+    const ponto = ensureDay(row.enviado_em);
+    ponto.enviadas += 1;
+    if (foiEntregue(row.status)) ponto.entregues += 1;
   }
   const leadsPerDay = new Map<string, Set<string>>();
   for (const row of recebidas) {
@@ -3875,8 +3896,9 @@ export async function obterDadosRelatoriosWa(
     kpis: {
       mensagensEnviadas: envios.length,
       enviadasTrend: "—",
-      entregues: 0,
-      taxaEntrega: "Dados insuficientes",
+      entregues: entreguesTotal,
+      taxaEntrega:
+        envios.length > 0 ? `${((entreguesTotal / envios.length) * 100).toFixed(1)}%` : "0%",
       respostas: recebidas.length,
       taxaResposta:
         envios.length > 0 ? `${((recebidas.length / envios.length) * 100).toFixed(1)}%` : "0%",

@@ -58,6 +58,7 @@ import {
   type WaVendasDiaPonto,
   type WaRelatorioAtividade,
 } from "@/services/whatsapp";
+import { AjudaTip } from "./AjudaTip";
 
 export interface WaRelatoriosProps {
   onIrParaNumeros?: () => void;
@@ -257,7 +258,12 @@ export function WaRelatorios({
                       <SiWhatsapp className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-white">Visão geral do desempenho</h3>
+                      <span className="inline-flex items-center gap-1.5">
+                        <h3 className="text-base font-bold text-white">
+                          Visão geral do desempenho
+                        </h3>
+                        <AjudaTip id="relatorios-visao" />
+                      </span>
                       <p className="text-xs text-slate-400">
                         Evolução das mensagens, entregas, respostas e leads gerados
                       </p>
@@ -481,7 +487,10 @@ export function WaRelatorios({
                       <PieChart className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-white">Distribuição por canal</h3>
+                      <span className="inline-flex items-center gap-1.5">
+                        <h3 className="text-base font-bold text-white">Distribuição por canal</h3>
+                        <AjudaTip id="relatorios-canal" />
+                      </span>
                       <p className="text-xs text-slate-400">Origem das conversas e resultados</p>
                     </div>
                   </div>
@@ -608,7 +617,10 @@ export function WaRelatorios({
                       <Smartphone className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-white">Desempenho por número</h3>
+                      <span className="inline-flex items-center gap-1.5">
+                        <h3 className="text-base font-bold text-white">Desempenho por número</h3>
+                        <AjudaTip id="relatorios-numero" />
+                      </span>
                       <p className="text-xs text-slate-400">
                         Compare o resultado de cada chip conectado
                       </p>
@@ -752,7 +764,10 @@ export function WaRelatorios({
                     <Activity className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white">Status das conversas</h3>
+                    <span className="inline-flex items-center gap-1.5">
+                      <h3 className="text-base font-bold text-white">Status das conversas</h3>
+                      <AjudaTip id="relatorios-conversas" />
+                    </span>
                     <p className="text-xs text-slate-400">Situação atual dos atendimentos</p>
                   </div>
                 </div>
@@ -987,7 +1002,10 @@ export function WaRelatorios({
                       <ShoppingCart className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-white">Conversões em vendas</h3>
+                      <span className="inline-flex items-center gap-1.5">
+                        <h3 className="text-base font-bold text-white">Conversões em vendas</h3>
+                        <AjudaTip id="relatorios-vendas" />
+                      </span>
                       <p className="text-xs text-slate-400">Faturamento atribuído ao WhatsApp</p>
                     </div>
                   </div>
@@ -1075,7 +1093,10 @@ export function WaRelatorios({
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
                 <Filter className="h-5 w-5" />
               </div>
-              <h3 className="text-base font-bold text-white">Filtros de relatório</h3>
+              <span className="inline-flex items-center gap-1.5">
+                <h3 className="text-base font-bold text-white">Filtros de relatório</h3>
+                <AjudaTip id="relatorios-filtros" />
+              </span>
             </div>
 
             {/* Campos de Filtro */}

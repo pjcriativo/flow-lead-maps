@@ -79,6 +79,7 @@ import {
   type WaLeadVinculavel,
   type WaScript,
 } from "@/services/whatsapp";
+import { AjudaTip } from "./AjudaTip";
 
 const MAX_FALLBACK_FAILURES = 3;
 const FALLBACK_BASE_DELAY_MS = 30_000;
@@ -1301,6 +1302,7 @@ export function WaConversas() {
           {/* Top Bar: Busca e Filtro */}
           <div className="p-3.5 border-b border-[#1b2334] space-y-3">
             <div className="flex items-center gap-2">
+              <AjudaTip id="conversas-lista" />
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-home-muted" />
                 <Input

@@ -1,5 +1,6 @@
 // Tela 04 — WhatsApp Premium: Números e Conexões (Fidelidade Visual Absoluta ao Layout Aprovado - Prompt 59)
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AjudaTip } from "./AjudaTip";
 import {
   Activity,
   AlertTriangle,
@@ -1118,7 +1119,10 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-white">Conectar novo número</h3>
+                  <span className="inline-flex items-center gap-1.5">
+                    <h3 className="text-base font-bold text-white">Conectar novo número</h3>
+                    <AjudaTip id="numeros-conectar" />
+                  </span>
                   <HelpTip label="como conectar um número">
                     No WhatsApp do celular, abra Aparelhos conectados, toque em Conectar aparelho e
                     escaneie o QR Code. Como alternativa, use o código de 8 dígitos.
@@ -1619,7 +1623,10 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                   <Activity className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Saúde das conexões</h3>
+                  <span className="inline-flex items-center gap-1.5">
+                    <h3 className="text-sm font-bold text-white">Saúde das conexões</h3>
+                    <AjudaTip id="numeros-saude" />
+                  </span>
                   <p className="text-[11px] text-home-muted">
                     Monitoramento em tempo real das suas instâncias
                   </p>
@@ -1763,10 +1770,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-white">Prioridade e contingência</h3>
-                    <HelpTip label="prioridade e contingência">
-                      A prioridade define a ordem preferencial dos números. A troca só ocorre após
-                      autorização explícita de contingência; não há rodízio automático ativo.
-                    </HelpTip>
+                    <AjudaTip id="numeros-rotacao" />
                   </div>
                   <p className="text-[11px] text-home-muted">
                     Continuidade autorizada para falhas técnicas
@@ -1775,7 +1779,7 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
               </div>
 
               <span className="rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold text-blue-300">
-                Manual
+                Só campanhas
               </span>
             </div>
 
@@ -1785,8 +1789,8 @@ export function WaNumeros({ onMudou }: WaNumerosProps) {
                 <span className="flex items-center gap-1.5 text-home-muted whitespace-nowrap">
                   Número de backup
                   <HelpTip label="número de backup">
-                    O backup só assume quando está conectado, uma origem está indisponível e você
-                    ativa a contingência manualmente.
+                    O backup assume os envios de campanha quando o número original está indisponível
+                    e a “Contingência ativa” está ligada. Precisa estar conectado.
                   </HelpTip>
                 </span>
                 <div className="relative flex-1 max-w-[180px]">

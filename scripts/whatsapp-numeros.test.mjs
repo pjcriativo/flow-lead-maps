@@ -164,8 +164,9 @@ test("16. Contingência: tela descreve somente prioridade e contingência realme
 test("17. Ajuda contextual: explica prioridade, backup, contingência e pareamento", () => {
   assert.match(waNumeros, /function HelpTip/);
   assert.match(waNumeros, /aria-label=\{`Ajuda:/);
-  assert.match(waNumeros, /A prioridade define a ordem/);
-  assert.match(waNumeros, /O backup só assume/);
+  // A explicação de prioridade/rodízio vive no catálogo de ajuda (AjudaTip), com passos de configuração.
+  assert.match(waNumeros, /<AjudaTip id="numeros-rotacao"/);
+  assert.match(waNumeros, /O backup assume os envios de campanha/);
   assert.match(waNumeros, /No WhatsApp do celular/);
 });
 

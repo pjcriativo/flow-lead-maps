@@ -67,6 +67,7 @@ import {
   type WaChip,
 } from "@/services/whatsapp";
 import { listarCampanhas } from "@/services/campanhas";
+import { AjudaTip } from "./AjudaTip";
 
 export const DISPARO_EM_MASSA_BLOQUEADO = true;
 
@@ -642,7 +643,10 @@ As mensagens serão enviadas pelos seus números para os leads com consentimento
                 <SiWhatsapp className="h-5 w-5" />
               </div>
               <div className="space-y-0.5">
-                <h2 className="text-base font-extrabold text-white">Campanhas WhatsApp</h2>
+                <span className="inline-flex items-center gap-1.5">
+                  <h2 className="text-base font-extrabold text-white">Campanhas WhatsApp</h2>
+                  <AjudaTip id="campanhas-lista" />
+                </span>
                 <p className="text-xs text-home-muted">
                   Gerencie suas campanhas e acompanhe os resultados em tempo real
                 </p>
@@ -961,7 +965,10 @@ As mensagens serão enviadas pelos seus números para os leads com consentimento
               <SiWhatsapp className="h-5 w-5" />
             </div>
             <div className="space-y-0.5">
-              <h2 className="text-base font-extrabold text-white">Criar nova campanha</h2>
+              <span className="inline-flex items-center gap-1.5">
+                <h2 className="text-base font-extrabold text-white">Criar nova campanha</h2>
+                <AjudaTip id="campanhas-criar" />
+              </span>
               <p className="text-xs text-home-muted">
                 Dispare mensagens para seus leads em poucos passos
               </p>
@@ -1395,7 +1402,10 @@ As mensagens serão enviadas pelos seus números para os leads com consentimento
                 <BarChart3 className="h-5 w-5" />
               </div>
               <div className="space-y-0.5">
-                <h3 className="text-sm font-extrabold text-white">Desempenho das campanhas</h3>
+                <span className="inline-flex items-center gap-1.5">
+                  <h3 className="text-sm font-extrabold text-white">Desempenho das campanhas</h3>
+                  <AjudaTip id="campanhas-desempenho" />
+                </span>
                 <p className="text-[11px] text-home-muted">
                   Evolução dos envios, entregas e respostas
                 </p>
@@ -1608,7 +1618,10 @@ As mensagens serão enviadas pelos seus números para os leads com consentimento
                 <BarChart2 className="h-5 w-5" />
               </div>
               <div className="space-y-0.5">
-                <h3 className="text-sm font-extrabold text-white">Mensagens por número</h3>
+                <span className="inline-flex items-center gap-1.5">
+                  <h3 className="text-sm font-extrabold text-white">Mensagens por número</h3>
+                  <AjudaTip id="campanhas-numeros" />
+                </span>
                 <p className="text-[11px] text-home-muted">
                   Distribuição de envios entre seus chips
                 </p>
@@ -1686,7 +1699,10 @@ As mensagens serão enviadas pelos seus números para os leads com consentimento
                 <Bell className="h-5 w-5" />
               </div>
               <div className="space-y-0.5">
-                <h3 className="text-sm font-extrabold text-white">Atividade recente</h3>
+                <span className="inline-flex items-center gap-1.5">
+                  <h3 className="text-sm font-extrabold text-white">Atividade recente</h3>
+                  <AjudaTip id="campanhas-atividade" />
+                </span>
                 <p className="text-[11px] text-home-muted">
                   Últimas ações realizadas nas campanhas
                 </p>

@@ -56,6 +56,7 @@ import {
   extrairVariaveis,
 } from "@/services/whatsapp";
 import { resolverVariaveis, WaLeadDados } from "@/lib/wa-copy";
+import { AjudaTip } from "./AjudaTip";
 
 const CATEGORIAS_INFO: Record<
   WaScriptCategoria,
@@ -476,7 +477,10 @@ export function WaScripts() {
                 <SiWhatsapp className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white tracking-tight">Meus scripts</h2>
+                <span className="inline-flex items-center gap-1.5">
+                  <h2 className="text-base font-bold text-white tracking-tight">Meus scripts</h2>
+                  <AjudaTip id="scripts-lista" />
+                </span>
                 <p className="text-xs text-home-muted mt-0.5">
                   Organize suas mensagens por categoria e use variáveis para personalizar
                 </p>

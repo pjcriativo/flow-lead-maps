@@ -40,6 +40,7 @@ import {
   type WaConversa,
   type WaAtividadeRecente,
 } from "@/services/whatsapp";
+import { AjudaTip } from "./AjudaTip";
 
 export interface WaPainelProps {
   onIrParaNumeros: () => void;
@@ -475,7 +476,10 @@ export function WaPainel({
                   <Share2 className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Campanhas recentes</h3>
+                  <span className="inline-flex items-center gap-1.5">
+                    <h3 className="text-sm font-semibold text-white">Campanhas recentes</h3>
+                    <AjudaTip id="painel-campanhas" />
+                  </span>
                   <p className="text-[11px] text-home-muted">
                     Acompanhe o desempenho das suas últimas campanhas
                   </p>
@@ -638,7 +642,10 @@ export function WaPainel({
                       <MessagesSquare className="h-4 w-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-semibold text-white">Conversas recentes</h3>
+                      <span className="inline-flex items-center gap-1.5">
+                        <h3 className="text-sm font-semibold text-white">Conversas recentes</h3>
+                        <AjudaTip id="painel-conversas" />
+                      </span>
                       <p className="text-[11px] text-home-muted">
                         Suas conversas mais recentes com leads e clientes
                       </p>
@@ -710,7 +717,10 @@ export function WaPainel({
                     <Clock className="h-4 w-4" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-white">Atividade recente</h3>
+                    <span className="inline-flex items-center gap-1.5">
+                      <h3 className="text-sm font-semibold text-white">Atividade recente</h3>
+                      <AjudaTip id="painel-atividade" />
+                    </span>
                     <p className="text-[11px] text-home-muted">
                       Últimas ações realizadas no WhatsApp
                     </p>
@@ -759,7 +769,10 @@ export function WaPainel({
                   <Check className="h-4 w-4 stroke-[2.5]" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Sistema saudável</h3>
+                  <span className="inline-flex items-center gap-1.5">
+                    <h3 className="text-sm font-semibold text-white">Sistema saudável</h3>
+                    <AjudaTip id="painel-saude" />
+                  </span>
                   <p className="text-[11px] text-home-muted">
                     Todos os sistemas operando normalmente.
                   </p>
@@ -808,7 +821,10 @@ export function WaPainel({
                   <Phone className="h-4 w-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Números ativos</h3>
+                  <span className="inline-flex items-center gap-1.5">
+                    <h3 className="text-sm font-semibold text-white">Números ativos</h3>
+                    <AjudaTip id="painel-numeros" />
+                  </span>
                   <p className="text-[11px] text-home-muted">
                     Seus números conectados e em operação
                   </p>
