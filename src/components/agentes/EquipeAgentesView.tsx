@@ -53,9 +53,10 @@ import { NovoAgenteModal } from "./NovoAgenteModal";
 
 interface EquipeAgentesViewProps {
   onVoltarPainel?: () => void;
+  onVerPerfil?: (agenteId: string) => void;
 }
 
-export function EquipeAgentesView({ onVoltarPainel }: EquipeAgentesViewProps) {
+export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentesViewProps) {
   const [abaAtiva, setAbaAtiva] = useState<"agentes" | "departamentos" | "enxames" | "biblioteca">("agentes");
   const [busca, setBusca] = useState("");
   const [filtroDepartamento, setFiltroDepartamento] = useState("todos");
@@ -458,7 +459,13 @@ export function EquipeAgentesView({ onVoltarPainel }: EquipeAgentesViewProps) {
                       {/* Bottom Link: "Ver perfil ➔" */}
                       <button
                         type="button"
-                        onClick={() => setAgenteSelecionado(agente)}
+                        onClick={() => {
+                          if (onVerPerfil) {
+                            onVerPerfil(agente.id);
+                          } else {
+                            setAgenteSelecionado(agente);
+                          }
+                        }}
                         className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-[#f95d14] transition-all hover:text-[#ff7836] hover:translate-x-0.5"
                       >
                         <span>Ver perfil</span>

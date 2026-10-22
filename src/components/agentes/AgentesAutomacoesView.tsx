@@ -63,19 +63,70 @@ const ICONES_CAPACIDADE: Record<string, { icon: LucideIcon; cor: string; bg: str
   sentimento: { icon: Heart, cor: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20" },
 };
 
+import { AgentesNavHeader, type TelaAgentesId } from "./AgentesNavHeader";
 import { EquipeAgentesView } from "./EquipeAgentesView";
+import { PerfilAgenteView } from "./PerfilAgenteView";
+
+function getInitialTela(): TelaAgentesId {
+  if (typeof window === "undefined") return "visao_geral";
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get("tela");
+  if (t === "equipe") return "equipe";
+  if (t === "perfil") return "perfil";
+  return "visao_geral";
+}
+
+function getInitialAgente(): string {
+  if (typeof window === "undefined") return "ceo";
+  const params = new URLSearchParams(window.location.search);
+  return params.get("agente") || "ceo";
+}
 
 export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void }) {
-  const [telaAtual, setTelaAtual] = useState<"painel" | "equipe">("painel");
+  const [telaAtiva, setTelaAtiva] = useState<TelaAgentesId>(getInitialTela);
+  const [agentePerfilId, setAgentePerfilId] = useState<string>(getInitialAgente);
   const [periodoMetas, setPeriodoMetas] = useState("Este mês");
 
-  if (telaAtual === "equipe") {
-    return <EquipeAgentesView onVoltarPainel={() => setTelaAtual("painel")} />;
-  }
+  const mudarTela = (novaTela: TelaAgentesId, novoAgenteId?: string) => {
+    setTelaAtiva(novaTela);
+    if (novoAgenteId) {
+      setAgentePerfilId(novoAgenteId);
+    }
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("tela", novaTela);
+      if (novoAgenteId) {
+        params.set("agente", novoAgenteId);
+      } else if (novaTela !== "perfil") {
+        params.delete("agente");
+      }
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}?${params.toString()}`,
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-[#f95d14]/30 selection:text-white">
-      <div className="mx-auto max-w-[1680px] px-4 pb-14 pt-6 sm:px-6 lg:px-8 space-y-6">
+      {/* Barra de Navegação Superior Compartilhada das 12 Telas */}
+      <AgentesNavHeader telaAtiva={telaAtiva} onSelecionarTela={(t) => mudarTela(t)} />
+
+      {/* Renderização Condicional da Tela Ativa */}
+      {telaAtiva === "equipe" ? (
+        <EquipeAgentesView
+          onVoltarPainel={() => mudarTela("visao_geral")}
+          onVerPerfil={(id) => mudarTela("perfil", id)}
+        />
+      ) : telaAtiva === "perfil" ? (
+        <PerfilAgenteView
+          agenteId={agentePerfilId}
+          onVoltar={() => mudarTela("equipe")}
+          onNavegarEquipe={() => mudarTela("equipe")}
+        />
+      ) : (
+        <div className="mx-auto max-w-[1680px] px-4 pb-14 pt-6 sm:px-6 lg:px-8 space-y-6">
         
         {/* =========================================================================
             1. CABEÇALHO PRINCIPAL DO MÓDULO
@@ -105,7 +156,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setTelaAtual("equipe")}
+              onClick={() => mudarTela("equipe")}
               className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#121620] px-4 text-xs font-semibold text-neutral-200 transition-all hover:border-white/20 hover:bg-[#181e2b] hover:text-white"
             >
               <Users className="size-4 text-neutral-400" />
@@ -233,13 +284,14 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setTelaAtual("equipe")}
+                  onClick={() => mudarTela("equipe")}
                   className="flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-neutral-200 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
                 >
                   Ver plano atual
                 </button>
                 <button
                   type="button"
+                  onClick={() => mudarTela("perfil", "ceo")}
                   className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#f95d14] px-3 text-xs font-semibold text-white shadow-md shadow-orange-500/20 transition-all hover:bg-[#ff6c26]"
                 >
                   <MessageSquare className="size-3.5" />
@@ -346,7 +398,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
               </div>
               <button
                 type="button"
-                onClick={() => setTelaAtual("equipe")}
+                onClick={() => mudarTela("equipe")}
                 className="flex items-center gap-1 text-xs font-semibold text-[#f95d14] transition-colors hover:text-[#ff7836]"
               >
                 <span>Gerenciar equipe</span>
@@ -361,8 +413,9 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
                 return (
                   <div
                     key={agente.id}
+                    onClick={() => mudarTela("perfil", agente.id)}
                     className={cn(
-                      "group relative flex flex-col items-center rounded-xl border p-3 text-center transition-all",
+                      "group relative flex flex-col items-center rounded-xl border p-3 text-center transition-all cursor-pointer",
                       isCeo
                         ? "border-orange-500/70 bg-[#161a25] shadow-lg shadow-orange-500/10 ring-1 ring-orange-500/30"
                         : "border-[#1b2232] bg-[#0e131d]/90 hover:border-white/20 hover:bg-[#131926]",
@@ -785,6 +838,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
         </section>
 
       </div>
+      )}
     </div>
   );
 }
