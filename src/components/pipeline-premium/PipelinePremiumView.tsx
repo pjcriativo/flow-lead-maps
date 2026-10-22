@@ -248,10 +248,10 @@ export function PipelinePremiumView({
                 action="Tentar novamente"
                 onAction={() => void pipeline.refresh()}
               />
-            ) : pipeline.filteredOpportunities.length === 0 ? (
+            ) : pipeline.empty ? (
               <PipelineState
                 text={
-                  pipeline.opportunities.length
+                  pipeline.totalLeads
                     ? "Nenhum resultado para os filtros selecionados."
                     : "Seu pipeline ainda não possui leads."
                 }
@@ -269,7 +269,7 @@ export function PipelinePremiumView({
                 ) : null}
                 <PipelineBoard
                   stages={pipeline.stages}
-                  opportunities={pipeline.filteredOpportunities}
+                  feeds={pipeline.stageFeeds}
                   selectedOpportunityId={selectedId}
                   onSelectOpportunity={(opportunity) => setSelectedId(opportunity.id)}
                   onAddLead={openCreate}

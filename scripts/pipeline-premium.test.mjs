@@ -253,15 +253,12 @@ test("a atualização otimista é imutável e o hook mantém snapshot, rollback 
   assert.equal(moved[0].status, "meeting");
   assert.equal(moved[1], original[1]);
 
-  assert.match(pipelineHook, /cancelQueries\(\{ queryKey: pipelineKeys\.leads\(\) \}\)/);
-  assert.match(pipelineHook, /const previous = queryClient\.getQueryData/);
+  assert.match(pipelineHook, /cancelQueries\(\{ queryKey: pipelineKeys\.stages\(\) \}\)/);
+  assert.match(pipelineHook, /const previous = queryClient\.getQueriesData/);
+  assert.match(pipelineHook, /onError:[\s\S]*setQueryData\(key, data\)/);
   assert.match(
     pipelineHook,
-    /onError:[\s\S]*setQueryData\(pipelineKeys\.leads\(\), context\.previous\)/,
-  );
-  assert.match(
-    pipelineHook,
-    /onSettled:[\s\S]*invalidateQueries\(\{ queryKey: pipelineKeys\.leads\(\) \}\)/,
+    /onSettled:[\s\S]*invalidateQueries\(\{ queryKey: pipelineKeys\.stages\(\) \}\)/,
   );
   assert.match(leadsApi, /\.eq\("updated_at", expectedUpdatedAt\)/);
 });
@@ -320,7 +317,10 @@ test("lead removido ou bloqueado por RLS encerra o foco com feedback sem fallbac
 
 test("Kanban e detalhes preservam navegação responsiva", () => {
   assert.match(pipelineBoard, /overflow-x-auto/);
-  assert.match(pipelineColumn, /min-w-\[210px\]/);
+  // Colunas com largura consistente (não espremem os cards); no celular, uma etapa por vez.
+  assert.match(pipelineColumn, /sm:w-\[270px\]/);
+  assert.match(pipelineColumn, /w-\[min\(85vw,300px\)\]/);
+  assert.match(pipelineColumn, /snap-start/);
   assert.match(pipelineView, /fixed inset-x-0 bottom-0/);
   assert.match(pipelineView, /max-h-\[85svh\]/);
   assert.match(pipelineView, /lg:sticky/);

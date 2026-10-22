@@ -117,6 +117,22 @@ const STATUS_STAGE: Record<LeadStatus, PipelineStageKey> = {
   lost: "fechado",
 };
 
+/** Status persistidos que pertencem a cada etapa (inverso de STATUS_STAGE). */
+export const STAGE_STATUSES: Record<PipelineStageKey, readonly LeadStatus[]> = (() => {
+  const result: Record<PipelineStageKey, LeadStatus[]> = {
+    novo: [],
+    contato: [],
+    qualificacao: [],
+    proposta: [],
+    negociacao: [],
+    fechado: [],
+  };
+  for (const [status, stage] of Object.entries(STATUS_STAGE)) {
+    result[stage as PipelineStageKey].push(status as LeadStatus);
+  }
+  return result;
+})();
+
 export const STAGE_TARGET_STATUS: Record<PipelineStageKey, LeadStatus> = {
   novo: "new",
   contato: "contacted",
@@ -285,6 +301,87 @@ export function buildPipelineStages(
           : "Sem valores",
     };
   });
+}
+
+/** Cabeçalhos das etapas a partir dos totais reais do banco (não só dos cards já carregados). */
+export function buildPipelineStagesFromTotals(
+  totals: Record<PipelineStageKey, number>,
+  knownValues: Record<PipelineStageKey, { sum: number; known: number }>,
+  proposalDataAvailable = true,
+): PipelineStageInfo[] {
+  return PIPELINE_STAGE_DEFINITIONS.map((definition) => {
+    const value = knownValues[definition.key];
+    return {
+      ...definition,
+      count: totals[definition.key],
+      totalValue: !proposalDataAvailable
+        ? "Indisponível"
+        : value.known
+          ? formatCurrency(value.sum)
+          : "Sem valores",
+    };
+  });
+}
+
+/** Soma o valor conhecido (última proposta) dos leads de cada etapa. */
+export function sumStageValues(
+  statusByLead: ReadonlyMap<string, LeadStatus>,
+  proposalValues: ReadonlyMap<string, number | null>,
+): Record<PipelineStageKey, { sum: number; known: number }> {
+  const result = Object.fromEntries(
+    PIPELINE_STAGE_DEFINITIONS.map((definition) => [definition.key, { sum: 0, known: 0 }]),
+  ) as Record<PipelineStageKey, { sum: number; known: number }>;
+  for (const [leadId, status] of statusByLead) {
+    const value = proposalValues.get(leadId);
+    if (value == null) continue;
+    const bucket = result[stageForStatus(status)];
+    bucket.sum += value;
+    bucket.known += 1;
+  }
+  return result;
+}
+
+/** KPIs do topo calculados com contagens do banco, sem precisar de todos os leads no navegador. */
+export function buildPipelineMetricsFromTotals(
+  totals: { total: number; negotiation: number; won: number },
+  proposals: readonly Proposta[],
+  statusByLead: ReadonlyMap<string, LeadStatus>,
+  proposalDataAvailable = true,
+): PipelineMetricItem[] {
+  const proposalValues = latestProposalValues(proposals);
+  const negotiationValues: number[] = [];
+  for (const [leadId, status] of statusByLead) {
+    const value = proposalValues.get(leadId);
+    if ((status === "responded" || status === "meeting") && value != null) {
+      negotiationValues.push(value);
+    }
+  }
+  const sentLeadIds = new Set(
+    proposals
+      .filter((proposal) => proposal.status === "enviada")
+      .map((proposal) => proposal.lead_id),
+  );
+  return [
+    metric("leads", "Leads no pipeline", totals.total.toLocaleString("pt-BR"), "orange"),
+    metric("negociacao", "Em negociação", totals.negotiation.toLocaleString("pt-BR"), "purple"),
+    metric(
+      "propostas",
+      "Propostas enviadas",
+      proposalDataAvailable ? sentLeadIds.size.toLocaleString("pt-BR") : "—",
+      "green",
+      !proposalDataAvailable,
+    ),
+    metric("vendas", "Vendas realizadas", totals.won.toLocaleString("pt-BR"), "blue"),
+    metric(
+      "valor",
+      "Valor em negociação",
+      proposalDataAvailable && negotiationValues.length
+        ? formatCurrency(negotiationValues.reduce((total, value) => total + value, 0))
+        : "—",
+      "amber",
+      !proposalDataAvailable,
+    ),
+  ];
 }
 
 export function buildPipelineMetrics(

@@ -7729,6 +7729,17 @@ export type Database = {
       org_dono_eh_super_admin: { Args: { p_org: string }; Returns: boolean };
       papel_do_usuario: { Args: { p_org: string }; Returns: string };
       pertence_a_org: { Args: { p_org: string }; Returns: boolean };
+      pipeline_status_counts: {
+        Args: {
+          p_channel?: string;
+          p_created_from?: string;
+          p_created_to?: string;
+          p_responsible?: string;
+          p_score?: string;
+          p_search?: string;
+        };
+        Returns: { status: string; total: number }[];
+      };
       plano_id_por_slug: { Args: { p_plan: string }; Returns: string };
       pode_ver_lead: {
         Args: { p_assigned: string; p_org: string };
