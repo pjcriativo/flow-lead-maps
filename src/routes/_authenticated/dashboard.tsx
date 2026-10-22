@@ -38,7 +38,7 @@ import {
   type CampanhasSubView,
 } from "@/components/campanhas-premium/CampanhasPremiumView";
 import type { Campanha } from "@/types";
-import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
+import { AgentesAutomacoesView } from "@/components/agentes/AgentesAutomacoesView";
 import { SuporteSection } from "@/components/suporte/SuporteSection";
 import { NotificacoesSection } from "@/components/notificacoes/NotificacoesSection";
 import { UserProfileSection } from "@/components/perfil/UserProfileSection";
@@ -246,7 +246,8 @@ function Dashboard() {
           section === "campanhas" ||
           section === "marketing" ||
           section === "influencers" ||
-          section === "whatsapp"
+          section === "whatsapp" ||
+          section === "automacao"
           ? "bg-home-background text-home-foreground"
           : "bg-background text-foreground",
       )}
@@ -291,7 +292,8 @@ function Dashboard() {
             section === "marketing" ||
             section === "influencers" ||
             section === "buscar" ||
-            section === "whatsapp") &&
+            section === "whatsapp" ||
+            section === "automacao") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
@@ -303,6 +305,7 @@ function Dashboard() {
             section !== "instagram" &&
             section !== "buscar" &&
             section !== "whatsapp" &&
+            section !== "automacao" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
       >
@@ -587,7 +590,7 @@ function Dashboard() {
           />
         )}
         {section === "automacao" && (
-          <AutomacaoSection onRevisar={() => selectSection("campanhas")} />
+          <AgentesAutomacoesView onRevisar={() => selectSection("campanhas")} />
         )}
         {section === "contratos" && <ContratosSection />}
         {section === "financeiro" && <FinanceiroSection />}

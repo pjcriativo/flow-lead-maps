@@ -26,7 +26,7 @@ test("a Gestão aparece logo após Home e reúne os oito destinos comerciais na 
     ['label: "Minhas Listas", section: "listas"', "Minhas Listas"],
     ['label: "Pipeline", section: "pipeline"', "Pipeline"],
     ['label: "WhatsApp", section: "whatsapp"', "WhatsApp"],
-    ['label: "Automações", section: "automacao"', "Automações"],
+    ['label: "Agentes & Automações", section: "automacao"', "Agentes & Automações"],
     ['label: "Propostas", section: "propostas"', "Propostas"],
     ['label: "Contratos", section: "contratos"', "Contratos"],
     ['label: "Financeiro", section: "financeiro"', "Financeiro"],

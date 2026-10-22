@@ -155,7 +155,7 @@ const MANAGEMENT_SUBITEMS = [
   { label: "Minhas Listas", section: "listas", icon: ListChecks },
   { label: "Pipeline", section: "pipeline", icon: Filter },
   { label: "WhatsApp", section: "whatsapp", icon: SiWhatsapp },
-  { label: "Automações", section: "automacao", icon: Workflow },
+  { label: "Agentes & Automações", section: "automacao", icon: Workflow },
   { label: "Propostas", section: "propostas", icon: FileText },
   { label: "Contratos", section: "contratos", icon: ScrollText },
   { label: "Financeiro", section: "financeiro", icon: WalletCards },
