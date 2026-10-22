@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsHeaders, json as jsonResponse } from "../_shared/cors.ts";
 import {
   authorizeWhatsappRequest,
   whatsappAuthorizationFailure,
@@ -14,6 +14,9 @@ import {
 } from "../_shared/wa.ts";
 
 Deno.serve(async (req) => {
+  // Toda resposta leva os headers de CORS do domínio chamador (antes saíam sem origem e o
+  // navegador bloqueava a leitura, escondendo o resultado real da operação).
+  const json = (body: unknown, status = 200) => jsonResponse(body, status, req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 

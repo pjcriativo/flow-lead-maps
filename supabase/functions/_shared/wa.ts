@@ -528,11 +528,10 @@ export type WaStatus = { connected: boolean; loggedIn: boolean; name: string; ji
 
 /**
  * Eventos que o sistema consome da Evolution GO. MESSAGE alimenta a Central de Conversas;
- * CONNECTION mantém a saúde do chip. (READ_RECEIPT fica de fora até o parser de recibos do
- * wa-webhook ser homologado: o payload de Receipt da Evolution não traz o id no formato que
- * extractProviderMessageId espera.) QRCODE é necessário só durante o pareamento.
+ * READ_RECEIPT traz os recibos de entrega/leitura (event "Receipt", state Delivered/Read) que
+ * atualizam o status dos balões; CONNECTION mantém a saúde do chip. QRCODE só no pareamento.
  */
-export const EVENTOS_RECEBIMENTO = ["MESSAGE", "CONNECTION"] as const;
+export const EVENTOS_RECEBIMENTO = ["MESSAGE", "READ_RECEIPT", "CONNECTION"] as const;
 export const EVENTOS_PAREAMENTO = [...EVENTOS_RECEBIMENTO, "QRCODE"] as const;
 
 /** URL que a Evolution chama de volta (o segredo vai na própria URL: ela não envia headers). */
@@ -1659,13 +1658,25 @@ export async function enviarTextoInstancia(
   token: string,
   number: string,
   text: string,
+  timeoutMs = 25_000,
 ): Promise<{ ok: boolean; error?: string; data?: unknown; httpStatus: number }> {
-  const r = await fetch(`${waBase()}/send/text`, {
-    method: "POST",
-    headers: { apikey: token, "Content-Type": "application/json" },
-    body: JSON.stringify({ number, text }),
-  });
-  const raw = await r.text();
+  // Sem timeout, um provedor travado deixava o navegador sem resposta. Ao estourar o prazo a
+  // exceção sobe e o chamador registra "resultado incerto" (a mensagem pode ter saído).
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let r: Response;
+  let raw: string;
+  try {
+    r = await fetch(`${waBase()}/send/text`, {
+      method: "POST",
+      headers: { apikey: token, "Content-Type": "application/json" },
+      body: JSON.stringify({ number, text }),
+      signal: controller.signal,
+    });
+    raw = await r.text();
+  } finally {
+    clearTimeout(timer);
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: any;
   try {

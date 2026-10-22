@@ -8,6 +8,12 @@ import {
 } from "@/lib/active-organization";
 import { normalizeEvolutionGoQr } from "@/lib/evolution-go-qr";
 import type { WaInstanciaAtendimento } from "@/lib/whatsapp-numero-atendimento";
+import {
+  reconciliarEnvio,
+  resultadoDoRegistro,
+  type WaEnvioDesfecho,
+  type WaEnvioResultado,
+} from "@/lib/whatsapp-envio";
 
 const WHATSAPP_ADMIN_ROLES = new Set(["admin", "gerente", "super_admin"]);
 
@@ -57,7 +63,7 @@ export function isWhatsappAuthorizationError(error: unknown): boolean {
 }
 
 async function invokeWhatsappEdge<T>(
-  functionName: "wa-chips" | "wa-conversations",
+  functionName: "wa-chips" | "wa-conversations" | "wa-responder",
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<T> {
@@ -873,6 +879,10 @@ export type WaMensagem = {
   tipo: string;
   texto: string | null;
   media_url: string | null;
+  /** Id do provedor (WhatsApp); só existe depois que o envio foi confirmado. */
+  externo_id?: string | null;
+  /** Chave de idempotência do envio manual (uuid gerado no navegador). */
+  client_operation_id?: string | null;
   lida: boolean;
   status: "pending" | "sent" | "delivered" | "read" | "failed" | "uncertain" | "received";
   provider_occurred_at: string | null;
@@ -1104,18 +1114,52 @@ export async function marcarConversaLida(conversaId: string): Promise<void> {
   await acaoConversaWa(conversaId, "mark_read");
 }
 
-/** Responde uma conversa (envia pelo chip da org via edge + grava a saída). */
+export type { WaEnvioDesfecho, WaEnvioResultado } from "@/lib/whatsapp-envio";
+
+/** Envia pela Edge (resultado bruto). Lança WhatsappEdgeRequestError em 4xx/5xx e sem resposta. */
 export async function responderConversa(
   conversaId: string,
   texto: string,
-  operationId = crypto.randomUUID(),
-): Promise<{ ok: boolean; error?: string; status?: string; message_id?: string }> {
+  operationId: string = crypto.randomUUID(),
+): Promise<WaEnvioResultado> {
   const context = await activeWhatsappOrganization();
-  const { data, error } = await supabase.functions.invoke("wa-responder", {
-    body: { conversa_id: conversaId, texto, operation_id: operationId, org_id: context.orgId },
+  return invokeWhatsappEdge<WaEnvioResultado>("wa-responder", {
+    conversa_id: conversaId,
+    texto,
+    operation_id: operationId,
+    org_id: context.orgId,
   });
-  if (error) throw error;
-  return data as { ok: boolean; error?: string; status?: string; message_id?: string };
+}
+
+/**
+ * Consulta o que o BACKEND registrou para uma operação de envio, pelo id da operação — a única
+ * forma segura de saber o desfecho quando a resposta HTTP se perdeu (CORS, rede, timeout).
+ */
+export async function consultarOperacaoEnvio(
+  conversaId: string,
+  operationId: string,
+  signal?: AbortSignal,
+): Promise<WaEnvioResultado | null> {
+  const snapshot = await consultarConversasWa(conversaId, 0, 1, signal);
+  const registrada = snapshot.messages.find(
+    (mensagem) => mensagem.client_operation_id === operationId,
+  );
+  return registrada ? resultadoDoRegistro(registrada, operationId) : null;
+}
+
+/** Envio manual com reconciliação (sem reenvio automático). Ver reconciliarEnvio. */
+export function enviarRespostaConversa(
+  conversaId: string,
+  texto: string,
+  operationId: string,
+): Promise<WaEnvioDesfecho> {
+  return reconciliarEnvio({
+    enviar: () => responderConversa(conversaId, texto, operationId),
+    consultar: () => consultarOperacaoEnvio(conversaId, operationId),
+    statusHttp: (error) => (error instanceof WhatsappEdgeRequestError ? error.status : null),
+    mensagemDoErro: (error) =>
+      error instanceof Error ? error.message : "A mensagem não foi enviada.",
+  });
 }
 
 /** Limpa o histórico de conversas da org (aba WhatsApp). Devolve quantas removeu. */

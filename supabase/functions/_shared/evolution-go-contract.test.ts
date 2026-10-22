@@ -224,7 +224,7 @@ test("qrInstancia only requests the QR after the session reports Connected", asy
         url: "https://evolution.invalid/instance/connect",
         method: "POST",
         apiKey: "tenant-instance-token",
-        body: JSON.stringify({ subscribe: ["MESSAGE", "CONNECTION", "QRCODE"] }),
+        body: JSON.stringify({ subscribe: ["MESSAGE", "READ_RECEIPT", "CONNECTION", "QRCODE"] }),
       },
       {
         url: "https://evolution.invalid/instance/status",
@@ -949,7 +949,7 @@ test("pairing connect carries the inbound webhook so Evolution GO does not erase
     assert.deepEqual(bodies, [
       {
         webhookUrl: "https://project.invalid/functions/v1/wa-webhook?k=webhook-secret",
-        subscribe: ["MESSAGE", "CONNECTION", "QRCODE"],
+        subscribe: ["MESSAGE", "READ_RECEIPT", "CONNECTION", "QRCODE"],
       },
     ]);
   } finally {
@@ -975,7 +975,7 @@ test("webhook reconciliation only touches connected instances that lost the webh
       token: "t2",
       connected: true,
       webhook: alvo,
-      events: "MESSAGE,CONNECTION",
+      events: "MESSAGE,READ_RECEIPT,CONNECTION",
     },
     { id: "r3", name: "chip-desconectado", token: "t3", connected: false, webhook: "", events: "" },
     {
@@ -998,7 +998,7 @@ test("webhook reconciliation only touches connected instances that lost the webh
       const remota = remotas.find((item) => item.token === apiKey);
       if (remota) {
         remota.webhook = alvo;
-        remota.events = "MESSAGE,CONNECTION";
+        remota.events = "MESSAGE,READ_RECEIPT,CONNECTION";
       }
       return Response.json({ message: "success", data: {} });
     }
@@ -1040,7 +1040,11 @@ test("webhook reconciliation only touches connected instances that lost the webh
     assert.deepEqual(connects, [
       {
         apiKey: "t1",
-        body: { webhookUrl: alvo, subscribe: ["MESSAGE", "CONNECTION"], immediate: false },
+        body: {
+          webhookUrl: alvo,
+          subscribe: ["MESSAGE", "READ_RECEIPT", "CONNECTION"],
+          immediate: false,
+        },
       },
     ]);
   } finally {

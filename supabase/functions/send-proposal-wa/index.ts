@@ -2,7 +2,7 @@
 // O fluxo anterior tratava `registro_falhou` depois da entrega e consultava `email_opt_out`,
 // que não representa autorização específica de WhatsApp. Nenhum desses caminhos envia agora.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsHeaders, json as jsonResponse } from "../_shared/cors.ts";
 import {
   authorizeWhatsappRequest,
   whatsappAuthorizationFailure,
@@ -11,6 +11,9 @@ import {
 export const DISPARO_EM_MASSA_BLOQUEADO = "disparo_em_massa_bloqueado";
 
 Deno.serve(async (req) => {
+  // Toda resposta leva os headers de CORS do domínio chamador (antes saíam sem origem e o
+  // navegador bloqueava a leitura, escondendo o resultado real da operação).
+  const json = (body: unknown, status = 200) => jsonResponse(body, status, req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 

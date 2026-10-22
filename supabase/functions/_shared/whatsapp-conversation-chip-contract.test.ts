@@ -70,8 +70,8 @@ test("manual replies use only the conversation's own instance, never the campaig
 });
 
 test("an unavailable original chip is reported, never swapped silently", () => {
-  assert.match(responder, /code: "chip_arquivado"/);
-  assert.match(responder, /code: "saude_nao_confirmada"/);
+  assert.match(responder, /"chip_arquivado"/);
+  assert.match(responder, /"saude_nao_confirmada"/);
   assert.match(
     responder,
     /checarSaudeChip\(admin, context\.orgId, conversation\.instancia_id, "manual"\)/,

@@ -160,6 +160,39 @@ export function normalizeInboundWhatsappMessage(
   };
 }
 
+export type NormalizedReceipt =
+  | { status: "delivered" | "read"; messageIds: string[]; occurredAt: string }
+  | { ignored: "recibo-nao-suportado" | "recibo-de-grupo" | "recibo-sem-id" };
+
+/**
+ * Recibo da Evolution GO 0.7.x: event "Receipt", state "Delivered" | "Read" | "ReadSelf" na raiz e,
+ * em data, os ids das mensagens (MessageIDs) e o Chat. "ReadSelf" é o próprio dono lendo em outro
+ * aparelho — NÃO é leitura do contato e nunca promove uma mensagem enviada. Grupos e listas de
+ * transmissão são descartados antes de qualquer consulta ao banco.
+ */
+export function normalizeReceiptEvent(body: unknown, receivedAt = new Date()): NormalizedReceipt {
+  const root = recordOf(body);
+  if (!root) return { ignored: "recibo-nao-suportado" };
+  const state = String(pickWhatsappValue(root, ["state", "State"]) ?? "").toLowerCase();
+  if (state !== "delivered" && state !== "read") return { ignored: "recibo-nao-suportado" };
+  const data = pickWhatsappValue(root, ["data", "Data"]) ?? root;
+  const chat = String(pickWhatsappValue(data, ["Chat", "chat"]) ?? "").toLowerCase();
+  if (/@(g\.us|broadcast|newsletter)$/.test(chat)) return { ignored: "recibo-de-grupo" };
+  const rawIds = pickWhatsappValue(data, ["MessageIDs", "messageIDs", "messageIds"]);
+  const messageIds = Array.isArray(rawIds)
+    ? [...new Set(rawIds.filter((id): id is string => typeof id === "string" && id.trim() !== ""))]
+    : [];
+  if (!messageIds.length) return { ignored: "recibo-sem-id" };
+  return {
+    status: state,
+    messageIds,
+    occurredAt: normalizeWhatsappTimestamp(
+      pickWhatsappValue(data, ["Timestamp", "timestamp"]),
+      receivedAt,
+    ),
+  };
+}
+
 /**
  * Parâmetros EXATOS de wa_ingest_inbound_message para uma mensagem normalizada. Mantidos aqui,
  * num módulo tipado e testado, porque um acesso a campo inexistente no webhook (inbound.contact)

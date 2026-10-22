@@ -277,6 +277,156 @@ async function sondarAvatares(admin: any, limite: number) {
   return { conversas: resultados.length, resultados };
 }
 
+/**
+ * Prova o caminho de STATUS (envio -> entregue -> lido) em produção SEM enviar nada ao WhatsApp:
+ * cria uma conversa de teste por um evento de entrada sintético, registra uma mensagem de saída
+ * só no banco (reserva + finalização), aplica recibos sintéticos pelo webhook real — inclusive
+ * fora de ordem, ReadSelf e de grupo — lê o status após cada passo e APAGA tudo no fim.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function provarRecibos(admin: any, nomeInstancia: string) {
+  const alvo = urlWebhookRecebimento();
+  if (!alvo) return { erro: "webhook_indisponivel" };
+  const { data: instancia } = await admin
+    .from("wa_instancias")
+    .select("id,org_id,nome")
+    .eq("nome", nomeInstancia)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!instancia) return { erro: "instancia_nao_encontrada" };
+  const remote = "5500000000002@s.whatsapp.net";
+  const { count: existentes } = await admin
+    .from("wa_conversas")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", instancia.org_id)
+    .eq("remote_contact_id", remote);
+  if ((existentes ?? 0) > 0) return { erro: "contato_de_teste_ja_existe" };
+  const { data: membro } = await admin
+    .from("memberships")
+    .select("user_id")
+    .eq("org_id", instancia.org_id)
+    .limit(1)
+    .maybeSingle();
+  if (!membro?.user_id) return { erro: "sem_membro_para_autoria" };
+
+  const sufixo = Date.now();
+  const externalId = `DIAGOUT${sufixo}`;
+  const entrar = (corpo: unknown) =>
+    fetch(alvo, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    }).then(async (r) => ({ http: r.status, corpo: redigir(await r.text().catch(() => "")) }));
+  const recibo = (state: string, chat = remote, ids: string[] = [externalId]) =>
+    entrar({
+      event: "Receipt",
+      state,
+      instanceName: instancia.nome,
+      data: { Chat: chat, Sender: chat, MessageIDs: ids, Timestamp: new Date().toISOString() },
+    });
+  const statusAtual = async () => {
+    const { data } = await admin
+      .from("wa_mensagens")
+      .select("status")
+      .eq("org_id", instancia.org_id)
+      .eq("externo_id", externalId)
+      .maybeSingle();
+    return data?.status ?? null;
+  };
+
+  const passos: Array<Record<string, unknown>> = [];
+  let conversaId: string | null = null;
+  try {
+    await entrar({
+      event: "Message",
+      instanceName: instancia.nome,
+      data: {
+        Info: {
+          Chat: remote,
+          Sender: remote,
+          IsFromMe: false,
+          ID: `DIAGIN${sufixo}`,
+          Type: "text",
+          PushName: "Teste Recibos",
+          Timestamp: new Date().toISOString(),
+        },
+        Message: { conversation: "entrada sintetica de diagnostico" },
+      },
+    });
+    const { data: conversa } = await admin
+      .from("wa_conversas")
+      .select("id")
+      .eq("org_id", instancia.org_id)
+      .eq("instancia_id", instancia.id)
+      .eq("remote_contact_id", remote)
+      .maybeSingle();
+    conversaId = conversa?.id ?? null;
+    if (!conversaId) return { erro: "conversa_nao_criada" };
+
+    const operacao = crypto.randomUUID();
+    const { data: reservada } = await admin.rpc("wa_reserve_outbound_message", {
+      p_org: instancia.org_id,
+      p_conversation: conversaId,
+      p_actor: membro.user_id,
+      p_operation: operacao,
+      p_text: "saida sintetica de diagnostico (nao enviada)",
+    });
+    const reserva = Array.isArray(reservada) ? reservada[0] : reservada;
+    await admin.rpc("wa_finalize_outbound_message", {
+      p_org: instancia.org_id,
+      p_message: reserva?.message_id,
+      p_status: "sent",
+      p_external_id: externalId,
+      p_occurred_at: new Date().toISOString(),
+      p_error: null,
+    });
+    passos.push({ passo: "enviada", status: await statusAtual() });
+
+    const entregue = await recibo("Delivered");
+    passos.push({ passo: "recibo Delivered", http: entregue.http, status: await statusAtual() });
+    const lido = await recibo("Read");
+    passos.push({ passo: "recibo Read", http: lido.http, status: await statusAtual() });
+    const atrasado = await recibo("Delivered");
+    passos.push({
+      passo: "Delivered fora de ordem",
+      http: atrasado.http,
+      status: await statusAtual(),
+    });
+    const lidoRepetido = await recibo("Read");
+    passos.push({ passo: "Read repetido", http: lidoRepetido.http, status: await statusAtual() });
+    const proprio = await recibo("ReadSelf");
+    passos.push({
+      passo: "ReadSelf",
+      http: proprio.http,
+      corpo: proprio.corpo,
+      status: await statusAtual(),
+    });
+    const grupo = await recibo("Read", "120363000000000000@g.us");
+    passos.push({ passo: "recibo de grupo", http: grupo.http, corpo: grupo.corpo });
+    const desconhecido = await recibo("Delivered", remote, ["DIAGINEXISTENTE"]);
+    passos.push({ passo: "id desconhecido", http: desconhecido.http, corpo: desconhecido.corpo });
+  } finally {
+    if (conversaId) {
+      await admin.from("wa_conversas").delete().eq("id", conversaId).eq("org_id", instancia.org_id);
+    }
+  }
+  const contar = async (tabela: string, coluna: string, valor: string) => {
+    const { count } = await admin
+      .from(tabela)
+      .select("id", { count: "exact", head: true })
+      .eq(coluna, valor);
+    return count ?? 0;
+  };
+  return {
+    configurado: true,
+    passos,
+    limpeza: {
+      conversas_restantes: conversaId ? await contar("wa_conversas", "id", conversaId) : 0,
+      mensagens_restantes: await contar("wa_mensagens", "externo_id", externalId),
+    },
+  };
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Método não permitido." }, 405);
   const secret = Deno.env.get("CRON_SECRET");
@@ -302,6 +452,9 @@ Deno.serve(async (request) => {
     .clone()
     .json()
     .catch(() => ({}));
+  if (body.modo === "recibos_sinteticos") {
+    return json(await provarRecibos(admin, String(body.instancia ?? "")));
+  }
   if (body.modo === "webhook_sintetico") {
     // Prova o caminho webhook -> wa_ingest_inbound_message NO AMBIENTE REAL com um evento
     // sintético no formato da Evolution GO 0.7.2, para um contato de teste inexistente.

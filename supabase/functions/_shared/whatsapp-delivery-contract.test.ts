@@ -14,6 +14,7 @@ const rotation = read("supabase/functions/_shared/whatsapp-chip-rotation.ts");
 const control = read("supabase/functions/wa-campaign-control/index.ts");
 const worker = read("supabase/functions/wa-send-worker/index.ts");
 const webhook = read("supabase/functions/wa-webhook/index.ts");
+const deliveryStatus = read("supabase/functions/_shared/whatsapp-delivery-status.ts");
 const config = read("supabase/config.toml");
 const campaignUi = read("src/components/whatsapp/WaCampanhas.tsx");
 const whatsappService = read("src/services/whatsapp.ts");
@@ -81,10 +82,13 @@ test("pause, resume, and cancellation preserve history and actor timestamps", ()
 });
 
 test("webhook persists deduplicated delivery events and blocks stale regressions", () => {
-  assert.match(webhook, /wa_envio_eventos/);
-  assert.match(webhook, /provider_message_id/);
-  assert.match(webhook, /canTransitionDelivery/);
-  assert.match(webhook, /deliveryEventIdentity/);
+  // A aplicação monotônica e idempotente vive em módulo testado com banco simulado.
+  assert.match(webhook, /aplicarStatusDoProvedor/);
+  assert.match(deliveryStatus, /wa_envio_eventos/);
+  assert.match(deliveryStatus, /provider_message_id/);
+  assert.match(deliveryStatus, /canTransitionDelivery/);
+  assert.match(deliveryStatus, /deliveryEventIdentity/);
+  assert.match(deliveryStatus, /canAdvanceConversationMessageStatus/);
 });
 
 test("uncertain results are persisted without automatic retry", () => {
@@ -211,7 +215,8 @@ test("real metrics distinguish accepted, delivered, failed, uncertain, and respo
 });
 
 test("inbound responses are attributed to an exact organization delivery", () => {
-  assert.match(webhook, /\.eq\("org_id", inst\.org_id\)/);
+  assert.match(deliveryStatus, /\.eq\("org_id", inst\.org_id\)/);
+  assert.match(deliveryStatus, /\.eq\("instancia_id", inst\.id\)/);
   // SUT_IS_CORRECT_BECAUSE: attribution now belongs to the same PostgreSQL transaction that
   // persists the inbound message; the webhook only supplies the instance-derived tenant.
   assert.match(webhook, /rpc\(\s*"wa_ingest_inbound_message"/);

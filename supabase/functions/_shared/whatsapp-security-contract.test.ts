@@ -95,7 +95,11 @@ test("conversation cleanup is confirmed and limited to the active organization",
 
 test("webhook derives the tenant from the persisted instance and never from the payload", () => {
   assert.match(webhook, /select\("id, user_id, org_id"\)/);
-  assert.match(webhook, /org_id: inst\.org_id/);
+  assert.match(webhook, /inboundIngestParams\(inst\.org_id, inst\.id, inbound\)/);
+  assert.match(
+    fs.readFileSync("supabase/functions/_shared/whatsapp-delivery-status.ts", "utf8"),
+    /org_id: inst\.org_id/,
+  );
   assert.doesNotMatch(webhook, /body\.org_id/);
 });
 

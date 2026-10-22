@@ -6,6 +6,7 @@ import {
   Briefcase,
   Building2,
   Calendar,
+  AlertTriangle,
   Check,
   CheckCheck,
   ChevronDown,
@@ -51,6 +52,7 @@ import {
   type EstadoChipAtendimento,
   type WaInstanciaAtendimento,
 } from "@/lib/whatsapp-numero-atendimento";
+import { escolherOperacaoEnvio, type OperacaoEnvio } from "@/lib/whatsapp-envio";
 import { dashboardUrlForSection } from "@/lib/dashboard-navigation";
 import { getActiveOrganizationContext } from "@/lib/active-organization";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,7 +68,7 @@ import {
   listarScripts,
   marcarConversaLida,
   obterKpisConversasWa,
-  responderConversa,
+  enviarRespostaConversa,
   sincronizarAvataresConversas,
   type WaConversa,
   type WaConversaKpis,
@@ -327,6 +329,13 @@ export function WaConversas() {
   const [composerTab, setComposerTab] = useState<"mensagem" | "resposta_rapida">("mensagem");
   const [textoMensagem, setTextoMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // Trava síncrona: dois cliques/Enter no mesmo instante passam pelo estado antes do re-render.
+  const enviandoRef = useRef(false);
+  // Operação lógica de envio ainda NÃO confirmada. O mesmo texto na mesma conversa reutiliza o
+  // mesmo operation_id: repetir nunca gera uma segunda mensagem real (a Edge devolve o estado
+  // registrado). Editar o texto cria uma nova operação.
+  const operacaoEnvioRef = useRef<OperacaoEnvio | null>(null);
+  const [envioNaoConfirmado, setEnvioNaoConfirmado] = useState<string | null>(null);
   const [scriptsDisponiveis, setScriptsDisponiveis] = useState<WaScript[]>([]);
   const [membros, setMembros] = useState<Membro[]>([]);
   const [usuarioAtualId, setUsuarioAtualId] = useState("");
@@ -695,30 +704,40 @@ export function WaConversas() {
 
   // Enviar Mensagem
   const enviarMensagem = async () => {
-    if (!contatoAtivo || !textoMensagem.trim() || enviando) return;
-
+    if (!contatoAtivo || enviandoRef.current) return;
     const texto = textoMensagem.trim();
-    const operationId = crypto.randomUUID();
+    if (!texto) return;
+
+    enviandoRef.current = true;
     setEnviando(true);
+    const operacao = escolherOperacaoEnvio(operacaoEnvioRef.current, contatoAtivo.id, texto, () =>
+      crypto.randomUUID(),
+    );
+    operacaoEnvioRef.current = operacao;
+    const operationId = operacao.operationId;
 
     try {
-      const resp = await responderConversa(contatoAtivo.id, texto, operationId);
-      if (!resp.ok || resp.status !== "sent") {
-        toast.error(
-          resp.status === "uncertain"
-            ? "Envio sem confirmação do provedor. Não reenvie automaticamente."
-            : resp.error || "A mensagem não foi enviada.",
-        );
-      } else {
+      const desfecho = await enviarRespostaConversa(contatoAtivo.id, texto, operationId);
+      if (desfecho.tipo === "confirmado") {
+        // Só limpa o texto depois que o backend CONFIRMOU o registro e o envio.
+        operacaoEnvioRef.current = null;
+        setEnvioNaoConfirmado(null);
         setTextoMensagem("");
-        toast.success("Mensagem enviada com sucesso.");
+        toast.success("Mensagem enviada. A entrega e a leitura são confirmadas pelo WhatsApp.");
+      } else if (desfecho.tipo === "recusado") {
+        // Nada saiu: a próxima tentativa é uma nova operação.
+        operacaoEnvioRef.current = null;
+        setEnvioNaoConfirmado(null);
+        toast.error(desfecho.mensagem);
+      } else {
+        // Pode ter saído: mantém texto e operação. Nunca reenvia sozinho.
+        setEnvioNaoConfirmado(desfecho.mensagem);
+        toast.warning(desfecho.mensagem);
       }
-      await carregarDetalhes(contatoAtivo.id);
-      await carregarDadosIniciais();
-    } catch (error) {
-      console.error("Falha ao enviar mensagem", error);
-      toast.error("A mensagem não foi confirmada. Consulte o status antes de tentar novamente.");
+      await carregarDetalhes(contatoAtivo.id).catch(() => undefined);
+      await carregarDadosIniciais().catch(() => undefined);
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
       textareaRef.current?.focus();
     }
@@ -1588,19 +1607,32 @@ export function WaConversas() {
                         <div className="mt-1.5 flex items-center justify-end gap-1 text-[10px] text-home-muted/80">
                           <span>{m.horario}</span>
                           {ehSaida && m.statusEnvio === "falha" && (
-                            <span className="text-rose-400">Falha</span>
+                            <span
+                              className="flex items-center gap-1 text-rose-400"
+                              title="O WhatsApp recusou o envio"
+                            >
+                              <AlertTriangle className="h-3 w-3" /> Falhou
+                            </span>
                           )}
                           {ehSaida && m.statusEnvio === "incerto" && (
-                            <span className="text-amber-400">Não confirmado</span>
+                            <span
+                              className="flex items-center gap-1 text-amber-400"
+                              title="O provedor não confirmou o envio. Não reenvie sem verificar."
+                            >
+                              <AlertTriangle className="h-3 w-3" /> Envio não confirmado
+                            </span>
                           )}
                           {ehSaida && m.statusEnvio === "pendente" && (
-                            <Clock className="h-3 w-3 text-home-muted" />
+                            <Clock className="h-3 w-3 text-home-muted" aria-label="Enviando" />
                           )}
                           {ehSaida && m.statusEnvio === "enviado" && (
-                            <Check className="h-3 w-3 text-emerald-400" />
+                            <Check className="h-3 w-3 text-home-muted" aria-label="Enviada" />
                           )}
-                          {ehSaida && ["entregue", "lido"].includes(m.statusEnvio ?? "") && (
-                            <CheckCheck className="h-3 w-3 text-emerald-400" />
+                          {ehSaida && m.statusEnvio === "entregue" && (
+                            <CheckCheck className="h-3 w-3 text-home-muted" aria-label="Entregue" />
+                          )}
+                          {ehSaida && m.statusEnvio === "lido" && (
+                            <CheckCheck className="h-3 w-3 text-sky-400" aria-label="Lida" />
                           )}
                         </div>
                       </div>
@@ -1707,17 +1739,37 @@ export function WaConversas() {
                   <Textarea
                     ref={textareaRef}
                     value={textoMensagem}
-                    onChange={(e) => setTextoMensagem(e.target.value)}
+                    onChange={(e) => {
+                      setTextoMensagem(e.target.value);
+                      if (operacaoEnvioRef.current?.texto !== e.target.value.trim()) {
+                        setEnvioNaoConfirmado(null);
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        enviarMensagem();
+                        void enviarMensagem();
                       }
                     }}
                     placeholder="Digite uma mensagem..."
                     rows={2}
                     className="w-full resize-none border-none bg-transparent p-0 text-xs text-white placeholder:text-home-muted/50 focus-visible:ring-0 leading-relaxed"
                   />
+
+                  {envioNaoConfirmado && (
+                    <p
+                      className="flex items-center gap-1.5 pt-1 text-[11px] text-amber-400"
+                      role="status"
+                    >
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      {envioNaoConfirmado} Enviar de novo repete a mesma operação, sem duplicar.
+                    </p>
+                  )}
+                  {enviando && (
+                    <p className="pt-1 text-[11px] text-home-muted" role="status">
+                      Enviando…
+                    </p>
+                  )}
 
                   {/* Toolbar Inferior: Emojis, Clips, Imagens, Documentos e Botão Enviar Laranja */}
                   <div className="flex items-center justify-between pt-1">
@@ -1762,7 +1814,7 @@ export function WaConversas() {
                     {/* Botão de Envio Laranja Vibrante Flow Business */}
                     <button
                       type="button"
-                      onClick={enviarMensagem}
+                      onClick={() => void enviarMensagem()}
                       disabled={enviando || !textoMensagem.trim()}
                       title="Enviar mensagem (Enter)"
                       className="flex h-8 w-8 items-center justify-center rounded-xl bg-home-orange text-white shadow-[0_0_15px_rgba(255,98,0,0.5)] transition-all hover:bg-orange-600 active:scale-95 disabled:opacity-40 disabled:pointer-events-none"

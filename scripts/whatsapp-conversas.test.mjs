@@ -106,18 +106,17 @@ test("8. Mensagem recebida: webhook normaliza e persiste por RPC idempotente", (
 });
 
 // 9. Envio manual autorizado
-test("9. Envio manual autorizado: invoca responderConversa e valida parâmetros", () => {
-  assert.match(waConversas, /responderConversa\(contatoAtivo\.id, texto, operationId\)/);
+test("9. Envio manual autorizado: invoca o envio reconciliado e valida parâmetros", () => {
+  assert.match(waConversas, /enviarRespostaConversa\(contatoAtivo\.id, texto, operationId\)/);
   assert.match(waConversas, /enviando/);
   assert.match(waConversas, /SendHorizontal/);
 });
 
 // 10. Bloqueio de envio não autorizado
 test("10. Bloqueio de envio não autorizado: barra envio vazio ou sem contato selecionado", () => {
-  assert.match(
-    waConversas,
-    /if \(!contatoAtivo \|\| !textoMensagem\.trim\(\) \|\| enviando\) return/,
-  );
+  // Trava síncrona (ref) + texto vazio: dois cliques/Enter no mesmo instante não geram duas operações.
+  assert.match(waConversas, /if \(!contatoAtivo \|\| enviandoRef\.current\) return;/);
+  assert.match(waConversas, /if \(!texto\) return;/);
   assert.match(waConversas, /disabled=\{enviando \|\| !textoMensagem\.trim\(\)\}/);
 });
 
@@ -132,9 +131,16 @@ test("11. Prevenção de duplicidade: proteção contra cliques múltiplos e est
 
 // 12. Resultado de envio com estados claros
 test("12. Resultado de envio: estados persistidos e nenhuma confirmação otimista inventada", () => {
-  assert.match(waConversas, /toast\.success\("Mensagem enviada com sucesso\."\)/);
-  assert.match(waConversas, /status === "uncertain"/);
+  assert.match(waConversas, /toast\.success\(\s*"Mensagem enviada\./);
+  assert.match(waConversas, /desfecho\.tipo === "confirmado"/);
+  assert.match(waConversas, /desfecho\.tipo === "recusado"/);
+  assert.match(waConversas, /Envio não confirmado/);
   assert.doesNotMatch(waConversas, /msg-out-\$\{Date\.now\(\)\}/);
+  // O texto só é limpo na ramificação CONFIRMADA — nunca antes de o backend registrar o envio.
+  const confirmado = waConversas.indexOf('desfecho.tipo === "confirmado"');
+  const recusado = waConversas.indexOf('desfecho.tipo === "recusado"');
+  const limpeza = waConversas.indexOf('setTextoMensagem("")', confirmado);
+  assert.ok(confirmado > 0 && limpeza > confirmado && limpeza < recusado);
 });
 
 // 13. Respostas rápidas

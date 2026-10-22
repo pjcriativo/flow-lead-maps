@@ -5,16 +5,12 @@
 // respondem 503 para que o provedor possa repetir o evento idempotente com segurança.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { corsHeaders, json } from "../_shared/cors.ts";
+import { extractProviderMessageId } from "../_shared/whatsapp-delivery-engine.ts";
+import { aplicarStatusDoProvedor } from "../_shared/whatsapp-delivery-status.ts";
 import {
-  canTransitionDelivery,
-  deliveryEventIdentity,
-  extractProviderMessageId,
-  type WhatsappDeliveryStatus,
-} from "../_shared/whatsapp-delivery-engine.ts";
-import {
-  canAdvanceConversationMessageStatus,
   inboundIngestParams,
   normalizeInboundWhatsappMessage,
+  normalizeReceiptEvent,
   normalizeWhatsappTimestamp,
 } from "../_shared/whatsapp-conversation.ts";
 
@@ -157,109 +153,65 @@ async function handleWebhook(req: Request): Promise<Response> {
     return json({ ok: true, stored: true, connection: providerState });
   }
 
-  const providerMessageId = extractProviderMessageId(body);
-  const providerStatus = deliveryStatus(body, evento);
-  if (providerMessageId && providerStatus) {
-    const { data: delivery } = await admin
-      .from("wa_envios")
-      .select("id,status")
-      .eq("org_id", inst.org_id)
-      .eq("instancia_id", inst.id)
-      .eq("provider_message_id", providerMessageId)
-      .maybeSingle();
-    const messageStatus = providerStatus === "accepted" ? "sent" : providerStatus;
-    const { data: conversationMessage } = await admin
-      .from("wa_mensagens")
-      .select("id,status,conversa_id")
-      .eq("org_id", inst.org_id)
-      .eq("instancia_id", inst.id)
-      .eq("externo_id", providerMessageId)
-      .maybeSingle();
-    if (
-      conversationMessage &&
-      canAdvanceConversationMessageStatus(conversationMessage.status, messageStatus)
-    ) {
-      const { error: messageStatusError } = await admin
-        .from("wa_mensagens")
-        .update({ status: messageStatus })
-        .eq("id", conversationMessage.id)
-        .eq("org_id", inst.org_id)
-        .eq("status", conversationMessage.status);
-      if (messageStatusError) {
-        console.error("wa-webhook message status persistence failed", messageStatusError.code);
-        return json({ ok: false, stored: false }, 503);
+  if (evento === "receipt") {
+    // Recibos de entrega/leitura das mensagens ENVIADAS por nós (conversa e campanha). O id do
+    // provedor é gravado no envio; um recibo pode chegar milissegundos antes dessa gravação, por
+    // isso um id ainda desconhecido é consultado de novo uma vez antes de ser ignorado.
+    const recibo = normalizeReceiptEvent(body);
+    if ("ignored" in recibo) return json({ ok: true, ignored: recibo.ignored });
+    let aplicados = 0;
+    let desconhecidos = 0;
+    for (const id of recibo.messageIds) {
+      let resultado = await aplicarStatusDoProvedor(
+        admin,
+        inst,
+        id,
+        recibo.status,
+        recibo.occurredAt,
+        evento,
+      );
+      if (resultado === "desconhecido") {
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        resultado = await aplicarStatusDoProvedor(
+          admin,
+          inst,
+          id,
+          recibo.status,
+          recibo.occurredAt,
+          evento,
+        );
       }
-    }
-    if (!delivery) {
-      return conversationMessage
-        ? json({ ok: true, stored: true, status: messageStatus })
-        : json({ ok: true, ignored: "envio-desconhecido" });
-    }
-
-    const occurredAtRaw = pick(body, [
-      "data.timestamp",
-      "data.Timestamp",
-      "timestamp",
-      "date_time",
-    ]);
-    const occurredAt = normalizeWhatsappTimestamp(occurredAtRaw);
-    const eventKey = await deliveryEventIdentity({
-      instanceId: inst.id,
-      providerMessageId,
-      status: providerStatus,
-      occurredAt,
-    });
-    const { error: eventError } = await admin.from("wa_envio_eventos").insert({
-      org_id: inst.org_id,
-      envio_id: delivery.id,
-      instancia_id: inst.id,
-      event_key: eventKey,
-      provider_message_id: providerMessageId,
-      event_type: evento || "status",
-      status: providerStatus,
-      occurred_at: occurredAt,
-      payload: { event: evento, status: providerStatus },
-    });
-    if (eventError && !String(eventError.code).includes("23505")) {
-      console.error("wa-webhook delivery event persistence failed", eventError.code);
-      return json({ ok: false, stored: false }, 503);
-    }
-
-    if (
-      canTransitionDelivery(
-        delivery.status as WhatsappDeliveryStatus,
-        providerStatus as WhatsappDeliveryStatus,
-      )
-    ) {
-      const timestampColumn = {
-        accepted: "accepted_at",
-        sent: "sent_at",
-        delivered: "delivered_at",
-        read: "read_at",
-        failed: "failed_at",
-      }[providerStatus];
-      const { error: deliveryUpdateError } = await admin
-        .from("wa_envios")
-        .update({
-          status: providerStatus,
-          [timestampColumn]: occurredAt ?? new Date().toISOString(),
-          processed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", delivery.id)
-        .eq("org_id", inst.org_id)
-        .eq("status", delivery.status);
-      if (deliveryUpdateError) {
-        console.error("wa-webhook delivery update failed", deliveryUpdateError.code);
-        return json({ ok: false, stored: false }, 503);
-      }
+      if (resultado === "erro") return json({ ok: false, stored: false }, 503);
+      if (resultado === "aplicado") aplicados++;
+      else desconhecidos++;
     }
     return json({
       ok: true,
-      stored: true,
-      duplicate: Boolean(eventError),
-      status: providerStatus,
+      stored: aplicados > 0,
+      status: recibo.status,
+      aplicados,
+      desconhecidos,
     });
+  }
+
+  const providerMessageId = extractProviderMessageId(body);
+  const providerStatus = deliveryStatus(body, evento);
+  if (providerMessageId && providerStatus) {
+    const occurredAt = normalizeWhatsappTimestamp(
+      pick(body, ["data.timestamp", "data.Timestamp", "timestamp", "date_time"]),
+    );
+    const resultado = await aplicarStatusDoProvedor(
+      admin,
+      inst,
+      providerMessageId,
+      providerStatus,
+      occurredAt,
+      evento,
+    );
+    if (resultado === "erro") return json({ ok: false, stored: false }, 503);
+    return resultado === "aplicado"
+      ? json({ ok: true, stored: true, status: providerStatus })
+      : json({ ok: true, ignored: "envio-desconhecido" });
   }
 
   const inbound = normalizeInboundWhatsappMessage(body);

@@ -34,7 +34,9 @@ test("manual reply reserves a unique operation before provider transport", () =>
   const transport = responder.indexOf("enviarTextoInstancia(");
   assert.ok(reservation >= 0 && transport > reservation);
   assert.match(migration, /unique index[^;]+client_operation_id/is);
-  assert.match(responder, /p_status: "uncertain"/);
+  // Falha de rede/timeout do provedor é registrada como resultado INCERTO (nunca como falha).
+  assert.match(responder, /finalizar\(\s*"uncertain"/);
+  assert.match(responder, /p_status: status/);
 });
 
 test("manual reply requires a recently healthy instance", () => {

@@ -217,11 +217,13 @@ async function handleRequest(req: Request): Promise<Response> {
         ? admin
             .from("wa_mensagens")
             .select(
-              "id,conversa_id,direcao,tipo,texto,media_url,externo_id,lida,status,author_id,provider_occurred_at,criado_em",
+              "id,conversa_id,direcao,tipo,texto,media_url,externo_id,client_operation_id,lida,status,author_id,provider_occurred_at,criado_em",
             )
             .eq("org_id", context.orgId)
             .eq("conversa_id", detailId)
-            .order("provider_occurred_at", { ascending: true })
+            // As 500 MAIS RECENTES (ordem decrescente + limite); invertidas abaixo. Antes eram as
+            // 500 mais antigas, e uma conversa longa deixava de mostrar as mensagens novas.
+            .order("provider_occurred_at", { ascending: false })
             .limit(500)
         : Promise.resolve({ data: [] }),
       detailId
@@ -319,7 +321,7 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       selected_id: detailId,
       instances,
-      messages: messagesResult.data ?? [],
+      messages: [...(messagesResult.data ?? [])].reverse(),
       notes: notesResult.data ?? [],
       events: eventsResult.data ?? [],
       tags: tagsResult.data ?? [],
