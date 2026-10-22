@@ -63,8 +63,15 @@ const ICONES_CAPACIDADE: Record<string, { icon: LucideIcon; cor: string; bg: str
   sentimento: { icon: Heart, cor: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20" },
 };
 
+import { EquipeAgentesView } from "./EquipeAgentesView";
+
 export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void }) {
+  const [telaAtual, setTelaAtual] = useState<"painel" | "equipe">("painel");
   const [periodoMetas, setPeriodoMetas] = useState("Este mês");
+
+  if (telaAtual === "equipe") {
+    return <EquipeAgentesView onVoltarPainel={() => setTelaAtual("painel")} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-[#f95d14]/30 selection:text-white">
@@ -98,6 +105,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
+              onClick={() => setTelaAtual("equipe")}
               className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#121620] px-4 text-xs font-semibold text-neutral-200 transition-all hover:border-white/20 hover:bg-[#181e2b] hover:text-white"
             >
               <Users className="size-4 text-neutral-400" />
@@ -225,6 +233,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
+                  onClick={() => setTelaAtual("equipe")}
                   className="flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-neutral-200 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
                 >
                   Ver plano atual
@@ -337,6 +346,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
               </div>
               <button
                 type="button"
+                onClick={() => setTelaAtual("equipe")}
                 className="flex items-center gap-1 text-xs font-semibold text-[#f95d14] transition-colors hover:text-[#ff7836]"
               >
                 <span>Gerenciar equipe</span>
