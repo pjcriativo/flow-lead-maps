@@ -119,3 +119,72 @@ test("realtime listens to messages and conversations of the organization with a 
   assert.match(ui, /Math\.min\(FALLBACK_BASE_DELAY_MS \* 2 \*\* failures, 120_000\)/);
   assert.match(ui, /failures >= MAX_FALLBACK_FAILURES/);
 });
+
+test("continuing a conversation through another number is explicit, scoped and audited", () => {
+  const migracao = read("supabase/migrations/202610220001_wa_change_conversation_instance.sql");
+  // Só quando o número ORIGINAL não está mais disponível; nunca tira conversa de número ativo.
+  assert.match(
+    migracao,
+    /raise exception 'original instance is still active' using errcode = '23514'/,
+  );
+  // Destino da mesma organização, ativo, conectado e pareado.
+  assert.match(
+    migracao,
+    /i\.org_id = p_org and i\.deleted_at is null\s+and i\.status = 'conectado' and i\.numero is not null/,
+  );
+  // Mesmas regras de acesso das demais ações de conversa.
+  assert.match(migracao, /membership not allowed/);
+  assert.match(
+    migracao,
+    /v_role in \('vendedor', 'sdr'\) and v_conv\.assigned_to is distinct from p_actor/,
+  );
+  // Auditoria na linha do tempo e na instância de destino.
+  assert.match(migracao, /'instance_changed'/);
+  assert.match(migracao, /wa_record_instance_event\(/);
+  // Nada é movido se o contato já tem conversa no destino.
+  assert.match(migracao, /conversation already exists in target/);
+  assert.match(
+    migracao,
+    /revoke all on function public\.wa_change_conversation_instance\(uuid, uuid, uuid, uuid\)\s+from public, anon, authenticated/,
+  );
+  assert.match(migracao, /to service_role/);
+  // O histórico NÃO é reescrito: nenhuma atualização de wa_mensagens na função.
+  assert.doesNotMatch(migracao.replace(/--[^\n]*/g, ""), /update public\.wa_mensagens/);
+});
+
+test("the change-number action is wired to the real function and lists only connected numbers", () => {
+  assert.match(conversations, /"trocar_numero"/);
+  assert.match(conversations, /rpc\("wa_change_conversation_instance"/);
+  assert.match(conversations, /p_actor: context\.userId/);
+  const ativos = conversations.slice(conversations.indexOf("const ativosResult"));
+  assert.match(ativos, /\.eq\("org_id", context\.orgId\)/);
+  assert.match(ativos, /\.eq\("status", "conectado"\)/);
+  assert.match(ativos, /\.is\("deleted_at", null\)/);
+  assert.doesNotMatch(ativos.slice(0, ativos.indexOf("let lead = null")), /token/i);
+});
+
+test("an archived-number conversation offers the number choice and blocks sending until chosen", () => {
+  assert.match(ui, /contatoAtivo\.chip\?\.arquivada/);
+  assert.match(ui, /Continuar por este número/);
+  assert.match(ui, /trocarNumeroConversaWa\(contatoAtivo\.id, numeroEscolhido\)/);
+  assert.match(
+    ui,
+    /if \(!contatoAtivo \|\| enviandoRef\.current \|\| contatoAtivo\.chip\?\.arquivada\) return;/,
+  );
+  assert.match(
+    ui,
+    /disabled=\{\s*enviando \|\| !textoMensagem\.trim\(\) \|\| Boolean\(contatoAtivo\.chip\?\.arquivada\)\s*\}/,
+  );
+  // A recusa do servidor também fala a língua do atendente, sem citar uma ação de administrador.
+  assert.doesNotMatch(responder, /administrador/i);
+  assert.match(responder, /Escolha por qual número continuar/);
+});
+
+test("creating a CRM lead from a conversation leads to the pipeline, not to the lead list", () => {
+  assert.match(ui, /label: "Ver no pipeline"/);
+  const destinos = [
+    ...ui.matchAll(/dashboardUrlForSection\(\s*window\.location\.href,\s*"(\w+)"/g),
+  ].map((m) => m[1]);
+  assert.ok(destinos.includes("pipeline"));
+  assert.ok(!destinos.includes("leads"), "nenhum atalho da conversa deve levar à lista de leads");
+});

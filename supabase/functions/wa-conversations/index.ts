@@ -18,6 +18,7 @@ const MUTATIONS = new Set([
   "create_lead",
   "add_tag",
   "remove_tag",
+  "trocar_numero",
 ]);
 const READ_ACTIONS = new Set(["snapshot", "contact_avatars"]);
 const CONVERSATION_FIELDS =
@@ -284,6 +285,21 @@ async function handleRequest(req: Request): Promise<Response> {
       funcao: instance.funcao,
       deleted: Boolean(instance.deleted_at),
     }));
+    // Números ativos para o atendente escolher quando o número original foi removido.
+    const ativosResult = await admin
+      .from("wa_instancias")
+      .select("id,nome,numero,funcao")
+      .eq("org_id", context.orgId)
+      .is("deleted_at", null)
+      .eq("status", "conectado")
+      .not("numero", "is", null)
+      .order("ordem", { ascending: true });
+    const chipsAtivos = (ativosResult.data ?? []).map((chip) => ({
+      id: chip.id,
+      nome: chip.nome,
+      numero: chip.numero,
+      funcao: chip.funcao,
+    }));
     let lead = null;
     let proposal = null;
     if (detail?.lead_id) {
@@ -321,6 +337,7 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       selected_id: detailId,
       instances,
+      chips_ativos: chipsAtivos,
       messages: [...(messagesResult.data ?? [])].reverse(),
       notes: notesResult.data ?? [],
       events: eventsResult.data ?? [],
@@ -332,6 +349,48 @@ async function handleRequest(req: Request): Promise<Response> {
 
   const conversationId = String(body.conversa_id || "");
   if (!UUID.test(conversationId)) return json({ error: "Conversa inválida." }, 422);
+
+  if (action === "trocar_numero") {
+    // Continuar a conversa por OUTRO número quando o original foi removido. Escolha explícita do
+    // atendente, auditada no banco; a função valida membro, atribuição, origem e destino.
+    const destino = String(body.instancia_destino_id || "");
+    if (!UUID.test(destino)) return json({ error: "Escolha o número de destino." }, 422);
+    const { error } = await admin.rpc("wa_change_conversation_instance", {
+      p_org: context.orgId,
+      p_conversation: conversationId,
+      p_actor: context.userId,
+      p_to: destino,
+    });
+    if (error) {
+      const respostas: Record<string, [string, number, string]> = {
+        "42501": [
+          "Você não tem permissão para continuar esta conversa por outro número.",
+          403,
+          "sem_permissao",
+        ],
+        P0002: [
+          "O número escolhido não está disponível (precisa estar conectado).",
+          409,
+          "destino_indisponivel",
+        ],
+        "23514": ["O número original desta conversa ainda está ativo.", 409, "origem_ativa"],
+        "23505": [
+          "Já existe uma conversa com este contato neste número. Use a conversa mais recente.",
+          409,
+          "conversa_existente",
+        ],
+        "22023": ["Esta conversa já usa o número escolhido.", 409, "mesmo_numero"],
+      };
+      const [mensagem, status, codigo] = respostas[String(error.code)] ?? [
+        "Não foi possível trocar o número desta conversa.",
+        409,
+        "erro",
+      ];
+      console.error("wa-conversations trocar_numero failed", error.code);
+      return json({ ok: false, error: mensagem, code: codigo }, status);
+    }
+    return json({ ok: true, conversa_id: conversationId, instancia_id: destino });
+  }
   const value =
     body.valor && typeof body.valor === "object" && !Array.isArray(body.valor) ? body.valor : {};
   const { data, error } = await admin.rpc("wa_conversation_action", {

@@ -115,9 +115,16 @@ test("9. Envio manual autorizado: invoca o envio reconciliado e valida parâmetr
 // 10. Bloqueio de envio não autorizado
 test("10. Bloqueio de envio não autorizado: barra envio vazio ou sem contato selecionado", () => {
   // Trava síncrona (ref) + texto vazio: dois cliques/Enter no mesmo instante não geram duas operações.
-  assert.match(waConversas, /if \(!contatoAtivo \|\| enviandoRef\.current\) return;/);
+  assert.match(
+    waConversas,
+    /if \(!contatoAtivo \|\| enviandoRef\.current \|\| contatoAtivo\.chip\?\.arquivada\) return;/,
+  );
   assert.match(waConversas, /if \(!texto\) return;/);
-  assert.match(waConversas, /disabled=\{enviando \|\| !textoMensagem\.trim\(\)\}/);
+  // Também bloqueado enquanto o número original da conversa estiver removido (escolha pendente).
+  assert.match(
+    waConversas,
+    /disabled=\{\s*enviando \|\| !textoMensagem\.trim\(\) \|\| Boolean\(contatoAtivo\.chip\?\.arquivada\)\s*\}/,
+  );
 });
 
 // 11. Prevenção de duplicidade

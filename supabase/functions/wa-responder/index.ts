@@ -162,11 +162,11 @@ async function handleRequest(req: Request): Promise<Response> {
   let health = await carregarSaude();
   if (!health) return recusa("Número de atendimento indisponível.", 409);
   if (health.deleted_at) {
-    // O número que atendia esta conversa foi arquivado. Nunca redirecionamos a conversa para
-    // outro número por conta própria: só um administrador autoriza a reatribuição (wa-chips,
-    // ação reatribuir_conversas), preservando o histórico.
+    // O número que atendia esta conversa foi removido. Nunca redirecionamos a conversa para outro
+    // número por conta própria: o atendente escolhe, na própria conversa, por qual número continuar
+    // (wa-conversations, ação trocar_numero), com auditoria e histórico preservado.
     return recusa(
-      "Esta conversa pertence a um número arquivado. Um administrador precisa reatribuí-la a um número ativo para responder.",
+      "O número que atendia esta conversa foi removido. Escolha por qual número continuar o atendimento na própria conversa.",
       409,
       "chip_arquivado",
     );

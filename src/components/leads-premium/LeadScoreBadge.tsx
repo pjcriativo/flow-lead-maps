@@ -62,13 +62,7 @@ export function LeadScoreDonut({
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
   const strokeColor =
-    score >= 80
-      ? "#10b981"
-      : score >= 70
-        ? "#f59e0b"
-        : score >= 60
-          ? "#ff6200"
-          : "#ea580c";
+    score >= 80 ? "#10b981" : score >= 70 ? "#f59e0b" : score >= 60 ? "#ff6200" : "#ea580c";
 
   const textColor =
     score >= 80
@@ -89,14 +83,7 @@ export function LeadScoreDonut({
       <div className="relative flex size-18 shrink-0 items-center justify-center">
         <svg className="size-18 -rotate-90 transform" viewBox="0 0 72 72">
           {/* Fundo do anel */}
-          <circle
-            cx="36"
-            cy="36"
-            r={radius}
-            stroke="#172531"
-            strokeWidth="5"
-            fill="transparent"
-          />
+          <circle cx="36" cy="36" r={radius} stroke="#172531" strokeWidth="5" fill="transparent" />
           {/* Barra de progresso do score */}
           <circle
             cx="36"
@@ -111,15 +98,11 @@ export function LeadScoreDonut({
             className="transition-all duration-700 ease-out"
           />
         </svg>
-        <span className="absolute text-base font-bold text-white tracking-tight">
-          {score}
-        </span>
+        <span className="absolute text-base font-bold text-white tracking-tight">{score}</span>
       </div>
 
       <div className="min-w-0 flex-1">
-        <h4 className={cn("text-xs font-bold leading-tight", textColor)}>
-          {label}
-        </h4>
+        <h4 className={cn("text-xs font-bold leading-tight", textColor)}>{label}</h4>
         <p className="mt-1 text-[11px] leading-relaxed text-home-muted line-clamp-2">
           {description}
         </p>

@@ -397,6 +397,7 @@ function Dashboard() {
               setFocusRedesignLead(leadId);
               selectSection("redesign");
             }}
+            onOpenPipeline={() => selectSection("pipeline")}
           />
         )}
         {section === "propostas" && <PropostasSection />}

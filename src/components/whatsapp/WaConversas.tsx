@@ -48,6 +48,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  formatarNumeroWhatsapp,
   descreverChipAtendimento,
   type EstadoChipAtendimento,
   type WaInstanciaAtendimento,
@@ -70,6 +71,7 @@ import {
   obterKpisConversasWa,
   enviarRespostaConversa,
   sincronizarAvataresConversas,
+  trocarNumeroConversaWa,
   type WaConversa,
   type WaConversaKpis,
   type WaMensagem,
@@ -336,6 +338,12 @@ export function WaConversas() {
   // registrado). Editar o texto cria uma nova operação.
   const operacaoEnvioRef = useRef<OperacaoEnvio | null>(null);
   const [envioNaoConfirmado, setEnvioNaoConfirmado] = useState<string | null>(null);
+  // Números ativos da organização, para continuar uma conversa cujo número original foi removido.
+  const [chipsAtivos, setChipsAtivos] = useState<
+    Array<{ id: string; nome: string; numero: string | null }>
+  >([]);
+  const [numeroEscolhido, setNumeroEscolhido] = useState("");
+  const [trocandoNumero, setTrocandoNumero] = useState(false);
   const [scriptsDisponiveis, setScriptsDisponiveis] = useState<WaScript[]>([]);
   const [membros, setMembros] = useState<Membro[]>([]);
   const [usuarioAtualId, setUsuarioAtualId] = useState("");
@@ -501,6 +509,7 @@ export function WaConversas() {
         const snapshot = await consultarConversasWa(conversationId, 0, 200, signal);
         if (signal?.aborted) return;
         setPapelAtual(snapshot.role);
+        setChipsAtivos(snapshot.chips_ativos ?? []);
         const statusMap: Record<string, MensagemChat["statusEnvio"]> = {
           pending: "pendente",
           sent: "enviado",
@@ -703,8 +712,27 @@ export function WaConversas() {
   }, []);
 
   // Enviar Mensagem
+  const trocarNumero = async () => {
+    if (!contatoAtivo || !numeroEscolhido || trocandoNumero) return;
+    setTrocandoNumero(true);
+    try {
+      await trocarNumeroConversaWa(contatoAtivo.id, numeroEscolhido);
+      setNumeroEscolhido("");
+      toast.success("Pronto. Esta conversa agora continua pelo número escolhido.");
+      await carregarDetalhes(contatoAtivo.id).catch(() => undefined);
+      await carregarDadosIniciais().catch(() => undefined);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível trocar o número desta conversa.",
+      );
+    } finally {
+      setTrocandoNumero(false);
+    }
+  };
+
   const enviarMensagem = async () => {
-    if (!contatoAtivo || enviandoRef.current) return;
+    // Número original removido: só envia depois de escolher por qual número continuar.
+    if (!contatoAtivo || enviandoRef.current || contatoAtivo.chip?.arquivada) return;
     const texto = textoMensagem.trim();
     if (!texto) return;
 
@@ -798,7 +826,14 @@ export function WaConversas() {
         ),
       );
       await carregarDetalhes(contatoAtivo.id);
-      toast.success("Lead criado e vinculado ao CRM.");
+      toast.success("Lead criado e vinculado ao CRM.", {
+        duration: 9000,
+        action: {
+          label: "Ver no pipeline",
+          onClick: () =>
+            window.location.assign(dashboardUrlForSection(window.location.href, "pipeline")),
+        },
+      });
     } catch {
       toast.error("Não foi possível criar ou vincular o lead.");
     }
@@ -1734,6 +1769,48 @@ export function WaConversas() {
                   </div>
                 )}
 
+                {contatoAtivo.chip?.arquivada && (
+                  <div
+                    className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5"
+                    role="status"
+                  >
+                    <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-amber-200">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />O número que atendia esta
+                      conversa foi removido. Escolha por qual número continuar: o histórico é
+                      mantido e a troca fica registrada.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={numeroEscolhido}
+                        onChange={(e) => setNumeroEscolhido(e.target.value)}
+                        disabled={trocandoNumero || chipsAtivos.length === 0}
+                        aria-label="Número para continuar a conversa"
+                        className="h-8 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#141a26] px-2 text-xs text-white focus:border-home-orange/60 focus:outline-none"
+                      >
+                        <option value="">
+                          {chipsAtivos.length === 0
+                            ? "Nenhum número conectado"
+                            : "Escolher o número…"}
+                        </option>
+                        {chipsAtivos.map((chip) => (
+                          <option key={chip.id} value={chip.id}>
+                            {formatarNumeroWhatsapp(chip.numero) ?? chip.nome} · {chip.nome}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => void trocarNumero()}
+                        disabled={!numeroEscolhido || trocandoNumero}
+                        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-home-orange px-3 text-xs font-semibold text-white transition-all hover:bg-orange-600 disabled:pointer-events-none disabled:opacity-40"
+                      >
+                        {trocandoNumero ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        Continuar por este número
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Textarea e Toolbar */}
                 <div className="relative rounded-xl border border-[#1b2334] bg-[#111723] p-2.5 focus-within:border-home-orange/60 transition-all">
                   <Textarea
@@ -1815,7 +1892,9 @@ export function WaConversas() {
                     <button
                       type="button"
                       onClick={() => void enviarMensagem()}
-                      disabled={enviando || !textoMensagem.trim()}
+                      disabled={
+                        enviando || !textoMensagem.trim() || Boolean(contatoAtivo.chip?.arquivada)
+                      }
                       title="Enviar mensagem (Enter)"
                       className="flex h-8 w-8 items-center justify-center rounded-xl bg-home-orange text-white shadow-[0_0_15px_rgba(255,98,0,0.5)] transition-all hover:bg-orange-600 active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
                     >
@@ -1937,11 +2016,13 @@ export function WaConversas() {
                   <button
                     type="button"
                     onClick={() =>
-                      window.location.assign(dashboardUrlForSection(window.location.href, "leads"))
+                      window.location.assign(
+                        dashboardUrlForSection(window.location.href, "pipeline"),
+                      )
                     }
                     className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#141a26] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-white/10"
                   >
-                    <User className="h-3.5 w-3.5" /> Abrir lead
+                    <User className="h-3.5 w-3.5" /> Ver no pipeline
                   </button>
                   <button
                     type="button"

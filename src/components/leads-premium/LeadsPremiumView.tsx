@@ -28,6 +28,7 @@ import { LeadsFiltersBar } from "./LeadsFiltersBar";
 import { LeadsHeader } from "./LeadsHeader";
 import { LeadsStatsCards } from "./LeadsStatsCards";
 import { LeadsTable } from "./LeadsTable";
+import type { LeadMenuAction } from "./LeadActionsMenu";
 import { leadsToCsv, toLeadItem, type LeadItem } from "./leads-premium-data";
 import { useLeadsPremium } from "./useLeadsPremium";
 
@@ -41,6 +42,7 @@ interface LeadsPremiumViewProps {
   focusLeadId?: string | null;
   onFocusHandled?: () => void;
   onOpenRedesign?: (leadId: string) => void;
+  onOpenPipeline?: (leadId: string) => void;
 }
 
 type BulkDialog = "assign" | "list" | null;
@@ -51,6 +53,7 @@ export function LeadsPremiumView({
   focusLeadId = null,
   onFocusHandled,
   onOpenRedesign,
+  onOpenPipeline,
 }: LeadsPremiumViewProps) {
   const leadsState = useLeadsPremium();
   const [selectedLead, setSelectedLead] = useState<LeadItem | null>(null);
@@ -185,6 +188,58 @@ export function LeadsPremiumView({
     }
   };
 
+  // Menu "⋮" de cada linha: age sobre ESTE lead (as ações em lote seguem usando a seleção).
+  const handleRowAction = (action: LeadMenuAction, lead: LeadItem) => {
+    switch (action) {
+      case "details":
+        setSelectedLead(lead);
+        break;
+      case "edit":
+        setSelectedLead(lead);
+        setEditingLead(lead);
+        saveMutation.reset();
+        setFormOpen(true);
+        break;
+      case "pipeline":
+        onOpenPipeline?.(lead.id);
+        break;
+      case "assign":
+        setSelectedIds(new Set([lead.id]));
+        setBulkTarget("");
+        setBulkDialog("assign");
+        break;
+      case "list":
+        setSelectedIds(new Set([lead.id]));
+        setBulkTarget("");
+        setBulkDialog("list");
+        break;
+      case "export":
+        void exportSelected([lead.id]);
+        break;
+      case "copy-phone":
+      case "copy-email": {
+        const valor = action === "copy-email" ? lead.email : lead.whatsapp || lead.phone;
+        if (!valor) break;
+        navigator.clipboard
+          .writeText(valor)
+          .then(() =>
+            toast.success(action === "copy-email" ? "E-mail copiado." : "Telefone copiado."),
+          )
+          .catch(() => toast.error("Não foi possível copiar. Copie manualmente."));
+        break;
+      }
+      case "delete":
+        if (!leadsState.context?.canDelete) break;
+        if (!window.confirm(`Excluir "${lead.company}"? Esta ação não pode ser desfeita.`)) break;
+        deleteMutation
+          .mutateAsync(lead.id)
+          .catch((error) =>
+            toast.error(error instanceof Error ? error.message : "Falha ao excluir o lead."),
+          );
+        break;
+    }
+  };
+
   const savePatch = async (patch: Parameters<typeof updateLead>[1], successMessage: string) => {
     if (!selectedLead) return;
     try {
@@ -226,9 +281,9 @@ export function LeadsPremiumView({
     }
   };
 
-  const exportSelected = async () => {
+  const exportSelected = async (ids: string[] = [...selectedIds]) => {
     try {
-      const records = await fetchLeadsByIds([...selectedIds]);
+      const records = await fetchLeadsByIds(ids);
       if (!records.length) throw new Error("Nenhum lead autorizado permaneceu na seleção.");
       downloadCsv(leadsToCsv(records), "flow-leads-selecionados");
       toast.success(`${records.length} lead(s) selecionado(s) exportado(s).`);
@@ -352,6 +407,8 @@ export function LeadsPremiumView({
                 setBulkDialog("list");
               }}
               onExportSelected={() => void exportSelected()}
+              onRowAction={handleRowAction}
+              canDelete={Boolean(leadsState.context?.canDelete)}
             />
           </div>
           {selectedLead ? (

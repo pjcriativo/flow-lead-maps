@@ -913,6 +913,8 @@ export type WaConversaSnapshot = {
   role: string;
   conversations: Array<Record<string, unknown>>;
   selected_id: string | null;
+  /** Números ativos e conectados da organização (para continuar uma conversa de número removido). */
+  chips_ativos?: Array<{ id: string; nome: string; numero: string | null; funcao: string }>;
   instances?: Array<{
     id: string;
     nome: string;
@@ -1107,6 +1109,21 @@ export async function listarLeadsVinculaveisWa(): Promise<WaLeadVinculavel[]> {
     .limit(100);
   if (error) throw error;
   return (data ?? []) as WaLeadVinculavel[];
+}
+
+/**
+ * Continua uma conversa por OUTRO número quando o original foi removido. Escolha explícita do
+ * atendente; o backend valida permissão e destino e registra a troca (histórico preservado).
+ */
+export async function trocarNumeroConversaWa(
+  conversaId: string,
+  instanciaDestinoId: string,
+): Promise<void> {
+  await invokeConversations({
+    acao: "trocar_numero",
+    conversa_id: conversaId,
+    instancia_destino_id: instanciaDestinoId,
+  });
 }
 
 /** Marca a entidade de conversa e suas mensagens inbound como lidas. */

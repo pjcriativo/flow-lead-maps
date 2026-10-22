@@ -7,7 +7,6 @@ import {
   Dumbbell,
   HeartPulse,
   Mail,
-  MoreVertical,
   Phone,
   Scale,
   Scissors,
@@ -24,6 +23,7 @@ import {
 } from "react-icons/si";
 import { cn } from "@/lib/utils";
 import type { LeadChannel, LeadItem } from "./leads-premium-data";
+import { LeadActionsMenu, type LeadMenuAction } from "./LeadActionsMenu";
 import { LeadScoreBadge } from "./LeadScoreBadge";
 import { LeadStatusBadge } from "./LeadStatusBadge";
 
@@ -33,11 +33,9 @@ interface LeadRowProps {
   isChecked: boolean;
   onToggleCheck: (id: string, e: MouseEvent) => void;
   onSelectLead: (lead: LeadItem) => void;
-  onQuickAction?: (
-    action: "phone" | "whatsapp" | "email" | "more",
-    lead: LeadItem,
-    e: MouseEvent,
-  ) => void;
+  onQuickAction?: (action: "phone" | "whatsapp" | "email", lead: LeadItem, e: MouseEvent) => void;
+  onRowAction: (action: LeadMenuAction, lead: LeadItem) => void;
+  canDelete: boolean;
 }
 
 export function CompanyLogo({
@@ -230,6 +228,8 @@ export function LeadRow({
   onToggleCheck,
   onSelectLead,
   onQuickAction,
+  onRowAction,
+  canDelete,
 }: LeadRowProps) {
   return (
     <tr
@@ -258,8 +258,9 @@ export function LeadRow({
         />
       </td>
 
-      {/* Empresa / Contato */}
-      <td className="px-3 py-3">
+      {/* Empresa / Contato — largura máxima: nomes longos são truncados em vez de empurrar a
+          tabela para fora da tela (a barra de rolagem horizontal escondia a coluna de ações). */}
+      <td className="max-w-[17rem] px-3 py-3" title={lead.company}>
         <div className="flex items-center gap-2.5">
           <CompanyLogo type={lead.avatarType} />
           <div className="min-w-0">
@@ -342,14 +343,7 @@ export function LeadRow({
           >
             <Mail className="size-3.5" />
           </button>
-          <button
-            type="button"
-            title="Mais opções"
-            onClick={(e) => onQuickAction?.("more", lead, e)}
-            className="flex size-7 items-center justify-center rounded-lg text-home-muted transition-colors hover:bg-home-surface hover:text-white"
-          >
-            <MoreVertical className="size-3.5" />
-          </button>
+          <LeadActionsMenu lead={lead} canDelete={canDelete} onAction={onRowAction} />
         </div>
       </td>
     </tr>

@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { LeadItem } from "./leads-premium-data";
 import { LeadRow } from "./LeadRow";
+import type { LeadMenuAction } from "./LeadActionsMenu";
 
 interface LeadsTableProps {
   leads: LeadItem[];
@@ -35,6 +36,8 @@ interface LeadsTableProps {
   onAssignSelected: () => void;
   onAddSelectedToList: () => void;
   onExportSelected: () => void;
+  onRowAction: (action: LeadMenuAction, lead: LeadItem) => void;
+  canDelete: boolean;
   className?: string;
 }
 
@@ -72,6 +75,8 @@ export function LeadsTable({
   onAssignSelected,
   onAddSelectedToList,
   onExportSelected,
+  onRowAction,
+  canDelete,
   className,
 }: LeadsTableProps) {
   const pageIds = leads.map((lead) => lead.id);
@@ -94,7 +99,7 @@ export function LeadsTable({
   };
 
   const handleQuickAction = (
-    action: "phone" | "whatsapp" | "email" | "more",
+    action: "phone" | "whatsapp" | "email",
     lead: LeadItem,
     event: MouseEvent,
   ) => {
@@ -117,7 +122,6 @@ export function LeadsTable({
       window.location.href = `mailto:${lead.email}`;
       return;
     }
-    if (action === "more") onSelectLead(lead);
   };
 
   const firstVisible = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -205,6 +209,8 @@ export function LeadsTable({
                   onToggleCheck={handleToggleCheck}
                   onSelectLead={onSelectLead}
                   onQuickAction={handleQuickAction}
+                  onRowAction={onRowAction}
+                  canDelete={canDelete}
                 />
               ))
             )}
