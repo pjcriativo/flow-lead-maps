@@ -92,7 +92,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "memoria",
     rotulo: "Memória & Segundo Cérebro",
     sub: "Memória por lead, projeto e Obsidian",
-    disponivel: false,
+    disponivel: true,
     icon: Database,
   },
   {

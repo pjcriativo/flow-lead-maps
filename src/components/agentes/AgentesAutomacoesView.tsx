@@ -63,10 +63,11 @@ const ICONES_CAPACIDADE: Record<string, { icon: LucideIcon; cor: string; bg: str
   sentimento: { icon: Heart, cor: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20" },
 };
 
-import { AgentesNavHeader, type TelaAgentesId } from "./AgentesNavHeader";
+import { AgentesSidebarNav, type TelaAgentesId } from "./AgentesSidebarNav";
 import { EquipeAgentesView } from "./EquipeAgentesView";
 import { PerfilAgenteView } from "./PerfilAgenteView";
 import { TreinamentoConhecimentoView } from "./TreinamentoConhecimentoView";
+import { MemoriaSegundoCerebroView } from "./MemoriaSegundoCerebroView";
 
 function getInitialTela(): TelaAgentesId {
   if (typeof window === "undefined") return "visao_geral";
@@ -75,6 +76,7 @@ function getInitialTela(): TelaAgentesId {
   if (t === "equipe") return "equipe";
   if (t === "perfil") return "perfil";
   if (t === "treinamento") return "treinamento";
+  if (t === "memoria") return "memoria";
   return "visao_geral";
 }
 
@@ -99,7 +101,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
       params.set("tela", novaTela);
       if (novoAgenteId) {
         params.set("agente", novoAgenteId);
-      } else if (novaTela !== "perfil" && novaTela !== "treinamento") {
+      } else if (novaTela !== "perfil" && novaTela !== "treinamento" && novaTela !== "memoria") {
         params.delete("agente");
       }
       window.history.replaceState(
@@ -111,32 +113,43 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-[#f95d14]/30 selection:text-white">
-      {/* Barra de Navegação Superior Compartilhada das 12 Telas */}
-      <AgentesNavHeader telaAtiva={telaAtiva} onSelecionarTela={(t) => mudarTela(t)} />
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-[#f95d14]/30 selection:text-white">
+      {/* Submenu Lateral Interno do Módulo (Fiel ao Layout Aprovado da Imagem 2) */}
+      <AgentesSidebarNav telaAtiva={telaAtiva} onSelecionarTela={(t) => mudarTela(t)} />
 
-      {/* Renderização Condicional da Tela Ativa */}
-      {telaAtiva === "equipe" ? (
-        <EquipeAgentesView
-          onVoltarPainel={() => mudarTela("visao_geral")}
-          onVerPerfil={(id) => mudarTela("perfil", id)}
-        />
-      ) : telaAtiva === "perfil" ? (
-        <PerfilAgenteView
-          agenteId={agentePerfilId}
-          onVoltar={() => mudarTela("equipe")}
-          onNavegarEquipe={() => mudarTela("equipe")}
-          onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
-        />
-      ) : telaAtiva === "treinamento" ? (
-        <TreinamentoConhecimentoView
-          agenteId={agentePerfilId}
-          onVoltar={() => mudarTela("perfil", agentePerfilId)}
-          onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
-          onNavegarEquipe={() => mudarTela("equipe")}
-        />
-      ) : (
-        <div className="mx-auto max-w-[1680px] px-4 pb-14 pt-6 sm:px-6 lg:px-8 space-y-6">
+      {/* Área Principal de Conteúdo da Tela Ativa */}
+      <main className="flex-1 min-w-0 overflow-y-auto">
+        {telaAtiva === "equipe" ? (
+          <EquipeAgentesView
+            onVoltarPainel={() => mudarTela("visao_geral")}
+            onVerPerfil={(id) => mudarTela("perfil", id)}
+          />
+        ) : telaAtiva === "perfil" ? (
+          <PerfilAgenteView
+            agenteId={agentePerfilId}
+            onVoltar={() => mudarTela("equipe")}
+            onNavegarEquipe={() => mudarTela("equipe")}
+            onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
+            onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
+          />
+        ) : telaAtiva === "treinamento" ? (
+          <TreinamentoConhecimentoView
+            agenteId={agentePerfilId}
+            onVoltar={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarEquipe={() => mudarTela("equipe")}
+            onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
+          />
+        ) : telaAtiva === "memoria" ? (
+          <MemoriaSegundoCerebroView
+            agenteId={agentePerfilId}
+            onVoltar={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
+            onNavegarEquipe={() => mudarTela("equipe")}
+          />
+        ) : (
+          <div className="mx-auto max-w-[1680px] px-4 pb-14 pt-6 sm:px-6 lg:px-8 space-y-6">
         
         {/* =========================================================================
             1. CABEÇALHO PRINCIPAL DO MÓDULO
@@ -849,6 +862,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
 
       </div>
       )}
+      </main>
     </div>
   );
 }

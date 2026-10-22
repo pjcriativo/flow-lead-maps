@@ -57,6 +57,7 @@ interface PerfilAgenteViewProps {
   onVoltar?: () => void;
   onNavegarEquipe?: () => void;
   onNavegarTreinamento?: () => void;
+  onNavegarMemoria?: () => void;
 }
 
 const PANEL_CLASS =
@@ -67,6 +68,7 @@ export function PerfilAgenteView({
   onVoltar,
   onNavegarEquipe,
   onNavegarTreinamento,
+  onNavegarMemoria,
 }: PerfilAgenteViewProps) {
   const [perfil, setPerfil] = useState<PerfilAgenteCompleto>(
     PERFIS_CATALOGO[agenteId] || PERFIS_CATALOGO.ceo,
@@ -321,6 +323,8 @@ export function PerfilAgenteView({
                 onClick={() => {
                   if (tab.id === "treinamento" && onNavegarTreinamento) {
                     onNavegarTreinamento();
+                  } else if (tab.id === "memoria" && onNavegarMemoria) {
+                    onNavegarMemoria();
                   } else {
                     setAbaAtiva(tab.id);
                   }
