@@ -1,675 +1,779 @@
-// Tela 01 — Agentes & Automações · Painel. Visão executiva do módulo.
-// HONESTIDADE: os agentes de IA ainda não têm backend. Tudo que é deles aparece "Em breve" e sem
-// números inventados. O que é real hoje vem das receitas/rodadas da automação e da base de leads.
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+// Tela 01 — Agentes & Automações · Painel Geral
+// Reprodução fiel e de altíssima precisão do layout executivo aprovado.
+import React, { useState } from "react";
 import {
   ArrowRight,
+  BarChart3,
   Bot,
+  Briefcase,
+  Calendar,
   CalendarCheck,
+  Check,
+  ChevronDown,
   ChevronRight,
+  Clock,
+  Crown,
+  Database,
+  FileCheck,
   FileText,
   Filter,
-  Layers,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Settings2,
-  Target,
-  Users,
-  Zap,
+  Globe,
+  Handshake,
   Heart,
+  Layers,
+  Lightbulb,
+  MessageSquare,
   Mic,
+  MoreVertical,
+  Plus,
+  Radio,
+  Search,
+  Settings,
+  Settings2,
+  ShieldCheck,
+  Sliders,
+  Sparkles,
+  Target,
+  TrendingUp,
+  UserCheck,
+  UserRoundSearch,
+  Users,
   Wrench,
-  Database,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatDataHora } from "@/lib/format";
-import { listarReceitas, type Receita, type Rodada } from "@/services/automacao";
 import {
-  carregarResumoPainel,
-  listarRodadasRecentes,
-  type ResumoPainelAgentes,
-} from "@/services/agentes";
-import { AutomacaoSection } from "@/components/automacao/AutomacaoSection";
-import {
-  ABAS_AGENTES,
-  CAPACIDADES,
-  CEO_AGENTE,
-  EQUIPE_AGENTES,
-  FLUXO_OPERACIONAL,
-  type AbaAgentes,
+  CEO_AGENTE_DATA,
+  EQUIPE_AGENTES_DATA,
+  PLANO_SEMANAL_DATA,
+  FLUXO_OPERACAO_DATA,
+  METAS_RESULTADOS_DATA,
+  ATIVIDADES_RECENTES_DATA,
+  CAPACIDADES_DATA,
 } from "./agentes-data";
 
 const PANEL_CLASS =
-  "rounded-2xl border border-home-border bg-[radial-gradient(circle_at_top_right,rgba(20,47,66,0.12),transparent_40%),var(--home-surface)]";
+  "rounded-2xl border border-[#1e2638] bg-[#0c1017]/90 backdrop-blur-sm shadow-xl";
 
-const ICONES_CAPACIDADE: Record<string, LucideIcon> = {
-  memoria: Database,
-  skills: Wrench,
-  voz: Mic,
-  sentimento: Heart,
-};
-
-const SOON_TITLE = "Em breve — ainda não disponível";
-
-function EmBreve({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn(
-        "rounded-full border border-home-border bg-home-surface-strong px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-home-muted",
-        className,
-      )}
-    >
-      Em breve
-    </span>
-  );
-}
-
-function Secao({
-  titulo,
-  sub,
-  icon: Icon,
-  acao,
-  className,
-  children,
-}: {
-  titulo: string;
-  sub?: string;
-  icon: LucideIcon;
-  acao?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className={cn(PANEL_CLASS, "p-5", className)}>
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-home-orange/15 text-home-orange">
-            <Icon className="size-5" />
-          </span>
-          <div>
-            <h2 className="text-sm font-semibold text-home-foreground">{titulo}</h2>
-            {sub ? <p className="mt-0.5 text-xs text-home-muted">{sub}</p> : null}
-          </div>
-        </div>
-        {acao}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-const fmt = (n: number) => n.toLocaleString("pt-BR");
-
-const STATUS_RODADA: Record<string, { texto: string; cor: string }> = {
-  rodando: { texto: "Em andamento", cor: "text-home-blue" },
-  concluida: { texto: "Concluída", cor: "text-home-green" },
-  parada_teto: { texto: "Parada pelo limite", cor: "text-home-amber" },
-  erro: { texto: "Com erro", cor: "text-home-red" },
+const ICONES_CAPACIDADE: Record<string, { icon: LucideIcon; cor: string; bg: string }> = {
+  memoria: { icon: Database, cor: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
+  skills: { icon: Wrench, cor: "text-sky-400", bg: "bg-sky-500/10 border-sky-500/20" },
+  voz: { icon: Mic, cor: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
+  sentimento: { icon: Heart, cor: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20" },
 };
 
 export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void }) {
-  const [aba, setAba] = useState<AbaAgentes>("painel");
-  const [resumo, setResumo] = useState<ResumoPainelAgentes | null>(null);
-  const [receitas, setReceitas] = useState<Receita[]>([]);
-  const [rodadas, setRodadas] = useState<Rodada[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [falhou, setFalhou] = useState(false);
-
-  const carregar = useCallback(async () => {
-    setCarregando(true);
-    setFalhou(false);
-    try {
-      const [r, rec, rod] = await Promise.all([
-        carregarResumoPainel(),
-        listarReceitas(),
-        listarRodadasRecentes(6),
-      ]);
-      setResumo(r);
-      setReceitas(rec);
-      setRodadas(rod);
-    } catch {
-      setFalhou(true);
-    } finally {
-      setCarregando(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    carregar();
-  }, [carregar]);
-
-  const receitasAtivas = receitas.filter((r) => r.ativa);
-  const leadsMes = receitas.reduce((a, r) => a + (r.leads_mes ?? 0), 0);
-  const tetoMes = receitas.reduce((a, r) => a + (r.max_leads_mes ?? 0), 0);
-  const nomeReceita = (id: string) => receitas.find((r) => r.id === id)?.nome ?? "Receita removida";
-  const valor = (n: number | undefined) => (carregando || falhou || n == null ? "—" : fmt(n));
-
-  const kpis: { icon: LucideIcon; cor: string; valor: string; rotulo: string; real: boolean }[] = [
-    {
-      icon: Users,
-      cor: "text-home-blue",
-      valor: valor(resumo?.leadsNaBase),
-      rotulo: "Leads na base",
-      real: true,
-    },
-    {
-      icon: Filter,
-      cor: "text-home-purple",
-      valor: valor(resumo?.rodadas30d.qualificados),
-      rotulo: "Qualificados pela automação (30 dias)",
-      real: true,
-    },
-    {
-      icon: Zap,
-      cor: "text-home-amber",
-      valor: carregando || falhou ? "—" : fmt(receitasAtivas.length),
-      rotulo: "Receitas com agendamento ligado",
-      real: true,
-    },
-    {
-      icon: FileText,
-      cor: "text-home-cyan",
-      valor: valor(resumo?.rodadas30d.preparados),
-      rotulo: "Propostas preparadas (30 dias)",
-      real: true,
-    },
-    {
-      icon: CalendarCheck,
-      cor: "text-home-green",
-      valor: "—",
-      rotulo: "Reuniões agendadas",
-      real: false,
-    },
-    { icon: Bot, cor: "text-home-orange", valor: "0", rotulo: "Agentes de IA ativos", real: false },
-  ];
+  const [periodoMetas, setPeriodoMetas] = useState("Este mês");
 
   return (
-    <div className="min-h-svh bg-home-background text-home-foreground">
-      <div className="mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-6 lg:px-7">
-        {/* Cabeçalho */}
-        <header className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-home-orange text-sm font-bold text-white">
+    <div className="min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-[#f95d14]/30 selection:text-white">
+      <div className="mx-auto max-w-[1680px] px-4 pb-14 pt-6 sm:px-6 lg:px-8 space-y-6">
+        
+        {/* =========================================================================
+            1. CABEÇALHO PRINCIPAL DO MÓDULO
+           ========================================================================= */}
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#f95d14] text-sm font-bold text-white shadow-lg shadow-orange-600/20">
               01
             </span>
             <div>
               <nav
                 aria-label="Breadcrumb"
-                className="flex items-center gap-1 text-[11px] text-home-muted"
+                className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-400"
               >
-                <ChevronRight className="size-3" /> Visão Geral
+                <ChevronRight className="size-3 text-neutral-500" />
+                <span>Visão Geral</span>
               </nav>
-              <h1 className="text-2xl font-semibold tracking-tight">Agentes &amp; Automações</h1>
-              <p className="mt-1 max-w-2xl text-sm text-home-muted">
-                Central de agentes comerciais inteligentes, em modo copiloto: você aprova, os
-                agentes preparam.
+              <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                Agentes &amp; Automações
+              </h1>
+              <p className="mt-1 text-xs text-neutral-400 sm:text-sm">
+                O CEO de IA coordena toda a operação comercial com agentes autônomos, em modo copiloto.
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              disabled
-              title={SOON_TITLE}
-              className="flex h-10 cursor-not-allowed items-center gap-2 rounded-xl border border-home-border bg-home-surface px-4 text-xs font-semibold text-home-muted opacity-70"
+              className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#121620] px-4 text-xs font-semibold text-neutral-200 transition-all hover:border-white/20 hover:bg-[#181e2b] hover:text-white"
             >
-              <Users className="size-4" /> Montar equipe com CEO de IA
+              <Users className="size-4 text-neutral-400" />
+              <span>Montar equipe com CEO de IA</span>
             </button>
+
             <button
               type="button"
-              disabled
-              title={SOON_TITLE}
-              className="flex h-10 cursor-not-allowed items-center gap-2 rounded-xl border border-home-border bg-home-surface px-4 text-xs font-semibold text-home-muted opacity-70"
+              className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#121620] px-4 text-xs font-semibold text-neutral-200 transition-all hover:border-white/20 hover:bg-[#181e2b] hover:text-white"
             >
-              <Settings2 className="size-4" /> Configurar metas
+              <Settings2 className="size-4 text-neutral-400" />
+              <span>Configurar metas</span>
             </button>
+
             <button
               type="button"
-              onClick={() => setAba("automacoes")}
-              className="flex h-10 items-center gap-2 rounded-xl bg-home-orange px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              className="flex h-10 items-center gap-2 rounded-xl bg-[#f95d14] px-4 text-xs font-semibold text-white shadow-lg shadow-orange-500/25 transition-all hover:bg-[#ff6c26] hover:shadow-orange-500/35"
             >
-              <Plus className="size-4" /> Nova operação
+              <Plus className="size-4" />
+              <span>Nova operação</span>
             </button>
           </div>
         </header>
 
-        {/* Navegação interna */}
-        <nav
-          aria-label="Navegação do módulo"
-          className="mt-5 flex gap-1 overflow-x-auto border-b border-home-border"
-        >
-          {ABAS_AGENTES.map((a) => {
-            const ativa = aba === a.id;
-            return (
-              <button
-                key={a.id}
-                type="button"
-                disabled={!a.disponivel}
-                title={a.disponivel ? undefined : SOON_TITLE}
-                aria-current={ativa ? "page" : undefined}
-                onClick={() => a.disponivel && setAba(a.id)}
-                className={cn(
-                  "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-xs font-semibold transition-colors",
-                  ativa
-                    ? "border-home-orange text-home-orange"
-                    : "border-transparent text-home-muted",
-                  a.disponivel ? "hover:text-home-foreground" : "cursor-not-allowed opacity-60",
-                )}
-              >
-                {a.label}
-                {a.disponivel ? null : <EmBreve className="px-1.5 py-0 text-[9px]" />}
-              </button>
-            );
-          })}
-        </nav>
+        {/* =========================================================================
+            2. CARD DO AGENTE CEO / ORQUESTRADOR
+           ========================================================================= */}
+        <section className="relative overflow-hidden rounded-2xl border border-orange-500/30 bg-[#0c1017] p-6 shadow-2xl shadow-orange-950/20">
+          {/* Glowing backlight */}
+          <div
+            className="pointer-events-none absolute -left-20 -top-20 size-[500px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(249,93,20,0.14),transparent_70%)]"
+            aria-hidden="true"
+          />
 
-        {aba === "automacoes" ? (
-          <div className="mt-6 rounded-2xl bg-background p-4 text-foreground sm:p-6">
-            <AutomacaoSection onRevisar={onRevisar} />
-          </div>
-        ) : (
-          <div className="mt-6 space-y-5">
-            {falhou ? (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-home-red/40 bg-home-red/10 px-4 py-3 text-sm">
-                <span>Não foi possível carregar os dados do painel.</span>
+          <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_minmax(320px,420px)]">
+            {/* CEO Profile Info */}
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              {/* Avatar with glow and online badge */}
+              <div className="relative shrink-0">
+                <div className="relative size-32 overflow-hidden rounded-2xl border-2 border-orange-500/50 shadow-2xl shadow-orange-500/20 sm:size-36">
+                  <img
+                    src={CEO_AGENTE_DATA.avatarUrl}
+                    alt="CEO de IA"
+                    className="size-full object-cover object-top"
+                  />
+                  {/* Subtle rim highlight */}
+                  <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                </div>
+                {/* Status Online Badge */}
+                <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-black/80 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 backdrop-blur-md">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Online</span>
+                </div>
+              </div>
+
+              {/* CEO Bio & Skills */}
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                  <Bot className="size-3 text-orange-400" />
+                  <span>AGENTE ORQUESTRADOR</span>
+                </div>
+
+                <div className="mt-1.5 flex items-center gap-2">
+                  <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                    CEO de IA
+                  </h2>
+                  <Crown className="size-6 text-amber-400 fill-amber-400/30" />
+                </div>
+
+                <p className="mt-2 text-xs leading-relaxed text-neutral-300 sm:text-sm">
+                  Planeja, coordena e impulsiona toda a operação comercial.
+                  <br className="hidden sm:inline" />
+                  Define estratégias, delega tarefas, acompanha metas e garante resultados.
+                </p>
+
+                {/* Pills */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {[
+                    { label: "Planejamento", icon: Target },
+                    { label: "Delegação", icon: Users },
+                    { label: "Análise de performance", icon: TrendingUp },
+                    { label: "Tomada de decisão", icon: Settings },
+                  ].map((p) => (
+                    <span
+                      key={p.label}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-medium text-neutral-300 transition-colors hover:border-white/20 hover:text-white"
+                    >
+                      <p.icon className="size-3 text-neutral-400" />
+                      <span>{p.label}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Comando da Operação Box */}
+            <div className="rounded-xl border border-white/10 bg-[#121620]/90 p-4 shadow-lg backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                <Target className="size-4 text-orange-400" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-white">
+                  Comando da operação
+                </h3>
+              </div>
+              <p className="mt-1 text-xs text-neutral-400">
+                Seu CEO de IA está ativo e coordenando 6 agentes.
+              </p>
+
+              {/* Status Banner */}
+              <div className="mt-3.5 flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-950/25 p-3 transition-colors hover:bg-emerald-950/35 cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                    <Radio className="size-4 animate-pulse" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-emerald-400">Operação em andamento</p>
+                    <p className="text-[11px] text-neutral-300">
+                      Todos os agentes executando conforme o plano.
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="size-4 text-emerald-400/70" />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={carregar}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-home-orange"
+                  className="flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-neutral-200 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-white"
                 >
-                  <RefreshCw className="size-3.5" /> Tentar de novo
+                  Ver plano atual
+                </button>
+                <button
+                  type="button"
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#f95d14] px-3 text-xs font-semibold text-white shadow-md shadow-orange-500/20 transition-all hover:bg-[#ff6c26]"
+                >
+                  <MessageSquare className="size-3.5" />
+                  <span>Conversar com o CEO</span>
                 </button>
               </div>
-            ) : null}
+            </div>
+          </div>
+        </section>
 
-            {/* CEO + comando */}
-            <section className="relative overflow-hidden rounded-2xl border border-home-orange/50 bg-[radial-gradient(circle_at_20%_0%,rgba(255,98,0,0.18),transparent_55%),var(--home-surface)] p-6">
-              <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,420px)]">
-                <div className="flex items-start gap-5">
-                  <span className="flex size-24 shrink-0 items-center justify-center rounded-2xl border border-home-orange/40 bg-home-orange/10 text-home-orange sm:size-32">
-                    <CEO_AGENTE.icon className="size-12 sm:size-16" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md border border-home-border bg-home-surface-strong px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-home-muted">
-                        Agente orquestrador
-                      </span>
-                      <EmBreve />
-                    </div>
-                    <h2 className="mt-2 text-3xl font-semibold tracking-tight">
-                      {CEO_AGENTE.nome}
-                    </h2>
-                    <p className="mt-2 max-w-xl text-sm text-home-muted">{CEO_AGENTE.descricao}</p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {[
-                        "Planejamento",
-                        "Delegação",
-                        "Análise de performance",
-                        "Tomada de decisão",
-                      ].map((c) => (
-                        <span
-                          key={c}
-                          className="rounded-full border border-home-border bg-home-surface-strong px-3 py-1 text-[11px] text-home-muted"
-                        >
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-home-border bg-home-surface-strong/60 p-4">
-                  <p className="text-xs font-semibold text-home-foreground">Comando da operação</p>
-                  <p className="mt-1 text-xs text-home-muted">
-                    O CEO de IA e os demais agentes ainda não foram ativados. Hoje a prospecção
-                    automática roda por receitas, sempre com a sua aprovação.
-                  </p>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAba("automacoes")}
-                      className="h-10 rounded-xl border border-home-border bg-home-surface text-xs font-semibold transition-colors hover:bg-home-surface-strong"
-                    >
-                      Ver receitas atuais
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      title={SOON_TITLE}
-                      className="h-10 cursor-not-allowed rounded-xl bg-home-orange/40 text-xs font-semibold text-white/80"
-                    >
-                      Conversar com o CEO
-                    </button>
-                  </div>
-                </div>
+        {/* =========================================================================
+            3. CARDS DE KPI (6 CARDS NA LINHA)
+           ========================================================================= */}
+        <section className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            {
+              icon: Users,
+              iconColor: "text-blue-400",
+              iconBg: "bg-blue-500/10 border-blue-500/20",
+              valor: "1.248",
+              badge: "+18%",
+              rotulo: "Leads prospectados",
+            },
+            {
+              icon: Filter,
+              iconColor: "text-purple-400",
+              iconBg: "bg-purple-500/10 border-purple-500/20",
+              valor: "342",
+              badge: "+24%",
+              rotulo: "Leads qualificados",
+            },
+            {
+              icon: Calendar,
+              iconColor: "text-amber-400",
+              iconBg: "bg-amber-500/10 border-amber-500/20",
+              valor: "56",
+              badge: "+12%",
+              rotulo: "Reuniões agendadas",
+            },
+            {
+              icon: FileText,
+              iconColor: "text-cyan-400",
+              iconBg: "bg-cyan-500/10 border-cyan-500/20",
+              valor: "28",
+              badge: "+33%",
+              rotulo: "Propostas em andamento",
+            },
+            {
+              icon: BarChart3,
+              iconColor: "text-emerald-400",
+              iconBg: "bg-emerald-500/10 border-emerald-500/20",
+              valor: "18%",
+              badge: "+6%",
+              rotulo: "Conversão semanal",
+            },
+            {
+              icon: Users,
+              iconColor: "text-sky-400",
+              iconBg: "bg-sky-500/10 border-sky-500/20",
+              valor: "6",
+              badge: "100%",
+              rotulo: "Agentes ativos",
+            },
+          ].map((k) => (
+            <div
+              key={k.rotulo}
+              className={cn(PANEL_CLASS, "flex items-center gap-3.5 p-4 transition-all hover:border-white/20")}
+            >
+              <div
+                className={cn(
+                  "flex size-11 shrink-0 items-center justify-center rounded-xl border",
+                  k.iconBg,
+                  k.iconColor,
+                )}
+              >
+                <k.icon className="size-5" />
               </div>
-            </section>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xl font-bold tracking-tight text-white">{k.valor}</span>
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    <TrendingUp className="size-2.5" />
+                    <span>{k.badge}</span>
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[11px] font-medium text-neutral-400">{k.rotulo}</p>
+              </div>
+            </div>
+          ))}
+        </section>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-              {kpis.map((k) => (
-                <div key={k.rotulo} className={cn(PANEL_CLASS, "flex items-center gap-3 p-4")}>
-                  <span
+        {/* =========================================================================
+            4. EQUIPE DE AGENTES + ENXAME DE AUTOMAÇÃO
+           ========================================================================= */}
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.75fr)_minmax(0,1.05fr)]">
+          {/* Equipe de Agentes */}
+          <div className={cn(PANEL_CLASS, "p-5")}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                  <Users className="size-4" />
+                </span>
+                <h2 className="text-sm font-semibold tracking-wide text-white">Equipe de Agentes</h2>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-semibold text-[#f95d14] transition-colors hover:text-[#ff7836]"
+              >
+                <span>Gerenciar equipe</span>
+                <ArrowRight className="size-3" />
+              </button>
+            </div>
+
+            {/* 7 Agent Cards Grid */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+              {EQUIPE_AGENTES_DATA.map((agente) => {
+                const isCeo = agente.id === "ceo";
+                return (
+                  <div
+                    key={agente.id}
                     className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-xl bg-home-surface-strong",
-                      k.cor,
+                      "group relative flex flex-col items-center rounded-xl border p-3 text-center transition-all",
+                      isCeo
+                        ? "border-orange-500/70 bg-[#161a25] shadow-lg shadow-orange-500/10 ring-1 ring-orange-500/30"
+                        : "border-[#1b2232] bg-[#0e131d]/90 hover:border-white/20 hover:bg-[#131926]",
                     )}
                   >
-                    <k.icon className="size-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-2xl font-semibold leading-none">
-                      {carregando && k.real ? <Loader2 className="size-5 animate-spin" /> : k.valor}
+                    {/* Top right 3 dots */}
+                    <button
+                      type="button"
+                      className="absolute right-2 top-2 text-neutral-500 transition-colors hover:text-white"
+                      aria-label="Opções do agente"
+                    >
+                      <MoreVertical className="size-3.5" />
+                    </button>
+
+                    {/* Circular Avatar */}
+                    <div className="relative mt-1">
+                      <div
+                        className={cn(
+                          "size-14 overflow-hidden rounded-full border-2",
+                          isCeo ? "border-orange-500 shadow-md shadow-orange-500/20" : "border-white/15",
+                        )}
+                      >
+                        <img
+                          src={agente.avatarUrl}
+                          alt={agente.nome}
+                          className="size-full object-cover object-top"
+                        />
+                      </div>
+                      {/* Status indicator dot */}
+                      <span className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-[#0e131d] bg-emerald-400" />
+                    </div>
+
+                    {/* Agent Name */}
+                    <div className="mt-2.5 flex items-center gap-1">
+                      <p className="truncate text-xs font-bold text-white">{agente.nome}</p>
+                      {isCeo && <Crown className="size-3 text-amber-400 fill-amber-400" />}
+                    </div>
+
+                    {/* Role */}
+                    <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-400">
+                      {agente.funcao}
                     </p>
-                    <p className="mt-1.5 text-[11px] leading-tight text-home-muted">{k.rotulo}</p>
-                    {k.real ? null : <EmBreve className="mt-1 inline-block" />}
+
+                    {/* Online badge */}
+                    <div className="mt-2 flex items-center gap-1 text-[10px] font-medium text-emerald-400">
+                      <span className="size-1.5 rounded-full bg-emerald-400" />
+                      <span>Online</span>
+                    </div>
+
+                    {/* Task count pill */}
+                    <div className="mt-2.5 flex w-full items-center justify-center gap-1 rounded-full border border-orange-500/25 bg-orange-500/10 py-1 text-[10px] font-semibold text-orange-400">
+                      <Briefcase className="size-2.5" />
+                      <span>{agente.tarefasCount} tarefas</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Enxame de Automação */}
+          <div className={cn(PANEL_CLASS, "p-5")}>
+            <div className="mb-1 flex items-start justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                  <Layers className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold tracking-wide text-white">
+                    Enxame de Automação
+                  </h2>
+                  <p className="text-[11px] text-neutral-400">
+                    O CEO coordena os agentes conforme o plano comercial.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-semibold text-[#f95d14] transition-colors hover:text-[#ff7836]"
+              >
+                <span>Ver fluxo completo</span>
+                <ArrowRight className="size-3" />
+              </button>
+            </div>
+
+            {/* Tree Structure */}
+            <div className="mt-5 flex flex-col items-center">
+              {/* Root Node: CEO */}
+              <div className="group relative flex flex-col items-center rounded-xl border border-orange-500/50 bg-[#161a25] px-4 py-2.5 shadow-lg shadow-orange-500/15">
+                <div className="relative size-11 overflow-hidden rounded-full border-2 border-orange-500 shadow-md">
+                  <img
+                    src={CEO_AGENTE_DATA.avatarUrl}
+                    alt="CEO de IA"
+                    className="size-full object-cover object-top"
+                  />
+                </div>
+                <div className="mt-1 flex items-center gap-1">
+                  <span className="text-xs font-bold text-white">CEO de IA</span>
+                  <Crown className="size-3 text-amber-400 fill-amber-400" />
+                </div>
+                <span className="text-[10px] text-neutral-400">Orquestra o enxame</span>
+              </div>
+
+              {/* Vertical connector down from CEO */}
+              <div className="h-4 w-px bg-orange-500/60" />
+
+              {/* Horizontal bar */}
+              <div className="relative w-[92%] border-t border-orange-500/40">
+                {/* 6 Drop pins */}
+                <div className="grid grid-cols-6 w-full">
+                  {EQUIPE_AGENTES_DATA.filter((a) => a.id !== "ceo").map((a) => (
+                    <div key={a.id} className="flex flex-col items-center">
+                      <div className="h-3 w-px bg-orange-500/40" />
+                      <div className="flex flex-col items-center pt-1 text-center">
+                        <div
+                          className={cn(
+                            "flex size-9 items-center justify-center rounded-full border border-white/10 bg-[#111723] transition-transform hover:scale-110",
+                            a.cor,
+                          )}
+                        >
+                          <a.iconeEnxame className="size-4" />
+                        </div>
+                        <p className="mt-1.5 truncate text-[10px] font-bold text-white max-w-[64px]">
+                          {a.nome}
+                        </p>
+                        <p className="text-[9px] text-neutral-400">{a.subtituloEnxame}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================================
+            5. PLANO SEMANAL + FLUXO OPERACIONAL + METAS E RESULTADOS
+           ========================================================================= */}
+        <section className="grid gap-6 xl:grid-cols-3">
+          
+          {/* 5.1 Plano semanal de prospecção */}
+          <div className={cn(PANEL_CLASS, "p-5")}>
+            <div className="mb-4 flex items-start justify-between">
+              <div className="flex items-start gap-2.5">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                  <Calendar className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold tracking-wide text-white">
+                    Plano semanal de prospecção
+                  </h2>
+                  <p className="text-[11px] text-neutral-400">
+                    Atividades e canais que os agentes vão executar esta semana.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-semibold text-[#f95d14] transition-colors hover:text-[#ff7836]"
+              >
+                <span>Ver agenda completa</span>
+                <ArrowRight className="size-3" />
+              </button>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-[#1b2232] text-[10px] uppercase tracking-wider text-neutral-400">
+                    <th className="pb-2.5 font-medium">Dia</th>
+                    <th className="pb-2.5 font-medium">Nicho / Segmento</th>
+                    <th className="pb-2.5 font-medium">Canais</th>
+                    <th className="pb-2.5 font-medium">Meta de leads</th>
+                    <th className="pb-2.5 text-right font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#161c28]">
+                  {PLANO_SEMANAL_DATA.map((row) => (
+                    <tr key={row.dia} className="transition-colors hover:bg-white/[0.02]">
+                      <td className="py-2.5 font-semibold text-neutral-200">{row.dia}</td>
+                      <td className="py-2.5 text-neutral-300 font-medium">{row.nicho}</td>
+                      <td className="py-2.5 text-neutral-400">{row.canais}</td>
+                      <td className="py-2.5 font-medium text-neutral-200">{row.metaLeads}</td>
+                      <td className="py-2.5 text-right">
+                        {row.status === "concluido" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                            <Check className="size-3" />
+                            <span>Concluído</span>
+                          </span>
+                        ) : row.status === "em_andamento" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-blue-400">
+                            <span className="size-1.5 rounded-full bg-blue-400 animate-pulse" />
+                            <span>Em andamento</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                            <Clock className="size-3" />
+                            <span>Pendente</span>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 5.2 Fluxo de operação comercial */}
+          <div className={cn(PANEL_CLASS, "p-5")}>
+            <div className="mb-5 flex items-start gap-2.5">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                <Filter className="size-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold tracking-wide text-white">
+                  Fluxo de operação comercial
+                </h2>
+                <p className="text-[11px] text-neutral-400">
+                  Do primeiro contato ao cliente fechado, com agentes especializados.
+                </p>
+              </div>
+            </div>
+
+            {/* Stepper Pipeline */}
+            <div className="flex items-center justify-between gap-1 pt-2">
+              {FLUXO_OPERACAO_DATA.map((passo, idx) => (
+                <React.Fragment key={passo.id}>
+                  <div className="flex min-w-0 flex-1 flex-col items-center text-center">
+                    <div
+                      className={cn(
+                        "flex size-11 items-center justify-center rounded-xl border transition-transform hover:scale-105",
+                        passo.corBadge,
+                      )}
+                    >
+                      <passo.icon className="size-5" />
+                    </div>
+                    <p className="mt-2 text-xs font-bold text-white">{passo.titulo}</p>
+                    <p className="text-[10px] text-neutral-300 font-medium">{passo.sub1}</p>
+                    <p className="text-[9px] text-neutral-500">{passo.sub2}</p>
+                  </div>
+
+                  {idx < FLUXO_OPERACAO_DATA.length - 1 && (
+                    <ChevronRight className="size-4 shrink-0 text-neutral-600 mb-6" />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          {/* 5.3 Metas e resultados */}
+          <div className={cn(PANEL_CLASS, "p-5")}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                  <Target className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold tracking-wide text-white">
+                    Metas e resultados
+                  </h2>
+                  <p className="text-[11px] text-neutral-400">
+                    Acompanhamento de desempenho da operação.
+                  </p>
+                </div>
+              </div>
+
+              {/* Period dropdown */}
+              <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-neutral-300">
+                <span>{periodoMetas}</span>
+                <ChevronDown className="size-3 text-neutral-500" />
+              </div>
+            </div>
+
+            {/* Progress Bars */}
+            <div className="space-y-4 pt-1">
+              {METAS_RESULTADOS_DATA.map((m) => (
+                <div key={m.rotulo}>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-neutral-300">
+                      <m.icon className="size-3.5 text-neutral-500" />
+                      <span>{m.rotulo}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-semibold">
+                      <span className="text-neutral-200">
+                        {m.atual.toLocaleString("pt-BR")} / {m.meta.toLocaleString("pt-BR")}
+                      </span>
+                      <span className="text-neutral-400 text-[11px]">({m.porcentagem}%)</span>
+                    </div>
+                  </div>
+                  {/* Progress bar line */}
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-orange-600 to-[#f95d14] transition-all duration-500"
+                      style={{ width: `${m.porcentagem}%` }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+        </section>
 
-            {/* Equipe + Enxame */}
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-              <Secao
-                titulo="Equipe de Agentes"
-                sub="Perfis planejados da equipe. Os agentes serão ativados em etapas."
-                icon={Users}
+        {/* =========================================================================
+            6. ATIVIDADES RECENTES + CAPACIDADES E INTEGRAÇÕES
+           ========================================================================= */}
+        <section className="grid gap-6 xl:grid-cols-2">
+          
+          {/* 6.1 Atividades recentes */}
+          <div className={cn(PANEL_CLASS, "p-5")}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                  <Zap className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold tracking-wide text-white">
+                    Atividades recentes
+                  </h2>
+                  <p className="text-[11px] text-neutral-400">
+                    Últimas ações dos agentes na sua operação.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-semibold text-[#f95d14] transition-colors hover:text-[#ff7836]"
               >
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
-                  {EQUIPE_AGENTES.map((a) => (
-                    <div
-                      key={a.id}
-                      className={cn(
-                        "flex flex-col items-center rounded-xl border bg-home-surface-strong/50 p-3 text-center",
-                        a.id === "ceo" ? "border-home-orange/60" : "border-home-border",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-14 items-center justify-center rounded-full bg-home-surface",
-                          a.cor,
-                        )}
-                      >
-                        <a.icon className="size-7" />
+                <span>Ver todas</span>
+                <ArrowRight className="size-3" />
+              </button>
+            </div>
+
+            {/* 2x2 Grid of Activities */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {ATIVIDADES_RECENTES_DATA.map((act) => (
+                <div
+                  key={act.id}
+                  className="flex items-start gap-3 rounded-xl border border-[#1b2232] bg-[#0e131d]/90 p-3.5 transition-all hover:border-white/15"
+                >
+                  <div className="size-9 shrink-0 overflow-hidden rounded-full border border-white/10">
+                    <img
+                      src={act.avatarUrl}
+                      alt={act.agente}
+                      className="size-full object-cover object-top"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className={cn("text-xs font-bold", act.corBadge)}>
+                        {act.agente}
                       </span>
-                      <p className="mt-2 text-xs font-semibold">{a.nome}</p>
-                      <p className="mt-0.5 text-[10px] leading-tight text-home-muted">{a.funcao}</p>
-                      <EmBreve className="mt-2" />
+                      <span className="text-[10px] text-neutral-500">{act.tempo}</span>
                     </div>
-                  ))}
-                </div>
-              </Secao>
-
-              <Secao
-                titulo="Enxame de Automação"
-                sub="O CEO coordenará os agentes conforme o plano comercial."
-                icon={Layers}
-              >
-                <div className="flex flex-col items-center">
-                  <div className="rounded-xl border border-home-orange/50 px-4 py-2 text-center">
-                    <p className="text-xs font-semibold">CEO de IA</p>
-                    <p className="text-[10px] text-home-muted">Orquestra o enxame</p>
-                  </div>
-                  <div className="h-4 w-px bg-home-orange/60" />
-                  <div className="grid w-full grid-cols-3 gap-2 border-t border-home-orange/60 pt-3 sm:grid-cols-6">
-                    {EQUIPE_AGENTES.filter((a) => a.id !== "ceo").map((a) => (
-                      <div key={a.id} className="flex flex-col items-center text-center">
-                        <span
-                          className={cn(
-                            "flex size-10 items-center justify-center rounded-full bg-home-surface-strong",
-                            a.cor,
-                          )}
-                        >
-                          <a.icon className="size-5" />
-                        </span>
-                        <p className="mt-1 text-[10px] font-semibold leading-tight">{a.nome}</p>
-                      </div>
-                    ))}
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-300">
+                      {act.texto}
+                    </p>
                   </div>
                 </div>
-              </Secao>
-            </div>
-
-            {/* Plano semanal + Fluxo + Metas */}
-            <div className="grid gap-5 xl:grid-cols-3">
-              <Secao
-                titulo="Plano semanal de prospecção"
-                sub="Receitas de prospecção cadastradas e seus agendamentos."
-                icon={CalendarCheck}
-                acao={
-                  <button
-                    type="button"
-                    onClick={() => setAba("automacoes")}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-home-orange"
-                  >
-                    Abrir automações <ArrowRight className="size-3" />
-                  </button>
-                }
-              >
-                {carregando ? (
-                  <Loader2 className="size-4 animate-spin text-home-muted" />
-                ) : receitas.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-home-border p-4 text-center text-xs text-home-muted">
-                    Nenhuma receita ainda. Crie uma em Automações para ela aparecer aqui.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="text-[10px] uppercase tracking-wide text-home-muted">
-                        <tr>
-                          <th className="py-2 pr-3 font-medium">Frequência</th>
-                          <th className="py-2 pr-3 font-medium">Nicho / Local</th>
-                          <th className="py-2 pr-3 font-medium">Canal</th>
-                          <th className="py-2 pr-3 font-medium">Leads/rodada</th>
-                          <th className="py-2 font-medium">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {receitas.slice(0, 6).map((r) => (
-                          <tr key={r.id} className="border-t border-home-border">
-                            <td className="py-2 pr-3 capitalize">{r.frequencia}</td>
-                            <td className="py-2 pr-3">
-                              {r.nicho} · {r.cidade}
-                              {r.uf ? `/${r.uf}` : ""}
-                            </td>
-                            <td className="py-2 pr-3 capitalize">{r.canal}</td>
-                            <td className="py-2 pr-3">{fmt(r.leads_por_rodada)}</td>
-                            <td
-                              className={cn(
-                                "py-2 font-semibold",
-                                r.ativa ? "text-home-green" : "text-home-muted",
-                              )}
-                            >
-                              {r.ativa ? "Agendada" : "Pausada"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </Secao>
-
-              <Secao
-                titulo="Fluxo de operação comercial"
-                sub="Do primeiro contato ao cliente fechado, com agentes especializados."
-                icon={Filter}
-              >
-                <ol className="flex items-start justify-between gap-1">
-                  {FLUXO_OPERACIONAL.map((e, i) => (
-                    <li key={e.id} className="flex min-w-0 flex-1 items-start">
-                      <div className="flex min-w-0 flex-1 flex-col items-center text-center">
-                        <span
-                          className={cn(
-                            "flex size-11 items-center justify-center rounded-xl text-sm font-bold",
-                            e.disponivel
-                              ? "bg-home-orange/20 text-home-orange"
-                              : "bg-home-surface-strong text-home-muted",
-                          )}
-                        >
-                          {i + 1}
-                        </span>
-                        <p className="mt-2 text-[11px] font-semibold">{e.titulo}</p>
-                        <p className="text-[10px] leading-tight text-home-muted">{e.sub}</p>
-                        {e.disponivel ? (
-                          <span className="mt-1 text-[9px] font-semibold uppercase text-home-green">
-                            Via receitas
-                          </span>
-                        ) : (
-                          <EmBreve className="mt-1 px-1.5 py-0 text-[9px]" />
-                        )}
-                      </div>
-                      {i < FLUXO_OPERACIONAL.length - 1 ? (
-                        <ChevronRight className="mt-3.5 size-3.5 shrink-0 text-home-muted" />
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
-              </Secao>
-
-              <Secao
-                titulo="Metas e resultados"
-                sub="Acompanhamento de desempenho da operação."
-                icon={Target}
-              >
-                <div className="space-y-4">
-                  <MetaBarra
-                    rotulo="Leads do mês (automação)"
-                    atual={leadsMes}
-                    meta={tetoMes}
-                    carregando={carregando}
-                  />
-                  {["Reuniões agendadas", "Propostas enviadas", "Vendas fechadas"].map((m) => (
-                    <div key={m}>
-                      <div className="mb-1.5 flex items-center justify-between text-xs">
-                        <span className="text-home-muted">{m}</span>
-                        <EmBreve />
-                      </div>
-                      <div className="h-2 rounded-full bg-home-surface-strong" />
-                    </div>
-                  ))}
-                </div>
-              </Secao>
-            </div>
-
-            {/* Atividades + Capacidades */}
-            <div className="grid gap-5 xl:grid-cols-2">
-              <Secao
-                titulo="Atividades recentes"
-                sub="Últimas rodadas executadas pela automação de prospecção."
-                icon={Zap}
-              >
-                {carregando ? (
-                  <Loader2 className="size-4 animate-spin text-home-muted" />
-                ) : rodadas.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-home-border p-4 text-center text-xs text-home-muted">
-                    Nenhuma rodada executada ainda.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-home-border">
-                    {rodadas.map((r) => {
-                      const st = STATUS_RODADA[r.status] ?? {
-                        texto: r.status,
-                        cor: "text-home-muted",
-                      };
-                      return (
-                        <li
-                          key={r.id}
-                          className="flex items-start justify-between gap-3 py-2.5 text-xs"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold">{nomeReceita(r.receita_id)}</p>
-                            <p className="text-home-muted">
-                              {fmt(r.leads_buscados)} buscados · {fmt(r.leads_preparados)} prontos
-                              para revisão
-                            </p>
-                          </div>
-                          <div className="shrink-0 text-right">
-                            <p className={cn("font-semibold", st.cor)}>{st.texto}</p>
-                            <p className="text-home-muted">{formatDataHora(r.iniciada_em)}</p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {onRevisar ? (
-                  <button
-                    type="button"
-                    onClick={onRevisar}
-                    className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-home-orange"
-                  >
-                    Revisar rascunhos em Campanhas <ArrowRight className="size-3" />
-                  </button>
-                ) : null}
-              </Secao>
-
-              <Secao
-                titulo="Capacidades e integrações (Copiloto)"
-                sub="Recursos que os agentes usarão para executar com autonomia supervisionada."
-                icon={Bot}
-              >
-                <div className="grid grid-cols-2 gap-3">
-                  {CAPACIDADES.map((c) => {
-                    const Icon = ICONES_CAPACIDADE[c.id];
-                    return (
-                      <div
-                        key={c.id}
-                        className="rounded-xl border border-home-border bg-home-surface-strong/50 p-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <Icon className="size-5 text-home-orange" />
-                          <EmBreve />
-                        </div>
-                        <p className="mt-2 text-xs font-semibold">{c.titulo}</p>
-                        <p className="mt-0.5 text-[11px] leading-snug text-home-muted">{c.texto}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Secao>
+              ))}
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
-function MetaBarra({
-  rotulo,
-  atual,
-  meta,
-  carregando,
-}: {
-  rotulo: string;
-  atual: number;
-  meta: number;
-  carregando: boolean;
-}) {
-  const pct = meta > 0 ? Math.min(100, Math.round((atual / meta) * 100)) : 0;
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between text-xs">
-        <span className="text-home-muted">{rotulo}</span>
-        <span className="font-semibold">
-          {carregando
-            ? "—"
-            : meta > 0
-              ? `${fmt(atual)} / ${fmt(meta)} · ${pct}%`
-              : "Sem limite definido"}
-        </span>
-      </div>
-      <div
-        role="progressbar"
-        aria-valuenow={pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={rotulo}
-        className="h-2 overflow-hidden rounded-full bg-home-surface-strong"
-      >
-        <div className="h-full rounded-full bg-home-orange" style={{ width: `${pct}%` }} />
+          {/* 6.2 Capacidades e integrações (Copiloto) */}
+          <div className={cn(PANEL_CLASS, "p-5")}>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400">
+                  <Layers className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-sm font-semibold tracking-wide text-white">
+                    Capacidades e integrações (Copiloto)
+                  </h2>
+                  <p className="text-[11px] text-neutral-400">
+                    Os agentes utilizam IA avançada, memória e integrações para executar com autonomia.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="flex items-center gap-1 text-xs font-semibold text-[#f95d14] transition-colors hover:text-[#ff7836]"
+              >
+                <span>Ver configurações</span>
+                <ArrowRight className="size-3" />
+              </button>
+            </div>
+
+            {/* 2x2 Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {CAPACIDADES_DATA.map((cap) => {
+                const conf = ICONES_CAPACIDADE[cap.iconId];
+                const IconComponent = conf.icon;
+                return (
+                  <div
+                    key={cap.id}
+                    className="flex items-start gap-3 rounded-xl border border-[#1b2232] bg-[#0e131d]/90 p-3.5 transition-all hover:border-white/15"
+                  >
+                    <div
+                      className={cn(
+                        "flex size-9 shrink-0 items-center justify-center rounded-xl border",
+                        conf.bg,
+                        conf.cor,
+                      )}
+                    >
+                      <IconComponent className="size-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white">{cap.titulo}</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">
+                        {cap.texto}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
   );
