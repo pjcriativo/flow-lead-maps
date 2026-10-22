@@ -66,6 +66,7 @@ const ICONES_CAPACIDADE: Record<string, { icon: LucideIcon; cor: string; bg: str
 import { AgentesNavHeader, type TelaAgentesId } from "./AgentesNavHeader";
 import { EquipeAgentesView } from "./EquipeAgentesView";
 import { PerfilAgenteView } from "./PerfilAgenteView";
+import { TreinamentoConhecimentoView } from "./TreinamentoConhecimentoView";
 
 function getInitialTela(): TelaAgentesId {
   if (typeof window === "undefined") return "visao_geral";
@@ -73,6 +74,7 @@ function getInitialTela(): TelaAgentesId {
   const t = params.get("tela");
   if (t === "equipe") return "equipe";
   if (t === "perfil") return "perfil";
+  if (t === "treinamento") return "treinamento";
   return "visao_geral";
 }
 
@@ -97,7 +99,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
       params.set("tela", novaTela);
       if (novoAgenteId) {
         params.set("agente", novoAgenteId);
-      } else if (novaTela !== "perfil") {
+      } else if (novaTela !== "perfil" && novaTela !== "treinamento") {
         params.delete("agente");
       }
       window.history.replaceState(
@@ -123,6 +125,14 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
         <PerfilAgenteView
           agenteId={agentePerfilId}
           onVoltar={() => mudarTela("equipe")}
+          onNavegarEquipe={() => mudarTela("equipe")}
+          onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
+        />
+      ) : telaAtiva === "treinamento" ? (
+        <TreinamentoConhecimentoView
+          agenteId={agentePerfilId}
+          onVoltar={() => mudarTela("perfil", agentePerfilId)}
+          onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
           onNavegarEquipe={() => mudarTela("equipe")}
         />
       ) : (

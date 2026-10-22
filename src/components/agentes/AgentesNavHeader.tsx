@@ -84,7 +84,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "treinamento",
     rotulo: "Treinamento & Conhecimento",
     sub: "Documentos, catálogos, FAQs e base RAG",
-    disponivel: false,
+    disponivel: true,
     icon: Brain,
   },
   {

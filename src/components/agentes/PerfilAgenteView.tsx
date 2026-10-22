@@ -56,6 +56,7 @@ interface PerfilAgenteViewProps {
   agenteId?: string;
   onVoltar?: () => void;
   onNavegarEquipe?: () => void;
+  onNavegarTreinamento?: () => void;
 }
 
 const PANEL_CLASS =
@@ -65,6 +66,7 @@ export function PerfilAgenteView({
   agenteId = "ceo",
   onVoltar,
   onNavegarEquipe,
+  onNavegarTreinamento,
 }: PerfilAgenteViewProps) {
   const [perfil, setPerfil] = useState<PerfilAgenteCompleto>(
     PERFIS_CATALOGO[agenteId] || PERFIS_CATALOGO.ceo,
@@ -316,7 +318,13 @@ export function PerfilAgenteView({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setAbaAtiva(tab.id)}
+                onClick={() => {
+                  if (tab.id === "treinamento" && onNavegarTreinamento) {
+                    onNavegarTreinamento();
+                  } else {
+                    setAbaAtiva(tab.id);
+                  }
+                }}
                 className={cn(
                   "shrink-0 rounded-xl px-4 py-2 text-xs font-semibold transition-all",
                   ativa
