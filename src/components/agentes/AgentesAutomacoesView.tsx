@@ -52,6 +52,11 @@ import {
   ATIVIDADES_RECENTES_DATA,
   CAPACIDADES_DATA,
 } from "./agentes-data";
+import { AgentesSidebarNav, type TelaAgentesId } from "./AgentesSidebarNav";
+import { EquipeAgentesView } from "./EquipeAgentesView";
+import { PerfilAgenteView } from "./PerfilAgenteView";
+import { TreinamentoConhecimentoView } from "./TreinamentoConhecimentoView";
+import { MemoriaSegundoCerebroView } from "./MemoriaSegundoCerebroView";
 
 const PANEL_CLASS =
   "rounded-2xl border border-[#1e2638] bg-[#0c1017]/90 backdrop-blur-sm shadow-xl";
@@ -62,12 +67,6 @@ const ICONES_CAPACIDADE: Record<string, { icon: LucideIcon; cor: string; bg: str
   voz: { icon: Mic, cor: "text-cyan-400", bg: "bg-cyan-500/10 border-cyan-500/20" },
   sentimento: { icon: Heart, cor: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20" },
 };
-
-import { AgentesSidebarNav, type TelaAgentesId } from "./AgentesSidebarNav";
-import { EquipeAgentesView } from "./EquipeAgentesView";
-import { PerfilAgenteView } from "./PerfilAgenteView";
-import { TreinamentoConhecimentoView } from "./TreinamentoConhecimentoView";
-import { MemoriaSegundoCerebroView } from "./MemoriaSegundoCerebroView";
 
 function getInitialTela(): TelaAgentesId {
   if (typeof window === "undefined") return "visao_geral";

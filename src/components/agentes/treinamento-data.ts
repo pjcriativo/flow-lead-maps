@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BookOpen,
   Brain,
   Briefcase,
@@ -20,6 +21,7 @@ import {
   Link2,
   Megaphone,
   Radio,
+  RefreshCw,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -288,6 +290,3 @@ export const SUGESTOES_MELHORIA_INICIAIS: SugestaoMelhoriaItem[] = [
     corBg: "bg-purple-500/10 border-purple-500/20",
   },
 ];
-
-import { BarChart3 as BarIcon, RefreshCw } from "lucide-react";
-const BarChart3 = BarIcon;
