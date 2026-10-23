@@ -85,6 +85,7 @@ interface AgendaInteligenteViewProps {
   onNavegarSkills?: () => void;
   onNavegarFluxos?: () => void;
   onNavegarPlanejamento?: () => void;
+  onNavegarCopiloto?: () => void;
 }
 
 const PANEL_CLASS =
@@ -100,6 +101,7 @@ export function AgendaInteligenteView({
   onNavegarSkills,
   onNavegarFluxos,
   onNavegarPlanejamento,
+  onNavegarCopiloto,
 }: AgendaInteligenteViewProps) {
   // Modais
   const [modalNovaReuniaoAberto, setModalNovaReuniaoAberto] = useState(false);

@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
   Compass,
+  Database,
   DollarSign,
   Eye,
   FileCheck,

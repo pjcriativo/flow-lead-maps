@@ -131,7 +131,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "copiloto",
     rotulo: "Copiloto de IA",
     sub: "Chat com agentes e supervisão",
-    disponivel: false,
+    disponivel: true,
     icon: Sparkles,
   },
   {
