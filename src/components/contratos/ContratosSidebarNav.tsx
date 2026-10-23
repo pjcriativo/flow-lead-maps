@@ -43,7 +43,7 @@ export const TODAS_AS_TELAS_CONTRATOS: ItemNavegacaoContratos[] = [
     id: "criador",
     rotulo: "Criador de Contrato",
     sub: "Editor profissional de contratos",
-    disponivel: false,
+    disponivel: true,
     icon: SquarePen,
   },
   {

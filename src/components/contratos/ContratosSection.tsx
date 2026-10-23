@@ -64,6 +64,7 @@ import type { Contrato, ContratoStatus } from "@/types";
 import { listarContratos, gerarContrato, marcarComoAssinado } from "@/services/contratos";
 import { ContratosSidebarNav, type TelaContratosId } from "./ContratosSidebarNav";
 import { CONTRATOS_CATALOGO_INICIAL, type ContratoItem } from "./contratos-data";
+import { CriadorContratosView } from "./CriadorContratosView";
 
 function getInitialTela(): TelaContratosId {
   if (typeof window === "undefined") return "painel";
@@ -262,57 +263,51 @@ export function ContratosSection() {
       {/* Conteúdo Principal Dinâmico */}
       <div className="flex-1 min-w-0 overflow-y-auto">
         <div className="mx-auto max-w-[1720px] px-3.5 pb-16 pt-5 sm:px-6 lg:px-8 space-y-5 antialiased text-neutral-100">
-          {/* =========================================================================
-              1. CABEÇALHO PRINCIPAL DO MÓDULO & BREADCRUMBS
-             ========================================================================= */}
-          <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              {/* Breadcrumbs */}
-              <nav
-                aria-label="Breadcrumb"
-                className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-400"
-              >
-                <span>Gestão</span>
-                <ChevronRight className="size-3 text-neutral-600" />
-                <span className="text-neutral-200 font-semibold">Contratos</span>
-              </nav>
-
-              <div className="flex items-center gap-2.5 mt-1.5">
-                <div className="flex size-9 items-center justify-center rounded-xl bg-orange-500/15 border border-orange-500/30 text-[#f95d14] shadow-sm">
-                  <ScrollText className="size-5" />
-                </div>
+          {telaAtiva === "criador" ? (
+            <CriadorContratosView onVoltarPainel={() => mudarTela("painel")} />
+          ) : (
+            <>
+              {/* =========================================================================
+                  1. CABEÇALHO PRINCIPAL DO MÓDULO & BREADCRUMBS
+                 ========================================================================= */}
+              <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                    Contratos
-                  </h1>
-                  <p className="mt-0.5 text-xs text-neutral-400 sm:text-sm">
-                    Gerencie contratos, assinaturas e renovações com segurança e agilidade.
-                  </p>
-                </div>
-              </div>
-            </div>
+                  {/* Breadcrumbs */}
+                  <nav
+                    aria-label="Breadcrumb"
+                    className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-400"
+                  >
+                    <span>Gestão</span>
+                    <ChevronRight className="size-3 text-neutral-600" />
+                    <span className="text-neutral-200 font-semibold">Contratos</span>
+                  </nav>
 
-            {/* Três Botões de Ação Superiores */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Novo contrato (Laranja) */}
-              <button
-                type="button"
-                onClick={handleGerarContratoReal}
-                disabled={gerando}
-                className="flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#ea580c] to-[#f97316] px-4 text-xs font-bold text-white shadow-lg shadow-orange-600/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-              >
-                {gerando ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    <span>Gerando...</span>
-                  </>
-                ) : (
-                  <>
+                  <div className="flex items-center gap-2.5 mt-1.5">
+                    <div className="flex size-9 items-center justify-center rounded-xl bg-orange-500/15 border border-orange-500/30 text-[#f95d14] shadow-sm">
+                      <ScrollText className="size-5" />
+                    </div>
+                    <div>
+                      <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                        Contratos
+                      </h1>
+                      <p className="mt-0.5 text-xs text-neutral-400 sm:text-sm">
+                        Gerencie contratos, assinaturas e renovações com segurança e agilidade.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Três Botões de Ação Superiores */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Novo contrato (Laranja) -> Abre Tela 02 Criador de Contrato */}
+                  <button
+                    type="button"
+                    onClick={() => mudarTela("criador")}
+                    className="flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#ea580c] to-[#f97316] px-4 text-xs font-bold text-white shadow-lg shadow-orange-600/25 transition-all hover:brightness-110 active:scale-[0.98]"
+                  >
                     <Plus className="size-4 stroke-[2.5]" />
                     <span>Novo contrato</span>
-                  </>
-                )}
-              </button>
+                  </button>
 
               {/* Criar com IA (Roxo) */}
               <button
@@ -1662,6 +1657,8 @@ export function ContratosSection() {
               </aside>
             )}
           </div>
+            </>
+          )}
         </div>
       </div>
 
