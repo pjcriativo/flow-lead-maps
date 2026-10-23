@@ -60,6 +60,7 @@ interface PerfilAgenteViewProps {
   onNavegarMemoria?: () => void;
   onNavegarSkills?: () => void;
   onNavegarFluxos?: () => void;
+  onNavegarPlanejamento?: () => void;
 }
 
 const PANEL_CLASS =
@@ -73,6 +74,7 @@ export function PerfilAgenteView({
   onNavegarMemoria,
   onNavegarSkills,
   onNavegarFluxos,
+  onNavegarPlanejamento,
 }: PerfilAgenteViewProps) {
   const [perfil, setPerfil] = useState<PerfilAgenteCompleto>(
     PERFIS_CATALOGO[agenteId] || PERFIS_CATALOGO.ceo,
@@ -334,6 +336,8 @@ export function PerfilAgenteView({
                     onNavegarSkills();
                   } else if (tab.id === "fluxos" && onNavegarFluxos) {
                     onNavegarFluxos();
+                  } else if (tab.id === "metas" && onNavegarPlanejamento) {
+                    onNavegarPlanejamento();
                   } else {
                     setAbaAtiva(tab.id);
                   }

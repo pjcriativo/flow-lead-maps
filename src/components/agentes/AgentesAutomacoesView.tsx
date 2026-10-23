@@ -59,6 +59,7 @@ import { TreinamentoConhecimentoView } from "./TreinamentoConhecimentoView";
 import { MemoriaSegundoCerebroView } from "./MemoriaSegundoCerebroView";
 import { SkillsIntegracoesView } from "./SkillsIntegracoesView";
 import { FluxosAutomacoesView } from "./FluxosAutomacoesView";
+import { PlanejamentoSemanalMetasView } from "./PlanejamentoSemanalMetasView";
 
 const PANEL_CLASS =
   "rounded-2xl border border-[#1e2638] bg-[#0c1017]/90 backdrop-blur-sm shadow-xl";
@@ -80,6 +81,7 @@ function getInitialTela(): TelaAgentesId {
   if (t === "memoria") return "memoria";
   if (t === "skills") return "skills";
   if (t === "fluxos") return "fluxos";
+  if (t === "planejamento") return "planejamento";
   return "visao_geral";
 }
 
@@ -109,7 +111,8 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
         novaTela !== "treinamento" &&
         novaTela !== "memoria" &&
         novaTela !== "skills" &&
-        novaTela !== "fluxos"
+        novaTela !== "fluxos" &&
+        novaTela !== "planejamento"
       ) {
         params.delete("agente");
       }
@@ -142,6 +145,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
             onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
             onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
+            onNavegarPlanejamento={() => mudarTela("planejamento", agentePerfilId)}
           />
         ) : telaAtiva === "treinamento" ? (
           <TreinamentoConhecimentoView
@@ -181,6 +185,18 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
             onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
             onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
+            onNavegarEquipe={() => mudarTela("equipe")}
+            onNavegarPlanejamento={() => mudarTela("planejamento", agentePerfilId)}
+          />
+        ) : telaAtiva === "planejamento" ? (
+          <PlanejamentoSemanalMetasView
+            agenteId={agentePerfilId}
+            onVoltar={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
+            onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
+            onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
+            onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
             onNavegarEquipe={() => mudarTela("equipe")}
           />
         ) : (

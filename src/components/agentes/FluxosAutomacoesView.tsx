@@ -83,6 +83,7 @@ interface FluxosAutomacoesViewProps {
   onNavegarMemoria?: () => void;
   onNavegarSkills?: () => void;
   onNavegarEquipe?: () => void;
+  onNavegarPlanejamento?: () => void;
 }
 
 export function FluxosAutomacoesView({
@@ -93,6 +94,7 @@ export function FluxosAutomacoesView({
   onNavegarMemoria,
   onNavegarSkills,
   onNavegarEquipe,
+  onNavegarPlanejamento,
 }: FluxosAutomacoesViewProps) {
   // Estado dos Modais
   const [modalNovoAberto, setModalNovoAberto] = useState(false);
@@ -500,7 +502,7 @@ export function FluxosAutomacoesView({
           { label: "Memória", id: "memoria", onClick: onNavegarMemoria },
           { label: "Skills", id: "skills", onClick: onNavegarSkills },
           { label: "Fluxos", id: "fluxos", ativo: true },
-          { label: "Metas", id: "metas", onClick: onNavegarPerfil },
+          { label: "Metas", id: "metas", onClick: onNavegarPlanejamento || onNavegarPerfil },
           { label: "Autonomia", id: "autonomia", onClick: onNavegarPerfil },
           { label: "Histórico", id: "historico", onClick: onNavegarPerfil },
         ].map((tab) => (

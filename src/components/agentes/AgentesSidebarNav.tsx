@@ -115,7 +115,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "planejamento",
     rotulo: "Planejamento & Metas",
     sub: "Configuração da operação e execução",
-    disponivel: false,
+    disponivel: true,
     icon: Target,
   },
   {
