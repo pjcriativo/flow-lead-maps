@@ -296,7 +296,8 @@ function Dashboard() {
             section === "whatsapp" ||
             section === "automacao" ||
             section === "propostas" ||
-            section === "contratos") &&
+            section === "contratos" ||
+            section === "financeiro") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
@@ -311,6 +312,7 @@ function Dashboard() {
             section !== "automacao" &&
             section !== "propostas" &&
             section !== "contratos" &&
+            section !== "financeiro" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
       >
