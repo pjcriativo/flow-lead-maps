@@ -107,7 +107,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "fluxos",
     rotulo: "Fluxos & Automações",
     sub: "Construtor visual de etapas e gatilhos",
-    disponivel: false,
+    disponivel: true,
     icon: GitBranch,
   },
   {

@@ -73,6 +73,7 @@ interface MemoriaSegundoCerebroViewProps {
   onNavegarMemoria?: () => void;
   onNavegarSkills?: () => void;
   onNavegarEquipe?: () => void;
+  onNavegarFluxos?: () => void;
 }
 
 const PANEL_CLASS =
@@ -136,6 +137,7 @@ export function MemoriaSegundoCerebroView({
   onNavegarMemoria,
   onNavegarSkills,
   onNavegarEquipe,
+  onNavegarFluxos,
 }: MemoriaSegundoCerebroViewProps) {
   // Estados de dados locais
   const [fontes, setFontes] = useState<FonteMemoriaItem[]>(FONTES_MEMORIA_INICIAIS);
@@ -496,6 +498,7 @@ export function MemoriaSegundoCerebroView({
             { id: "treinamento", label: "Treinamento", action: onNavegarTreinamento },
             { id: "memoria", label: "Memória", ativo: true },
             { id: "skills", label: "Skills", action: onNavegarSkills },
+            { id: "fluxos", label: "Fluxos", action: onNavegarFluxos },
             { id: "voz", label: "Voz" },
             { id: "metas", label: "Metas" },
             { id: "autonomia", label: "Autonomia" },

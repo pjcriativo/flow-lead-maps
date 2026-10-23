@@ -58,6 +58,7 @@ import { PerfilAgenteView } from "./PerfilAgenteView";
 import { TreinamentoConhecimentoView } from "./TreinamentoConhecimentoView";
 import { MemoriaSegundoCerebroView } from "./MemoriaSegundoCerebroView";
 import { SkillsIntegracoesView } from "./SkillsIntegracoesView";
+import { FluxosAutomacoesView } from "./FluxosAutomacoesView";
 
 const PANEL_CLASS =
   "rounded-2xl border border-[#1e2638] bg-[#0c1017]/90 backdrop-blur-sm shadow-xl";
@@ -78,6 +79,7 @@ function getInitialTela(): TelaAgentesId {
   if (t === "treinamento") return "treinamento";
   if (t === "memoria") return "memoria";
   if (t === "skills") return "skills";
+  if (t === "fluxos") return "fluxos";
   return "visao_geral";
 }
 
@@ -106,7 +108,8 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
         novaTela !== "perfil" &&
         novaTela !== "treinamento" &&
         novaTela !== "memoria" &&
-        novaTela !== "skills"
+        novaTela !== "skills" &&
+        novaTela !== "fluxos"
       ) {
         params.delete("agente");
       }
@@ -138,6 +141,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
             onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
             onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
+            onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
           />
         ) : telaAtiva === "treinamento" ? (
           <TreinamentoConhecimentoView
@@ -147,6 +151,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarEquipe={() => mudarTela("equipe")}
             onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
             onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
+            onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
           />
         ) : telaAtiva === "memoria" ? (
           <MemoriaSegundoCerebroView
@@ -156,6 +161,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
             onNavegarEquipe={() => mudarTela("equipe")}
             onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
+            onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
           />
         ) : telaAtiva === "skills" ? (
           <SkillsIntegracoesView
@@ -164,6 +170,17 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
             onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
             onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
+            onNavegarEquipe={() => mudarTela("equipe")}
+            onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
+          />
+        ) : telaAtiva === "fluxos" ? (
+          <FluxosAutomacoesView
+            agenteId={agentePerfilId}
+            onVoltar={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
+            onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
+            onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
             onNavegarEquipe={() => mudarTela("equipe")}
           />
         ) : (

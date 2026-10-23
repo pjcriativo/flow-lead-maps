@@ -83,6 +83,7 @@ interface SkillsIntegracoesViewProps {
   onNavegarTreinamento?: () => void;
   onNavegarMemoria?: () => void;
   onNavegarEquipe?: () => void;
+  onNavegarFluxos?: () => void;
 }
 
 const PANEL_CLASS =
@@ -151,6 +152,7 @@ export function SkillsIntegracoesView({
   onNavegarTreinamento,
   onNavegarMemoria,
   onNavegarEquipe,
+  onNavegarFluxos,
 }: SkillsIntegracoesViewProps) {
   // Estados de dados locais
   const [skills, setSkills] = useState<SkillItem[]>(SKILLS_INICIAIS);
@@ -459,6 +461,7 @@ export function SkillsIntegracoesView({
             { id: "treinamento", label: "Treinamento", action: onNavegarTreinamento },
             { id: "memoria", label: "Memória", action: onNavegarMemoria },
             { id: "skills", label: "Skills", ativo: true },
+            { id: "fluxos", label: "Fluxos", action: onNavegarFluxos },
             { id: "voz", label: "Voz" },
             { id: "metas", label: "Metas" },
             { id: "autonomia", label: "Autonomia" },
