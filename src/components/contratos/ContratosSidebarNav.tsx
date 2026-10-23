@@ -172,7 +172,7 @@ export function ContratosSidebarNav({
                       </div>
 
                       {!item.disponivel && (
-                        <span className="text-[9px] uppercase tracking-wide bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded text-neutral-500">
+                        <span className="text-[9px] uppercase tracking-wide bg-orange-500/10 border border-orange-500/30 px-1.5 py-0.5 rounded text-orange-400 font-bold">
                           Em breve
                         </span>
                       )}
@@ -228,7 +228,7 @@ export function ContratosSidebarNav({
                     <Icon className="size-4 shrink-0 text-neutral-600" />
                     <span className="truncate text-[12px]">{item.rotulo}</span>
                   </div>
-                  <span className="rounded bg-neutral-900/80 px-1.5 py-0.5 text-[8px] uppercase tracking-wide text-neutral-600 border border-neutral-800 shrink-0">
+                  <span className="rounded bg-orange-500/10 px-1.5 py-0.5 text-[8px] uppercase tracking-wide text-orange-400 border border-orange-500/30 shrink-0 font-bold">
                     Em breve
                   </span>
                 </div>
