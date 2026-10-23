@@ -85,6 +85,7 @@ import { AutomacaoAgenteModal } from "./AutomacaoAgenteModal";
 import { VerPropostaModal } from "./VerPropostaModal";
 import { PropostasSidebarNav, type TelaPropostasId } from "./PropostasSidebarNav";
 import { CriadorPropostasView } from "./CriadorPropostasView";
+import { BibliotecaModelosView } from "./BibliotecaModelosView";
 
 function getInitialTela(): TelaPropostasId {
   if (typeof window === "undefined") return "painel";
@@ -131,6 +132,9 @@ export function PropostasSection() {
   const [propostaSelecionada, setPropostaSelecionada] = useState<PropostaComercialItem | null>(
     PROPOSTAS_CATALOGO_INICIAL[1] // Escritório Parelheiros (segunda linha na referência)
   );
+
+  // Modelo selecionado para o Criador Profissional (vindo da Biblioteca de Modelos)
+  const [modeloSelecionadoCriadorId, setModeloSelecionadoCriadorId] = useState<string>("mensal");
 
   // Filtros de Busca e Tabela
   const [busca, setBusca] = useState("");
@@ -361,11 +365,26 @@ export function PropostasSection() {
       <div className="flex-1 min-w-0 overflow-y-auto">
         {telaAtiva === "criador" ? (
           <CriadorPropostasView
+            modeloInicialId={modeloSelecionadoCriadorId}
             onVoltarPainel={() => mudarTela("painel")}
             onEnviarAprovacao={() => {
               toast.success("Proposta enviada para o fluxo de aprovação!");
               mudarTela("painel");
             }}
+          />
+        ) : telaAtiva === "modelos" ? (
+          <BibliotecaModelosView
+            onUsarModelo={(modeloId) => {
+              setModeloSelecionadoCriadorId(modeloId);
+              mudarTela("criador");
+              toast.success("Modelo carregado no Criador Profissional!");
+            }}
+            onPersonalizarModelo={(modeloId) => {
+              setModeloSelecionadoCriadorId(modeloId);
+              mudarTela("criador");
+              toast.info("Modo de personalização ativado no Criador!");
+            }}
+            onVoltarPainel={() => mudarTela("painel")}
           />
         ) : (
           <div className="mx-auto max-w-[1720px] px-3.5 pb-16 pt-5 sm:px-6 lg:px-8 space-y-5 antialiased text-neutral-100">

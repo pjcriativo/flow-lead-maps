@@ -1,6 +1,6 @@
 // Tela 02 — Criador Profissional de Propostas (Gestão → Propostas → Criador)
 // Editor visual de propostas comerciais no padrão A4 com biblioteca de modelos, estrutura de seções, dados do cliente, precificação e assistente de IA.
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -62,6 +62,7 @@ import { formatBRL } from "@/lib/format";
 interface CriadorPropostasViewProps {
   onVoltarPainel?: () => void;
   onEnviarAprovacao?: () => void;
+  modeloInicialId?: string;
 }
 
 interface ModeloProposta {
@@ -144,9 +145,16 @@ const SECOES_INICIAIS: SecaoEstrutura[] = [
 export function CriadorPropostasView({
   onVoltarPainel,
   onEnviarAprovacao,
+  modeloInicialId,
 }: CriadorPropostasViewProps) {
   // Estado do Modelo Selecionado
-  const [modeloAtivo, setModeloAtivo] = useState<string>("mensal");
+  const [modeloAtivo, setModeloAtivo] = useState<string>(modeloInicialId || "mensal");
+
+  useEffect(() => {
+    if (modeloInicialId) {
+      setModeloAtivo(modeloInicialId);
+    }
+  }, [modeloInicialId]);
   const [filtroCategoriaModelo, setFiltroCategoriaModelo] = useState<
     "todos" | "comercial" | "marketing" | "consultoria"
   >("todos");

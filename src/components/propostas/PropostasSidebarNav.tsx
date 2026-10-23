@@ -48,7 +48,7 @@ export const TODAS_AS_TELAS_PROPOSTAS: ItemNavegacaoPropostas[] = [
     id: "modelos",
     rotulo: "Biblioteca de Modelos",
     sub: "Templates e modelos reutilizáveis",
-    disponivel: false,
+    disponivel: true,
     icon: LayoutTemplate,
   },
   {
