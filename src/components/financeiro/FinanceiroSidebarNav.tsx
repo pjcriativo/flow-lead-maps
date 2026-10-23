@@ -63,7 +63,7 @@ export const TODAS_AS_TELAS_FINANCEIRO: ItemNavegacaoFinanceiro[] = [
     id: "despesas",
     rotulo: "Despesas",
     sub: "Custos e contas a pagar",
-    disponivel: false,
+    disponivel: true,
     icon: TrendingDown,
   },
   {
