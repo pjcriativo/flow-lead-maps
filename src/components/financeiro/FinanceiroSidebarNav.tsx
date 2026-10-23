@@ -55,7 +55,7 @@ export const TODAS_AS_TELAS_FINANCEIRO: ItemNavegacaoFinanceiro[] = [
     id: "receitas",
     rotulo: "Receitas",
     sub: "Recebíveis e recorrência",
-    disponivel: false,
+    disponivel: true,
     icon: TrendingUp,
   },
   {

@@ -64,6 +64,7 @@ import { formatBRL, formatData } from "@/lib/format";
 import type { RegistroFinanceiro, PagamentoStatus } from "@/types";
 import { listarFinanceiro, marcarComoPago } from "@/services/financeiro";
 import { FinanceiroSidebarNav, type TelaFinanceiroId } from "./FinanceiroSidebarNav";
+import { ReceitasView } from "./ReceitasView";
 import {
   TRANSACOES_INICIAIS,
   CONTAS_BANCARIAS_INICIAIS,
@@ -339,45 +340,16 @@ export function FinanceiroSection() {
     }
   };
 
-  // Se não for a tela 01, exibe o placeholder respeitando o submenu
-  if (telaAtiva !== "painel") {
-    return (
-      <div className="flex flex-col lg:flex-row min-h-screen bg-[#07090e] text-neutral-100 antialiased">
-        <FinanceiroSidebarNav telaAtiva={telaAtiva} onSelecionarTela={mudarTela} />
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[70vh]">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 mb-4 shadow-lg shadow-orange-500/10">
-            <Receipt className="size-8 stroke-[1.8]" />
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-400 mb-3">
-            Módulo em desenvolvimento
-          </span>
-          <h2 className="text-2xl font-bold text-white tracking-tight">
-            Tela {telaAtiva.toUpperCase()} — Em Breve
-          </h2>
-          <p className="mt-2 text-sm text-neutral-400 max-w-md">
-            Esta visualização está programada para a próxima etapa do redesign do módulo Financeiro.
-            Acesse o Painel Executivo para acompanhar os KPIs, gráficos e transações.
-          </p>
-          <button
-            type="button"
-            onClick={() => mudarTela("painel")}
-            className="mt-6 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#ea580c] to-[#f97316] px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-orange-600/25 transition-all hover:brightness-110 active:scale-95"
-          >
-            <LayoutDashboard className="size-4" />
-            <span>Voltar ao Painel Financeiro</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-orange-500/30">
       {/* 1. SUBMENU LATERAL EXCLUSIVO DO FINANCEIRO */}
       <FinanceiroSidebarNav telaAtiva={telaAtiva} onSelecionarTela={mudarTela} />
 
       {/* 2. ÁREA PRINCIPAL DE CONTEÚDO */}
-      <div className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 flex flex-col gap-5 overflow-x-hidden">
+      {telaAtiva === "receitas" ? (
+        <ReceitasView onMudarTela={mudarTela} />
+      ) : telaAtiva === "painel" ? (
+        <div className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 flex flex-col gap-5 overflow-x-hidden">
         {/* =========================================================================
             CABEÇALHO & BREADCRUMB
            ========================================================================= */}
@@ -1641,6 +1613,41 @@ export function FinanceiroSection() {
           </div>
         </div>
       </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[70vh]">
+          <div className="flex size-16 items-center justify-center rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 mb-4 shadow-lg shadow-orange-500/10">
+            <Receipt className="size-8 stroke-[1.8]" />
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-400 mb-3">
+            Módulo em desenvolvimento
+          </span>
+          <h2 className="text-2xl font-bold text-white tracking-tight">
+            Tela {telaAtiva.toUpperCase()} — Em Breve
+          </h2>
+          <p className="mt-2 text-sm text-neutral-400 max-w-md">
+            Esta visualização está programada para a próxima etapa do redesign do módulo Financeiro.
+            Acesse o Painel Executivo ou Receitas para acompanhar os KPIs, gráficos e transações.
+          </p>
+          <div className="mt-6 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => mudarTela("painel")}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#ea580c] to-[#f97316] px-5 py-2.5 text-xs font-bold text-white shadow-lg shadow-orange-600/25 transition-all hover:brightness-110 active:scale-95"
+            >
+              <LayoutDashboard className="size-4" />
+              <span>Painel Financeiro</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => mudarTela("receitas")}
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#121620] px-5 py-2.5 text-xs font-bold text-white hover:border-white/20 transition-all active:scale-95"
+            >
+              <TrendingUp className="size-4 text-emerald-400" />
+              <span>Receitas</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* =========================================================================
           MODAIS & DIÁLOGOS OPERACIONAIS
