@@ -59,7 +59,7 @@ export const TODAS_AS_TELAS_CONTRATOS: ItemNavegacaoContratos[] = [
     id: "assinaturas",
     rotulo: "Assinaturas & Acordos",
     sub: "Assinaturas, aceite e histórico",
-    disponivel: false,
+    disponivel: true,
     icon: FileSignature,
   },
 ];

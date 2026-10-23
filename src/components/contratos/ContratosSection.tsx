@@ -66,6 +66,7 @@ import { ContratosSidebarNav, type TelaContratosId } from "./ContratosSidebarNav
 import { CONTRATOS_CATALOGO_INICIAL, type ContratoItem } from "./contratos-data";
 import { CriadorContratosView } from "./CriadorContratosView";
 import { BibliotecaModelosContratosView } from "./BibliotecaModelosContratosView";
+import { AssinaturasAcordosView } from "./AssinaturasAcordosView";
 
 function getInitialTela(): TelaContratosId {
   if (typeof window === "undefined") return "painel";
@@ -279,6 +280,14 @@ export function ContratosSection() {
                 mudarTela("criador");
               }}
               onVoltarPainel={() => mudarTela("painel")}
+            />
+          ) : telaAtiva === "assinaturas" ? (
+            <AssinaturasAcordosView
+              onNovoAcordo={() => mudarTela("criador")}
+              onVoltarPainel={() => mudarTela("painel")}
+              onEditarContrato={(docId) => {
+                mudarTela("criador");
+              }}
             />
           ) : (
             <>
