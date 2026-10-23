@@ -65,6 +65,7 @@ import { listarContratos, gerarContrato, marcarComoAssinado } from "@/services/c
 import { ContratosSidebarNav, type TelaContratosId } from "./ContratosSidebarNav";
 import { CONTRATOS_CATALOGO_INICIAL, type ContratoItem } from "./contratos-data";
 import { CriadorContratosView } from "./CriadorContratosView";
+import { BibliotecaModelosContratosView } from "./BibliotecaModelosContratosView";
 
 function getInitialTela(): TelaContratosId {
   if (typeof window === "undefined") return "painel";
@@ -96,6 +97,9 @@ export function ContratosSection() {
       window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
     }
   };
+
+  // Modelo selecionado para carregar no Criador de Contrato (vindo da Biblioteca de Modelos)
+  const [modeloSelecionadoCriadorId, setModeloSelecionadoCriadorId] = useState<string>("servicos_mensais");
 
   // Contratos Reais do Supabase e Catálogo Visual
   const [contratosReais, setContratosReais] = useState<Contrato[]>([]);
@@ -264,7 +268,18 @@ export function ContratosSection() {
       <div className="flex-1 min-w-0 overflow-y-auto">
         <div className="mx-auto max-w-[1720px] px-3.5 pb-16 pt-5 sm:px-6 lg:px-8 space-y-5 antialiased text-neutral-100">
           {telaAtiva === "criador" ? (
-            <CriadorContratosView onVoltarPainel={() => mudarTela("painel")} />
+            <CriadorContratosView
+              modeloInicialId={modeloSelecionadoCriadorId}
+              onVoltarPainel={() => mudarTela("painel")}
+            />
+          ) : telaAtiva === "modelos" ? (
+            <BibliotecaModelosContratosView
+              onSelecionarModeloParaCriador={(modeloId) => {
+                setModeloSelecionadoCriadorId(modeloId);
+                mudarTela("criador");
+              }}
+              onVoltarPainel={() => mudarTela("painel")}
+            />
           ) : (
             <>
               {/* =========================================================================

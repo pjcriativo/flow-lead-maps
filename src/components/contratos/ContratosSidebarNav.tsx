@@ -51,7 +51,7 @@ export const TODAS_AS_TELAS_CONTRATOS: ItemNavegacaoContratos[] = [
     id: "modelos",
     rotulo: "Modelos de Contratos",
     sub: "Biblioteca de cláusulas e templates",
-    disponivel: false,
+    disponivel: true,
     icon: LayoutTemplate,
   },
   {

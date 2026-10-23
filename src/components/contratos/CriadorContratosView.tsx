@@ -73,6 +73,7 @@ import { formatBRL } from "@/lib/format";
 export interface CriadorContratosViewProps {
   onVoltarPainel?: () => void;
   onSalvarRascunho?: (dados: any) => void;
+  modeloInicialId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,11 +176,24 @@ export interface ItemServicoContrato {
 export function CriadorContratosView({
   onVoltarPainel,
   onSalvarRascunho,
+  modeloInicialId,
 }: CriadorContratosViewProps) {
   // 1. Estado da Biblioteca de Modelos
   const [buscaModelo, setBuscaModelo] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todos");
-  const [modeloSelecionadoId, setModeloSelecionadoId] = useState<string>("servicos_mensais");
+  const [modeloSelecionadoId, setModeloSelecionadoId] = useState<string>(
+    modeloInicialId || "servicos_mensais"
+  );
+
+  React.useEffect(() => {
+    if (modeloInicialId) {
+      setModeloSelecionadoId(modeloInicialId);
+      const achado = MODELOS_CATALOGO.find((m) => m.id === modeloInicialId);
+      if (achado) {
+        setConfigContrato((prev) => ({ ...prev, modelo: achado.titulo }));
+      }
+    }
+  }, [modeloInicialId]);
 
   // 2. Estado da Estrutura de Cláusulas
   const [secoes, setSecoes] = useState<SecaoContrato[]>(SECOES_INICIAIS);
