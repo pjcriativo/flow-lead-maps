@@ -71,7 +71,7 @@ export const TODAS_AS_TELAS_FINANCEIRO: ItemNavegacaoFinanceiro[] = [
     id: "cobrancas",
     rotulo: "Cobranças",
     sub: "Inadimplência e vencimentos",
-    disponivel: false,
+    disponivel: true,
     icon: Receipt,
   },
   {

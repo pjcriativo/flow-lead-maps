@@ -66,6 +66,7 @@ import { listarFinanceiro, marcarComoPago } from "@/services/financeiro";
 import { FinanceiroSidebarNav, type TelaFinanceiroId } from "./FinanceiroSidebarNav";
 import { ReceitasView } from "./ReceitasView";
 import { DespesasView } from "./DespesasView";
+import { CobrancasView } from "./CobrancasView";
 import {
   TRANSACOES_INICIAIS,
   CONTAS_BANCARIAS_INICIAIS,
@@ -351,6 +352,8 @@ export function FinanceiroSection() {
         <ReceitasView onMudarTela={mudarTela} />
       ) : telaAtiva === "despesas" ? (
         <DespesasView onMudarTela={mudarTela} />
+      ) : telaAtiva === "cobrancas" ? (
+        <CobrancasView onMudarTela={mudarTela} />
       ) : telaAtiva === "painel" ? (
         <div className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 flex flex-col gap-5 overflow-x-hidden">
         {/* =========================================================================
