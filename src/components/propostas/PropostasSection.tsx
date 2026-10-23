@@ -166,45 +166,50 @@ export function PropostasSection() {
 
       // Se houver propostas reais cadastradas, convertê-las para o formato visual
       if (ps.length > 0) {
-        const convertidas: PropostaComercialItem[] = ps.map((p, idx) => ({
-          id: p.id,
-          identificador: `#PRP-2026-${String(ps.length - idx).padStart(3, "0")}`,
-          lead_id: p.lead_id,
-          lead_nome: p.lead_nome,
-          segmento: "Geral",
-          assunto: p.assunto,
-          valor: p.valor ?? 2500,
-          valorFormatado: formatBRL(p.valor ?? 2500),
-          status: p.status === "respondida" ? "aceita" : p.status,
-          statusRotulo:
-            p.status === "aprovada"
-              ? "Aprovada"
-              : p.status === "enviada"
-              ? "Enviada"
-              : p.status === "respondida"
-              ? "Aceita"
-              : "Rascunho",
-          data: formatData(p.criada_em),
-          responsavelNome: "Marcos",
-          responsavelAvatar:
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-          origem: "Site / Formulário",
-          resumoComercial: p.corpo.slice(0, 150) + "...",
-          validade: "30/08/2026",
-          diasRestantes: 30,
-          servicos: [
-            { nome: p.assunto, descricao: "Serviço principal da proposta", valor: formatBRL(p.valor) },
-          ],
-          historico: [
-            { data: formatData(p.criada_em), hora: "10:00", evento: "Proposta criada", usuario: "Marcos" },
-          ],
-          arquivos: [],
-        }));
+        const convertidas: PropostaComercialItem[] = ps
+          .filter((p) => p.assunto && !p.assunto.toLowerCase().includes("o site de vocês não"))
+          .map((p, idx) => ({
+            id: p.id,
+            identificador: `#PRP-2026-${String(ps.length - idx).padStart(3, "0")}`,
+            lead_id: p.lead_id,
+            lead_nome: p.lead_nome,
+            segmento: "Geral",
+            assunto: p.assunto,
+            valor: p.valor ?? 2500,
+            valorFormatado: formatBRL(p.valor ?? 2500),
+            status: p.status === "respondida" ? "aceita" : p.status,
+            statusRotulo:
+              p.status === "aprovada"
+                ? "Aprovada"
+                : p.status === "enviada"
+                ? "Enviada"
+                : p.status === "respondida"
+                ? "Aceita"
+                : "Rascunho",
+            data: formatData(p.criada_em),
+            responsavelNome: "Marcos",
+            responsavelAvatar:
+              "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+            origem: "Site / Formulário",
+            resumoComercial: p.corpo ? p.corpo.slice(0, 150) + "..." : "Proposta comercial",
+            validade: "30/08/2026",
+            diasRestantes: 30,
+            servicos: [
+              { nome: p.assunto, descricao: "Serviço principal da proposta", valor: formatBRL(p.valor) },
+            ],
+            historico: [
+              { data: formatData(p.criada_em), hora: "10:00", evento: "Proposta criada", usuario: "Marcos" },
+            ],
+            arquivos: [],
+          }));
 
-        // Manter a lista rica com as amostras se o usuário tiver poucas propostas reais
-        const unificadas = [...convertidas, ...PROPOSTAS_CATALOGO_INICIAL.filter((c) => !convertidas.some((x) => x.id === c.id))];
+        // Mantém as propostas de catálogo aprovadas como base para o layout visual perfeito
+        const unificadas = [
+          ...PROPOSTAS_CATALOGO_INICIAL,
+          ...convertidas.filter((c) => !PROPOSTAS_CATALOGO_INICIAL.some((x) => x.id === c.id)),
+        ];
         setItensPropostas(unificadas);
-        setPropostaSelecionada(unificadas[0]);
+        setPropostaSelecionada(PROPOSTAS_CATALOGO_INICIAL[1]); // Escritório Parelheiros selecionado por padrão
       }
     } catch (e) {
       console.warn("Falha ao sincronizar propostas do banco:", e);
@@ -582,20 +587,20 @@ export function PropostasSection() {
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Tabela de Propostas (8 colunas na tela grande ~68% da largura) */}
         <div className="lg:col-span-8 rounded-2xl border border-[#1e2638] bg-[#0c1017]/95 p-4 shadow-xl flex flex-col justify-between overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-none">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-white/10 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                  <th className="p-3 w-8">
+                  <th className="py-2.5 px-2.5 w-8">
                     <input type="checkbox" className="rounded border-white/20 bg-white/5" />
                   </th>
-                  <th className="p-3">LEAD / EMPRESA</th>
-                  <th className="p-3">ASSUNTO</th>
-                  <th className="p-3 text-right">VALOR</th>
-                  <th className="p-3 text-center">STATUS / ETAPA</th>
-                  <th className="p-3 text-center">DATA</th>
-                  <th className="p-3">RESPONSÁVEL</th>
-                  <th className="p-3 text-center">AÇÕES</th>
+                  <th className="py-2.5 px-2.5">LEAD / EMPRESA</th>
+                  <th className="py-2.5 px-2.5">ASSUNTO</th>
+                  <th className="py-2.5 px-2.5 text-right">VALOR</th>
+                  <th className="py-2.5 px-2.5 text-center">STATUS / ETAPA</th>
+                  <th className="py-2.5 px-2.5 text-center">DATA</th>
+                  <th className="py-2.5 px-2.5">RESPONSÁVEL</th>
+                  <th className="py-2.5 px-2.5 text-center">AÇÕES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -613,7 +618,7 @@ export function PropostasSection() {
                       )}
                     >
                       {/* Checkbox */}
-                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-2.5 px-2.5" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={estaSelecionada}
@@ -623,7 +628,7 @@ export function PropostasSection() {
                       </td>
 
                       {/* Lead / Empresa */}
-                      <td className="p-3">
+                      <td className="py-2.5 px-2.5">
                         <div className="flex items-center gap-2.5">
                           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white font-bold text-xs">
                             <Building2 className="size-4 text-neutral-300" />
@@ -640,17 +645,17 @@ export function PropostasSection() {
                       </td>
 
                       {/* Assunto */}
-                      <td className="p-3 font-medium text-neutral-200 truncate max-w-[190px]">
+                      <td className="py-2.5 px-2.5 font-medium text-neutral-200 truncate max-w-[190px]">
                         {p.assunto}
                       </td>
 
                       {/* Valor */}
-                      <td className="p-3 text-right font-mono font-bold text-white whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 text-right font-mono font-bold text-white whitespace-nowrap">
                         {p.valorFormatado}
                       </td>
 
                       {/* Status / Etapa */}
-                      <td className="p-3 text-center">
+                      <td className="py-2.5 px-2.5 text-center">
                         <span
                           className={cn(
                             "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap border",
@@ -671,12 +676,12 @@ export function PropostasSection() {
                       </td>
 
                       {/* Data */}
-                      <td className="p-3 text-center text-neutral-400 font-mono text-[11px] whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 text-center text-neutral-400 font-mono text-[11px] whitespace-nowrap">
                         {p.data}
                       </td>
 
                       {/* Responsável */}
-                      <td className="p-3">
+                      <td className="py-2.5 px-2.5">
                         <div className="flex items-center gap-1.5">
                           <img
                             src={p.responsavelAvatar}
@@ -688,7 +693,7 @@ export function PropostasSection() {
                       </td>
 
                       {/* Ações */}
-                      <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-2.5 px-2.5 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"

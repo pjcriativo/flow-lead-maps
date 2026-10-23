@@ -247,7 +247,8 @@ function Dashboard() {
           section === "marketing" ||
           section === "influencers" ||
           section === "whatsapp" ||
-          section === "automacao"
+          section === "automacao" ||
+          section === "propostas"
           ? "bg-home-background text-home-foreground"
           : "bg-background text-foreground",
       )}
@@ -293,7 +294,8 @@ function Dashboard() {
             section === "influencers" ||
             section === "buscar" ||
             section === "whatsapp" ||
-            section === "automacao") &&
+            section === "automacao" ||
+            section === "propostas") &&
             "bg-home-background pt-14 lg:pt-0",
           section === "instagram" && "p-0",
           section !== "home" &&
@@ -306,6 +308,7 @@ function Dashboard() {
             section !== "buscar" &&
             section !== "whatsapp" &&
             section !== "automacao" &&
+            section !== "propostas" &&
             "bg-background px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8",
         )}
       >

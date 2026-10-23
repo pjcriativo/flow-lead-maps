@@ -115,15 +115,15 @@ export function PropostasFunilEvolucao({
           {/* 7 Meses */}
           <div className="flex-1 flex items-end justify-around h-20 border-b border-white/10 pb-1">
             {evolucao.map((item) => {
-              const alturaPct = Math.min(100, Math.max(10, (item.quantidade / 15) * 100));
+              const alturaPixels = Math.max(10, Math.round((item.quantidade / 15) * 72));
               return (
-                <div key={item.mes} className="flex flex-col items-center gap-1 group">
+                <div key={item.mes} className="flex flex-col items-center justify-end h-full gap-1 group">
                   <div
-                    className="w-4 rounded-t bg-gradient-to-t from-orange-600 to-[#f97316] group-hover:brightness-125 transition-all"
-                    style={{ height: `${alturaPct}%` }}
+                    className="w-4.5 rounded-t bg-gradient-to-t from-[#ea580c] to-[#f97316] shadow-sm shadow-orange-500/20 group-hover:brightness-125 transition-all"
+                    style={{ height: `${alturaPixels}px` }}
                     title={`${item.mes}: ${item.quantidade} propostas`}
                   />
-                  <span className="text-[9px] font-mono text-neutral-400 mt-1">{item.mes}</span>
+                  <span className="text-[9px] font-mono text-neutral-400 group-hover:text-white transition-colors">{item.mes}</span>
                 </div>
               );
             })}
