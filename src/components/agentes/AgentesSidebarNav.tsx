@@ -139,7 +139,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "aprovacoes",
     rotulo: "Aprovações & Histórico",
     sub: "Fila de decisões e auditoria copiloto",
-    disponivel: false,
+    disponivel: true,
     icon: ShieldCheck,
   },
   {

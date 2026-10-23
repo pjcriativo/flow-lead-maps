@@ -18,6 +18,7 @@ import {
   CornerDownLeft,
   Crown,
   Database,
+  DollarSign,
   Edit2,
   ExternalLink,
   Eye,
@@ -96,6 +97,7 @@ interface CopilotoCeoViewProps {
   onNavegarFluxos?: () => void;
   onNavegarPlanejamento?: () => void;
   onNavegarAgenda?: () => void;
+  onNavegarAprovacoes?: () => void;
 }
 
 const PANEL_CLASS =
@@ -112,6 +114,7 @@ export function CopilotoCeoView({
   onNavegarFluxos,
   onNavegarPlanejamento,
   onNavegarAgenda,
+  onNavegarAprovacoes,
 }: CopilotoCeoViewProps) {
   // Modais
   const [modalNovoPlanoAberto, setModalNovoPlanoAberto] = useState(false);
