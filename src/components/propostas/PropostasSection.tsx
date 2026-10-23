@@ -86,6 +86,7 @@ import { VerPropostaModal } from "./VerPropostaModal";
 import { PropostasSidebarNav, type TelaPropostasId } from "./PropostasSidebarNav";
 import { CriadorPropostasView } from "./CriadorPropostasView";
 import { BibliotecaModelosView } from "./BibliotecaModelosView";
+import { AcompanhamentoPropostasView } from "./AcompanhamentoPropostasView";
 
 function getInitialTela(): TelaPropostasId {
   if (typeof window === "undefined") return "painel";
@@ -383,6 +384,15 @@ export function PropostasSection() {
               setModeloSelecionadoCriadorId(modeloId);
               mudarTela("criador");
               toast.info("Modo de personalização ativado no Criador!");
+            }}
+            onVoltarPainel={() => mudarTela("painel")}
+          />
+        ) : telaAtiva === "acompanhamento" ? (
+          <AcompanhamentoPropostasView
+            onNovaProposta={() => mudarTela("criador")}
+            onAbrirNoCriador={(modeloId) => {
+              if (modeloId) setModeloSelecionadoCriadorId(modeloId);
+              mudarTela("criador");
             }}
             onVoltarPainel={() => mudarTela("painel")}
           />

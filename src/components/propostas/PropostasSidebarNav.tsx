@@ -56,7 +56,7 @@ export const TODAS_AS_TELAS_PROPOSTAS: ItemNavegacaoPropostas[] = [
     id: "acompanhamento",
     rotulo: "Acompanhamento",
     sub: "Rastreamento, visualizações e aceites",
-    disponivel: false,
+    disponivel: true,
     icon: Eye,
   },
 ];
