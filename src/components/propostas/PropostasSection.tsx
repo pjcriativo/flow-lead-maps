@@ -83,8 +83,40 @@ import { PropostasFunilEvolucao } from "./PropostasFunilEvolucao";
 import { CriarComIaModal } from "./CriarComIaModal";
 import { AutomacaoAgenteModal } from "./AutomacaoAgenteModal";
 import { VerPropostaModal } from "./VerPropostaModal";
+import { PropostasSidebarNav, type TelaPropostasId } from "./PropostasSidebarNav";
+import { CriadorPropostasView } from "./CriadorPropostasView";
+
+function getInitialTela(): TelaPropostasId {
+  if (typeof window === "undefined") return "painel";
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get("tela");
+  if (t === "criador") return "criador";
+  if (t === "modelos") return "modelos";
+  if (t === "acompanhamento") return "acompanhamento";
+  return "painel";
+}
 
 export function PropostasSection() {
+  // Navegação do Submenu Lateral Interno
+  const [telaAtiva, setTelaAtiva] = useState<TelaPropostasId>(getInitialTela);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setTelaAtiva(getInitialTela());
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const mudarTela = (novaTela: TelaPropostasId) => {
+    setTelaAtiva(novaTela);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("tela", novaTela);
+      window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
+    }
+  };
+
   // Estado real do Supabase
   const [propostasReais, setPropostasReais] = useState<Proposta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -316,7 +348,22 @@ export function PropostasSection() {
   };
 
   return (
-    <div className="mx-auto max-w-[1720px] px-3.5 pb-16 pt-5 sm:px-6 lg:px-8 space-y-5 antialiased text-neutral-100">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-[#f95d14]/30 selection:text-white">
+      {/* Submenu Lateral Interno do Módulo Propostas */}
+      <PropostasSidebarNav telaAtiva={telaAtiva} onSelecionarTela={(t) => mudarTela(t)} />
+
+      {/* Conteúdo Principal Dinâmico */}
+      <div className="flex-1 min-w-0 overflow-y-auto">
+        {telaAtiva === "criador" ? (
+          <CriadorPropostasView
+            onVoltarPainel={() => mudarTela("painel")}
+            onEnviarAprovacao={() => {
+              toast.success("Proposta enviada para o fluxo de aprovação!");
+              mudarTela("painel");
+            }}
+          />
+        ) : (
+          <div className="mx-auto max-w-[1720px] px-3.5 pb-16 pt-5 sm:px-6 lg:px-8 space-y-5 antialiased text-neutral-100">
       {/* =========================================================================
           1. CABEÇALHO PRINCIPAL DO MÓDULO & BREADCRUMBS
          ========================================================================= */}
@@ -346,7 +393,7 @@ export function PropostasSection() {
           {/* Nova proposta (Laranja) */}
           <button
             type="button"
-            onClick={() => setModalManualAberto(true)}
+            onClick={() => mudarTela("criador")}
             className="flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-[#ea580c] to-[#f97316] px-4 text-xs font-bold text-white shadow-lg shadow-orange-600/25 transition-all hover:brightness-110 active:scale-[0.98]"
           >
             <Plus className="size-4 stroke-[2.5]" />
@@ -379,7 +426,7 @@ export function PropostasSection() {
           2. TRÊS CARDS DE MODOS DE CRIAÇÃO
          ========================================================================= */}
       <ModosCriacaoProposta
-        onCriarManual={() => setModalManualAberto(true)}
+        onCriarManual={() => mudarTela("criador")}
         onCriarComIa={() => setModalIaAberto(true)}
         onConfigurarAgente={() => setModalAgenteAberto(true)}
       />
@@ -840,6 +887,9 @@ export function PropostasSection() {
           }}
         />
       )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -955,7 +1005,7 @@ function GerarPropostaDialog({
   );
 }
 
-function RevisarPropostaDialog({
+export function RevisarPropostaDialog({
   proposta,
   onClose,
   onChange,
