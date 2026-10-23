@@ -147,7 +147,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "relatorios",
     rotulo: "Relatórios & Resultados",
     sub: "Funil, produtividade, conversões e ROI",
-    disponivel: false,
+    disponivel: true,
     icon: BarChart3,
   },
 ];

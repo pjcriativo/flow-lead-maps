@@ -101,6 +101,7 @@ interface AprovacoesHistoricoViewProps {
   onNavegarPlanejamento?: () => void;
   onNavegarAgenda?: () => void;
   onNavegarCopiloto?: () => void;
+  onNavegarRelatorios?: () => void;
 }
 
 const PANEL_CLASS =
@@ -127,6 +128,7 @@ export function AprovacoesHistoricoView({
   onNavegarPlanejamento,
   onNavegarAgenda,
   onNavegarCopiloto,
+  onNavegarRelatorios,
 }: AprovacoesHistoricoViewProps) {
   // Aba Ativa
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>("aprovacoes");

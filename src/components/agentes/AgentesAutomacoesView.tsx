@@ -63,6 +63,7 @@ import { PlanejamentoSemanalMetasView } from "./PlanejamentoSemanalMetasView";
 import { AgendaInteligenteView } from "./AgendaInteligenteView";
 import { CopilotoCeoView } from "./CopilotoCeoView";
 import { AprovacoesHistoricoView } from "./AprovacoesHistoricoView";
+import { RelatoriosResultadosView } from "./RelatoriosResultadosView";
 
 const PANEL_CLASS =
   "rounded-2xl border border-[#1e2638] bg-[#0c1017]/90 backdrop-blur-sm shadow-xl";
@@ -88,6 +89,7 @@ function getInitialTela(): TelaAgentesId {
   if (t === "agenda") return "agenda";
   if (t === "copiloto") return "copiloto";
   if (t === "aprovacoes") return "aprovacoes";
+  if (t === "relatorios") return "relatorios";
   return "visao_geral";
 }
 
@@ -121,7 +123,8 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
         novaTela !== "planejamento" &&
         novaTela !== "agenda" &&
         novaTela !== "copiloto" &&
-        novaTela !== "aprovacoes"
+        novaTela !== "aprovacoes" &&
+        novaTela !== "relatorios"
       ) {
         params.delete("agente");
       }
@@ -249,6 +252,22 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarPlanejamento={() => mudarTela("planejamento", agentePerfilId)}
             onNavegarAgenda={() => mudarTela("agenda", agentePerfilId)}
             onNavegarCopiloto={() => mudarTela("copiloto", agentePerfilId)}
+            onNavegarRelatorios={() => mudarTela("relatorios", agentePerfilId)}
+          />
+        ) : telaAtiva === "relatorios" ? (
+          <RelatoriosResultadosView
+            agenteId={agentePerfilId}
+            onVoltar={() => mudarTela("aprovacoes", agentePerfilId)}
+            onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarEquipe={() => mudarTela("equipe")}
+            onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
+            onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
+            onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
+            onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
+            onNavegarPlanejamento={() => mudarTela("planejamento", agentePerfilId)}
+            onNavegarAgenda={() => mudarTela("agenda", agentePerfilId)}
+            onNavegarCopiloto={() => mudarTela("copiloto", agentePerfilId)}
+            onNavegarAprovacoes={() => mudarTela("aprovacoes", agentePerfilId)}
           />
         ) : (
           <div className="mx-auto max-w-[1680px] px-4 pb-14 pt-6 sm:px-6 lg:px-8 space-y-6">
