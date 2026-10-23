@@ -76,6 +76,7 @@ interface TreinamentoConhecimentoViewProps {
   onNavegarPerfil?: () => void;
   onNavegarEquipe?: () => void;
   onNavegarMemoria?: () => void;
+  onNavegarSkills?: () => void;
 }
 
 const PANEL_CLASS =
@@ -87,6 +88,7 @@ export function TreinamentoConhecimentoView({
   onNavegarPerfil,
   onNavegarEquipe,
   onNavegarMemoria,
+  onNavegarSkills,
 }: TreinamentoConhecimentoViewProps) {
   // Estados de dados locais
   const [categorias, setCategorias] = useState<CategoriaConhecimento[]>(CATEGORIAS_INICIAIS);
@@ -447,7 +449,7 @@ export function TreinamentoConhecimentoView({
             { id: "configuracoes", label: "Configurações" },
             { id: "treinamento", label: "Treinamento", ativo: true },
             { id: "memoria", label: "Memória", action: onNavegarMemoria },
-            { id: "skills", label: "Skills" },
+            { id: "skills", label: "Skills", action: onNavegarSkills },
             { id: "voz", label: "Voz" },
             { id: "metas", label: "Metas" },
             { id: "autonomia", label: "Autonomia" },

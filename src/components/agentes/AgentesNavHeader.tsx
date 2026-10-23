@@ -100,7 +100,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "skills",
     rotulo: "Skills & Integrações",
     sub: "Ferramentas internas, APIs e permissões",
-    disponivel: false,
+    disponivel: true,
     icon: Wrench,
   },
   {

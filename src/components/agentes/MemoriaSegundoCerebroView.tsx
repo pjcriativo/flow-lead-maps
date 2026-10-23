@@ -70,6 +70,8 @@ interface MemoriaSegundoCerebroViewProps {
   onVoltar?: () => void;
   onNavegarPerfil?: () => void;
   onNavegarTreinamento?: () => void;
+  onNavegarMemoria?: () => void;
+  onNavegarSkills?: () => void;
   onNavegarEquipe?: () => void;
 }
 
@@ -131,6 +133,8 @@ export function MemoriaSegundoCerebroView({
   onVoltar,
   onNavegarPerfil,
   onNavegarTreinamento,
+  onNavegarMemoria,
+  onNavegarSkills,
   onNavegarEquipe,
 }: MemoriaSegundoCerebroViewProps) {
   // Estados de dados locais
@@ -491,7 +495,7 @@ export function MemoriaSegundoCerebroView({
             { id: "configuracoes", label: "Configurações" },
             { id: "treinamento", label: "Treinamento", action: onNavegarTreinamento },
             { id: "memoria", label: "Memória", ativo: true },
-            { id: "skills", label: "Skills" },
+            { id: "skills", label: "Skills", action: onNavegarSkills },
             { id: "voz", label: "Voz" },
             { id: "metas", label: "Metas" },
             { id: "autonomia", label: "Autonomia" },
