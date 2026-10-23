@@ -95,6 +95,7 @@ interface PlanejamentoSemanalMetasViewProps {
   onNavegarSkills?: () => void;
   onNavegarFluxos?: () => void;
   onNavegarEquipe?: () => void;
+  onNavegarAgenda?: () => void;
 }
 
 export function PlanejamentoSemanalMetasView({
@@ -106,6 +107,7 @@ export function PlanejamentoSemanalMetasView({
   onNavegarSkills,
   onNavegarFluxos,
   onNavegarEquipe,
+  onNavegarAgenda,
 }: PlanejamentoSemanalMetasViewProps) {
   // Modais
   const [modalAtividadeAberto, setModalAtividadeAberto] = useState(false);

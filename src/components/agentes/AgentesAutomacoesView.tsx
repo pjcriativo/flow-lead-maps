@@ -60,6 +60,7 @@ import { MemoriaSegundoCerebroView } from "./MemoriaSegundoCerebroView";
 import { SkillsIntegracoesView } from "./SkillsIntegracoesView";
 import { FluxosAutomacoesView } from "./FluxosAutomacoesView";
 import { PlanejamentoSemanalMetasView } from "./PlanejamentoSemanalMetasView";
+import { AgendaInteligenteView } from "./AgendaInteligenteView";
 
 const PANEL_CLASS =
   "rounded-2xl border border-[#1e2638] bg-[#0c1017]/90 backdrop-blur-sm shadow-xl";
@@ -82,6 +83,7 @@ function getInitialTela(): TelaAgentesId {
   if (t === "skills") return "skills";
   if (t === "fluxos") return "fluxos";
   if (t === "planejamento") return "planejamento";
+  if (t === "agenda") return "agenda";
   return "visao_geral";
 }
 
@@ -112,7 +114,8 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
         novaTela !== "memoria" &&
         novaTela !== "skills" &&
         novaTela !== "fluxos" &&
-        novaTela !== "planejamento"
+        novaTela !== "planejamento" &&
+        novaTela !== "agenda"
       ) {
         params.delete("agente");
       }
@@ -198,6 +201,19 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
             onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
             onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
             onNavegarEquipe={() => mudarTela("equipe")}
+            onNavegarAgenda={() => mudarTela("agenda", agentePerfilId)}
+          />
+        ) : telaAtiva === "agenda" ? (
+          <AgendaInteligenteView
+            agenteId={agentePerfilId}
+            onVoltar={() => mudarTela("planejamento", agentePerfilId)}
+            onNavegarPerfil={() => mudarTela("perfil", agentePerfilId)}
+            onNavegarEquipe={() => mudarTela("equipe")}
+            onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
+            onNavegarMemoria={() => mudarTela("memoria", agentePerfilId)}
+            onNavegarSkills={() => mudarTela("skills", agentePerfilId)}
+            onNavegarFluxos={() => mudarTela("fluxos", agentePerfilId)}
+            onNavegarPlanejamento={() => mudarTela("planejamento", agentePerfilId)}
           />
         ) : (
           <div className="mx-auto max-w-[1680px] px-4 pb-14 pt-6 sm:px-6 lg:px-8 space-y-6">

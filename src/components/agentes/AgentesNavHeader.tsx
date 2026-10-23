@@ -124,7 +124,7 @@ export const TODAS_AS_TELAS_AGENTES: ItemNavegacaoTela[] = [
     id: "agenda",
     rotulo: "Agenda Inteligente",
     sub: "Calendário de reuniões e confirmações",
-    disponivel: false,
+    disponivel: true,
     icon: CalendarCheck,
   },
   {
