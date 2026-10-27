@@ -6,31 +6,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5";
   };
-  graphql_public: {
-    Tables: {
-      [_ in never]: never;
-    };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json;
-          operationName?: string;
-          query?: string;
-          variables?: Json;
-        };
-        Returns: Json;
-      };
-    };
-    Enums: {
-      [_ in never]: never;
-    };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
   public: {
     Tables: {
       activity_log: {
@@ -67,6 +42,449 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "activity_log_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_approvals: {
+        Row: {
+          agent_id: string;
+          criado_em: string;
+          decidido_em: string | null;
+          decidido_por: string | null;
+          id: string;
+          motivo_decisao: string | null;
+          org_id: string;
+          payload: Json;
+          resumo: string;
+          status: string;
+          task_id: string | null;
+          tipo: string;
+        };
+        Insert: {
+          agent_id: string;
+          criado_em?: string;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          id?: string;
+          motivo_decisao?: string | null;
+          org_id: string;
+          payload?: Json;
+          resumo: string;
+          status?: string;
+          task_id?: string | null;
+          tipo: string;
+        };
+        Update: {
+          agent_id?: string;
+          criado_em?: string;
+          decidido_em?: string | null;
+          decidido_por?: string | null;
+          id?: string;
+          motivo_decisao?: string | null;
+          org_id?: string;
+          payload?: Json;
+          resumo?: string;
+          status?: string;
+          task_id?: string | null;
+          tipo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_approvals_agent_id_org_id_fkey";
+            columns: ["agent_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_approvals_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_approvals_task_id_org_id_fkey";
+            columns: ["task_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_tasks";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
+      agent_permissions: {
+        Row: {
+          agent_id: string;
+          ativo: boolean;
+          concedida_em: string;
+          concedida_por: string | null;
+          id: string;
+          org_id: string;
+          tool_nome: string;
+        };
+        Insert: {
+          agent_id: string;
+          ativo?: boolean;
+          concedida_em?: string;
+          concedida_por?: string | null;
+          id?: string;
+          org_id: string;
+          tool_nome: string;
+        };
+        Update: {
+          agent_id?: string;
+          ativo?: boolean;
+          concedida_em?: string;
+          concedida_por?: string | null;
+          id?: string;
+          org_id?: string;
+          tool_nome?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_permissions_agent_id_org_id_fkey";
+            columns: ["agent_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_permissions_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_permissions_tool_nome_fkey";
+            columns: ["tool_nome"];
+            isOneToOne: false;
+            referencedRelation: "agent_tools";
+            referencedColumns: ["nome"];
+          },
+        ];
+      };
+      agent_run_steps: {
+        Row: {
+          criado_em: string;
+          custo_usd: number;
+          duracao_ms: number | null;
+          entrada: Json | null;
+          erro: string | null;
+          id: string;
+          org_id: string;
+          run_id: string;
+          saida: Json | null;
+          seq: number;
+          tipo: string;
+          tokens_entrada: number;
+          tokens_saida: number;
+          tool_nome: string | null;
+        };
+        Insert: {
+          criado_em?: string;
+          custo_usd?: number;
+          duracao_ms?: number | null;
+          entrada?: Json | null;
+          erro?: string | null;
+          id?: string;
+          org_id: string;
+          run_id: string;
+          saida?: Json | null;
+          seq: number;
+          tipo: string;
+          tokens_entrada?: number;
+          tokens_saida?: number;
+          tool_nome?: string | null;
+        };
+        Update: {
+          criado_em?: string;
+          custo_usd?: number;
+          duracao_ms?: number | null;
+          entrada?: Json | null;
+          erro?: string | null;
+          id?: string;
+          org_id?: string;
+          run_id?: string;
+          saida?: Json | null;
+          seq?: number;
+          tipo?: string;
+          tokens_entrada?: number;
+          tokens_saida?: number;
+          tool_nome?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_run_steps_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_run_steps_run_id_org_id_fkey";
+            columns: ["run_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_runs";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
+      agent_runs: {
+        Row: {
+          agent_id: string;
+          custo_usd: number;
+          erro: string | null;
+          finalizado_em: string | null;
+          id: string;
+          iniciado_em: string;
+          modelo: string;
+          org_id: string;
+          passos: number;
+          status: string;
+          task_id: string;
+          tokens_entrada: number;
+          tokens_saida: number;
+          user_id: string | null;
+        };
+        Insert: {
+          agent_id: string;
+          custo_usd?: number;
+          erro?: string | null;
+          finalizado_em?: string | null;
+          id?: string;
+          iniciado_em?: string;
+          modelo: string;
+          org_id: string;
+          passos?: number;
+          status?: string;
+          task_id: string;
+          tokens_entrada?: number;
+          tokens_saida?: number;
+          user_id?: string | null;
+        };
+        Update: {
+          agent_id?: string;
+          custo_usd?: number;
+          erro?: string | null;
+          finalizado_em?: string | null;
+          id?: string;
+          iniciado_em?: string;
+          modelo?: string;
+          org_id?: string;
+          passos?: number;
+          status?: string;
+          task_id?: string;
+          tokens_entrada?: number;
+          tokens_saida?: number;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_agent_id_org_id_fkey";
+            columns: ["agent_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_runs_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_runs_task_id_org_id_fkey";
+            columns: ["task_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_tasks";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
+      agent_tasks: {
+        Row: {
+          agent_id: string;
+          attempt_count: number;
+          atualizado_em: string;
+          concluido_em: string | null;
+          criado_em: string;
+          entrada: Json;
+          id: string;
+          idempotency_key: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          next_attempt_at: string;
+          org_id: string;
+          prioridade: number;
+          resultado: Json | null;
+          solicitado_por: string | null;
+          status: string;
+          tipo: string;
+          ultimo_erro: string | null;
+          worker_id: string | null;
+        };
+        Insert: {
+          agent_id: string;
+          attempt_count?: number;
+          atualizado_em?: string;
+          concluido_em?: string | null;
+          criado_em?: string;
+          entrada?: Json;
+          id?: string;
+          idempotency_key: string;
+          lease_expires_at?: string | null;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          org_id: string;
+          prioridade?: number;
+          resultado?: Json | null;
+          solicitado_por?: string | null;
+          status?: string;
+          tipo: string;
+          ultimo_erro?: string | null;
+          worker_id?: string | null;
+        };
+        Update: {
+          agent_id?: string;
+          attempt_count?: number;
+          atualizado_em?: string;
+          concluido_em?: string | null;
+          criado_em?: string;
+          entrada?: Json;
+          id?: string;
+          idempotency_key?: string;
+          lease_expires_at?: string | null;
+          max_attempts?: number;
+          next_attempt_at?: string;
+          org_id?: string;
+          prioridade?: number;
+          resultado?: Json | null;
+          solicitado_por?: string | null;
+          status?: string;
+          tipo?: string;
+          ultimo_erro?: string | null;
+          worker_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_tasks_agent_id_org_id_fkey";
+            columns: ["agent_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_tasks_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_tools: {
+        Row: {
+          ativo: boolean;
+          criado_em: string;
+          descricao: string;
+          nome: string;
+          risco: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          criado_em?: string;
+          descricao: string;
+          nome: string;
+          risco: string;
+        };
+        Update: {
+          ativo?: boolean;
+          criado_em?: string;
+          descricao?: string;
+          nome?: string;
+          risco?: string;
+        };
+        Relationships: [];
+      };
+      agents: {
+        Row: {
+          atualizado_em: string;
+          autonomia: string;
+          avatar_url: string | null;
+          cargo: string | null;
+          criado_em: string;
+          criado_por: string | null;
+          departamento: string | null;
+          descricao: string | null;
+          especialidade: string | null;
+          estado: string;
+          id: string;
+          kill_switch: boolean;
+          max_passos: number;
+          max_tokens_saida: number;
+          modelo: string;
+          nome: string;
+          org_id: string;
+          papel: string;
+          slug: string;
+          teto_usd_dia: number;
+          teto_usd_mes: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          autonomia?: string;
+          avatar_url?: string | null;
+          cargo?: string | null;
+          criado_em?: string;
+          criado_por?: string | null;
+          departamento?: string | null;
+          descricao?: string | null;
+          especialidade?: string | null;
+          estado?: string;
+          id?: string;
+          kill_switch?: boolean;
+          max_passos?: number;
+          max_tokens_saida?: number;
+          modelo?: string;
+          nome: string;
+          org_id: string;
+          papel: string;
+          slug: string;
+          teto_usd_dia?: number;
+          teto_usd_mes?: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          autonomia?: string;
+          avatar_url?: string | null;
+          cargo?: string | null;
+          criado_em?: string;
+          criado_por?: string | null;
+          departamento?: string | null;
+          descricao?: string | null;
+          especialidade?: string | null;
+          estado?: string;
+          id?: string;
+          kill_switch?: boolean;
+          max_passos?: number;
+          max_tokens_saida?: number;
+          modelo?: string;
+          nome?: string;
+          org_id?: string;
+          papel?: string;
+          slug?: string;
+          teto_usd_dia?: number;
+          teto_usd_mes?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agents_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "orgs";
@@ -5926,6 +6344,7 @@ export type Database = {
       };
       wa_automation_events: {
         Row: {
+          attempts: number;
           causation_id: string | null;
           conversation_id: string | null;
           correlation_id: string;
@@ -5935,13 +6354,16 @@ export type Database = {
           event_type: string;
           id: string;
           lead_id: string | null;
+          lease_until: string | null;
           occurred_at: string;
           org_id: string;
           payload: Json;
+          processed_at: string | null;
           resource_type: string;
           source: string;
         };
         Insert: {
+          attempts?: number;
           causation_id?: string | null;
           conversation_id?: string | null;
           correlation_id?: string;
@@ -5951,13 +6373,16 @@ export type Database = {
           event_type: string;
           id?: string;
           lead_id?: string | null;
+          lease_until?: string | null;
           occurred_at: string;
           org_id: string;
           payload?: Json;
+          processed_at?: string | null;
           resource_type: string;
           source: string;
         };
         Update: {
+          attempts?: number;
           causation_id?: string | null;
           conversation_id?: string | null;
           correlation_id?: string;
@@ -5967,9 +6392,11 @@ export type Database = {
           event_type?: string;
           id?: string;
           lead_id?: string | null;
+          lease_until?: string | null;
           occurred_at?: string;
           org_id?: string;
           payload?: Json;
+          processed_at?: string | null;
           resource_type?: string;
           source?: string;
         };
@@ -7463,6 +7890,242 @@ export type Database = {
             Args: { p_plan?: string; p_plano_id?: string; p_user: string };
             Returns: Json;
           };
+      agent_cancelar_tarefa: { Args: { p_task: string }; Returns: undefined };
+      agent_conceder_permissao: {
+        Args: { p_agent: string; p_tool: string };
+        Returns: undefined;
+      };
+      agent_concluir_tarefa: {
+        Args: {
+          p_erro?: string;
+          p_reenfileirar_em?: string;
+          p_resultado?: Json;
+          p_status: string;
+          p_task: string;
+        };
+        Returns: undefined;
+      };
+      agent_configurar_ceo: {
+        Args: {
+          p_avatar_url: string;
+          p_cargo: string;
+          p_departamento: string;
+          p_descricao: string;
+          p_especialidade: string;
+          p_ferramentas: string[];
+          p_modelo: string;
+          p_nome: string;
+          p_org: string;
+          p_teto_dia: number;
+          p_teto_mes: number;
+        };
+        Returns: {
+          atualizado_em: string;
+          autonomia: string;
+          avatar_url: string | null;
+          cargo: string | null;
+          criado_em: string;
+          criado_por: string | null;
+          departamento: string | null;
+          descricao: string | null;
+          especialidade: string | null;
+          estado: string;
+          id: string;
+          kill_switch: boolean;
+          max_passos: number;
+          max_tokens_saida: number;
+          modelo: string;
+          nome: string;
+          org_id: string;
+          papel: string;
+          slug: string;
+          teto_usd_dia: number;
+          teto_usd_mes: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "agents";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      agent_consumo: {
+        Args: { p_agent: string };
+        Returns: {
+          usd_dia: number;
+          usd_mes: number;
+        }[];
+      };
+      agent_consumo_org: {
+        Args: { p_org: string };
+        Returns: {
+          usd_dia: number;
+          usd_mes: number;
+        }[];
+      };
+      agent_criar_ceo: {
+        Args: { p_org: string };
+        Returns: {
+          atualizado_em: string;
+          autonomia: string;
+          avatar_url: string | null;
+          cargo: string | null;
+          criado_em: string;
+          criado_por: string | null;
+          departamento: string | null;
+          descricao: string | null;
+          especialidade: string | null;
+          estado: string;
+          id: string;
+          kill_switch: boolean;
+          max_passos: number;
+          max_tokens_saida: number;
+          modelo: string;
+          nome: string;
+          org_id: string;
+          papel: string;
+          slug: string;
+          teto_usd_dia: number;
+          teto_usd_mes: number;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "agents";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      agent_decidir_aprovacao: {
+        Args: { p_approval: string; p_aprovar: boolean; p_motivo?: string };
+        Returns: undefined;
+      };
+      agent_definir_estado: {
+        Args: { p_agent: string; p_estado: string };
+        Returns: undefined;
+      };
+      agent_definir_limites: {
+        Args: {
+          p_agent: string;
+          p_max_passos: number;
+          p_modelo?: string;
+          p_teto_dia: number;
+          p_teto_mes: number;
+        };
+        Returns: undefined;
+      };
+      agent_enfileirar_tarefa: {
+        Args: {
+          p_agent: string;
+          p_entrada: Json;
+          p_idempotency_key: string;
+          p_org: string;
+          p_tipo: string;
+          p_user: string;
+        };
+        Returns: {
+          agent_id: string;
+          attempt_count: number;
+          atualizado_em: string;
+          concluido_em: string | null;
+          criado_em: string;
+          entrada: Json;
+          id: string;
+          idempotency_key: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          next_attempt_at: string;
+          org_id: string;
+          prioridade: number;
+          resultado: Json | null;
+          solicitado_por: string | null;
+          status: string;
+          tipo: string;
+          ultimo_erro: string | null;
+          worker_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "agent_tasks";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      agent_exigir_humano: { Args: { p_org: string }; Returns: string };
+      agent_finalizar_run: {
+        Args: { p_erro?: string; p_run: string; p_status: string };
+        Returns: undefined;
+      };
+      agent_iniciar_run: {
+        Args: { p_modelo: string; p_task: string };
+        Returns: string;
+      };
+      agent_kill_switch: {
+        Args: { p_ligado: boolean; p_org: string };
+        Returns: number;
+      };
+      agent_pode_gerir: { Args: { p_org: string }; Returns: boolean };
+      agent_registrar_passo: {
+        Args: {
+          p_custo: number;
+          p_duracao_ms: number;
+          p_entrada: Json;
+          p_erro: string;
+          p_run: string;
+          p_saida: Json;
+          p_seq: number;
+          p_tipo: string;
+          p_tokens_in: number;
+          p_tokens_out: number;
+          p_tool: string;
+        };
+        Returns: undefined;
+      };
+      agent_reservar_tarefa: {
+        Args: { p_lease_seconds?: number; p_task: string; p_worker: string };
+        Returns: {
+          agent_id: string;
+          attempt_count: number;
+          atualizado_em: string;
+          concluido_em: string | null;
+          criado_em: string;
+          entrada: Json;
+          id: string;
+          idempotency_key: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          next_attempt_at: string;
+          org_id: string;
+          prioridade: number;
+          resultado: Json | null;
+          solicitado_por: string | null;
+          status: string;
+          tipo: string;
+          ultimo_erro: string | null;
+          worker_id: string | null;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "agent_tasks";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      agent_resumo_comercial: { Args: { p_org: string }; Returns: Json };
+      agent_revogar_permissao: {
+        Args: { p_agent: string; p_tool: string };
+        Returns: undefined;
+      };
+      agent_solicitar_aprovacao: {
+        Args: {
+          p_agent: string;
+          p_org: string;
+          p_payload: Json;
+          p_resumo: string;
+          p_task: string;
+          p_tipo: string;
+        };
+        Returns: string;
+      };
       canonical_lead_niche_key: { Args: { p_value: string }; Returns: string };
       claim_apify_search_cache: {
         Args: { p_query_key: string; p_target_depth: number };
@@ -7738,7 +8401,10 @@ export type Database = {
           p_score?: string;
           p_search?: string;
         };
-        Returns: { status: string; total: number }[];
+        Returns: {
+          status: string;
+          total: number;
+        }[];
       };
       plano_id_por_slug: { Args: { p_plan: string }; Returns: string };
       pode_ver_lead: {
@@ -7764,7 +8430,7 @@ export type Database = {
       };
       salvar_rascunho_estudio: {
         Args: {
-          p_campanha_id: string | null;
+          p_campanha_id: string;
           p_draft: Json;
           p_org_id: string;
           p_revisao_esperada: number;
@@ -7837,6 +8503,34 @@ export type Database = {
         };
         Returns: boolean;
       };
+      wa_automation_claim_events: {
+        Args: { p_lease_seconds?: number; p_limit?: number };
+        Returns: {
+          attempts: number;
+          causation_id: string | null;
+          conversation_id: string | null;
+          correlation_id: string;
+          created_at: string;
+          depth: number;
+          event_key: string;
+          event_type: string;
+          id: string;
+          lead_id: string | null;
+          lease_until: string | null;
+          occurred_at: string;
+          org_id: string;
+          payload: Json;
+          processed_at: string | null;
+          resource_type: string;
+          source: string;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "wa_automation_events";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       wa_automation_controls: {
         Args: { p_automation: string; p_org: string };
         Returns: {
@@ -7846,10 +8540,66 @@ export type Database = {
           rule_enabled: boolean;
         }[];
       };
+      wa_automation_emit_due_followups: {
+        Args: { p_limit?: number };
+        Returns: number;
+      };
+      wa_automation_execute_action: {
+        Args: {
+          p_action: string;
+          p_actor: string;
+          p_conversation: string;
+          p_depth: number;
+          p_event: string;
+          p_org: string;
+          p_value: Json;
+        };
+        Returns: Json;
+      };
+      wa_automation_finish_event: {
+        Args: { p_event: string; p_org: string };
+        Returns: boolean;
+      };
+      wa_automation_record_activity: {
+        Args: {
+          p_actor: string;
+          p_conversation: string;
+          p_details: Json;
+          p_org: string;
+        };
+        Returns: string;
+      };
+      wa_automation_schedule_followup: {
+        Args: {
+          p_automation: string;
+          p_conversation: string;
+          p_depth: number;
+          p_due_at: string;
+          p_key: string;
+          p_lead: string;
+          p_org: string;
+          p_timezone: string;
+          p_version: number;
+        };
+        Returns: boolean;
+      };
       wa_backfill_conversations: { Args: { p_limit?: number }; Returns: number };
       wa_campaign_is_whatsapp: {
         Args: { p_campaign: string };
         Returns: boolean;
+      };
+      wa_change_conversation_instance: {
+        Args: {
+          p_actor: string;
+          p_conversation: string;
+          p_org: string;
+          p_to: string;
+        };
+        Returns: {
+          conversation_id: string;
+          from_instance: string;
+          to_instance: string;
+        }[];
       };
       wa_control_campaign: {
         Args: {
@@ -8276,9 +9026,6 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       papel_org: ["super_admin", "admin", "gerente", "vendedor", "sdr", "suporte"],
