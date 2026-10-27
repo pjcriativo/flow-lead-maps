@@ -2,6 +2,7 @@
 // Central de comunicação e comando do executivo digital para planejar, montar e coordenar a operação comercial.
 // Reproduz fielmente a imagem de referência aprovada (media_1792739962352.jpg) com máxima precisão estética e interativa.
 import React, { useState } from "react";
+import { CEO_IA_REAL_HABILITADO, perguntarAoCeo } from "@/services/agente-ceo";
 import {
   Activity,
   AlertCircle,
@@ -133,6 +134,7 @@ export function CopilotoCeoView({
   const [conversaAtivaId, setConversaAtivaId] = useState<string>("conv-1");
   const [mensagens, setMensagens] = useState<MensagemChat[]>(MENSAGENS_CHAT_INICIAIS);
   const [textoMensagem, setTextoMensagem] = useState("");
+  const [ceoRespondendo, setCeoRespondendo] = useState(false);
   const [planoVendas, setPlanoVendas] = useState<PlanoVendasResumo>(PLANO_VENDAS_Q4);
   const [nichoAtivo, setNichoAtivo] = useState("Clínicas Odontológicas");
   const [contexto, setContexto] = useState<ContextoComercial>(CONTEXTO_ATUAL_INICIAL);
@@ -146,10 +148,11 @@ export function CopilotoCeoView({
     setTimeout(() => setMensagemFeedback(null), 3500);
   };
 
-  // Enviar nova mensagem demonstrativa no chat
-  const handleEnviarMensagem = (e?: React.FormEvent) => {
+  // Enviar mensagem. Com VITE_CEO_IA_REAL desligada (padrão) o chat segue demonstrativo; ligada,
+  // o CEO de IA responde com dados reais via Edge `agent-ceo` (somente leitura).
+  const handleEnviarMensagem = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!textoMensagem.trim()) return;
+    if (!textoMensagem.trim() || ceoRespondendo) return;
 
     const novaMsgUsuario: MensagemChat = {
       id: `msg-${Date.now()}`,
@@ -159,19 +162,49 @@ export function CopilotoCeoView({
       horario: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
       conteudo: textoMensagem.trim(),
     };
-
-    const respostaCeoDemonstrativa: MensagemChat = {
+    const montarRespostaCeo = (conteudo: string): MensagemChat => ({
       id: `msg-ceo-${Date.now() + 1}`,
       remetente: "ceo",
       nome: "CEO de IA",
       avatar: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=120&auto=format&fit=crop&q=80",
       horario: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      conteudo:
-        "Mensagem registrada nesta demonstração frontend. O CEO de IA será conectado ao motor de inteligência artificial na etapa de integração.",
-    };
+      conteudo,
+    });
 
-    setMensagens((prev) => [...prev, novaMsgUsuario, respostaCeoDemonstrativa]);
+    if (!CEO_IA_REAL_HABILITADO) {
+      setMensagens((prev) => [
+        ...prev,
+        novaMsgUsuario,
+        montarRespostaCeo(
+          "Mensagem registrada nesta demonstração frontend. O CEO de IA será conectado ao motor de inteligência artificial na etapa de integração.",
+        ),
+      ]);
+      setTextoMensagem("");
+      return;
+    }
+
+    const historico = mensagens.slice(-10).map((m) => ({
+      role: m.remetente === "usuario" ? ("user" as const) : ("assistant" as const),
+      content: m.conteudo,
+    }));
+    setMensagens((prev) => [...prev, novaMsgUsuario]);
     setTextoMensagem("");
+    setCeoRespondendo(true);
+    try {
+      const r = await perguntarAoCeo({
+        mensagem: novaMsgUsuario.conteudo,
+        clientMessageId: crypto.randomUUID(),
+        historico,
+      });
+      setMensagens((prev) => [...prev, montarRespostaCeo(r.ok ? r.resposta : r.mensagem)]);
+    } catch {
+      setMensagens((prev) => [
+        ...prev,
+        montarRespostaCeo("Não foi possível consultar o CEO de IA agora."),
+      ]);
+    } finally {
+      setCeoRespondendo(false);
+    }
   };
 
   // Criar nova conversa local
@@ -796,7 +829,8 @@ export function CopilotoCeoView({
                 </button>
                 <button
                   type="submit"
-                  className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-r from-[#f95d14] to-orange-600 text-white shadow-md shadow-orange-500/20 hover:from-orange-500 hover:to-orange-600 transition-all active:scale-95"
+                  disabled={ceoRespondendo}
+                  className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-r from-[#f95d14] to-orange-600 text-white shadow-md shadow-orange-500/20 hover:from-orange-500 hover:to-orange-600 transition-all active:scale-95 disabled:opacity-60"
                   title="Enviar mensagem"
                 >
                   <ArrowRight className="size-4" />

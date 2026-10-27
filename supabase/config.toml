@@ -37,6 +37,11 @@ verify_jwt = true
 # Melhora a proposta via IA. JWT obrigatório.
 verify_jwt = true
 
+[functions.agent-ceo]
+# Copiloto do CEO de IA (Prompt 28). Manual, somente leitura. JWT obrigatório; a Edge valida org e papel.
+# NÃO publicada: deploy depende de autorização do dono.
+verify_jwt = true
+
 [functions.sdr-sugerir]
 # Sugestões de SDR (IA). JWT obrigatório.
 verify_jwt = true
