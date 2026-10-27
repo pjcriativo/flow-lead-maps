@@ -173,7 +173,7 @@ export function ConfiguracoesFinanceirasView({ onMudarTela }: ConfiguracoesFinan
   const [novoNomeCat, setNovoNomeCat] = useState("");
   const [novoTipoCat, setNovoTipoCat] = useState<"Receita" | "Despesa">("Receita");
   const [novaCorCat, setNovaCorCat] = useState("#f97316");
-  const [novaDescCat, setNovoDescCat] = useState("");
+  const [novaDescCat, setNovaDescCat] = useState("");
 
   // Form Nova Forma de Pagamento
   const [novoNomeForma, setNovoNomeForma] = useState("");
@@ -305,13 +305,13 @@ export function ConfiguracoesFinanceirasView({ onMudarTela }: ConfiguracoesFinan
       tipo: novoTipoCat,
       cor: novaCorCat,
       status: "ativa",
-      descricao: novoDescCat || "Categoria cadastrada manualmente",
+      descricao: novaDescCat || "Categoria cadastrada manualmente",
       icone: "Folder",
     };
     setCategorias((prev) => [...prev, nova]);
     setModalNovaCategoriaAberto(false);
     setNovoNomeCat("");
-    setNovoDescCat("");
+    setNovaDescCat("");
     toast.success(`Categoria "${nova.nome}" criada com sucesso!`);
   };
 
@@ -2249,8 +2249,8 @@ export function ConfiguracoesFinanceirasView({ onMudarTela }: ConfiguracoesFinan
               <label className="text-neutral-400 font-medium">Descrição</label>
               <input
                 type="text"
-                value={novoDescCat}
-                onChange={(e) => setNovoDescCat(e.target.value)}
+                value={novaDescCat}
+                onChange={(e) => setNovaDescCat(e.target.value)}
                 placeholder="Finalidade desta categoria"
                 className="mt-1 w-full h-9 rounded-xl border border-white/10 bg-[#121620] px-3 text-white focus:border-orange-500/50 focus:outline-none"
               />
