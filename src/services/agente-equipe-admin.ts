@@ -15,6 +15,7 @@ import {
 } from "@/lib/equipe-config";
 import {
   COLUNAS_AGENTE,
+  COLUNAS_AGENTE_LEGADAS,
   db,
   ErroCeo,
   paraAgente,
@@ -38,25 +39,50 @@ export type EquipeCarregada = {
 
 const JANELA_DIAS = 30;
 
+type Resposta = { data: unknown; error: { code?: string; message?: string } | null };
+
+/**
+ * Tenta as colunas novas (migration 003) e, se ainda não existirem no banco, repete com as
+ * anteriores — assim as telas seguem funcionando antes de a 003 ser aplicada.
+ */
+async function comFallback(
+  consulta: (colunas: string) => PromiseLike<unknown>,
+  colunas: string,
+  legadas: string,
+): Promise<Resposta> {
+  const r = (await consulta(colunas)) as Resposta;
+  const ausente =
+    r.error &&
+    (r.error.code === "42703" || /column .* does not exist/i.test(r.error.message ?? ""));
+  return ausente ? ((await consulta(legadas)) as Resposta) : r;
+}
+
 /** Lê o estado REAL da equipe da organização ativa. Falha com ErroCeo (inclui "serviço indisponível"). */
 export async function carregarEquipe(): Promise<EquipeCarregada> {
   const { orgId } = await getActiveOrganizationContext();
   const desde = new Date(Date.now() - JANELA_DIAS * 86_400_000).toISOString();
   const [ag, pm, tk, rn, ap, consumo] = await Promise.all([
-    db().from("agents").select(COLUNAS_AGENTE).eq("org_id", orgId),
+    comFallback(
+      (c) => db().from("agents").select(c).eq("org_id", orgId),
+      COLUNAS_AGENTE,
+      COLUNAS_AGENTE_LEGADAS,
+    ),
     db()
       .from("agent_permissions")
       .select("agent_id, tool_nome")
       .eq("org_id", orgId)
       .eq("ativo", true),
-    db()
-      .from("agent_tasks")
-      .select(
-        "id, agent_id, tipo, status, delegado_por, criado_em, concluido_em, ultimo_erro, resultado",
-      )
-      .eq("org_id", orgId)
-      .order("criado_em", { ascending: false })
-      .limit(60),
+    comFallback(
+      (c) =>
+        db()
+          .from("agent_tasks")
+          .select(c)
+          .eq("org_id", orgId)
+          .order("criado_em", { ascending: false })
+          .limit(60),
+      "id, agent_id, tipo, status, delegado_por, criado_em, concluido_em, ultimo_erro, resultado",
+      "id, agent_id, tipo, status, criado_em, concluido_em, ultimo_erro, resultado",
+    ),
     db()
       .from("agent_runs")
       .select("agent_id, status, custo_usd, passos, iniciado_em, finalizado_em")

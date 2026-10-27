@@ -139,3 +139,18 @@ test("permissões individuais: humano concede/revoga ferramentas do papel; deleg
   assert.match(ui, /desabilitarDelegacao\(a\.id\) : habilitarDelegacao\(a\.id\)/);
   assert.match(ui, /Somente você \(administrador logado\) concede ou revoga/);
 });
+
+test("retrocompatibilidade: as leituras funcionam antes da migration 003 (fallback de colunas)", () => {
+  const ceoSvc = read("../../../src/services/agente-ceo-admin.ts");
+  for (const s of [ceoSvc, svc]) {
+    assert.match(s, /42703/);
+    assert.match(s, /column \.\* does not exist/);
+  }
+  assert.match(ceoSvc, /COLUNAS_AGENTE_LEGADAS = COLUNAS_AGENTE\.replace\(", reports_to", ""\)/);
+  assert.match(svc, /COLUNAS_AGENTE_LEGADAS/);
+  // a leitura legada de tarefas não pede a coluna que só existe na 003
+  assert.match(
+    svc,
+    /"id, agent_id, tipo, status, criado_em, concluido_em, ultimo_erro, resultado"/,
+  );
+});

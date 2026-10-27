@@ -77,15 +77,26 @@ export async function rpc<T = unknown>(nome: string, args: Record<string, unknow
   return data as T;
 }
 
+/** Colunas das migrations 001/002 (sem a hierarquia da 003), para ambientes em que a 003 ainda não foi aplicada. */
+export const COLUNAS_AGENTE_LEGADAS = COLUNAS_AGENTE.replace(", reports_to", "");
+
+const colunaAusente = (e: { code?: string; message?: string } | null) =>
+  Boolean(e && (e.code === "42703" || /column .* does not exist/i.test(e.message ?? "")));
+
 /** Lê o estado REAL do CEO da organização ativa (RLS: só gestores enxergam). */
 export async function carregarCeo(): Promise<CargaCeo & { orgId: string }> {
   const { orgId } = await getActiveOrganizationContext();
-  const { data: agente, error } = await db()
-    .from("agents")
-    .select(COLUNAS_AGENTE)
-    .eq("org_id", orgId)
-    .eq("slug", "ceo")
-    .maybeSingle();
+  type Leitura = { data: LinhaAgente | null; error: { code?: string; message?: string } | null };
+  const ler = async (colunas: string): Promise<Leitura> =>
+    (await db()
+      .from("agents")
+      .select(colunas)
+      .eq("org_id", orgId)
+      .eq("slug", "ceo")
+      .maybeSingle()) as unknown as Leitura;
+  let { data: agente, error } = await ler(COLUNAS_AGENTE);
+  // Retrocompatibilidade: a migration 003 (reports_to) pode ainda não existir no banco.
+  if (colunaAusente(error)) ({ data: agente, error } = await ler(COLUNAS_AGENTE_LEGADAS));
   if (error) throw new ErroCeo(error);
   if (!agente)
     return { orgId, agente: null, ferramentasConcedidas: [], gastoDiaUsd: 0, gastoMesUsd: 0 };
