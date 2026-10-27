@@ -50,6 +50,9 @@ import {
 } from "./equipe-data";
 import { MontarEquipeModal } from "./MontarEquipeModal";
 import { NovoAgenteModal } from "./NovoAgenteModal";
+import { CeoConfigWizard } from "./CeoConfigWizard";
+import { CeoRealStatusCard } from "./CeoRealUi";
+import { useCeoReal } from "./useCeoReal";
 
 interface EquipeAgentesViewProps {
   onVoltarPainel?: () => void;
@@ -67,6 +70,9 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
   const [modalNovoAberto, setModalNovoAberto] = useState(false);
   const [agenteSelecionado, setAgenteSelecionado] = useState<AgenteDetalhado | null>(null);
   const [menuAcoesAberto, setMenuAcoesAberto] = useState<string | null>(null);
+  // CEO de IA REAL (backend): estado verdadeiro + assistente de configuração.
+  const ceo = useCeoReal();
+  const [wizardCeoAberto, setWizardCeoAberto] = useState(false);
 
   // Filtragem dinâmica de agentes
   const agentesFiltrados = useMemo(() => {
@@ -169,7 +175,7 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
 
             <button
               type="button"
-              onClick={() => setModalMontarAberto(true)}
+              onClick={() => setWizardCeoAberto(true)}
               className="flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-orange-600 to-[#f95d14] px-5 text-xs font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:opacity-95 hover:shadow-orange-500/35"
             >
               <Zap className="size-4 fill-white" />
@@ -177,6 +183,21 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
             </button>
           </div>
         </header>
+
+        {/* Estado REAL do CEO de IA (backend). Os cartões de agentes abaixo são exemplos demonstrativos. */}
+        <CeoRealStatusCard ceo={ceo} onConfigurar={() => setWizardCeoAberto(true)} />
+        <CeoConfigWizard
+          aberto={wizardCeoAberto}
+          onFechar={() => setWizardCeoAberto(false)}
+          ceo={ceo}
+          onAbrirMontagemCompleta={() => {
+            setWizardCeoAberto(false);
+            setModalMontarAberto(true);
+          }}
+        />
+        <p className="-mt-3 text-[10px] text-neutral-500">
+          Os agentes, departamentos e enxames listados nesta tela são exemplos demonstrativos. Nesta fase somente o CEO de IA é operacional.
+        </p>
 
         {/* =========================================================================
             2. NAVEGAÇÃO INTERNA (ABAS)

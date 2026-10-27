@@ -1,6 +1,9 @@
 // Tela 03 — Perfil do Agente
 // Reprodução fiel, de altíssima precisão e responsiva da referência aprovada.
 import React, { useState } from "react";
+import { CeoConfigWizard } from "./CeoConfigWizard";
+import { CeoEstadoPill, CeoRealConfigPanel } from "./CeoRealUi";
+import { useCeoReal } from "./useCeoReal";
 import {
   ArrowLeft,
   ArrowRight,
@@ -86,6 +89,10 @@ export function PerfilAgenteView({
   const [mensagemSalvo, setMensagemSalvo] = useState(false);
   const [serieAtiva, setSerieAtiva] = useState<"todas" | "leads" | "reunioes" | "vendas">("todas");
   const [periodoGrafico, setPeriodoGrafico] = useState("30 dias");
+  // Somente o CEO tem backend: os dados reais sobrescrevem a identidade demonstrativa.
+  const ceo = useCeoReal(Boolean(perfil.isCeo));
+  const [wizardCeoAberto, setWizardCeoAberto] = useState(false);
+  const real = perfil.isCeo ? (ceo.carga?.agente ?? null) : null;
 
   // Feedback demonstrativo ao salvar
   const handleSalvar = () => {
@@ -200,6 +207,13 @@ export function PerfilAgenteView({
           </div>
         </header>
 
+        {perfil.isCeo && (
+          <>
+            <CeoRealConfigPanel ceo={ceo} onConfigurar={() => setWizardCeoAberto(true)} />
+            <CeoConfigWizard aberto={wizardCeoAberto} onFechar={() => setWizardCeoAberto(false)} ceo={ceo} />
+          </>
+        )}
+
         {/* =========================================================================
             2. HERO CARD — IDENTIDADE SUPERIOR + 7 INDICADORES
            ========================================================================= */}
@@ -212,8 +226,8 @@ export function PerfilAgenteView({
               <div className="relative shrink-0">
                 <div className="relative size-32 overflow-hidden rounded-2xl border-2 border-orange-500/60 shadow-xl shadow-orange-500/20 sm:size-36">
                   <img
-                    src={perfil.avatarUrl}
-                    alt={perfil.nome}
+                    src={real?.avatarUrl ?? perfil.avatarUrl}
+                    alt={real?.nome ?? perfil.nome}
                     className="size-full object-cover object-top"
                   />
                   {/* Overlay gradiente inferior */}
@@ -241,21 +255,25 @@ export function PerfilAgenteView({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                    <span>{perfil.nome}</span>
+                    <span>{real?.nome ?? perfil.nome}</span>
                     {perfil.isCeo && <Crown className="size-5 text-amber-400 fill-amber-400" />}
                   </h2>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
-                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>{perfil.status}</span>
-                  </span>
+                  {perfil.isCeo ? (
+                    <CeoEstadoPill estado={ceo.estado} />
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{perfil.status}</span>
+                    </span>
+                  )}
                 </div>
 
                 <p className="mt-1 text-xs font-semibold text-neutral-300">
-                  {perfil.cargo}
+                  {real?.cargo ?? perfil.cargo}
                 </p>
 
                 <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                  {perfil.descricao}
+                  {real?.descricao ?? perfil.descricao}
                 </p>
 
                 {/* Tags de especialidade */}

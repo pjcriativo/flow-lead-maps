@@ -92,8 +92,8 @@ export function MontarEquipeModal({ aberto, onFechar, onConcluir }: MontarEquipe
                 <h3 className="text-sm font-bold uppercase tracking-wider text-white">
                   Montar Equipe Comercial com CEO de IA
                 </h3>
-                <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] font-semibold text-orange-400 border border-orange-500/20">
-                  Modo Copiloto
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300 border border-amber-500/30">
+                  Em breve · funcionalidade futura
                 </span>
               </div>
               <p className="text-xs text-neutral-400">
@@ -108,6 +108,12 @@ export function MontarEquipeModal({ aberto, onFechar, onConcluir }: MontarEquipe
           >
             <X className="size-5" />
           </button>
+        </div>
+
+        <div className="border-b border-amber-500/20 bg-amber-500/5 px-6 py-2 text-[11px] text-amber-200">
+          Montagem completa da equipe (departamentos, enxames, metas e delegação) ainda não é operacional. Esta é uma
+          prévia do planejamento: nada é criado nem ativado. Hoje somente o CEO de IA é configurado e ativado, pela
+          tela Equipe &amp; Enxames.
         </div>
 
         {/* Stepper Progress bar (1 to 10 + 11 Result) */}
@@ -539,7 +545,7 @@ export function MontarEquipeModal({ aberto, onFechar, onConcluir }: MontarEquipe
                 className="flex items-center gap-2 rounded-xl bg-[#f95d14] px-6 py-2.5 text-xs font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:bg-[#ff6c26]"
               >
                 <Check className="size-4" />
-                <span>Ativar Operação da Equipe</span>
+                <span>Concluir prévia (nada é ativado)</span>
               </button>
             </div>
           )}

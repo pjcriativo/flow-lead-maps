@@ -3,6 +3,9 @@
 // Reproduz fielmente a imagem de referência aprovada (media_1792739962352.jpg) com máxima precisão estética e interativa.
 import React, { useState } from "react";
 import { CEO_IA_REAL_HABILITADO, perguntarAoCeo } from "@/services/agente-ceo";
+import { copilotoRealPronto } from "@/lib/ceo-config";
+import { CeoCopilotoBanner, CeoEstadoPill } from "./CeoRealUi";
+import { useCeoReal } from "./useCeoReal";
 import {
   Activity,
   AlertCircle,
@@ -135,6 +138,10 @@ export function CopilotoCeoView({
   const [mensagens, setMensagens] = useState<MensagemChat[]>(MENSAGENS_CHAT_INICIAIS);
   const [textoMensagem, setTextoMensagem] = useState("");
   const [ceoRespondendo, setCeoRespondendo] = useState(false);
+  // Estado REAL do CEO (só consultado quando o Copiloto real está habilitado neste ambiente).
+  const ceoReal = useCeoReal(CEO_IA_REAL_HABILITADO);
+  const copilotoPronto = copilotoRealPronto(CEO_IA_REAL_HABILITADO, ceoReal.estado);
+  const bloqueadoPorEstado = CEO_IA_REAL_HABILITADO && !copilotoPronto;
   const [planoVendas, setPlanoVendas] = useState<PlanoVendasResumo>(PLANO_VENDAS_Q4);
   const [nichoAtivo, setNichoAtivo] = useState("Clínicas Odontológicas");
   const [contexto, setContexto] = useState<ContextoComercial>(CONTEXTO_ATUAL_INICIAL);
@@ -152,7 +159,7 @@ export function CopilotoCeoView({
   // o CEO de IA responde com dados reais via Edge `agent-ceo` (somente leitura).
   const handleEnviarMensagem = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!textoMensagem.trim() || ceoRespondendo) return;
+    if (!textoMensagem.trim() || ceoRespondendo || bloqueadoPorEstado) return;
 
     const novaMsgUsuario: MensagemChat = {
       id: `msg-${Date.now()}`,
@@ -366,10 +373,13 @@ export function CopilotoCeoView({
                   CEO de IA
                   <Crown className="size-3.5 text-amber-400 inline" />
                 </h2>
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Online
-                </span>
+                {CEO_IA_REAL_HABILITADO ? (
+                  <CeoEstadoPill estado={ceoReal.estado} />
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                    Demonstração
+                  </span>
+                )}
               </div>
 
               <p className="text-xs text-neutral-400 font-medium">
@@ -791,12 +801,14 @@ export function CopilotoCeoView({
               CAMPO DE DIGITAÇÃO & ATALHOS RÁPIDOS
               ===================================================================== */}
           <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+            <CeoCopilotoBanner ceo={ceoReal} flagLigada={CEO_IA_REAL_HABILITADO} />
             {/* Campo de Entrada de Mensagem */}
             <form onSubmit={handleEnviarMensagem} className="relative flex items-center">
               <input
                 type="text"
                 placeholder="Digite sua mensagem para o CEO de IA..."
                 value={textoMensagem}
+                disabled={bloqueadoPorEstado}
                 onChange={(e) => setTextoMensagem(e.target.value)}
                 className="w-full rounded-2xl border border-white/10 bg-[#101624] pl-4 pr-32 py-3 text-xs text-white placeholder-neutral-500 focus:border-[#f95d14] focus:outline-none shadow-inner"
               />
@@ -829,7 +841,7 @@ export function CopilotoCeoView({
                 </button>
                 <button
                   type="submit"
-                  disabled={ceoRespondendo}
+                  disabled={ceoRespondendo || bloqueadoPorEstado}
                   className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-r from-[#f95d14] to-orange-600 text-white shadow-md shadow-orange-500/20 hover:from-orange-500 hover:to-orange-600 transition-all active:scale-95 disabled:opacity-60"
                   title="Enviar mensagem"
                 >
