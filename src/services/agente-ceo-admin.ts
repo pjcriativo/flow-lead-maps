@@ -14,7 +14,7 @@ import {
 } from "@/lib/ceo-config";
 
 // As tabelas de agentes ainda não estão em types.ts (gerado após a migration ser aplicada).
-const db = () => supabase as unknown as SupabaseClient;
+export const db = () => supabase as unknown as SupabaseClient;
 
 export class ErroCeo extends Error {
   readonly indisponivel: boolean;
@@ -26,7 +26,7 @@ export class ErroCeo extends Error {
   }
 }
 
-type LinhaAgente = {
+export type LinhaAgente = {
   id: string;
   org_id: string;
   nome: string;
@@ -41,12 +41,15 @@ type LinhaAgente = {
   teto_usd_dia: number | string;
   teto_usd_mes: number | string;
   max_passos: number;
+  papel?: string;
+  autonomia?: "somente_leitura" | "interna_supervisionada";
+  reports_to?: string | null;
 };
 
-const COLUNAS =
-  "id, org_id, nome, cargo, departamento, descricao, especialidade, avatar_url, modelo, estado, kill_switch, teto_usd_dia, teto_usd_mes, max_passos";
+export const COLUNAS_AGENTE =
+  "id, org_id, nome, cargo, departamento, descricao, especialidade, avatar_url, modelo, estado, kill_switch, teto_usd_dia, teto_usd_mes, max_passos, papel, autonomia, reports_to";
 
-function paraAgente(l: LinhaAgente): AgenteCeoRow {
+export function paraAgente(l: LinhaAgente): AgenteCeoRow {
   return {
     id: l.id,
     orgId: l.org_id,
@@ -62,10 +65,13 @@ function paraAgente(l: LinhaAgente): AgenteCeoRow {
     tetoDiaUsd: Number(l.teto_usd_dia),
     tetoMesUsd: Number(l.teto_usd_mes),
     maxPassos: l.max_passos,
+    papel: l.papel,
+    autonomia: l.autonomia,
+    reportsTo: l.reports_to ?? null,
   };
 }
 
-async function rpc<T = unknown>(nome: string, args: Record<string, unknown>): Promise<T> {
+export async function rpc<T = unknown>(nome: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await db().rpc(nome, args);
   if (error) throw new ErroCeo(error);
   return data as T;
@@ -76,7 +82,7 @@ export async function carregarCeo(): Promise<CargaCeo & { orgId: string }> {
   const { orgId } = await getActiveOrganizationContext();
   const { data: agente, error } = await db()
     .from("agents")
-    .select(COLUNAS)
+    .select(COLUNAS_AGENTE)
     .eq("org_id", orgId)
     .eq("slug", "ceo")
     .maybeSingle();

@@ -1,6 +1,8 @@
 // Tela 12 — Relatórios & Resultados
 // Módulo: Gestão → Agentes & Automações
 // Painel Executivo de Business Intelligence comercial coordenado pelo CEO de IA
+import { RelatorioRealPanel } from "./EquipeRealUi";
+import { useEquipeReal } from "./useEquipeReal";
 import React, { useState, useMemo } from "react";
 import {
   ArrowUpRight,
@@ -130,6 +132,8 @@ export function RelatoriosResultadosView({
   onNavegarCopiloto,
   onNavegarAprovacoes,
 }: RelatoriosResultadosViewProps) {
+  // Dados REAIS do runtime de agentes (o restante da tela é demonstrativo).
+  const equipeReal = useEquipeReal();
   // Controles de Período
   const [periodoSelecionado, setPeriodoSelecionado] = useState("Este mês");
   const [menuPeriodoAberto, setMenuPeriodoAberto] = useState(false);
@@ -338,6 +342,8 @@ export function RelatoriosResultadosView({
           </button>
         </div>
       </header>
+
+      <RelatorioRealPanel eq={equipeReal} />
 
       {/* =========================================================================
           2. TOPO: CARD DO CEO DE IA + 8 INDICADORES EXECUTIVOS

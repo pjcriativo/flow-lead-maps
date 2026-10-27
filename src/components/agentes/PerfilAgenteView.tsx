@@ -3,7 +3,9 @@
 import React, { useState } from "react";
 import { CeoConfigWizard } from "./CeoConfigWizard";
 import { CeoEstadoPill, CeoRealConfigPanel } from "./CeoRealUi";
-import { useCeoReal } from "./useCeoReal";
+import { PermissoesDoPapel } from "./EquipeRealUi";
+import { useAgenteReal } from "./useEquipeReal";
+import { META_PAPEL, ehPapel, type Papel } from "@/lib/equipe-config";
 import {
   ArrowLeft,
   ArrowRight,
@@ -79,8 +81,13 @@ export function PerfilAgenteView({
   onNavegarFluxos,
   onNavegarPlanejamento,
 }: PerfilAgenteViewProps) {
+  // Ids "real:<papel>" vêm da equipe real (Tela 02); os demais são os perfis demonstrativos.
+  const papelDoId: Papel | null =
+    agenteId.startsWith("real:") && ehPapel(agenteId.slice(5)) ? (agenteId.slice(5) as Papel) : null;
   const [perfil, setPerfil] = useState<PerfilAgenteCompleto>(
-    PERFIS_CATALOGO[agenteId] || PERFIS_CATALOGO.ceo,
+    papelDoId
+      ? { ...PERFIS_CATALOGO.ceo, id: agenteId, isCeo: papelDoId === "ceo" }
+      : PERFIS_CATALOGO[agenteId] || PERFIS_CATALOGO.ceo,
   );
   const [abaAtiva, setAbaAtiva] = useState<string>("visao_geral");
   const [editandoIdentidade, setEditandoIdentidade] = useState(false);
@@ -90,9 +97,10 @@ export function PerfilAgenteView({
   const [serieAtiva, setSerieAtiva] = useState<"todas" | "leads" | "reunioes" | "vendas">("todas");
   const [periodoGrafico, setPeriodoGrafico] = useState("30 dias");
   // Somente o CEO tem backend: os dados reais sobrescrevem a identidade demonstrativa.
-  const ceo = useCeoReal(Boolean(perfil.isCeo));
+  const papelReal: Papel | null = papelDoId ?? (perfil.isCeo ? "ceo" : null);
+  const ceo = useAgenteReal(papelReal);
   const [wizardCeoAberto, setWizardCeoAberto] = useState(false);
-  const real = perfil.isCeo ? (ceo.carga?.agente ?? null) : null;
+  const real = papelReal ? (ceo.carga?.agente ?? null) : null;
 
   // Feedback demonstrativo ao salvar
   const handleSalvar = () => {
@@ -207,10 +215,17 @@ export function PerfilAgenteView({
           </div>
         </header>
 
-        {perfil.isCeo && (
+        {papelReal && (
           <>
-            <CeoRealConfigPanel ceo={ceo} onConfigurar={() => setWizardCeoAberto(true)} />
-            <CeoConfigWizard aberto={wizardCeoAberto} onFechar={() => setWizardCeoAberto(false)} ceo={ceo} />
+            <CeoRealConfigPanel
+              ceo={ceo}
+              titulo={`Configuração real — ${META_PAPEL[papelReal].rotulo}`}
+              onConfigurar={papelReal === "ceo" ? () => setWizardCeoAberto(true) : undefined}
+              extra={<PermissoesDoPapel agente={ceo} papel={papelReal} />}
+            />
+            {papelReal === "ceo" && (
+              <CeoConfigWizard aberto={wizardCeoAberto} onFechar={() => setWizardCeoAberto(false)} ceo={ceo} />
+            )}
           </>
         )}
 
@@ -258,7 +273,7 @@ export function PerfilAgenteView({
                     <span>{real?.nome ?? perfil.nome}</span>
                     {perfil.isCeo && <Crown className="size-5 text-amber-400 fill-amber-400" />}
                   </h2>
-                  {perfil.isCeo ? (
+                  {papelReal ? (
                     <CeoEstadoPill estado={ceo.estado} />
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">

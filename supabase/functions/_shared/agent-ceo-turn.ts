@@ -2,7 +2,6 @@
 // Orquestração PURA: todo I/O (banco, modelo, ferramenta) entra por `CeoDeps`, então os testes
 // rodam o ciclo completo com dublês — sem rede, sem banco e sem gastar IA.
 import {
-  authorizeToolCall,
   budgetDecision,
   buildIdempotencyKey,
   canRunAgent,
@@ -12,7 +11,6 @@ import {
   retryDecision,
   StepRecorder,
   stepLimitDecision,
-  validateParams,
   type AgentIdentity,
   type AgentPermission,
   type BlockReason,
@@ -20,12 +18,10 @@ import {
   type TaskStatus,
   type ToolSpec,
 } from "./agent-runtime.ts";
-import {
-  CEO_SYSTEM_PROMPT,
-  TOOL_REGISTRY,
-  normalizarResumoComercial,
-  TOOL_RESUMO_COMERCIAL,
-} from "./agent-tools.ts";
+import { CEO_SYSTEM_PROMPT, anthropicToolSchemas, ferramentasDoAgente } from "./agent-tools.ts";
+import { MAX_DELEGACOES_POR_EXECUCAO, processarUsosDeFerramenta } from "./agent-tool-exec.ts";
+
+export type ToolSchema = ReturnType<typeof anthropicToolSchemas>[number];
 
 export const MAX_MENSAGEM_CHARS = 2000;
 const MAX_HISTORICO = 10;
@@ -46,6 +42,8 @@ export type ChamadaModelo = {
   system: string;
   mensagens: ModeloMensagem[];
   maxTokensSaida: number;
+  /** Somente as ferramentas que ESTE agente pode usar (papel + autonomia + permissão humana). */
+  tools: ToolSchema[];
 };
 export type ModeloMensagem =
   | { role: "user" | "assistant"; content: string }
@@ -96,7 +94,10 @@ export type CeoDeps = {
     reenfileirarEm?: Date;
   }): Promise<void>;
   /** Executa uma ferramenta REGISTRADA com a org da sessão. Devolve o payload bruto da RPC. */
-  executarFerramenta(nome: string, orgId: string): Promise<unknown>;
+  executarFerramenta(
+    nome: string,
+    ctx: { orgId: string; agentId: string; taskId: string | null; params: Record<string, unknown> },
+  ): Promise<unknown>;
   chamarModelo(req: ChamadaModelo): Promise<RespostaModelo>;
   registrarUsoIa(i: { userId: string; modelo: string }): Promise<void>;
   agora(): Date;
@@ -219,6 +220,7 @@ export async function executarTurnoCeo(
   const rec = new StepRecorder();
   const gravar = async (step: StepRecord) => deps.registrarPasso(runId, step);
   let custoTotal = 0;
+  let delegacoes = 0;
 
   const encerrar = async (
     status: "failed" | "cancelled",
@@ -290,6 +292,9 @@ export async function executarTurnoCeo(
         system: CEO_SYSTEM_PROMPT,
         mensagens,
         maxTokensSaida: atual.agent.maxTokensSaida,
+        tools: anthropicToolSchemas(
+          ferramentasDoAgente(atual.agent, atual.catalog, atual.permissions),
+        ),
       });
       const custo = costUsd(modelo, resp.tokensEntrada, resp.tokensSaida) ?? 0;
       custoTotal += custo;
@@ -340,85 +345,24 @@ export async function executarTurnoCeo(
       }
 
       mensagens.push({ role: "assistant", text: resp.texto, toolUses: resp.toolUses });
-      const resultados: { id: string; content: string; isError: boolean }[] = [];
-      for (const uso of resp.toolUses) {
-        const tInicio = deps.agora().getTime();
-        const registro = (saida: unknown, erro: string | null) =>
-          gravar(
-            rec.next({
-              tipo: erro ? "blocked" : "tool_result",
-              toolNome: uso.name,
-              entrada: uso.input,
-              saida,
-              tokensEntrada: 0,
-              tokensSaida: 0,
-              custoUsd: 0,
-              duracaoMs: deps.agora().getTime() - tInicio,
-              erro,
-            }),
-          );
-
-        const def = TOOL_REGISTRY.find((t) => t.nome === uso.name);
-        const auth = authorizeToolCall({
-          agent: atual.agent,
-          orgId: input.orgId,
-          toolNome: uso.name,
-          catalog: atual.catalog,
-          permissions: atual.permissions,
-        });
-        if (!def || !auth.ok) {
-          const motivo = auth.ok ? "ferramenta_desconhecida" : auth.reason;
-          await registro({ negado: motivo }, motivo);
-          resultados.push({ id: uso.id, content: `Ferramenta negada: ${motivo}.`, isError: true });
-          continue;
-        }
-        const parametros = validateParams(def.params, uso.input ?? {});
-        if (!parametros.ok) {
-          await registro({ erros: parametros.errors }, "parametros_invalidos");
-          resultados.push({ id: uso.id, content: "Parâmetros inválidos.", isError: true });
-          continue;
-        }
-        await gravar(
-          rec.next({
-            tipo: "tool_call",
-            toolNome: uso.name,
-            entrada: parametros.value,
-            tokensEntrada: 0,
-            tokensSaida: 0,
-            custoUsd: 0,
-            duracaoMs: null,
-            erro: null,
+      const { resultados, delegacoesUsadas } = await processarUsosDeFerramenta({
+        usos: resp.toolUses,
+        agent: atual.agent,
+        catalog: atual.catalog,
+        permissions: atual.permissions,
+        rec,
+        gravar,
+        agora: () => deps.agora(),
+        delegacoesRestantes: MAX_DELEGACOES_POR_EXECUCAO - delegacoes,
+        executar: (nome, params) =>
+          deps.executarFerramenta(nome, {
+            orgId: input.orgId,
+            agentId: atual.agent.id,
+            taskId: reservada.id,
+            params,
           }),
-        );
-        try {
-          const bruto = await deps.executarFerramenta(uso.name, input.orgId);
-          const resumo =
-            uso.name === TOOL_RESUMO_COMERCIAL
-              ? normalizarResumoComercial(bruto, input.orgId)
-              : { disponivel: false, motivo: "sem_normalizador" };
-          await gravar(
-            rec.next({
-              tipo: "tool_result",
-              toolNome: uso.name,
-              saida: resumo,
-              tokensEntrada: 0,
-              tokensSaida: 0,
-              custoUsd: 0,
-              duracaoMs: deps.agora().getTime() - tInicio,
-              erro: null,
-            }),
-          );
-          resultados.push({ id: uso.id, content: JSON.stringify(resumo), isError: false });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : "erro_ferramenta";
-          await registro({ erro: msg.slice(0, 200) }, "erro_ferramenta");
-          resultados.push({
-            id: uso.id,
-            content: JSON.stringify({ disponivel: false, motivo: "consulta_indisponivel" }),
-            isError: true,
-          });
-        }
-      }
+      });
+      delegacoes += delegacoesUsadas;
       mensagens.push({ role: "user", toolResults: resultados });
     }
   } catch (e) {

@@ -1,6 +1,8 @@
 // Tela 07 — Fluxos & Automações
 // Construtor visual de processos comerciais com agentes de IA.
 // Reproduz fielmente a imagem de referência aprovada com máxima fidelidade estética e interativa.
+import { FilaRealPanel } from "./EquipeRealUi";
+import { useEquipeReal } from "./useEquipeReal";
 import React, { useState, useRef, useEffect } from "react";
 import {
   Activity,
@@ -96,6 +98,8 @@ export function FluxosAutomacoesView({
   onNavegarEquipe,
   onNavegarPlanejamento,
 }: FluxosAutomacoesViewProps) {
+  // Dados REAIS do runtime de agentes (o restante da tela é demonstrativo).
+  const equipeReal = useEquipeReal();
   // Estado dos Modais
   const [modalNovoAberto, setModalNovoAberto] = useState(false);
   const [modalModelosAberto, setModalModelosAberto] = useState(false);
@@ -351,6 +355,8 @@ export function FluxosAutomacoesView({
           </button>
         </div>
       </header>
+
+      <FilaRealPanel eq={equipeReal} />
 
       {/* =========================================================================
           2. CARD PRINCIPAL DO AGENTE (CEO DE IA) & INDICADORES SUPERIORES

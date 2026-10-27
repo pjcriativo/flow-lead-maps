@@ -1,6 +1,8 @@
 // Tela 08 — Planejamento Semanal & Metas
 // Central de planejamento comercial gerenciada pelo CEO de IA.
 // Reproduz fielmente a imagem de referência aprovada com máxima fidelidade estética e interativa.
+import { PlanosRealPanel } from "./EquipeRealUi";
+import { useEquipeReal } from "./useEquipeReal";
 import React, { useState } from "react";
 import {
   Activity,
@@ -109,6 +111,8 @@ export function PlanejamentoSemanalMetasView({
   onNavegarEquipe,
   onNavegarAgenda,
 }: PlanejamentoSemanalMetasViewProps) {
+  // Dados REAIS do runtime de agentes (o restante da tela é demonstrativo).
+  const equipeReal = useEquipeReal();
   // Modais
   const [modalAtividadeAberto, setModalAtividadeAberto] = useState(false);
   const [modalMetasAberto, setModalMetasAberto] = useState(false);
@@ -289,6 +293,8 @@ export function PlanejamentoSemanalMetasView({
           </button>
         </div>
       </header>
+
+      <PlanosRealPanel eq={equipeReal} />
 
       {/* =========================================================================
           2. CARD PRINCIPAL DO AGENTE (CEO DE IA) & INDICADORES SUPERIORES

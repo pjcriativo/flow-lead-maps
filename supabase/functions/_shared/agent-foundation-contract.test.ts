@@ -154,13 +154,28 @@ test("a migration é idempotente e não mexe em objetos existentes do produto", 
   assert.doesNotMatch(sql, /cron\.schedule/, "nenhum cron é criado");
 });
 
-test("Edge agent-ceo: JWT, papel de gestão, sem service_role para dados do funil, sem cron", () => {
+test("Edge agent-ceo: JWT, papel de gestão, nenhuma tabela de negócio e nenhum cron", () => {
+  const kit = read("../_shared/agent-edge-kit.ts");
+  const exec = read("../_shared/agent-tool-exec.ts");
+  const worker = read("../agent-worker/index.ts");
   assert.match(config, /\[functions\.agent-ceo\][\s\S]*?verify_jwt = true/);
-  assert.match(edge, /canManageAgents\(/);
-  assert.match(edge, /userClient\.rpc\("agent_resumo_comercial"/);
-  assert.doesNotMatch(edge, /admin\.(from|rpc)\("(leads|agent_resumo_comercial)"/);
-  assert.doesNotMatch(edge, /Deno\.cron|cron\.schedule/);
-  assert.doesNotMatch(edge, /\.insert\(\{[^}]*(leads|propostas|wa_)/);
+  assert.match(config, /\[functions\.agent-worker\][\s\S]*?verify_jwt = true/);
+  for (const e of [edge, worker]) {
+    assert.match(e, /autorizarGestorDeAgentes\(/);
+    assert.doesNotMatch(e, /\.from\("(leads|propostas|campanhas|lead_lists|wa_[a-z_]+)"\)/);
+    assert.doesNotMatch(e, /Deno\.cron|cron\.schedule/);
+    assert.doesNotMatch(e, /\.(update|delete|upsert)\(/);
+  }
+  assert.match(kit, /canManageAgents\(/);
+  assert.match(kit, /auth\.getUser\(\)/);
+  // todas as ferramentas passam por RPC fixa do banco (org derivada do agente)
+  const rpcs = [...exec.matchAll(/chamarRpc\("([a-z_]+)"/g)].map((m) => m[1]);
+  assert.ok(rpcs.length >= 7);
+  assert.ok(
+    rpcs.every((n) => /^agent_(tool_[a-z_]+|delegar_tarefa|propor_equipe)$/.test(n)),
+    rpcs.join(","),
+  );
+  assert.doesNotMatch(exec, /\.from\("|\.insert\(|\.update\(|fetch\(/);
 });
 
 test("guardas de governança aceitam cascata referencial (apagar org/usuário) mas não DML direto", () => {

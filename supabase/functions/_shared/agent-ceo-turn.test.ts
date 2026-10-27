@@ -151,9 +151,9 @@ function deps(w: World): CeoDeps {
       t.status = i.status;
       if (i.resultado) t.resultado = i.resultado as { resposta: string };
     },
-    executarFerramenta: async (nome, org) => {
-      w.chamadasFerramenta.push({ nome, org });
-      return rpcResumo(w, org);
+    executarFerramenta: async (nome, ctx) => {
+      w.chamadasFerramenta.push({ nome, org: ctx.orgId });
+      return rpcResumo(w, ctx.orgId);
     },
     chamarModelo: async () => {
       w.onAntesDoModelo?.();

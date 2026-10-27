@@ -89,14 +89,48 @@ test("contagens que chegam como texto numérico (bigint do Postgres) são aceita
   assert.equal(r.disponivel && r.totalLeads, 10);
 });
 
-test("registro expõe UMA ferramenta, de leitura, sem parâmetros", () => {
-  assert.equal(TOOL_REGISTRY.length, 1);
-  assert.equal(TOOL_REGISTRY[0].risco, "read");
-  assert.deepEqual(TOOL_REGISTRY[0].params, {});
-  const [schema] = anthropicToolSchemas();
-  assert.deepEqual(schema.input_schema, {
+test("registro: 5 ferramentas de leitura e 2 de coordenação interna, nenhuma externa", () => {
+  assert.equal(TOOL_REGISTRY.length, 7);
+  const risco = (r: string) =>
+    TOOL_REGISTRY.filter((t) => t.risco === r)
+      .map((t) => t.nome)
+      .sort();
+  assert.deepEqual(risco("read"), [
+    "consultar_execucoes_equipe",
+    "consultar_lead",
+    "consultar_oportunidades",
+    "consultar_pipeline",
+    "consultar_resumo_comercial",
+  ]);
+  assert.deepEqual(risco("write_internal"), ["delegar_tarefa", "propor_estrutura_equipe"]);
+  assert.deepEqual(risco("external_send"), []);
+  assert.deepEqual(risco("spend"), []);
+});
+
+test("o resumo comercial segue sem parâmetros e o modelo nunca informa a organização", () => {
+  const resumo = TOOL_REGISTRY.find((t) => t.nome === "consultar_resumo_comercial")!;
+  assert.deepEqual(resumo.params, {});
+  const schemas = anthropicToolSchemas();
+  assert.deepEqual(schemas.find((t) => t.name === "consultar_resumo_comercial")!.input_schema, {
     type: "object",
     properties: {},
     additionalProperties: false,
   });
+  for (const t of TOOL_REGISTRY) {
+    for (const proibido of ["org_id", "org", "sql", "tabela", "query", "agent_id"]) {
+      assert.ok(!(proibido in t.params), `${t.nome} aceita ${proibido}`);
+    }
+  }
+});
+
+test("esquema da API: parâmetros obrigatórios, enum e limites chegam ao modelo", () => {
+  const d = anthropicToolSchemas().find((t) => t.name === "delegar_tarefa")!;
+  const schema = d.input_schema as {
+    required: string[];
+    properties: Record<string, { enum?: string[] }>;
+  };
+  assert.deepEqual(schema.required.sort(), ["instrucoes", "papel", "tipo"]);
+  assert.ok(schema.properties.papel.enum!.includes("sdr"));
+  assert.ok(!schema.properties.papel.enum!.includes("ceo"));
+  assert.ok(!schema.properties.tipo.enum!.includes("copiloto_conversa"));
 });

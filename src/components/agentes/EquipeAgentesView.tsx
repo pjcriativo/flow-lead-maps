@@ -53,6 +53,8 @@ import { NovoAgenteModal } from "./NovoAgenteModal";
 import { CeoConfigWizard } from "./CeoConfigWizard";
 import { CeoRealStatusCard } from "./CeoRealUi";
 import { useCeoReal } from "./useCeoReal";
+import { EquipeRealPanel } from "./EquipeRealUi";
+import { useEquipeReal } from "./useEquipeReal";
 
 interface EquipeAgentesViewProps {
   onVoltarPainel?: () => void;
@@ -73,6 +75,8 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
   // CEO de IA REAL (backend): estado verdadeiro + assistente de configuração.
   const ceo = useCeoReal();
   const [wizardCeoAberto, setWizardCeoAberto] = useState(false);
+  // Equipe comercial REAL (agentes, hierarquia, fila): lida do backend.
+  const equipeReal = useEquipeReal();
 
   // Filtragem dinâmica de agentes
   const agentesFiltrados = useMemo(() => {
@@ -188,15 +192,19 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
         <CeoRealStatusCard ceo={ceo} onConfigurar={() => setWizardCeoAberto(true)} />
         <CeoConfigWizard
           aberto={wizardCeoAberto}
-          onFechar={() => setWizardCeoAberto(false)}
+          onFechar={() => {
+            setWizardCeoAberto(false);
+            void equipeReal.recarregar();
+          }}
           ceo={ceo}
           onAbrirMontagemCompleta={() => {
             setWizardCeoAberto(false);
             setModalMontarAberto(true);
           }}
         />
+        <EquipeRealPanel eq={equipeReal} onVerPerfil={(id) => onVerPerfil?.(id)} />
         <p className="-mt-3 text-[10px] text-neutral-500">
-          Os agentes, departamentos e enxames listados nesta tela são exemplos demonstrativos. Nesta fase somente o CEO de IA é operacional.
+          Os cartões de agentes, departamentos e enxames abaixo desta linha são exemplos demonstrativos. A equipe real está no painel acima.
         </p>
 
         {/* =========================================================================

@@ -231,16 +231,22 @@ const FUTURAS = [
   "Memória e RAG",
   "Voz",
   "Skills adicionais",
-  "Montagem de equipe e enxames",
+  "Enxames e departamentos",
 ];
 
 /** Tela 03 — configuração real do CEO (identidade, modelo, limites, ferramenta, estado). */
 export function CeoRealConfigPanel({
   ceo,
   onConfigurar,
+  titulo = "Configuração real do CEO de IA",
+  extra,
 }: {
   ceo: CeoReal;
-  onConfigurar: () => void;
+  /** Só o CEO tem o assistente de configuração; subordinados são ajustados no painel. */
+  onConfigurar?: () => void;
+  titulo?: string;
+  /** Conteúdo adicional (ex.: permissões do papel) dentro do mesmo painel. */
+  extra?: React.ReactNode;
 }) {
   const { ocupado, mensagem, executar } = useAcaoCeo(ceo);
   const agente = ceo.carga?.agente ?? null;
@@ -270,7 +276,7 @@ export function CeoRealConfigPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Crown className="size-4 text-amber-400" />
-          <h3 className="text-sm font-bold text-white">Configuração real do CEO de IA</h3>
+          <h3 className="text-sm font-bold text-white">{titulo}</h3>
           <CeoEstadoPill estado={ceo.estado} />
         </div>
         <AcoesEstado ceo={ceo} onConfigurar={onConfigurar} />
@@ -305,13 +311,15 @@ export function CeoRealConfigPanel({
           </div>
           <div className="rounded-xl border border-white/5 bg-[#121620]/90 p-3">
             <p className="text-[10px] font-medium text-neutral-400">Ferramentas autorizadas</p>
-            {ceo.carga?.ferramentasConcedidas.includes(FERRAMENTA_RESUMO_COMERCIAL) ? (
-              <p className="mt-1 text-xs font-bold text-white">{FERRAMENTA_RESUMO_COMERCIAL}</p>
+            {(ceo.carga?.ferramentasConcedidas.length ?? 0) > 0 ? (
+              <p className="mt-1 break-words text-xs font-bold text-white">
+                {ceo.carga?.ferramentasConcedidas.join(", ")}
+              </p>
             ) : (
               <p className="mt-1 text-xs text-neutral-400">Nenhuma ferramenta concedida.</p>
             )}
             <p className="text-[11px] text-neutral-500">
-              Somente leitura · concedida por um administrador
+              Concedidas por um administrador · nenhuma envia nada externo
             </p>
           </div>
         </div>
@@ -404,6 +412,8 @@ export function CeoRealConfigPanel({
           </div>
         ))}
       </div>
+
+      {extra}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
         <span className="text-[10px] font-medium text-neutral-500">

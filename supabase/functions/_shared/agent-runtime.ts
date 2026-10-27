@@ -5,13 +5,72 @@
 
 // ───────────────────────────── identidade e estados ─────────────────────────────
 export type AgentEstado = "inativo" | "ativo" | "pausado";
-export type AgentAutonomia = "somente_leitura";
+export type AgentAutonomia = "somente_leitura" | "interna_supervisionada";
+
+export const PAPEIS_AGENTE = [
+  "ceo",
+  "gerente_comercial",
+  "prospeccao",
+  "sdr",
+  "vendedor",
+  "estrategista",
+  "seo_geral",
+] as const;
+export type AgentPapel = (typeof PAPEIS_AGENTE)[number];
+
+/** Ferramentas permitidas por papel. Espelha agent_ferramentas_do_papel (migration 003); um teste garante a paridade. */
+export const FERRAMENTAS_DO_PAPEL: Record<AgentPapel, readonly string[]> = {
+  ceo: [
+    "consultar_resumo_comercial",
+    "consultar_pipeline",
+    "consultar_oportunidades",
+    "consultar_execucoes_equipe",
+    "delegar_tarefa",
+    "propor_estrutura_equipe",
+  ],
+  gerente_comercial: [
+    "consultar_resumo_comercial",
+    "consultar_pipeline",
+    "consultar_oportunidades",
+    "consultar_lead",
+    "consultar_execucoes_equipe",
+    "delegar_tarefa",
+  ],
+  prospeccao: ["consultar_resumo_comercial", "consultar_oportunidades"],
+  sdr: ["consultar_oportunidades", "consultar_lead"],
+  vendedor: ["consultar_oportunidades", "consultar_lead", "consultar_pipeline"],
+  estrategista: ["consultar_resumo_comercial", "consultar_pipeline"],
+  seo_geral: ["consultar_resumo_comercial"],
+};
+
+/** Tipos de tarefa por papel. Espelha agent_tipos_do_papel (migration 003). */
+export const TIPOS_DO_PAPEL: Record<AgentPapel, readonly string[]> = {
+  ceo: ["copiloto_conversa", "analise_comercial"],
+  gerente_comercial: ["analise_comercial", "priorizar_oportunidades", "supervisao_comercial"],
+  prospeccao: ["plano_prospeccao"],
+  sdr: ["preparar_abordagem"],
+  vendedor: ["preparar_proposta"],
+  estrategista: ["plano_estrategia"],
+  seo_geral: ["plano_seo"],
+};
+
+/** Quem reporta a quem (CEO é a raiz). */
+export const SUPERIOR_DO_PAPEL: Record<AgentPapel, AgentPapel | null> = {
+  ceo: null,
+  gerente_comercial: "ceo",
+  prospeccao: "gerente_comercial",
+  sdr: "gerente_comercial",
+  vendedor: "gerente_comercial",
+  estrategista: "gerente_comercial",
+  seo_geral: "gerente_comercial",
+};
 export type ToolRisco = "read" | "write_internal" | "external_send" | "spend";
 
 export type AgentIdentity = {
   id: string;
   orgId: string;
-  papel: "ceo";
+  papel: AgentPapel;
+  reportsTo?: string | null;
   modelo: string;
   autonomia: AgentAutonomia;
   estado: AgentEstado;
@@ -58,6 +117,7 @@ export type BlockReason =
   | "organizacao_divergente"
   | "ferramenta_desconhecida"
   | "ferramenta_acima_da_autonomia"
+  | "ferramenta_fora_do_papel"
   | "permissao_ausente"
   | "limite_de_passos"
   | "teto_dia"
@@ -80,6 +140,7 @@ export type ToolSpec = { nome: string; risco: ToolRisco; ativo: boolean };
 
 const RISCOS_POR_AUTONOMIA: Record<AgentAutonomia, readonly ToolRisco[]> = {
   somente_leitura: ["read"],
+  interna_supervisionada: ["read", "write_internal"],
 };
 
 /** Ferramenta existe, cabe na autonomia do agente e foi CONCEDIDA por humano a este agente/org. */
@@ -94,6 +155,9 @@ export function authorizeToolCall(input: {
   if (!tool) return { ok: false, reason: "ferramenta_desconhecida", detail: input.toolNome };
   if (!RISCOS_POR_AUTONOMIA[input.agent.autonomia].includes(tool.risco)) {
     return { ok: false, reason: "ferramenta_acima_da_autonomia", detail: tool.risco };
+  }
+  if (!FERRAMENTAS_DO_PAPEL[input.agent.papel].includes(tool.nome)) {
+    return { ok: false, reason: "ferramenta_fora_do_papel", detail: tool.nome };
   }
   const granted = input.permissions.some(
     (p) =>

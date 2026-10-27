@@ -133,6 +133,10 @@ export type AgenteCeoRow = {
   tetoDiaUsd: number;
   tetoMesUsd: number;
   maxPassos: number;
+  /** Equipe comercial (migration 003). Ausentes nos dados antigos do CEO. */
+  papel?: string;
+  autonomia?: "somente_leitura" | "interna_supervisionada";
+  reportsTo?: string | null;
 };
 
 export type CargaCeo = {
@@ -208,6 +212,8 @@ export function derivarEstadoCeo(input: {
   carregando: boolean;
   erroServico: boolean;
   carga: CargaCeo | null;
+  /** Subordinados não usam a ferramenta do CEO: basta ter ALGUMA ferramenta concedida. */
+  qualquerFerramenta?: boolean;
 }): EstadoCeo {
   if (input.carregando) return infoEstado("carregando");
   if (input.erroServico || !input.carga) return infoEstado("servico_indisponivel");
@@ -222,7 +228,9 @@ export function derivarEstadoCeo(input: {
     agente.tetoDiaUsd <= agente.tetoMesUsd &&
     agente.tetoDiaUsd <= TETOS_CEO.diaMaxUsd &&
     agente.tetoMesUsd <= TETOS_CEO.mesMaxUsd;
-  const temFerramenta = ferramentasConcedidas.includes(FERRAMENTA_RESUMO_COMERCIAL);
+  const temFerramenta = input.qualquerFerramenta
+    ? ferramentasConcedidas.length > 0
+    : ferramentasConcedidas.includes(FERRAMENTA_RESUMO_COMERCIAL);
   const identidadeSalva = Boolean(agente.cargo);
   // Ativo sem ferramenta/identidade é incoerência que o banco já impede; se aparecer, é erro.
   if (
@@ -275,11 +283,32 @@ const ERROS_RPC: Record<string, string> = {
   ceo_sem_identidade: "Salve a identidade do CEO antes de ativar.",
   kill_switch_ligado: "O kill-switch está ligado. Retome antes de ativar.",
   agente_inexistente: "CEO não encontrado.",
+  superior_inativo: "Ative primeiro o superior na hierarquia (CEO e depois Gerente).",
+  ceo_inexistente: "Configure o CEO de IA antes de criar a equipe.",
+  equipe_invalida: "Estrutura de equipe inválida.",
+  papel_invalido: "Papel inválido na estrutura da equipe.",
+  papel_duplicado: "Papel repetido na estrutura da equipe.",
+  agente_ja_existe: "Um dos agentes já existe nesta organização.",
+  gerente_ausente: "Os especialistas exigem o Gerente Comercial na equipe.",
+  proposta_pendente: "Já existe uma proposta de equipe aguardando decisão.",
+  aprovacao_ja_decidida: "Esta aprovação já foi decidida.",
+  aprovacao_nao_e_de_equipe: "Esta aprovação não é uma proposta de equipe.",
+  delegacao_nao_habilitada: "A delegação interna não está habilitada para este agente.",
+  papel_nao_delega: "Este papel não pode receber delegação interna.",
+  ferramenta_fora_do_papel: "Esta ferramenta não pertence ao papel deste agente.",
+  hierarquia_imutavel: "A hierarquia não pode ser alterada depois da criação.",
 };
 
 /** Traduz erro de RPC/PostgREST em mensagem do usuário; `indisponivel` = backend ausente/sem rede. */
 export function traduzirErroCeo(err: unknown): { mensagem: string; indisponivel: boolean } {
   const e = (err ?? {}) as { message?: string; code?: string; details?: string };
+  // Erro já legível vindo da Edge de processamento (código sintético WORKER).
+  if (e.code === "WORKER" && e.message) {
+    return {
+      mensagem: e.message,
+      indisponivel: /failed to fetch|network|non-2xx/i.test(e.message),
+    };
+  }
   const texto = `${e.message ?? ""} ${e.details ?? ""}`;
   const ausente =
     ["42P01", "42883", "PGRST202", "PGRST205"].includes(e.code ?? "") ||

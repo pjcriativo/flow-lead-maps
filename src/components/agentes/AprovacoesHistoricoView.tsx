@@ -1,6 +1,8 @@
 // Tela 11 — Aprovações & Histórico
 // Central de governança, aprovações e auditoria de ações dos agentes coordenada pelo CEO de IA.
 // Reproduz fielmente a imagem de referência aprovada (media_1792741493656.jpg) com máxima fidelidade estética e interativa.
+import { AprovacoesRealPanel } from "./EquipeRealUi";
+import { useEquipeReal } from "./useEquipeReal";
 import React, { useState } from "react";
 import {
   Activity,
@@ -130,6 +132,8 @@ export function AprovacoesHistoricoView({
   onNavegarCopiloto,
   onNavegarRelatorios,
 }: AprovacoesHistoricoViewProps) {
+  // Dados REAIS do runtime de agentes (o restante da tela é demonstrativo).
+  const equipeReal = useEquipeReal();
   // Aba Ativa
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>("aprovacoes");
 
@@ -403,6 +407,8 @@ export function AprovacoesHistoricoView({
           </button>
         </div>
       </div>
+
+      <AprovacoesRealPanel eq={equipeReal} />
 
       {/* =========================================================================
           2. CARD SUPERIOR DO CEO DE IA & INDICADORES

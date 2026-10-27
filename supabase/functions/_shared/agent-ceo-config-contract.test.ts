@@ -152,9 +152,9 @@ test("assistente: 5 etapas, salvar e ativar pelo serviço, ativação bloqueada 
 });
 
 test("Tela 03: painel real só para o CEO; selo de estado vem do backend; mocks identificados", () => {
-  assert.match(t03, /perfil\.isCeo && \(\s*<>\s*<CeoRealConfigPanel/);
+  assert.match(t03, /papelReal && \(\s*<>\s*<CeoRealConfigPanel/);
   assert.match(t03, /<CeoEstadoPill estado=\{ceo\.estado\} \/>/);
-  assert.match(t03, /useCeoReal\(Boolean\(perfil\.isCeo\)\)/);
+  assert.match(t03, /useAgenteReal\(papelReal\)/);
   assert.match(ui, /demonstrativos e não vêm do backend/);
   assert.match(ui, /Em breve \(ainda não operacionais\)/);
   for (const futura of ["Treinamento e conhecimento", "Memória e RAG", "Voz"])
@@ -181,7 +181,7 @@ test("CEO nunca aparece como 'Online' fixo nas Telas 03 e 10", () => {
   );
   assert.match(t10, /<CeoEstadoPill estado=\{ceoReal\.estado\} \/>/);
   assert.match(t10, /Demonstração/);
-  assert.match(t03, /perfil\.isCeo \? \(\s*<CeoEstadoPill/);
+  assert.match(t03, /papelReal \? \(\s*<CeoEstadoPill/);
 });
 
 test("nenhuma tela nova: 12 telas no submenu, nenhuma rota nova, navegação 02 → 03 → 10 intacta", () => {
