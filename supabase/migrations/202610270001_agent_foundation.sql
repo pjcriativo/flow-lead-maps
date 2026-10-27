@@ -35,10 +35,13 @@ end
 $$;
 
 -- Trigger de guarda: só RPCs de governança (que ligam a flag local) alteram tabelas governadas.
+-- Exceção: ações referenciais em cascata (ON DELETE CASCADE / SET NULL ao apagar organização ou
+-- usuário) rodam dentro de outro gatilho (pg_trigger_depth() > 1) e não podem ser bloqueadas.
+-- DML direto, inclusive de service_role, tem profundidade 1 e continua recusado.
 create or replace function public.agent_guard_governanca()
 returns trigger language plpgsql set search_path = public as $$
 begin
-  if coalesce(current_setting('flow.agent_governanca', true), '') <> 'on' then
+  if coalesce(current_setting('flow.agent_governanca', true), '') <> 'on' and pg_trigger_depth() <= 1 then
     raise exception 'governanca_agente_somente_via_rpc' using errcode = '42501';
   end if;
   return coalesce(new, old);
@@ -197,6 +200,7 @@ begin
     end if;
     return new;
   end if;
+  if pg_trigger_depth() > 1 then return coalesce(new, old); end if;   -- cascata referencial
   if tg_op = 'DELETE' or coalesce(current_setting('flow.agent_governanca', true), '') <> 'on' then
     raise exception 'governanca_agente_somente_via_rpc' using errcode = '42501';
   end if;

@@ -162,3 +162,16 @@ test("Edge agent-ceo: JWT, papel de gestão, sem service_role para dados do funi
   assert.doesNotMatch(edge, /Deno\.cron|cron\.schedule/);
   assert.doesNotMatch(edge, /\.insert\(\{[^}]*(leads|propostas|wa_)/);
 });
+
+test("guardas de governança aceitam cascata referencial (apagar org/usuário) mas não DML direto", () => {
+  const guarda =
+    sql.match(
+      /create or replace function public\.agent_guard_governanca\(\)[\s\S]*?\n\$\$;/,
+    )?.[0] ?? "";
+  assert.match(guarda, /<> 'on' and pg_trigger_depth\(\) <= 1/);
+  const aprov =
+    sql.match(/create or replace function public\.agent_approvals_guard\(\)[\s\S]*?\n\$\$;/)?.[0] ??
+    "";
+  assert.match(aprov, /if pg_trigger_depth\(\) > 1 then return coalesce\(new, old\); end if;/);
+  assert.match(aprov, /tg_op = 'DELETE' or coalesce\(current_setting/);
+});
