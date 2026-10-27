@@ -67,6 +67,8 @@ import { FinanceiroSidebarNav, type TelaFinanceiroId } from "./FinanceiroSidebar
 import { ReceitasView } from "./ReceitasView";
 import { DespesasView } from "./DespesasView";
 import { CobrancasView } from "./CobrancasView";
+import { RelatoriosView } from "./RelatoriosView";
+import { ConfiguracoesFinanceirasView } from "./ConfiguracoesFinanceirasView";
 import {
   TRANSACOES_INICIAIS,
   CONTAS_BANCARIAS_INICIAIS,
@@ -155,6 +157,15 @@ export function FinanceiroSection() {
       window.history.pushState({}, "", url.toString());
     }
   };
+
+  // Suporte a Voltar e Avançar do navegador
+  useEffect(() => {
+    const handlePopState = () => {
+      setTelaAtiva(getInitialTela());
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Carregar dados reais existentes e fundir com catálogo
   const carregarDadosReais = async () => {
@@ -354,6 +365,10 @@ export function FinanceiroSection() {
         <DespesasView onMudarTela={mudarTela} />
       ) : telaAtiva === "cobrancas" ? (
         <CobrancasView onMudarTela={mudarTela} />
+      ) : telaAtiva === "relatorios" ? (
+        <RelatoriosView onMudarTela={mudarTela} />
+      ) : telaAtiva === "configuracoes" ? (
+        <ConfiguracoesFinanceirasView onMudarTela={mudarTela} />
       ) : telaAtiva === "painel" ? (
         <div className="flex-1 min-w-0 p-3 sm:p-5 lg:p-6 flex flex-col gap-5 overflow-x-hidden">
         {/* =========================================================================

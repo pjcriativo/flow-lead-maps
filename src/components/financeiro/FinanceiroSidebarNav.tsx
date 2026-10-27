@@ -79,7 +79,7 @@ export const TODAS_AS_TELAS_FINANCEIRO: ItemNavegacaoFinanceiro[] = [
     id: "relatorios",
     rotulo: "Relatórios",
     sub: "Fluxo de caixa e resultados",
-    disponivel: false,
+    disponivel: true,
     icon: BarChart3,
   },
   {
@@ -87,7 +87,7 @@ export const TODAS_AS_TELAS_FINANCEIRO: ItemNavegacaoFinanceiro[] = [
     id: "configuracoes",
     rotulo: "Configurações",
     sub: "Contas e preferências",
-    disponivel: false,
+    disponivel: true,
     icon: Settings,
   },
 ];
