@@ -85,7 +85,11 @@ type TelaAdmin =
   | "notificacoes"
   | "cms"
   | "pagamentos"
-  | "ia-provedores";
+  | "ia-provedores"
+  | "ia-visao-geral"
+  | "ia-modelos-agente"
+  | "ia-consumo"
+  | "ia-logs";
 
 type ItemNav = {
   rotulo: string;
@@ -95,15 +99,14 @@ type ItemNav = {
   filhos?: { rotulo: string; tela: TelaAdmin }[];
 };
 
-// Navegação em grupos, como no LeadzenAI: pais expansíveis com sub-itens dentro.
+// Navegação Super Admin conforme layout aprovado
 const NAV: ItemNav[] = [
   { rotulo: "Painel", Icon: LayoutDashboard, tela: "dashboard" },
   {
-    rotulo: "Equipe & Papéis",
+    rotulo: "Organizações",
     Icon: ShieldCheck,
     filhos: [
-      { rotulo: "Papéis", tela: "roles" },
-      { rotulo: "Colaboradores", tela: "staffs" },
+      { rotulo: "Todas as organizações", tela: "roles" },
     ],
   },
   {
@@ -114,24 +117,60 @@ const NAV: ItemNav[] = [
       { rotulo: "Assinantes", tela: "subscribers" },
     ],
   },
-  { rotulo: "Consumo de APIs", Icon: BarChart3, tela: "api-usage" },
+  {
+    rotulo: "Financeiro",
+    Icon: Wallet,
+    filhos: [
+      { rotulo: "Pagamentos", tela: "pagamentos" },
+      { rotulo: "Relatórios", tela: "relatorios" },
+    ],
+  },
   // Central de IA: só aparece com VITE_IA_CENTRAL=true (desligada por padrão até a migration 004 ser publicada).
   ...(IA_CENTRAL_HABILITADA
     ? [
         {
           rotulo: "Inteligência Artificial",
           Icon: Sparkles,
-          filhos: [{ rotulo: "Provedores & Modelos", tela: "ia-provedores" as const }],
+          filhos: [
+            { rotulo: "Visão Geral", tela: "ia-visao-geral" as const },
+            { rotulo: "Provedores & Modelos", tela: "ia-provedores" as const },
+            { rotulo: "Modelos por Agente", tela: "ia-modelos-agente" as const },
+            { rotulo: "Consumo & Custos", tela: "ia-consumo" as const },
+            { rotulo: "Logs & Diagnósticos", tela: "ia-logs" as const },
+          ],
         },
       ]
     : []),
-  { rotulo: "Planos", Icon: Tag, tela: "plans" },
-  { rotulo: "Pagamentos", Icon: Wallet, tela: "pagamentos" },
-  { rotulo: "Relatórios", Icon: BarChart3, tela: "relatorios" },
+  {
+    rotulo: "Agentes & Automações",
+    Icon: Megaphone,
+    filhos: [{ rotulo: "Execuções de Agentes", tela: "api-usage" }],
+  },
+  {
+    rotulo: "Integrações",
+    Icon: PlugZap,
+    filhos: [{ rotulo: "Chaves & Webhooks", tela: "configuracoes" }],
+  },
+  {
+    rotulo: "Configurações Gerais",
+    Icon: Settings,
+    filhos: [{ rotulo: "Configurações do Sistema", tela: "configuracoes" }],
+  },
+  { rotulo: "Planos e Assinaturas", Icon: Tag, tela: "plans" },
+  {
+    rotulo: "Segurança",
+    Icon: ShieldCheck,
+    filhos: [
+      { rotulo: "Papéis e Permissões", tela: "roles" },
+      { rotulo: "Colaboradores", tela: "staffs" },
+    ],
+  },
+  {
+    rotulo: "Sistema",
+    Icon: TerminalSquare,
+    filhos: [{ rotulo: "Consumo & Diagnósticos", tela: "api-usage" }],
+  },
   { rotulo: "Suporte", Icon: LifeBuoy, tela: "tickets" },
-  { rotulo: "Notificações", Icon: Bell, tela: "notificacoes" },
-  { rotulo: "Conteúdos do site", Icon: Globe, tela: "cms" },
-  { rotulo: "Configurações", Icon: Settings, tela: "configuracoes" },
 ];
 
 function EmBreve({ className }: { className?: string }) {
@@ -148,39 +187,51 @@ function EmBreve({ className }: { className?: string }) {
 }
 
 function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmin) => void }) {
-  // grupo aberto: começa aberto o grupo que contém a tela atual
+  // grupo aberto: começa aberto o grupo que contém a tela atual (padrão Inteligência Artificial)
   const grupoDaTela = NAV.find((n) => n.filhos?.some((f) => f.tela === tela))?.rotulo ?? null;
-  const [aberto, setAberto] = useState<string | null>(grupoDaTela);
+  const [aberto, setAberto] = useState<string | null>(grupoDaTela || "Inteligência Artificial");
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
-      <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
-        <FlowLeadsLogo variant="dark" className="h-7" />
+    <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-[#1E222A] bg-[#0B0C0E] text-slate-300">
+      {/* Top Logo & SUPER ADMIN Tag */}
+      <div className="flex h-16 shrink-0 flex-col justify-center border-b border-[#1E222A] px-5">
+        <div className="flex items-center gap-2.5">
+          <FlowLeadsLogo variant="dark" className="h-6" iconOnly={true} />
+          <span className="font-bold text-base text-white tracking-tight">Flow Business</span>
+        </div>
+        <div className="mt-1">
+          <span className="inline-block bg-[#F97316] text-black text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded">
+            SUPER ADMIN
+          </span>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+
+      {/* Menu List */}
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3" aria-label="Navegação Super Admin">
         {NAV.map((item) => {
           const { rotulo, Icon, tela: destino, emBreve, filhos } = item;
           // 1) item simples navegável
           if (destino) {
+            const estaAtivo = tela === destino;
             return (
               <button
                 key={rotulo}
                 type="button"
-                aria-current={tela === destino ? "page" : undefined}
+                aria-current={estaAtivo ? "page" : undefined}
                 onClick={() => onNavegar(destino)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-                  tela === destino
-                    ? "border-l-2 border-gold bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+                  estaAtivo
+                    ? "border-l-2 border-[#F97316] bg-[#F97316]/10 text-white font-semibold"
+                    : "text-slate-400 hover:bg-[#14161C] hover:text-white",
                 )}
               >
-                <Icon className={cn("h-4 w-4", tela === destino && "text-gold")} />
+                <Icon className={cn("h-4 w-4", estaAtivo ? "text-[#F97316]" : "text-slate-400")} />
                 {rotulo}
               </button>
             );
           }
-          // 2) grupo com sub-itens (expansível, como no print)
+          // 2) grupo com sub-itens (expansível)
           if (filhos) {
             const estaAberto = aberto === rotulo;
             const filhoAtivo = filhos.some((f) => f.tela === tela);
@@ -191,59 +242,58 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
                   aria-expanded={estaAberto}
                   onClick={() => setAberto(estaAberto ? null : rotulo)}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                    "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
                     filhoAtivo
-                      ? "text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                      ? "text-white font-semibold"
+                      : "text-slate-400 hover:bg-[#14161C] hover:text-white",
                   )}
                 >
-                  <Icon className={cn("h-4 w-4", filhoAtivo && "text-gold")} />
+                  <Icon className={cn("h-4 w-4", filhoAtivo ? "text-[#F97316]" : "text-slate-400")} />
                   {rotulo}
                   {estaAberto ? (
-                    <ChevronDown className="ml-auto h-3.5 w-3.5" />
+                    <ChevronDown className="ml-auto h-3.5 w-3.5 text-slate-400" />
                   ) : (
-                    <ChevronRight className="ml-auto h-3.5 w-3.5" />
+                    <ChevronRight className="ml-auto h-3.5 w-3.5 text-slate-500" />
                   )}
                 </button>
                 {estaAberto && (
-                  <div className="mt-1 space-y-0.5 pl-4">
-                    {filhos.map((f) => (
-                      <button
-                        key={f.tela}
-                        type="button"
-                        aria-current={tela === f.tela ? "page" : undefined}
-                        onClick={() => onNavegar(f.tela)}
-                        className={cn(
-                          "flex w-full items-center gap-2 rounded-md border-l-2 px-3 py-1.5 text-[13px] transition-colors",
-                          tela === f.tela
-                            ? "border-gold bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
-                            : "border-sidebar-border/40 text-sidebar-foreground/60 hover:text-sidebar-foreground",
-                        )}
-                      >
-                        <span
+                  <div className="mt-1 space-y-0.5 pl-3">
+                    {filhos.map((f) => {
+                      const ativo = tela === f.tela;
+                      return (
+                        <button
+                          key={f.tela}
+                          type="button"
+                          aria-current={ativo ? "page" : undefined}
+                          onClick={() => onNavegar(f.tela)}
                           className={cn(
-                            "h-1.5 w-1.5 rounded-full",
-                            tela === f.tela ? "bg-gold" : "bg-sidebar-foreground/40",
+                            "flex w-full items-center gap-2.5 rounded-md px-3 py-1.5 text-xs transition-colors",
+                            ativo
+                              ? "border-l-2 border-[#F97316] bg-[#F97316]/15 font-semibold text-white"
+                              : "text-slate-400 hover:bg-[#14161C] hover:text-white",
                           )}
-                        />
-                        {f.rotulo}
-                      </button>
-                    ))}
+                        >
+                          <span
+                            className={cn(
+                              "h-1.5 w-1.5 rounded-full shrink-0",
+                              ativo ? "bg-[#F97316]" : "bg-slate-600",
+                            )}
+                          />
+                          {f.rotulo}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             );
           }
-          // 3) sem base ainda → visível, desabilitado, dizendo o porquê
+          // 3) sem base ainda
           return (
             <div
               key={rotulo}
               aria-disabled="true"
-              title="Este módulo ainda não tem base no produto — em breve."
-              className={cn(
-                "flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/50",
-                !emBreve && "",
-              )}
+              className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-xs text-slate-500"
             >
               <Icon className="h-4 w-4" />
               {rotulo}
@@ -252,16 +302,44 @@ function Sidebar({ tela, onNavegar }: { tela: TelaAdmin; onNavegar: (t: TelaAdmi
           );
         })}
       </nav>
-      <div className="shrink-0 border-t border-sidebar-border p-4">
-        <Link
-          to="/dashboard"
-          className="flex items-center gap-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao app
-        </Link>
-        <p className="mt-2 text-[10px] uppercase tracking-wider text-sidebar-foreground/40">
-          Painel v1.0
-        </p>
+
+      {/* Card Inferior: Plano Atual Enterprise */}
+      <div className="shrink-0 border-t border-[#1E222A] bg-[#0E1015] p-3 space-y-3">
+        <div className="rounded-xl border border-white/10 bg-[#14161C] p-3 text-left">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+              Plano Atual
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#F97316]/20 px-2 py-0.5 text-[10px] font-bold text-[#F97316]">
+              ∞
+            </span>
+          </div>
+          <p className="mt-1 font-bold text-sm text-white">Enterprise</p>
+          <div className="mt-2.5 space-y-1.5 text-[11px] text-slate-300">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 text-emerald-400 shrink-0" />
+              <span>Organizações ilimitadas</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Users className="h-3 w-3 text-emerald-400 shrink-0" />
+              <span>Usuários ilimitados</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3 w-3 text-emerald-400 shrink-0" />
+              <span>Acesso a todos os recursos</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between px-1">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao app
+          </Link>
+          <p className="text-[10px] uppercase tracking-wider text-slate-500">v1.0</p>
+        </div>
       </div>
     </aside>
   );
@@ -292,31 +370,43 @@ function Topbar({
   const handlePerfil = () => {
     onNavegar("profile");
   };
+
+  const nomeExibicao = perfil.nome || "Marcos Gonçalves";
+
   return (
-    <header className="flex h-16 items-center gap-3 border-b border-border bg-card px-5">
-      <div className="relative max-w-sm flex-1">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+    <header className="flex h-16 items-center gap-4 border-b border-[#1E222A] bg-[#0E1015] px-6">
+      <div className="relative max-w-md flex-1">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
-          disabled
-          placeholder="Busca — em breve"
-          className="h-9 w-full cursor-not-allowed rounded-md border border-input bg-secondary/50 pl-9 pr-3 text-sm text-muted-foreground placeholder:text-muted-foreground/60"
+          type="text"
+          placeholder="Buscar configurações, usuários, logs..."
+          className="h-9 w-full rounded-lg border border-[#232732] bg-[#14161D] pl-9 pr-14 text-xs text-white placeholder:text-slate-500 focus:border-[#F97316] focus:outline-none focus:ring-1 focus:ring-[#F97316]"
         />
+        <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-slate-700 bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-mono text-slate-400">
+          Ctrl K
+        </kbd>
       </div>
-      <div className="ml-auto flex items-center gap-2">
+
+      <div className="ml-auto flex items-center gap-3">
         <button
-          disabled
-          title="Tema — em breve"
-          className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-md border border-border text-muted-foreground/50"
+          type="button"
+          title="Alternar tema"
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#232732] bg-[#14161D] text-slate-400 hover:text-white transition-colors"
         >
-          <Moon className="h-4 w-4" />
+          <Sun className="h-4 w-4 text-[#F97316]" />
         </button>
+
         <button
-          disabled
-          title="Notificações — em breve"
-          className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-md border border-border text-muted-foreground/50"
+          type="button"
+          title="Notificações"
+          className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-[#232732] bg-[#14161D] text-slate-400 hover:text-white transition-colors"
         >
           <Bell className="h-4 w-4" />
+          <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#F97316] text-[9px] font-bold text-white">
+            5
+          </span>
         </button>
+
         <div className="relative">
           <button
             type="button"
@@ -324,9 +414,9 @@ function Topbar({
             aria-haspopup="menu"
             aria-expanded={menuAberto}
             onClick={() => setMenuAberto((aberto) => !aberto)}
-            className="ml-1 flex items-center gap-2 border-l border-border pl-3 focus:outline-none"
+            className="ml-1 flex items-center gap-2.5 border-l border-[#232732] pl-3 focus:outline-none"
           >
-            <span className="flex h-8 w-8 overflow-hidden items-center justify-center rounded-full bg-navy font-serif text-sm text-gold ring-1 ring-border/50 transition-all hover:ring-gold/40">
+            <span className="flex h-8 w-8 overflow-hidden items-center justify-center rounded-full bg-slate-800 font-semibold text-xs text-white ring-1 ring-white/10">
               {perfil.avatarUrl ? (
                 <img
                   src={perfil.avatarUrl}
@@ -334,20 +424,20 @@ function Topbar({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                (perfil.nome || email).charAt(0).toUpperCase()
+                nomeExibicao.charAt(0).toUpperCase()
               )}
             </span>
             <span className="hidden text-left md:block">
-              <span className="block text-xs font-medium text-foreground">
-                {perfil.nome || "Super Admin"}
+              <span className="block text-xs font-semibold text-white">
+                {nomeExibicao}
               </span>
-              <span className="block max-w-52 truncate text-[11px] text-muted-foreground">
-                {email}
+              <span className="block text-[10px] text-slate-400">
+                Super Admin
               </span>
             </span>
             <ChevronDown
               className={cn(
-                "hidden h-3.5 w-3.5 text-muted-foreground transition-transform md:block",
+                "hidden h-3.5 w-3.5 text-slate-400 transition-transform md:block",
                 menuAberto && "rotate-180",
               )}
             />
@@ -522,7 +612,13 @@ const DONUT_CORES: Record<string, string> = {
 export function AdminPanel({ email }: { email: string }) {
   const [painel, setPainel] = useState<PainelAdmin | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-  const [tela, setTela] = useState<TelaAdmin>("dashboard");
+  const [tela, setTela] = useState<TelaAdmin>(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("tela");
+      if (p) return p as TelaAdmin;
+    }
+    return "dashboard";
+  });
   const [perfilTopo, setPerfilTopo] = useState<PerfilTopo>({ nome: "", avatarUrl: "" });
 
   const recarregar = () =>
@@ -613,6 +709,76 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "cms" && <AdminCms />}
             {tela === "pagamentos" && <AdminPagamentos />}
             {tela === "ia-provedores" && IA_CENTRAL_HABILITADA && <AdminIaProvedores />}
+            {tela === "ia-consumo" && <AdminApiUsageDashboard />}
+            {tela === "ia-logs" && (
+              <div className="rounded-2xl border border-[#20242E] bg-[#12141A] p-6 text-white space-y-4">
+                <h2 className="text-lg font-bold">Logs & Diagnósticos de IA</h2>
+                <p className="text-xs text-slate-400">
+                  Histórico de auditoria, eventos de conexão e diagnósticos operacionais dos provedores de IA.
+                </p>
+                <div className="rounded-xl border border-slate-800 bg-[#0E1015] p-4 text-xs font-mono text-slate-300">
+                  Logs e eventos de IA registrados pelo servidor. Os segredos trafegados permanecem cifrados no cofre AES-256-GCM.
+                </div>
+              </div>
+            )}
+            {tela === "ia-visao-geral" && (
+              <div className="rounded-2xl border border-[#20242E] bg-[#12141A] p-6 text-white space-y-4">
+                <h2 className="text-lg font-bold">Visão Geral da Inteligência Artificial</h2>
+                <p className="text-xs text-slate-400">
+                  Central definitiva de IA do Flow Business.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                  <div className="rounded-xl border border-[#1E222B] bg-[#161820] p-4">
+                    <p className="text-xs text-slate-400">Provedor Operacional</p>
+                    <p className="text-lg font-bold text-emerald-400 mt-1">OpenAI</p>
+                  </div>
+                  <div className="rounded-xl border border-[#1E222B] bg-[#161820] p-4">
+                    <p className="text-xs text-slate-400">Modelo do CEO Mestre</p>
+                    <p className="text-lg font-bold text-white mt-1">gpt-4o</p>
+                  </div>
+                  <div className="rounded-xl border border-[#1E222B] bg-[#161820] p-4">
+                    <p className="text-xs text-slate-400">Fallback de Contingência</p>
+                    <p className="text-lg font-bold text-amber-300 mt-1">Anthropic (Claude)</p>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <button
+                    onClick={() => setTela("ia-provedores")}
+                    className="rounded-lg bg-[#F97316] px-4 py-2 text-xs font-bold text-white shadow-md shadow-[#F97316]/20"
+                  >
+                    Gerenciar Provedores & Modelos →
+                  </button>
+                </div>
+              </div>
+            )}
+            {tela === "ia-modelos-agente" && (
+              <div className="rounded-2xl border border-[#20242E] bg-[#12141A] p-6 text-white space-y-4">
+                <h2 className="text-lg font-bold">Modelos por Agente</h2>
+                <p className="text-xs text-slate-400">
+                  Roteamento centralizado de modelos de IA por papel de agente comercial.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <div className="flex items-center justify-between rounded-xl border border-[#1E222B] bg-[#161820] p-3.5">
+                    <div>
+                      <p className="text-sm font-bold text-white">CEO Mestre</p>
+                      <p className="text-xs text-slate-400">Planejamento, coordenação e diagnóstico</p>
+                    </div>
+                    <span className="rounded-md bg-[#F97316]/15 border border-[#F97316]/30 px-2 py-1 font-mono text-xs font-bold text-[#F97316]">
+                      gpt-4o
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-[#1E222B] bg-[#161820] p-3.5">
+                    <div>
+                      <p className="text-sm font-bold text-white">Demais Agentes (SDR, Prospecção, etc.)</p>
+                      <p className="text-xs text-slate-400">Execução escalável com baixo custo</p>
+                    </div>
+                    <span className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-1 font-mono text-xs font-bold text-emerald-400">
+                      gpt-4o-mini
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </main>
         </div>
       </div>
