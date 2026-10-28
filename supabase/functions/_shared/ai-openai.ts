@@ -117,20 +117,35 @@ export async function chamarOpenAI(
   const fetcher = opts.fetcher ?? fetch;
   const timeout = AbortSignal.timeout(TIMEOUT_OPENAI_MS);
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
-  let res: Response;
-  try {
-    res = await fetcher(`${OPENAI_BASE}/responses`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
-      body: JSON.stringify(construirPedidoResponses(r)),
-      signal,
-    });
-  } catch (e) {
-    const aborted =
-      e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
-    throw new ModeloErro("Falha de rede com o provedor de IA.", undefined, aborted);
+  const enviar = async (pedido: Rec): Promise<Response> => {
+    try {
+      return await fetcher(`${OPENAI_BASE}/responses`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
+        body: JSON.stringify(pedido),
+        signal,
+      });
+    } catch (e) {
+      const aborted =
+        e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
+      throw new ModeloErro("Falha de rede com o provedor de IA.", undefined, aborted);
+    }
+  };
+  const pedido = construirPedidoResponses(r);
+  let res = await enviar(pedido);
+  let data: Rec = await res.json().catch(() => ({}));
+  // Modelos sem raciocínio recusam `include: reasoning.encrypted_content` (400). O pedido foi rejeitado
+  // antes de gerar tokens, então repetir sem o campo não gera custo extra nem duplica efeito.
+  if (
+    !res.ok &&
+    res.status === 400 &&
+    /encrypted|reasoning/i.test(String(data?.error?.message ?? ""))
+  ) {
+    const { include: _descartado, ...semInclude } = pedido;
+    void _descartado;
+    res = await enviar(semInclude);
+    data = await res.json().catch(() => ({}));
   }
-  const data: Rec = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new ModeloErro(
       `OpenAI: ${redigirSegredos(data?.error?.message ?? "HTTP " + res.status)}`,

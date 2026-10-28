@@ -260,3 +260,75 @@ test("listagem de modelos: ids da API; erros traduzidos sem expor a chave", asyn
     motivo: "sem_resposta_do_provedor",
   });
 });
+
+test("modelo sem raciocínio: 400 por 'encrypted_content' repete UMA vez sem o include; outros 400 não repetem", async () => {
+  const corpos: Record<string, unknown>[] = [];
+  const f1 = (async (_u: string, init: RequestInit) => {
+    corpos.push(JSON.parse(String(init.body)));
+    return corpos.length === 1
+      ? resp({ error: { message: "Encrypted content is not supported with this model." } }, 400)
+      : resp({
+          status: "completed",
+          output: [{ type: "message", content: [{ type: "output_text", text: "ok" }] }],
+          usage: { input_tokens: 5, output_tokens: 1 },
+        });
+  }) as unknown as typeof fetch;
+  const r = await chamarOpenAI(CHAVE, base(), { fetcher: f1 });
+  assert.equal(r.texto, "ok");
+  assert.equal(corpos.length, 2);
+  assert.ok("include" in corpos[0] && !("include" in corpos[1]));
+  assert.equal(corpos[1].store, false);
+
+  let chamadas = 0;
+  const f2 = (async () => {
+    chamadas += 1;
+    return resp({ error: { message: "Invalid value for max_output_tokens" } }, 400);
+  }) as unknown as typeof fetch;
+  await assert.rejects(
+    () => chamarOpenAI(CHAVE, base(), { fetcher: f2 }),
+    (e: unknown) => e instanceof ModeloErro && e.status === 400,
+  );
+  assert.equal(chamadas, 1);
+});
+
+test("encadeamento: turno 1 (ferramenta) → turno 2 reenvia raciocínio + function_call + saída, sem previous_response_id", async () => {
+  const pedidos: Record<string, unknown>[] = [];
+  const turno1 = {
+    status: "completed",
+    output: [
+      { type: "reasoning", id: "rs_1", encrypted_content: "enc", summary: [] },
+      { type: "function_call", call_id: "call_1", name: "consultar_pipeline", arguments: "{}" },
+    ],
+    usage: { input_tokens: 100, output_tokens: 30 },
+  };
+  const f = (async (_u: string, init: RequestInit) => {
+    pedidos.push(JSON.parse(String(init.body)));
+    return resp(
+      pedidos.length === 1
+        ? turno1
+        : {
+            status: "completed",
+            output: [{ type: "message", content: [{ type: "output_text", text: "Pronto" }] }],
+            usage: { input_tokens: 160, output_tokens: 10 },
+          },
+    );
+  }) as unknown as typeof fetch;
+  const msgs: ChamadaModelo["mensagens"] = [{ role: "user", content: "Como está o funil?" }];
+  const r1 = await chamarOpenAI(CHAVE, base({ mensagens: msgs }), { fetcher: f });
+  msgs.push({ role: "assistant", text: r1.texto, toolUses: r1.toolUses, raw: r1.raw });
+  msgs.push({
+    role: "user",
+    toolResults: [{ id: "call_1", content: '{"etapas":[]}', isError: false }],
+  });
+  const r2 = await chamarOpenAI(CHAVE, base({ mensagens: msgs }), { fetcher: f });
+  assert.equal(r2.texto, "Pronto");
+  const entrada2 = pedidos[1].input as { type?: string; role?: string; call_id?: string }[];
+  assert.deepEqual(
+    entrada2.map((i) => i.type ?? i.role),
+    ["user", "reasoning", "function_call", "function_call_output"],
+  );
+  assert.equal(entrada2[3].call_id, "call_1");
+  assert.ok(!("previous_response_id" in pedidos[1]), "contexto é nosso: stateless");
+  assert.equal(pedidos[1].store, false);
+  assert.equal(r1.tokensEntrada + r2.tokensEntrada, 260); // contagem acumulável para o custo
+});

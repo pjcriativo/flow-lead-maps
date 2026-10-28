@@ -76,3 +76,16 @@ cobrir um turno com ferramenta antes de liberar o CEO para clientes.
 - Provedor: Super Admin → Revogar chave (remove do cofre e desativa) ou desativar o provedor.
 - Banco: a migration é aditiva; reverter = desativar o uso (flags) e manter as tabelas. Remoção física só
   com backup e autorização.
+
+## Revisão do adaptador (Prompt 41, item 5)
+
+Conferido por testes simulados: function calling (`function_call` → `function_call_output` por `call_id`),
+encadeamento de dois turnos sem `previous_response_id` (contexto é nosso, `store:false`), reenvio dos
+itens de raciocínio, contagem de tokens acumulável para custo, erros 401/429/5xx/400/timeout.
+
+Correção feita: modelos sem raciocínio recusam `include: reasoning.encrypted_content` (400). O adaptador
+repete **uma vez** sem o campo (o pedido foi rejeitado antes de gerar tokens: sem custo extra).
+
+Atenção ao ligar: em modelos de raciocínio, `max_output_tokens` inclui os tokens de raciocínio; o limite
+atual do agente (800) pode gerar resposta `incomplete` (erro permanente 422, sem custo oculto além do
+consumido). Se ocorrer no smoke autorizado, subir `max_tokens_saida` do CEO pela UI de limites.
