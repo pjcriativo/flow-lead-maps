@@ -33,3 +33,26 @@ export function json(body: unknown, status = 200, req?: Request): Response {
     headers: { ...corsHeaders(req), "Content-Type": "application/json" },
   });
 }
+
+/**
+ * Envolve o handler da Edge e garante os headers CORS em TODA resposta (inclusive erros e exceções).
+ * Evita depender de cada `json(...)` receber o `req`: sem isso o navegador bloqueia a resposta por CORS
+ * mesmo quando a função respondeu corretamente.
+ */
+export function comCors(handler: (req: Request) => Response | Promise<Response>) {
+  return async (req: Request): Promise<Response> => {
+    let res: Response;
+    try {
+      res = await handler(req);
+    } catch (e) {
+      console.error("edge:", e instanceof Error ? e.message : "erro");
+      res = new Response(JSON.stringify({ ok: false, reason: "erro_interno" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const h = new Headers(res.headers);
+    for (const [k, v] of Object.entries(corsHeaders(req))) if (!h.has(k)) h.set(k, v);
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+  };
+}

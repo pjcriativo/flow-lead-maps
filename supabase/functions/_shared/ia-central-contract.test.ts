@@ -209,9 +209,11 @@ test("Edge admin-acoes: a chave NUNCA volta ao navegador (nem cifrada), nem entr
   // o único campo "chave" devolvido é o ESTADO mascarado (configurada/origem/mascarada/atualizada_em)
   const campos = [...ia.matchAll(/\bchave:\s*([^,\n]+)/g)].map((m) => m[1].trim());
   assert.deepEqual(campos, ['p.provider === "openai" ? kO : kA']);
-  const estado = ia.match(/const statusChave = async[\s\S]*?\n {6}\};/)?.[0] ?? "";
+  // independe de indentação: pega o objeto retornado por statusChave
+  const estado =
+    ia.match(/const statusChave = async[\s\S]*?return \{([\s\S]*?)\n\s*\};/)?.[1] ?? "";
   assert.deepEqual(
-    [...estado.matchAll(/^ {10}(\w+):/gm)].map((m) => m[1]),
+    [...estado.matchAll(/^\s+(\w+):/gm)].map((m) => m[1]),
     ["configurada", "origem", "mascarada", "atualizada_em"],
   );
   assert.doesNotMatch(ia, /\bvalor:/, "nenhuma resposta devolve valor de chave");
@@ -314,4 +316,30 @@ test("aprovação de operação é roteada para a RPC própria (nunca para a dec
     /ehPropostaDeOperacao\(a\) \? decidirPropostaOperacao\(a\.id, aprovar\) : decidirAprovacao/,
   );
   assert.match(ler("src/services/agente-operacoes.ts"), /rpc\("agent_decidir_proposta_operacao"/);
+});
+
+test("CORS: as Edges republicadas respondem com Access-Control-Allow-Origin em QUALQUER resposta (comCors)", async () => {
+  const { comCors } = await import("./cors.ts");
+  for (const f of ["admin-acoes", "agent-ceo", "agent-worker"]) {
+    const src = ler(`supabase/functions/${f}/index.ts`);
+    assert.match(src.replace(/\s+/g, " "), /Deno\.serve\( comCors\(async \(req\) => \{/, f);
+  }
+  const origem = "https://business.flowgenius.com.br";
+  const req = (m = "POST") =>
+    new Request("https://x/f", { method: m, headers: { origin: origem } });
+  // resposta que NÃO passa o req ao json() (o caso que quebrou o painel)
+  const ok = await comCors(() => new Response("{}", { status: 401 }))(req());
+  assert.equal(ok.headers.get("access-control-allow-origin"), origem);
+  assert.equal(ok.status, 401);
+  // exceção não tratada: 500 com CORS (o navegador vê o erro real, não "CORS bloqueado")
+  const quebra = await comCors(() => {
+    throw new Error("boom");
+  })(req());
+  assert.equal(quebra.status, 500);
+  assert.equal(quebra.headers.get("access-control-allow-origin"), origem);
+  // origem fora da allowlist continua sem o header
+  const fora = await comCors(() => new Response("{}"))(
+    new Request("https://x/f", { method: "POST", headers: { origin: "https://evil.example" } }),
+  );
+  assert.equal(fora.headers.get("access-control-allow-origin"), null);
 });
