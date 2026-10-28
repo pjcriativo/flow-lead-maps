@@ -2,6 +2,7 @@
 // Módulo: Gestão → Agentes & Automações
 // Painel Executivo de Business Intelligence comercial coordenado pelo CEO de IA
 import { RelatorioRealPanel } from "./EquipeRealUi";
+import { OperacoesRealPanel } from "./OperacoesRealUi";
 import { useEquipeReal } from "./useEquipeReal";
 import React, { useState, useMemo } from "react";
 import {
@@ -138,7 +139,7 @@ export function RelatoriosResultadosView({
   const [periodoSelecionado, setPeriodoSelecionado] = useState("Este mês");
   const [menuPeriodoAberto, setMenuPeriodoAberto] = useState(false);
   const [dataInicioFim, setDataInicioFim] = useState(
-    "01 de Outubro de 2026 a 31 de Outubro de 2026"
+    "01 de Outubro de 2026 a 31 de Outubro de 2026",
   );
 
   // Aba Ativa
@@ -173,7 +174,7 @@ export function RelatoriosResultadosView({
   // Tabela de Campanhas - Filtro e Busca
   const [buscaCampanha, setBuscaCampanha] = useState("");
   const [filtroStatusCampanha, setFiltroStatusCampanha] = useState<"Todos" | "Ativa" | "Pausada">(
-    "Todos"
+    "Todos",
   );
   const [campanhaSelecionadaDetalhes, setCampanhaSelecionadaDetalhes] =
     useState<CampanhaResultado | null>(null);
@@ -320,7 +321,7 @@ export function RelatoriosResultadosView({
                       "flex w-full items-center justify-between px-3 py-2 text-xs rounded-lg transition-colors text-left",
                       periodoSelecionado === p
                         ? "bg-orange-500/15 font-semibold text-[#f97316]"
-                        : "text-neutral-300 hover:bg-white/5"
+                        : "text-neutral-300 hover:bg-white/5",
                     )}
                   >
                     <span>{p}</span>
@@ -344,6 +345,7 @@ export function RelatoriosResultadosView({
       </header>
 
       <RelatorioRealPanel eq={equipeReal} />
+      <OperacoesRealPanel modo="resultados" />
 
       {/* =========================================================================
           2. TOPO: CARD DO CEO DE IA + 8 INDICADORES EXECUTIVOS
@@ -353,7 +355,7 @@ export function RelatoriosResultadosView({
         <div
           className={cn(
             PANEL_CLASS,
-            "lg:col-span-4 p-5 flex flex-col justify-between relative overflow-hidden group border-orange-500/20"
+            "lg:col-span-4 p-5 flex flex-col justify-between relative overflow-hidden group border-orange-500/20",
           )}
         >
           {/* Badge de Coroa Dourada no Canto Superior Esquerdo */}
@@ -385,8 +387,8 @@ export function RelatoriosResultadosView({
                 Orquestrador Geral da Operação Comercial
               </p>
               <p className="text-[11px] text-neutral-400 leading-relaxed mt-2 line-clamp-3">
-                Acompanha os resultados da operação, identifica oportunidades de crescimento e otimiza a
-                performance da equipe de agentes.
+                Acompanha os resultados da operação, identifica oportunidades de crescimento e
+                otimiza a performance da equipe de agentes.
               </p>
             </div>
           </div>
@@ -411,7 +413,7 @@ export function RelatoriosResultadosView({
               key={ind.id}
               className={cn(
                 PANEL_CLASS,
-                "p-3.5 flex flex-col justify-between hover:border-white/20 transition-all group"
+                "p-3.5 flex flex-col justify-between hover:border-white/20 transition-all group",
               )}
             >
               <div className="flex items-start justify-between">
@@ -463,7 +465,7 @@ export function RelatoriosResultadosView({
                 "px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all",
                 ativa
                   ? "bg-gradient-to-r from-orange-600 to-[#f97316] text-white shadow-md shadow-orange-600/20"
-                  : "bg-[#0c1017] text-neutral-400 border border-white/5 hover:text-white hover:bg-[#121620]"
+                  : "bg-[#0c1017] text-neutral-400 border border-white/5 hover:text-white hover:bg-[#121620]",
               )}
             >
               {tab.rotulo}
@@ -485,12 +487,10 @@ export function RelatoriosResultadosView({
               <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px]">
                 <button
                   type="button"
-                  onClick={() =>
-                    setSeriesVisiveis((p) => ({ ...p, leads: !p.leads }))
-                  }
+                  onClick={() => setSeriesVisiveis((p) => ({ ...p, leads: !p.leads }))}
                   className={cn(
                     "flex items-center gap-1.5 transition-opacity",
-                    seriesVisiveis.leads ? "opacity-100" : "opacity-30 line-through"
+                    seriesVisiveis.leads ? "opacity-100" : "opacity-30 line-through",
                   )}
                 >
                   <span className="size-2 rounded-full bg-[#06b6d4]" />
@@ -498,12 +498,10 @@ export function RelatoriosResultadosView({
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    setSeriesVisiveis((p) => ({ ...p, reunioes: !p.reunioes }))
-                  }
+                  onClick={() => setSeriesVisiveis((p) => ({ ...p, reunioes: !p.reunioes }))}
                   className={cn(
                     "flex items-center gap-1.5 transition-opacity",
-                    seriesVisiveis.reunioes ? "opacity-100" : "opacity-30 line-through"
+                    seriesVisiveis.reunioes ? "opacity-100" : "opacity-30 line-through",
                   )}
                 >
                   <span className="size-2 rounded-full bg-[#3b82f6]" />
@@ -511,12 +509,10 @@ export function RelatoriosResultadosView({
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    setSeriesVisiveis((p) => ({ ...p, propostas: !p.propostas }))
-                  }
+                  onClick={() => setSeriesVisiveis((p) => ({ ...p, propostas: !p.propostas }))}
                   className={cn(
                     "flex items-center gap-1.5 transition-opacity",
-                    seriesVisiveis.propostas ? "opacity-100" : "opacity-30 line-through"
+                    seriesVisiveis.propostas ? "opacity-100" : "opacity-30 line-through",
                   )}
                 >
                   <span className="size-2 rounded-full bg-[#a855f7]" />
@@ -524,12 +520,10 @@ export function RelatoriosResultadosView({
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    setSeriesVisiveis((p) => ({ ...p, vendas: !p.vendas }))
-                  }
+                  onClick={() => setSeriesVisiveis((p) => ({ ...p, vendas: !p.vendas }))}
                   className={cn(
                     "flex items-center gap-1.5 transition-opacity",
-                    seriesVisiveis.vendas ? "opacity-100" : "opacity-30 line-through"
+                    seriesVisiveis.vendas ? "opacity-100" : "opacity-30 line-through",
                   )}
                 >
                   <span className="size-2 rounded-full bg-[#f97316]" />
@@ -561,7 +555,7 @@ export function RelatoriosResultadosView({
                         "w-full px-2 py-1 text-xs rounded text-left transition-colors",
                         frequenciaLinha === f
                           ? "bg-orange-500/20 text-[#f97316] font-semibold"
-                          : "text-neutral-300 hover:bg-white/5"
+                          : "text-neutral-300 hover:bg-white/5",
                       )}
                     >
                       {f}
@@ -770,7 +764,7 @@ export function RelatoriosResultadosView({
                         "w-full px-2 py-1 text-xs rounded text-left transition-colors",
                         metricaAgentes === m
                           ? "bg-orange-500/20 text-[#f97316] font-semibold"
-                          : "text-neutral-300 hover:bg-white/5"
+                          : "text-neutral-300 hover:bg-white/5",
                       )}
                     >
                       {m}
@@ -800,12 +794,12 @@ export function RelatoriosResultadosView({
                   metricaAgentes === "Leads"
                     ? ag.leads
                     : metricaAgentes === "Reuniões"
-                    ? ag.reunioes * 6
-                    : metricaAgentes === "Propostas"
-                    ? ag.propostas * 10
-                    : metricaAgentes === "Vendas"
-                    ? ag.vendas * 16
-                    : ag.leads;
+                      ? ag.reunioes * 6
+                      : metricaAgentes === "Propostas"
+                        ? ag.propostas * 10
+                        : metricaAgentes === "Vendas"
+                          ? ag.vendas * 16
+                          : ag.leads;
                 const alturaPercent = Math.min(95, Math.max(15, (valorAtual / 1000) * 100));
 
                 return (
@@ -815,14 +809,14 @@ export function RelatoriosResultadosView({
                       {metricaAgentes === "Leads"
                         ? ag.leads
                         : metricaAgentes === "Reuniões"
-                        ? ag.reunioes
-                        : metricaAgentes === "Propostas"
-                        ? ag.propostas
-                        : metricaAgentes === "Vendas"
-                        ? ag.vendas
-                        : metricaAgentes === "Conversão"
-                        ? ag.conversao
-                        : ag.receitaAtribuida}
+                          ? ag.reunioes
+                          : metricaAgentes === "Propostas"
+                            ? ag.propostas
+                            : metricaAgentes === "Vendas"
+                              ? ag.vendas
+                              : metricaAgentes === "Conversão"
+                                ? ag.conversao
+                                : ag.receitaAtribuida}
                     </span>
 
                     {/* Barra Vertical */}
@@ -830,7 +824,7 @@ export function RelatoriosResultadosView({
                       <div
                         className={cn(
                           "w-full rounded-t-lg transition-all duration-500 bg-gradient-to-t group-hover:brightness-125",
-                          ag.corBarra
+                          ag.corBarra,
                         )}
                         style={{ height: `${alturaPercent}%` }}
                       />
@@ -936,9 +930,7 @@ export function RelatoriosResultadosView({
 
               {/* Centro do Donut */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-bold font-mono text-white tracking-tight">
-                  4.280
-                </span>
+                <span className="text-xl font-bold font-mono text-white tracking-tight">4.280</span>
                 <span className="text-[10px] text-neutral-400 font-medium">Leads</span>
               </div>
             </div>
@@ -1005,7 +997,7 @@ export function RelatoriosResultadosView({
                         "w-full px-2 py-1 text-xs rounded text-left",
                         frequenciaFinanceiro === f
                           ? "bg-orange-500/20 text-[#f97316] font-semibold"
-                          : "text-neutral-300 hover:bg-white/5"
+                          : "text-neutral-300 hover:bg-white/5",
                       )}
                     >
                       {f}
@@ -1048,7 +1040,9 @@ export function RelatoriosResultadosView({
                         title={`Investimento: ${item.investimentoFormatado}`}
                       />
                     </div>
-                    <span className="text-[9px] font-mono text-neutral-400 mt-1">{item.semana}</span>
+                    <span className="text-[9px] font-mono text-neutral-400 mt-1">
+                      {item.semana}
+                    </span>
                   </div>
                 );
               })}
@@ -1265,7 +1259,7 @@ export function RelatoriosResultadosView({
                 type="button"
                 onClick={() =>
                   setAvisoAcao(
-                    "O criador de novas campanhas está disponível no módulo Campanhas. Esta tela é dedicada ao BI de resultados."
+                    "O criador de novas campanhas está disponível no módulo Campanhas. Esta tela é dedicada ao BI de resultados.",
                   )
                 }
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-[#121620] text-xs font-semibold text-neutral-200 hover:bg-[#181e2b] transition-colors"
@@ -1339,13 +1333,13 @@ export function RelatoriosResultadosView({
                           "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold",
                           c.status === "Ativa"
                             ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
-                            : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
+                            : "bg-rose-500/15 text-rose-400 border border-rose-500/20",
                         )}
                       >
                         <span
                           className={cn(
                             "size-1.5 rounded-full",
-                            c.status === "Ativa" ? "bg-emerald-400" : "bg-rose-400"
+                            c.status === "Ativa" ? "bg-emerald-400" : "bg-rose-400",
                           )}
                         />
                         {c.status}

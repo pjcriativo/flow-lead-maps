@@ -24,6 +24,19 @@ import { planApifyRunLedgerSync, type RemoteApifyRun } from "../_shared/apify-ru
 import { collectUniqueOffsetPages } from "../_shared/offset-pagination.ts";
 import { validarEmailAutentico } from "../_shared/email-validation.ts";
 import { getMetaOAuthPrerequisiteStatus } from "../_shared/meta-oauth-config.ts";
+import { PAPEIS_AGENTE } from "../_shared/agent-runtime.ts";
+import { listarModelosOpenAI } from "../_shared/ai-openai.ts";
+import {
+  classificarModelosOpenAI,
+  ehProvedor,
+  mascararChave,
+  modeloOpenAICompativel,
+  modelosPermitidos,
+  redigirSegredos,
+  validarFormatoChaveOpenAI,
+  type ModeloIa,
+  type ProviderId,
+} from "../_shared/ai-provider.ts";
 
 const PAPEIS = ["admin", "gerente", "vendedor", "sdr", "suporte"];
 type Rec = Record<string, unknown>;
@@ -2027,6 +2040,499 @@ Deno.serve(async (req) => {
         esgotada: linha.apelido,
         proxima: proxima?.apelido ?? null,
       });
+    }
+
+    // ═══ Central de IA (Prompt 40) — Provedores & Modelos ═══
+    // Guard super_admin já vale para TODA ação deste Edge. A chave da OpenAI entra por aqui, é validada
+    // ANTES de ser gravada (GET /models, gratuito), cifrada no cofre (AES-256-GCM) e nunca volta ao navegador:
+    // só estado e os 4 últimos caracteres. Nenhuma ação desta seção gera chamada paga.
+    if (acao.startsWith("ia_")) {
+      const faltaMigration = (e: { code?: string; message?: string } | null) =>
+        Boolean(
+          e &&
+          (e.code === "42P01" || /relation .* does not exist|schema cache/i.test(e.message ?? "")),
+        );
+      const evento = async (
+        tipo: string,
+        provider: string | null,
+        status: string,
+        detalhe: string,
+        modelo: string | null = null,
+      ) => {
+        await admin.from("ia_eventos").insert({
+          tipo,
+          provider,
+          modelo,
+          status: status.slice(0, 40),
+          detalhe: redigirSegredos(detalhe),
+          user_id: userData.user.id,
+        });
+      };
+      const carregar = async () => {
+        const [cfg, prov, mod] = await Promise.all([
+          admin.from("ia_config").select("*").eq("id", true).maybeSingle(),
+          admin.from("ia_provedores").select("*"),
+          admin.from("ia_modelos").select("*").order("provider").order("id"),
+        ]);
+        const erro = [cfg.error, prov.error, mod.error].find(Boolean) ?? null;
+        const modelos: ModeloIa[] = (mod.data ?? []).map((m: Rec) => ({
+          id: String(m.id),
+          provider: m.provider as ProviderId,
+          rotulo: (m.rotulo as string | null) ?? null,
+          usdIn: m.usd_in_mtok === null ? null : Number(m.usd_in_mtok),
+          usdOut: m.usd_out_mtok === null ? null : Number(m.usd_out_mtok),
+          ativo: m.ativo === true,
+          suportaFerramentas: m.suporta_ferramentas !== false,
+        }));
+        const ativos = new Set<ProviderId>(
+          (prov.data ?? [])
+            .filter((p: Rec) => p.ativo === true)
+            .map((p: Rec) => p.provider as ProviderId),
+        );
+        return {
+          cfg: cfg.data as Rec | null,
+          prov: (prov.data ?? []) as Rec[],
+          mod: (mod.data ?? []) as Rec[],
+          modelos,
+          ativos,
+          erro,
+        };
+      };
+      const statusChave = async (nome: string) => {
+        const { data } = await admin
+          .from("config_chaves")
+          .select("ultimos4, atualizado_em")
+          .eq("nome", nome)
+          .maybeSingle();
+        const ambiente = Boolean(Deno.env.get(nome));
+        return {
+          configurada: Boolean(data) || ambiente,
+          origem: data ? "cofre" : ambiente ? "ambiente" : null,
+          mascarada: data ? mascararChave(data.ultimos4 as string) : null,
+          atualizada_em: (data?.atualizado_em as string | null) ?? null,
+        };
+      };
+      const PROVEDOR_CHAVE: Record<string, string> = {
+        anthropic: "ANTHROPIC_API_KEY",
+        openai: "OPENAI_API_KEY",
+      };
+
+      if (acao === "ia_central_ler") {
+        const c = await carregar();
+        if (c.erro) {
+          if (faltaMigration(c.erro))
+            return json({ ok: true, disponivel: false, motivo: "migration_pendente" });
+          return json(
+            { ok: false, reason: "erro_consulta", detalhe: redigirSegredos(c.erro.message) },
+            500,
+          );
+        }
+        const [kA, kO, eventos, consumo, visao] = await Promise.all([
+          statusChave("ANTHROPIC_API_KEY"),
+          statusChave("OPENAI_API_KEY"),
+          admin
+            .from("ia_eventos")
+            .select("id, criado_em, provider, tipo, modelo, status, detalhe, org_id")
+            .order("criado_em", { ascending: false })
+            .limit(50),
+          admin.rpc("ia_consumo_resumo", { p_dias: 30 }),
+          admin.rpc("ia_visao_orgs"),
+        ]);
+        return json({
+          ok: true,
+          disponivel: true,
+          config: c.cfg,
+          provedores: c.prov.map((p) => ({
+            ...p,
+            chave: p.provider === "openai" ? kO : kA,
+          })),
+          modelos: c.mod,
+          modelos_permitidos: modelosPermitidos(c.modelos, c.ativos),
+          eventos: eventos.data ?? [],
+          consumo: consumo.error ? [] : (consumo.data ?? []),
+          visao_orgs: visao.error ? [] : (visao.data ?? []),
+        });
+      }
+
+      if (acao === "ia_openai_conectar") {
+        const f = validarFormatoChaveOpenAI(String(b.chave ?? ""));
+        if (!f.ok) return json({ ok: false, reason: `chave_${f.motivo}` });
+        const lista = await listarModelosOpenAI(f.chave);
+        if (!lista.ok) {
+          await evento("conexao_testada", "openai", "falha", lista.motivo);
+          return json({ ok: false, reason: lista.motivo });
+        }
+        const { compativeis, descartados } = classificarModelosOpenAI(lista.ids);
+        const cifrado = await cifrar(f.chave);
+        const ultimos4 = f.chave.slice(-4);
+        const { error } = await admin.from("config_chaves").upsert(
+          {
+            nome: "OPENAI_API_KEY",
+            valor_cifrado: cifrado,
+            ultimos4,
+            atualizado_em: new Date().toISOString(),
+            atualizado_por: userData.user.id,
+          },
+          { onConflict: "nome" },
+        );
+        if (error)
+          return json({
+            ok: false,
+            reason: "erro_salvar",
+            detalhe: redigirSegredos(error.message),
+          });
+        await admin
+          .from("config_chaves_auditoria")
+          .insert({ nome: "OPENAI_API_KEY", alterado_por: userData.user.id });
+        // modelos novos entram DESLIGADOS e sem preço; o Super Admin escolhe, precifica e ativa
+        if (compativeis.length) {
+          await admin.from("ia_modelos").upsert(
+            compativeis.map((id) => ({
+              id,
+              provider: "openai",
+              rotulo: id,
+              ativo: false,
+              validado_em: new Date().toISOString(),
+            })),
+            { onConflict: "id", ignoreDuplicates: true },
+          );
+        }
+        await admin
+          .from("ia_provedores")
+          .update({
+            conexao_status: "ok",
+            conexao_verificada_em: new Date().toISOString(),
+            conexao_detalhe: `${compativeis.length} modelos compatíveis`,
+            atualizado_por: userData.user.id,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq("provider", "openai");
+        await evento("chave_configurada", "openai", "ok", `••••${ultimos4}`);
+        await evento(
+          "modelos_sincronizados",
+          "openai",
+          "ok",
+          `${compativeis.length} compatíveis, ${descartados.length} descartados`,
+        );
+        return json({
+          ok: true,
+          mascarada: mascararChave(ultimos4),
+          modelos_compativeis: compativeis.length,
+          modelos_descartados: descartados.length,
+        });
+      }
+
+      if (acao === "ia_openai_testar") {
+        const chave = await resolverChave(admin, "OPENAI_API_KEY");
+        if (!chave) return json({ ok: false, reason: "chave_nao_configurada" });
+        const lista = await listarModelosOpenAI(chave);
+        const agora = new Date().toISOString();
+        if (!lista.ok) {
+          await admin
+            .from("ia_provedores")
+            .update({
+              conexao_status: "falha",
+              conexao_verificada_em: agora,
+              conexao_detalhe: lista.motivo,
+              atualizado_em: agora,
+            })
+            .eq("provider", "openai");
+          await evento("conexao_testada", "openai", "falha", lista.motivo);
+          return json({ ok: false, reason: lista.motivo });
+        }
+        const { compativeis } = classificarModelosOpenAI(lista.ids);
+        if (compativeis.length) {
+          await admin.from("ia_modelos").upsert(
+            compativeis.map((id) => ({
+              id,
+              provider: "openai",
+              rotulo: id,
+              ativo: false,
+              validado_em: agora,
+            })),
+            { onConflict: "id", ignoreDuplicates: true },
+          );
+        }
+        await admin
+          .from("ia_provedores")
+          .update({
+            conexao_status: "ok",
+            conexao_verificada_em: agora,
+            conexao_detalhe: `${compativeis.length} modelos compatíveis`,
+            atualizado_em: agora,
+          })
+          .eq("provider", "openai");
+        await evento(
+          "conexao_testada",
+          "openai",
+          "ok",
+          `${compativeis.length} modelos compatíveis`,
+        );
+        return json({ ok: true, modelos_compativeis: compativeis.length });
+      }
+
+      if (acao === "ia_openai_revogar") {
+        await admin.from("config_chaves").delete().eq("nome", "OPENAI_API_KEY");
+        await admin
+          .from("config_chaves_auditoria")
+          .insert({ nome: "OPENAI_API_KEY", alterado_por: userData.user.id });
+        await admin
+          .from("ia_provedores")
+          .update({
+            ativo: false,
+            conexao_status: "revogada",
+            conexao_detalhe: null,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq("provider", "openai");
+        await evento("chave_revogada", "openai", "ok", "chave removida do cofre");
+        return json({
+          ok: true,
+          // um secret de AMBIENTE com o mesmo nome continuaria valendo: avisar em vez de fingir revogação total
+          segredo_de_ambiente_ativo: Boolean(Deno.env.get("OPENAI_API_KEY")),
+        });
+      }
+
+      if (acao === "ia_provedor_ativar") {
+        const provider = String(b.provider ?? "");
+        if (!ehProvedor(provider)) return json({ ok: false, reason: "provedor_invalido" });
+        const ativar = b.ativo === true;
+        const c = await carregar();
+        if (c.erro) return json({ ok: false, reason: "migration_pendente" });
+        const atual = c.prov.find((p) => p.provider === provider);
+        if (ativar && provider === "openai") {
+          const chave = await statusChave("OPENAI_API_KEY");
+          if (!chave.configurada) return json({ ok: false, reason: "chave_nao_configurada" });
+          if (atual?.conexao_status !== "ok")
+            return json({ ok: false, reason: "conexao_nao_verificada" });
+        }
+        if (!ativar) {
+          if (c.cfg?.provedor_ceo === provider)
+            return json({ ok: false, reason: "provedor_em_uso_pelo_ceo" });
+          if (c.cfg?.fallback_provider === provider)
+            return json({ ok: false, reason: "provedor_em_uso_como_fallback" });
+        }
+        await admin
+          .from("ia_provedores")
+          .update({
+            ativo: ativar,
+            atualizado_por: userData.user.id,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq("provider", provider);
+        await evento(
+          "config_alterada",
+          provider,
+          ativar ? "ativado" : "desativado",
+          `provedor ${provider}`,
+        );
+        return json({ ok: true, provider, ativo: ativar });
+      }
+
+      if (acao === "ia_modelo_salvar") {
+        const id = String(b.id ?? "").trim();
+        const c = await carregar();
+        if (c.erro) return json({ ok: false, reason: "migration_pendente" });
+        const m = c.modelos.find((x) => x.id === id);
+        if (!m) return json({ ok: false, reason: "modelo_desconhecido" });
+        if (m.provider === "openai" && !modeloOpenAICompativel(id))
+          return json({ ok: false, reason: "modelo_incompativel" });
+        const preco = (v: unknown) =>
+          v === null || v === "" || v === undefined ? null : Number(v);
+        const pin = preco(b.usd_in_mtok);
+        const pout = preco(b.usd_out_mtok);
+        for (const p of [pin, pout]) {
+          if (p !== null && (!Number.isFinite(p) || p < 0 || p > 1000))
+            return json({ ok: false, reason: "preco_invalido" });
+        }
+        const ativo = b.ativo === true;
+        if (ativo && (pin === null || pout === null))
+          return json({ ok: false, reason: "preco_obrigatorio_para_ativar" });
+        if (!ativo) {
+          const emUso =
+            c.cfg &&
+            [
+              c.cfg.modelo_ceo,
+              c.cfg.modelo_padrao,
+              c.cfg.fallback_modelo,
+              ...Object.values((c.cfg.modelos_por_papel ?? {}) as Record<string, string>),
+            ].includes(id);
+          if (emUso) return json({ ok: false, reason: "modelo_em_uso_na_configuracao" });
+        }
+        const rotulo =
+          typeof b.rotulo === "string" && b.rotulo.trim()
+            ? b.rotulo.trim().slice(0, 80)
+            : (m.rotulo ?? id);
+        const { error } = await admin
+          .from("ia_modelos")
+          .update({
+            usd_in_mtok: pin,
+            usd_out_mtok: pout,
+            ativo,
+            rotulo,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq("id", id);
+        if (error)
+          return json({
+            ok: false,
+            reason: "erro_salvar",
+            detalhe: redigirSegredos(error.message),
+          });
+        await evento(
+          "config_alterada",
+          m.provider,
+          ativo ? "modelo_ativo" : "modelo_inativo",
+          `modelo ${id}`,
+          id,
+        );
+        return json({ ok: true });
+      }
+
+      if (acao === "ia_config_salvar") {
+        const c = await carregar();
+        if (c.erro) return json({ ok: false, reason: "migration_pendente" });
+        const permitidos = new Set(modelosPermitidos(c.modelos, c.ativos));
+        const txt = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+        const provedorCeo = String(b.provedor_ceo ?? c.cfg?.provedor_ceo ?? "anthropic");
+        if (!ehProvedor(provedorCeo)) return json({ ok: false, reason: "provedor_invalido" });
+        const modeloCeo =
+          "modelo_ceo" in b ? txt(b.modelo_ceo) : ((c.cfg?.modelo_ceo as string | null) ?? null);
+        const modeloPadrao =
+          "modelo_padrao" in b
+            ? txt(b.modelo_padrao)
+            : ((c.cfg?.modelo_padrao as string | null) ?? null);
+        const fallbackProvider =
+          "fallback_provider" in b
+            ? txt(b.fallback_provider)
+            : ((c.cfg?.fallback_provider as string | null) ?? null);
+        const fallbackModelo =
+          "fallback_modelo" in b
+            ? txt(b.fallback_modelo)
+            : ((c.cfg?.fallback_modelo as string | null) ?? null);
+        const porPapelBruto =
+          ("modelos_por_papel" in b ? b.modelos_por_papel : c.cfg?.modelos_por_papel) ?? {};
+        if (!porPapelBruto || typeof porPapelBruto !== "object" || Array.isArray(porPapelBruto))
+          return json({ ok: false, reason: "modelos_por_papel_invalido" });
+        const porPapel: Record<string, string> = {};
+        for (const [papel, modelo] of Object.entries(porPapelBruto as Rec)) {
+          if (!(PAPEIS_AGENTE as readonly string[]).includes(papel))
+            return json({ ok: false, reason: "papel_invalido" });
+          if (typeof modelo !== "string" || !permitidos.has(modelo))
+            return json({ ok: false, reason: "modelo_nao_permitido", detalhe: papel });
+          porPapel[papel] = modelo;
+        }
+        for (const m of [modeloCeo, modeloPadrao]) {
+          if (m && !permitidos.has(m))
+            return json({ ok: false, reason: "modelo_nao_permitido", detalhe: m });
+        }
+        if (provedorCeo === "openai") {
+          const mo = c.modelos.find((x) => x.id === modeloCeo);
+          if (!modeloCeo || mo?.provider !== "openai")
+            return json({ ok: false, reason: "modelo_ceo_deve_ser_openai" });
+          if (!c.ativos.has("openai")) return json({ ok: false, reason: "provedor_desativado" });
+        } else if (
+          modeloCeo &&
+          c.modelos.find((x) => x.id === modeloCeo)?.provider !== "anthropic" &&
+          !modeloCeo.startsWith("claude-")
+        ) {
+          return json({ ok: false, reason: "modelo_ceo_deve_ser_anthropic" });
+        }
+        if (fallbackProvider) {
+          if (!ehProvedor(fallbackProvider) || fallbackProvider === provedorCeo)
+            return json({ ok: false, reason: "fallback_invalido" });
+          const mf = c.modelos.find((x) => x.id === fallbackModelo);
+          if (
+            !fallbackModelo ||
+            !permitidos.has(fallbackModelo) ||
+            mf?.provider !== fallbackProvider
+          )
+            return json({ ok: false, reason: "fallback_modelo_invalido" });
+        }
+        const num = (v: unknown, atual: unknown) => (v === undefined ? Number(atual) : Number(v));
+        const tetoDia = num(b.teto_org_dia_usd, c.cfg?.teto_org_dia_usd);
+        const tetoMes = num(b.teto_org_mes_usd, c.cfg?.teto_org_mes_usd);
+        if (
+          ![tetoDia, tetoMes].every(Number.isFinite) ||
+          tetoDia < 0 ||
+          tetoMes < tetoDia ||
+          tetoDia > 100 ||
+          tetoMes > 1000
+        )
+          return json({ ok: false, reason: "tetos_invalidos" });
+        const { error } = await admin
+          .from("ia_config")
+          .update({
+            provedor_ceo: provedorCeo,
+            modelo_ceo: modeloCeo,
+            modelo_padrao: modeloPadrao,
+            modelos_por_papel: porPapel,
+            fallback_provider: fallbackProvider,
+            fallback_modelo: fallbackProvider ? fallbackModelo : null,
+            teto_org_dia_usd: tetoDia,
+            teto_org_mes_usd: tetoMes,
+            atualizado_por: userData.user.id,
+            atualizado_em: new Date().toISOString(),
+          })
+          .eq("id", true);
+        if (error)
+          return json({
+            ok: false,
+            reason: "erro_salvar",
+            detalhe: redigirSegredos(error.message),
+          });
+        await evento(
+          "config_alterada",
+          provedorCeo,
+          "config",
+          `CEO ${provedorCeo}/${modeloCeo ?? "—"}; fallback ${fallbackProvider ?? "nenhum"}`,
+        );
+        return json({ ok: true });
+      }
+
+      if (acao === "ia_orcamento_org_salvar") {
+        const orgId = String(b.org_id ?? "");
+        if (!/^[0-9a-f-]{36}$/i.test(orgId)) return json({ ok: false, reason: "org_invalida" });
+        if (b.teto_dia_usd === null && b.teto_mes_usd === null) {
+          await admin.from("agent_orcamento_org").delete().eq("org_id", orgId);
+          await evento(
+            "config_alterada",
+            null,
+            "orcamento_org",
+            `org ${orgId}: teto agregado volta ao padrão`,
+          );
+          return json({ ok: true, padrao: true });
+        }
+        const dia = Number(b.teto_dia_usd);
+        const mes = Number(b.teto_mes_usd);
+        if (![dia, mes].every(Number.isFinite) || dia < 0 || mes < dia || dia > 100 || mes > 1000)
+          return json({ ok: false, reason: "tetos_invalidos" });
+        const { error } = await admin.from("agent_orcamento_org").upsert(
+          {
+            org_id: orgId,
+            teto_dia_usd: dia,
+            teto_mes_usd: mes,
+            atualizado_por: userData.user.id,
+            atualizado_em: new Date().toISOString(),
+          },
+          { onConflict: "org_id" },
+        );
+        if (error)
+          return json({
+            ok: false,
+            reason: "erro_salvar",
+            detalhe: redigirSegredos(error.message),
+          });
+        await evento(
+          "config_alterada",
+          null,
+          "orcamento_org",
+          `org ${orgId}: ${dia}/dia ${mes}/mês`,
+        );
+        return json({ ok: true });
+      }
+
+      return json({ ok: false, reason: "acao_desconhecida" });
     }
 
     return json({ ok: false, reason: "acao_desconhecida" });

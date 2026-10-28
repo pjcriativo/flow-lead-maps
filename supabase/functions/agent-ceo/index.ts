@@ -15,10 +15,15 @@ import { executarTurnoCeo, type CeoDeps, type TarefaRow } from "../_shared/agent
 import {
   autorizarGestorDeAgentes,
   carregarAgenteComPermissoes,
-  chamarAnthropic,
+  carregarContextoIa,
+  criarChamadorModelo,
+  criarConsumoOrg,
+  criarRegistradorDeEventos,
   criarRpc,
+  ehMotivoDeTeto,
   type Rec,
 } from "../_shared/agent-edge-kit.ts";
+import { MSG_CONFIGURAR_PROVEDOR } from "../_shared/ai-provider.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
@@ -45,8 +50,12 @@ Deno.serve(async (req) => {
   if (!auth.ok) return json({ error: auth.error }, auth.status);
   const userId = auth.userId;
 
-  const chave = await resolverChave(admin, "ANTHROPIC_API_KEY");
-  if (!chave) return json({ error: "Assistente indisponível." }, 503);
+  // Provedor/modelo vêm da Central de IA (Super Admin). Sem a Central publicada, vale o comportamento
+  // anterior: Claude com a chave ANTHROPIC_API_KEY.
+  const ia = await carregarContextoIa(admin);
+  if (!ia.central && !(await resolverChave(admin, "ANTHROPIC_API_KEY"))) {
+    return json({ error: "Assistente indisponível." }, 503);
+  }
 
   const rpc = criarRpc(admin);
   const linhaTarefa = (t: Rec): TarefaRow => ({
@@ -57,6 +66,7 @@ Deno.serve(async (req) => {
     resultado: t.resultado ?? null,
   });
 
+  const registrarEvento = criarRegistradorDeEventos(admin, { orgId });
   const deps: CeoDeps = {
     carregarAgente: (org) => carregarAgenteComPermissoes(admin, { orgId: org, slug: "ceo" }),
     consumo: async (agentId) => {
@@ -124,7 +134,9 @@ Deno.serve(async (req) => {
         },
         ctx.params,
       ),
-    chamarModelo: (r) => chamarAnthropic(chave, r),
+    chamarModelo: criarChamadorModelo(admin, ia, registrarEvento),
+    tabelaPrecos: ia.tabela,
+    consumoOrg: criarConsumoOrg(rpc),
     registrarUsoIa: async ({ userId: uid, modelo }) => {
       await admin.from("ia_uso").insert({ user_id: uid, funcao: "agent-ceo", modelo });
     },
@@ -140,8 +152,22 @@ Deno.serve(async (req) => {
     workerId: `agent-ceo:${crypto.randomUUID()}`,
   });
   if (!resultado.ok) {
+    if (ehMotivoDeTeto(resultado.reason)) {
+      await registrarEvento({
+        tipo: "limite_atingido",
+        provider: null,
+        modelo: "—",
+        status: resultado.reason,
+        detalhe: "Copiloto do CEO bloqueado por teto de custo",
+      });
+    }
     return json(
-      { ok: false, reason: resultado.reason, detail: resultado.detail },
+      {
+        ok: false,
+        reason: resultado.reason,
+        detail: resultado.detail,
+        ...(resultado.reason === "falha_modelo" ? { mensagem: MSG_CONFIGURAR_PROVEDOR } : {}),
+      },
       resultado.httpStatus,
     );
   }

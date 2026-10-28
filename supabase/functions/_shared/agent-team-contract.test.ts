@@ -16,14 +16,17 @@ import {
 import { TOOL_REGISTRY, TIPOS_DELEGAVEIS, PAPEIS_SUBORDINADOS } from "./agent-tools.ts";
 
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
-const sql = read("../../migrations/202610270003_agent_team.sql");
+const sql003 = read("../../migrations/202610270003_agent_team.sql");
+const sql004 = read("../../migrations/202610280001_ia_provedores_memoria_operacoes.sql");
+const sql = sql003 + "\n" + sql004;
 const base = read("../../migrations/202610270001_agent_foundation.sql");
 
 const arrayDe = (texto: string): string[] => [...texto.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-const funcao = (nome: string) =>
-  sql.match(
-    new RegExp(`create or replace function public\\.${nome}\\([\\s\\S]*?\\n\\$\\$;`),
-  )?.[0] ?? "";
+// A definição EFETIVA é a última aplicada: a 004 (mais nova) sobrescreve a 003 quando redefine a função.
+const funcao = (nome: string) => {
+  const re = new RegExp(`create or replace function public\\.${nome}\\([\\s\\S]*?\\n\\$\\$;`);
+  return sql004.match(re)?.[0] ?? sql003.match(re)?.[0] ?? "";
+};
 
 test("papéis: o CHECK do banco é exatamente a lista do TypeScript", () => {
   const check = sql.match(/agents_papel_check check \(\s*papel in \(([^)]*)\)/)?.[1] ?? "";
@@ -70,7 +73,10 @@ test("hierarquia: SUPERIOR_DO_PAPEL bate com o gatilho; subordinados do TypeScri
 });
 
 test("modelos permitidos no banco == tabela de preços do runtime (003 e 002)", () => {
-  const lista = arrayDe(funcao("agent_modelos_permitidos")).sort();
+  // base estática (Claude); a 004 soma os modelos ativos e precificados da Central de IA
+  const lista = arrayDe(funcao("agent_modelos_permitidos"))
+    .filter((m) => m.startsWith("claude-"))
+    .sort();
   assert.deepEqual(lista, Object.keys(MODEL_PRICES).sort());
 });
 

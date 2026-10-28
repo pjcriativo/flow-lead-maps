@@ -54,6 +54,7 @@ import { CeoConfigWizard } from "./CeoConfigWizard";
 import { CeoRealStatusCard } from "./CeoRealUi";
 import { useCeoReal } from "./useCeoReal";
 import { EquipeRealPanel } from "./EquipeRealUi";
+import { OperacoesRealPanel } from "./OperacoesRealUi";
 import { useEquipeReal } from "./useEquipeReal";
 
 interface EquipeAgentesViewProps {
@@ -62,7 +63,9 @@ interface EquipeAgentesViewProps {
 }
 
 export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentesViewProps) {
-  const [abaAtiva, setAbaAtiva] = useState<"agentes" | "departamentos" | "enxames" | "biblioteca">("agentes");
+  const [abaAtiva, setAbaAtiva] = useState<"agentes" | "departamentos" | "enxames" | "biblioteca">(
+    "agentes",
+  );
   const [busca, setBusca] = useState("");
   const [filtroDepartamento, setFiltroDepartamento] = useState("todos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
@@ -119,7 +122,6 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
   return (
     <div className="min-h-screen bg-[#07090e] text-neutral-100 antialiased selection:bg-[#f95d14]/30 selection:text-white">
       <div className="mx-auto max-w-[1680px] px-4 pb-16 pt-6 sm:px-6 lg:px-8 space-y-6">
-
         {/* =========================================================================
             1. CABEÇALHO DA TELA 02
            ========================================================================= */}
@@ -203,8 +205,10 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
           }}
         />
         <EquipeRealPanel eq={equipeReal} onVerPerfil={(id) => onVerPerfil?.(id)} />
+        <OperacoesRealPanel />
         <p className="-mt-3 text-[10px] text-neutral-500">
-          Os cartões de agentes, departamentos e enxames abaixo desta linha são exemplos demonstrativos. A equipe real está no painel acima.
+          Os cartões de agentes, departamentos e enxames abaixo desta linha são exemplos
+          demonstrativos. A equipe real está no painel acima.
         </p>
 
         {/* =========================================================================
@@ -214,9 +218,19 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
           <div className="flex flex-wrap items-center gap-2">
             {[
               { id: "agentes", label: "Meus Agentes", icon: Users, count: agentes.length },
-              { id: "departamentos", label: "Departamentos", icon: Building2, count: DEPARTAMENTOS_DATA.length },
+              {
+                id: "departamentos",
+                label: "Departamentos",
+                icon: Building2,
+                count: DEPARTAMENTOS_DATA.length,
+              },
               { id: "enxames", label: "Enxames", icon: Layers, count: ENXAMES_DATA.length },
-              { id: "biblioteca", label: "Biblioteca de Agentes", icon: Sparkles, count: BIBLIOTECA_AGENTES_DATA.length },
+              {
+                id: "biblioteca",
+                label: "Biblioteca de Agentes",
+                icon: Sparkles,
+                count: BIBLIOTECA_AGENTES_DATA.length,
+              },
             ].map((tab) => {
               const ativa = abaAtiva === tab.id;
               const IconComp = tab.icon;
@@ -289,14 +303,30 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                   onChange={(e) => setFiltroDepartamento(e.target.value)}
                   className="bg-transparent text-xs text-neutral-200 focus:outline-none"
                 >
-                  <option value="todos" className="bg-[#121620]">Todos os departamentos</option>
-                  <option value="direcao" className="bg-[#121620]">Direção</option>
-                  <option value="estrategia" className="bg-[#121620]">Estratégia</option>
-                  <option value="prospeccao" className="bg-[#121620]">Prospecção</option>
-                  <option value="pre-vendas" className="bg-[#121620]">Pré-vendas</option>
-                  <option value="vendas" className="bg-[#121620]">Vendas</option>
-                  <option value="gestao" className="bg-[#121620]">Gestão Comercial</option>
-                  <option value="seo-marketing" className="bg-[#121620]">SEO e Marketing</option>
+                  <option value="todos" className="bg-[#121620]">
+                    Todos os departamentos
+                  </option>
+                  <option value="direcao" className="bg-[#121620]">
+                    Direção
+                  </option>
+                  <option value="estrategia" className="bg-[#121620]">
+                    Estratégia
+                  </option>
+                  <option value="prospeccao" className="bg-[#121620]">
+                    Prospecção
+                  </option>
+                  <option value="pre-vendas" className="bg-[#121620]">
+                    Pré-vendas
+                  </option>
+                  <option value="vendas" className="bg-[#121620]">
+                    Vendas
+                  </option>
+                  <option value="gestao" className="bg-[#121620]">
+                    Gestão Comercial
+                  </option>
+                  <option value="seo-marketing" className="bg-[#121620]">
+                    SEO e Marketing
+                  </option>
                 </select>
               </div>
 
@@ -307,10 +337,18 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                   onChange={(e) => setFiltroStatus(e.target.value)}
                   className="bg-transparent text-xs text-neutral-200 focus:outline-none"
                 >
-                  <option value="todos" className="bg-[#121620]">Status: Todos</option>
-                  <option value="online" className="bg-[#121620]">Online</option>
-                  <option value="trabalhando" className="bg-[#121620]">Trabalhando</option>
-                  <option value="pausado" className="bg-[#121620]">Pausado</option>
+                  <option value="todos" className="bg-[#121620]">
+                    Status: Todos
+                  </option>
+                  <option value="online" className="bg-[#121620]">
+                    Online
+                  </option>
+                  <option value="trabalhando" className="bg-[#121620]">
+                    Trabalhando
+                  </option>
+                  <option value="pausado" className="bg-[#121620]">
+                    Pausado
+                  </option>
                 </select>
               </div>
             </div>
@@ -369,7 +407,9 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                       <div className="absolute right-3.5 top-3.5">
                         <button
                           type="button"
-                          onClick={() => setMenuAcoesAberto(menuAcoesAberto === agente.id ? null : agente.id)}
+                          onClick={() =>
+                            setMenuAcoesAberto(menuAcoesAberto === agente.id ? null : agente.id)
+                          }
                           className="rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-white/10 hover:text-white"
                           aria-label="Ações do agente"
                         >
@@ -395,7 +435,11 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                               onClick={() => handleToggleStatusAgente(agente.id)}
                               className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-neutral-300 hover:bg-white/10 hover:text-white"
                             >
-                              {isPausado ? <Play className="size-3.5 text-emerald-400" /> : <Pause className="size-3.5 text-amber-400" />}
+                              {isPausado ? (
+                                <Play className="size-3.5 text-emerald-400" />
+                              ) : (
+                                <Pause className="size-3.5 text-amber-400" />
+                              )}
                               <span>{isPausado ? "Retomar agente" : "Pausar operações"}</span>
                             </button>
                             <button
@@ -449,9 +493,7 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                       </h3>
 
                       {/* Role & Department */}
-                      <p className="mt-0.5 text-xs text-neutral-400 font-medium">
-                        {agente.cargo}
-                      </p>
+                      <p className="mt-0.5 text-xs text-neutral-400 font-medium">{agente.cargo}</p>
 
                       {/* Status indicator Pill */}
                       <div className="mt-2.5">
@@ -533,7 +575,12 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                     <div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <div className={cn("flex size-9 items-center justify-center rounded-xl border", dept.corBadge)}>
+                          <div
+                            className={cn(
+                              "flex size-9 items-center justify-center rounded-xl border",
+                              dept.corBadge,
+                            )}
+                          >
                             <IconComp className="size-4" />
                           </div>
                           <div>
@@ -553,7 +600,9 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
                           Objetivo Setorial
                         </p>
-                        <p className="mt-0.5 text-xs font-medium text-white">{dept.objetivoPrincipal}</p>
+                        <p className="mt-0.5 text-xs font-medium text-white">
+                          {dept.objetivoPrincipal}
+                        </p>
                       </div>
                     </div>
 
@@ -561,10 +610,16 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                     <div className="mt-4 flex items-center justify-between border-t border-[#1b2232] pt-3 text-xs">
                       <div className="flex items-center gap-2">
                         <div className="size-7 overflow-hidden rounded-full border border-white/10">
-                          <img src={dept.avatarLider} alt={dept.lider} className="size-full object-cover" />
+                          <img
+                            src={dept.avatarLider}
+                            alt={dept.lider}
+                            className="size-full object-cover"
+                          />
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-white leading-tight">{dept.lider}</p>
+                          <p className="text-xs font-semibold text-white leading-tight">
+                            {dept.lider}
+                          </p>
                           <p className="text-[10px] text-neutral-400">{dept.liderCargo}</p>
                         </div>
                       </div>
@@ -656,7 +711,11 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                             title={`${p.nome} (${p.cargo})`}
                             className="relative size-8 overflow-hidden rounded-full border border-orange-500/40 shadow-sm"
                           >
-                            <img src={p.avatarUrl} alt={p.nome} className="size-full object-cover" />
+                            <img
+                              src={p.avatarUrl}
+                              alt={p.nome}
+                              className="size-full object-cover"
+                            />
                           </div>
                         ))}
                       </div>
@@ -685,7 +744,9 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
         {abaAtiva === "biblioteca" && (
           <div className="space-y-4">
             <div>
-              <h3 className="text-base font-bold text-white">Biblioteca de Agentes Especialistas</h3>
+              <h3 className="text-base font-bold text-white">
+                Biblioteca de Agentes Especialistas
+              </h3>
               <p className="text-xs text-neutral-400">
                 Ative novos perfis certificados para expandir a capacidade de atendimento e vendas.
               </p>
@@ -699,7 +760,11 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                 >
                   <div>
                     <div className="relative size-16 mx-auto overflow-hidden rounded-full border-2 border-white/15">
-                      <img src={item.avatarUrl} alt={item.nome} className="size-full object-cover" />
+                      <img
+                        src={item.avatarUrl}
+                        alt={item.nome}
+                        className="size-full object-cover"
+                      />
                     </div>
 
                     <h4 className="mt-3 text-center text-sm font-bold text-white">{item.nome}</h4>
@@ -752,7 +817,6 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
             </div>
           </div>
         )}
-
       </div>
 
       {/* =========================================================================
@@ -789,7 +853,9 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
               </div>
               <h3 className="mt-3 text-lg font-bold text-white flex items-center gap-1.5">
                 <span>{agenteSelecionado.nome}</span>
-                {agenteSelecionado.isCeo && <Crown className="size-4 text-amber-400 fill-amber-400" />}
+                {agenteSelecionado.isCeo && (
+                  <Crown className="size-4 text-amber-400 fill-amber-400" />
+                )}
               </h3>
               <p className="text-xs text-neutral-400 font-medium">{agenteSelecionado.cargo}</p>
               <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-0.5 text-[11px] font-bold text-emerald-400">
@@ -806,15 +872,21 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-400">Especialidade:</span>
-                  <span className="font-semibold text-white">{agenteSelecionado.especialidade}</span>
+                  <span className="font-semibold text-white">
+                    {agenteSelecionado.especialidade}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-400">Autonomia:</span>
-                  <span className="font-semibold text-orange-400">{agenteSelecionado.nivelAutonomia}</span>
+                  <span className="font-semibold text-orange-400">
+                    {agenteSelecionado.nivelAutonomia}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-400">Taxa de Sucesso:</span>
-                  <span className="font-semibold text-emerald-400">{agenteSelecionado.taxaSucesso}</span>
+                  <span className="font-semibold text-emerald-400">
+                    {agenteSelecionado.taxaSucesso}
+                  </span>
                 </div>
               </div>
 

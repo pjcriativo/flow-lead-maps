@@ -8,6 +8,7 @@ import {
   classifyFailure,
   costUsd,
   estimateMaxCallCostUsd,
+  orgBudgetDecision,
   retryDecision,
   StepRecorder,
   stepLimitDecision,
@@ -15,6 +16,7 @@ import {
   type AgentPermission,
   type BlockReason,
   type StepRecord,
+  type TabelaPrecos,
   type TaskStatus,
   type ToolSpec,
 } from "./agent-runtime.ts";
@@ -47,13 +49,22 @@ export type ChamadaModelo = {
 };
 export type ModeloMensagem =
   | { role: "user" | "assistant"; content: string }
-  | { role: "assistant"; toolUses: { id: string; name: string; input: unknown }[]; text: string }
+  | {
+      role: "assistant";
+      toolUses: { id: string; name: string; input: unknown }[];
+      text: string;
+      /** Itens opacos do provedor (ex.: raciocínio da OpenAI) reenviados no passo seguinte. */
+      raw?: unknown;
+    }
   | { role: "user"; toolResults: { id: string; content: string; isError: boolean }[] };
 export type RespostaModelo = {
   texto: string;
   toolUses: { id: string; name: string; input: unknown }[];
   tokensEntrada: number;
   tokensSaida: number;
+  raw?: unknown[];
+  /** Modelo que de fato respondeu (difere do do agente quando o fallback autorizado entrou). */
+  modeloUsado?: string;
 };
 
 export type TarefaRow = {
@@ -71,6 +82,12 @@ export type CeoDeps = {
     permissions: AgentPermission[];
   } | null>;
   consumo(agentId: string): Promise<{ usdDia: number; usdMes: number }>;
+  /** Gasto e teto AGREGADOS da organização. Ausente = só vale o teto por agente (comportamento anterior). */
+  consumoOrg?(
+    orgId: string,
+  ): Promise<{ usdDia: number; usdMes: number; tetoDia: number; tetoMes: number }>;
+  /** Preços da Central de IA (modelos fora de MODEL_PRICES). */
+  tabelaPrecos?: TabelaPrecos;
   enfileirar(i: {
     orgId: string;
     agentId: string;
@@ -144,6 +161,8 @@ const HTTP: Record<string, number> = {
   organizacao_divergente: 403,
   teto_dia: 429,
   teto_mes: 429,
+  teto_org_dia: 429,
+  teto_org_mes: 429,
   em_andamento: 409,
   tarefa_encerrada: 409,
   falha_modelo: 502,
@@ -273,6 +292,7 @@ export async function executarTurnoCeo(
         modelo,
         JSON.stringify(mensagens).length + CEO_SYSTEM_PROMPT.length,
         atual.agent.maxTokensSaida,
+        deps.tabelaPrecos,
       );
       if (estimativa === null) return await bloquear("modelo_nao_precificado", modelo);
       // O gasto de passos anteriores já está em agent_runs (registrarPasso soma antes do próximo passo).
@@ -285,6 +305,17 @@ export async function executarTurnoCeo(
         proximaChamadaUsd: estimativa,
       });
       if (!orcamento.ok) return await bloquear(orcamento.reason);
+      if (deps.consumoOrg) {
+        const org = await deps.consumoOrg(input.orgId);
+        const orcOrg = orgBudgetDecision({
+          gastoDiaUsd: org.usdDia,
+          gastoMesUsd: org.usdMes,
+          tetoDiaUsd: org.tetoDia,
+          tetoMesUsd: org.tetoMes,
+          proximaChamadaUsd: estimativa,
+        });
+        if (!orcOrg.ok) return await bloquear(orcOrg.reason);
+      }
 
       const inicio = deps.agora().getTime();
       const resp = await deps.chamarModelo({
@@ -296,9 +327,11 @@ export async function executarTurnoCeo(
           ferramentasDoAgente(atual.agent, atual.catalog, atual.permissions),
         ),
       });
-      const custo = costUsd(modelo, resp.tokensEntrada, resp.tokensSaida) ?? 0;
+      const modeloUsado = resp.modeloUsado ?? modelo;
+      const custo =
+        costUsd(modeloUsado, resp.tokensEntrada, resp.tokensSaida, deps.tabelaPrecos) ?? 0;
       custoTotal += custo;
-      await deps.registrarUsoIa({ userId: input.userId, modelo });
+      await deps.registrarUsoIa({ userId: input.userId, modelo: modeloUsado });
       await gravar(
         rec.next({
           tipo: "model",
@@ -344,7 +377,12 @@ export async function executarTurnoCeo(
         };
       }
 
-      mensagens.push({ role: "assistant", text: resp.texto, toolUses: resp.toolUses });
+      mensagens.push({
+        role: "assistant",
+        text: resp.texto,
+        toolUses: resp.toolUses,
+        raw: resp.raw,
+      });
       const { resultados, delegacoesUsadas } = await processarUsosDeFerramenta({
         usos: resp.toolUses,
         agent: atual.agent,

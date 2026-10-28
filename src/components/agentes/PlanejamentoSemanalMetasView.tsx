@@ -2,6 +2,7 @@
 // Central de planejamento comercial gerenciada pelo CEO de IA.
 // Reproduz fielmente a imagem de referência aprovada com máxima fidelidade estética e interativa.
 import { PlanosRealPanel } from "./EquipeRealUi";
+import { MemoriaRealPanel } from "./OperacoesRealUi";
 import { useEquipeReal } from "./useEquipeReal";
 import React, { useState } from "react";
 import {
@@ -125,11 +126,14 @@ export function PlanejamentoSemanalMetasView({
   const [campanhas, setCampanhas] = useState<CampanhaSemanalItem[]>(CAMPANHAS_DA_SEMANA_INICIAIS);
   const [tarefas, setTarefas] = useState<TarefaSemanaItem[]>(TAREFAS_DA_SEMANA_INICIAIS);
   const [orcamentoTotal, setOrcamentoTotal] = useState(ORCAMENTO_TOTAL_SEMANAL);
-  const [categoriasOrcamento, setCategoriasOrcamento] = useState<CategoriaOrcamento[]>(CATEGORIAS_ORCAMENTO);
+  const [categoriasOrcamento, setCategoriasOrcamento] =
+    useState<CategoriaOrcamento[]>(CATEGORIAS_ORCAMENTO);
 
   // Navegação de Semanas
   const [semanaOffset, setSemanaOffset] = useState(0);
-  const [visualizacaoCalendario, setVisualizacaoCalendario] = useState<"semana" | "mes" | "lista">("semana");
+  const [visualizacaoCalendario, setVisualizacaoCalendario] = useState<"semana" | "mes" | "lista">(
+    "semana",
+  );
 
   // Notificação Toast
   const [toastMensagem, setToastMensagem] = useState<string | null>(null);
@@ -156,9 +160,7 @@ export function PlanejamentoSemanalMetasView({
 
   // Toggle de tarefa concluída
   const handleToggleTarefa = (id: string) => {
-    setTarefas((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, concluida: !t.concluida } : t))
-    );
+    setTarefas((prev) => prev.map((t) => (t.id === id ? { ...t, concluida: !t.concluida } : t)));
   };
 
   // Obter cor de estilo do evento no calendário
@@ -295,6 +297,7 @@ export function PlanejamentoSemanalMetasView({
       </header>
 
       <PlanosRealPanel eq={equipeReal} />
+      <MemoriaRealPanel />
 
       {/* =========================================================================
           2. CARD PRINCIPAL DO AGENTE (CEO DE IA) & INDICADORES SUPERIORES
@@ -338,7 +341,8 @@ export function PlanejamentoSemanalMetasView({
               </p>
 
               <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                Planeja, distribui e acompanha as ações da equipe comercial para garantir o atingimento das metas com máxima eficiência.
+                Planeja, distribui e acompanha as ações da equipe comercial para garantir o
+                atingimento das metas com máxima eficiência.
               </p>
 
               {/* Tags */}
@@ -368,7 +372,13 @@ export function PlanejamentoSemanalMetasView({
                       <span className="text-[10px] font-medium text-neutral-400 truncate">
                         {ind.rotulo}
                       </span>
-                      <div className={cn("flex size-6 items-center justify-center rounded-lg border", ind.corBg, ind.corIcone)}>
+                      <div
+                        className={cn(
+                          "flex size-6 items-center justify-center rounded-lg border",
+                          ind.corBg,
+                          ind.corIcone,
+                        )}
+                      >
                         <ind.icon className="size-3.5" />
                       </div>
                     </div>
@@ -423,7 +433,13 @@ export function PlanejamentoSemanalMetasView({
                   className="flex flex-col justify-between rounded-xl border border-white/5 bg-[#121620]/90 p-3 shadow-md"
                 >
                   <div className="flex items-center justify-between">
-                    <div className={cn("flex size-7 items-center justify-center rounded-lg border", ind.corBg, ind.corIcone)}>
+                    <div
+                      className={cn(
+                        "flex size-7 items-center justify-center rounded-lg border",
+                        ind.corBg,
+                        ind.corIcone,
+                      )}
+                    >
                       <ind.icon className="size-3.5" />
                     </div>
                     <span className="text-[10px] font-medium text-emerald-400">{ind.sub}</span>
@@ -466,7 +482,7 @@ export function PlanejamentoSemanalMetasView({
               "rounded-xl px-4 py-2 text-xs font-semibold whitespace-nowrap transition-all",
               tab.ativo
                 ? "border border-[#FF5500] bg-[#FF5500]/15 text-white shadow-sm"
-                : "text-neutral-400 hover:text-white hover:bg-white/5"
+                : "text-neutral-400 hover:text-white hover:bg-white/5",
             )}
           >
             {tab.label}
@@ -478,7 +494,6 @@ export function PlanejamentoSemanalMetasView({
           4. CORPO PRINCIPAL: CALENDÁRIO SEMANAL & CARDS DE METAS / ORÇAMENTO
          ========================================================================= */}
       <section className="grid gap-5 lg:grid-cols-12 items-start">
-        
         {/* ---------------------------------------------------------------------
             COLUNA ESQUERDA: CALENDÁRIO — PLANEJAMENTO DA SEMANA (8 colunas no lg)
            --------------------------------------------------------------------- */}
@@ -513,7 +528,7 @@ export function PlanejamentoSemanalMetasView({
                       "rounded-lg px-2.5 py-1 font-semibold capitalize transition-all",
                       visualizacaoCalendario === view
                         ? "bg-[#FF5500] text-white shadow"
-                        : "text-neutral-400 hover:text-white"
+                        : "text-neutral-400 hover:text-white",
                     )}
                   >
                     {view}
@@ -526,7 +541,6 @@ export function PlanejamentoSemanalMetasView({
           {/* Calendário Semanal Grid */}
           <div className="overflow-x-auto select-none">
             <div className="min-w-[700px]">
-              
               {/* Cabeçalho dos 7 Dias */}
               <div className="grid grid-cols-7 gap-2 border-b border-white/5 pb-2 text-center text-xs">
                 {DIAS_DA_SEMANA.map((dia) => (
@@ -536,7 +550,7 @@ export function PlanejamentoSemanalMetasView({
                       "flex flex-col items-center justify-center py-1.5 rounded-xl transition-colors",
                       dia.hoje
                         ? "border border-orange-500/80 bg-orange-500/10 text-orange-400 font-bold"
-                        : "text-neutral-400 hover:bg-white/5"
+                        : "text-neutral-400 hover:bg-white/5",
                     )}
                   >
                     <span className="text-[11px] font-medium">{dia.sigla}</span>
@@ -561,7 +575,7 @@ export function PlanejamentoSemanalMetasView({
                         const eventosNesteSlot = eventos.filter(
                           (ev) =>
                             ev.diaSemana === dia.diaSemana &&
-                            ev.horaInicio.startsWith(hora.substring(0, 2))
+                            ev.horaInicio.startsWith(hora.substring(0, 2)),
                         );
 
                         return (
@@ -574,7 +588,7 @@ export function PlanejamentoSemanalMetasView({
                             }}
                             className={cn(
                               "relative rounded-lg p-1 transition-colors min-h-[48px]",
-                              dia.hoje ? "bg-orange-500/[0.02]" : "hover:bg-white/[0.02]"
+                              dia.hoje ? "bg-orange-500/[0.02]" : "hover:bg-white/[0.02]",
                             )}
                           >
                             {eventosNesteSlot.map((ev) => (
@@ -582,19 +596,21 @@ export function PlanejamentoSemanalMetasView({
                                 key={ev.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  exibirToast(`Atividade: "${ev.titulo}" • Responsável: ${ev.agente} (${ev.horaInicio} às ${ev.horaFim})`);
+                                  exibirToast(
+                                    `Atividade: "${ev.titulo}" • Responsável: ${ev.agente} (${ev.horaInicio} às ${ev.horaFim})`,
+                                  );
                                 }}
                                 className={cn(
                                   "group flex flex-col justify-between rounded-lg border p-1.5 text-[10px] font-semibold transition-all shadow-md hover:scale-[1.02] cursor-pointer",
-                                  getCorEventoStyle(ev.cor)
+                                  getCorEventoStyle(ev.cor),
                                 )}
                               >
-                                <div className="truncate font-bold leading-tight">
-                                  {ev.titulo}
-                                </div>
+                                <div className="truncate font-bold leading-tight">{ev.titulo}</div>
                                 <div className="mt-1 flex items-center justify-between text-[9px] opacity-80">
                                   <span>{ev.agente}</span>
-                                  <span>{ev.horaInicio} - {ev.horaFim}</span>
+                                  <span>
+                                    {ev.horaInicio} - {ev.horaFim}
+                                  </span>
                                 </div>
                               </div>
                             ))}
@@ -605,7 +621,6 @@ export function PlanejamentoSemanalMetasView({
                   );
                 })}
               </div>
-
             </div>
           </div>
         </div>
@@ -614,7 +629,6 @@ export function PlanejamentoSemanalMetasView({
             COLUNA DIREITA: METAS DA SEMANA & ORÇAMENTO (4 colunas no lg)
            --------------------------------------------------------------------- */}
         <div className="lg:col-span-4 space-y-5">
-          
           {/* Card: Metas da Semana */}
           <div className="rounded-2xl border border-white/10 bg-[#0d1017] p-5 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
@@ -635,7 +649,13 @@ export function PlanejamentoSemanalMetasView({
                   <div key={meta.id} className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <div className={cn("flex size-5 items-center justify-center rounded-md border", meta.corBg, meta.corIcone)}>
+                        <div
+                          className={cn(
+                            "flex size-5 items-center justify-center rounded-md border",
+                            meta.corBg,
+                            meta.corIcone,
+                          )}
+                        >
                           <Icon className="size-3" />
                         </div>
                         <span className="font-semibold text-neutral-200">{meta.nome}</span>
@@ -715,7 +735,6 @@ export function PlanejamentoSemanalMetasView({
               ))}
             </div>
           </div>
-
         </div>
       </section>
 
@@ -723,7 +742,6 @@ export function PlanejamentoSemanalMetasView({
           5. LINHA INFERIOR (3 CARDS): CAMPANHAS | TAREFAS | DESEMPENHO
          ========================================================================= */}
       <section className="grid gap-5 lg:grid-cols-12">
-        
         {/* ---------------------------------------------------------------------
             CARD 1: CAMPANHAS DA SEMANA (4 colunas no lg)
            --------------------------------------------------------------------- */}
@@ -758,7 +776,13 @@ export function PlanejamentoSemanalMetasView({
                     <tr key={camp.id} className="group hover:bg-white/[0.02]">
                       <td className="py-2.5 pr-2">
                         <div className="flex items-center gap-2">
-                          <div className={cn("flex size-6 shrink-0 items-center justify-center rounded-lg border", camp.corBg, camp.corIcone)}>
+                          <div
+                            className={cn(
+                              "flex size-6 shrink-0 items-center justify-center rounded-lg border",
+                              camp.corBg,
+                              camp.corIcone,
+                            )}
+                          >
                             <Icon className="size-3" />
                           </div>
                           <span className="font-semibold text-white truncate max-w-[110px]">
@@ -775,16 +799,19 @@ export function PlanejamentoSemanalMetasView({
                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
                             camp.status === "ativa"
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-neutral-800 text-neutral-400 border border-neutral-700"
+                              : "bg-neutral-800 text-neutral-400 border border-neutral-700",
                           )}
                         >
-                          <span className={cn("size-1 rounded-full", camp.status === "ativa" ? "bg-emerald-400" : "bg-neutral-500")} />
+                          <span
+                            className={cn(
+                              "size-1 rounded-full",
+                              camp.status === "ativa" ? "bg-emerald-400" : "bg-neutral-500",
+                            )}
+                          />
                           {camp.status}
                         </span>
                       </td>
-                      <td className="py-2.5 text-right font-bold text-white">
-                        {camp.leads}
-                      </td>
+                      <td className="py-2.5 text-right font-bold text-white">{camp.leads}</td>
                       <td className="py-2.5 text-right font-semibold text-emerald-400">
                         {camp.conversao}
                       </td>
@@ -825,14 +852,20 @@ export function PlanejamentoSemanalMetasView({
                       "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
                       tar.concluida
                         ? "border-emerald-500 bg-emerald-500 text-black"
-                        : "border-white/20 bg-white/5 hover:border-orange-500"
+                        : "border-white/20 bg-white/5 hover:border-orange-500",
                     )}
                   >
                     {tar.concluida && <Check className="size-3 stroke-[3]" />}
                   </div>
 
                   {/* Ícone */}
-                  <div className={cn("flex size-6 shrink-0 items-center justify-center rounded-lg border", tar.corBg, tar.corIcone)}>
+                  <div
+                    className={cn(
+                      "flex size-6 shrink-0 items-center justify-center rounded-lg border",
+                      tar.corBg,
+                      tar.corIcone,
+                    )}
+                  >
                     <tar.icon className="size-3" />
                   </div>
 
@@ -841,7 +874,7 @@ export function PlanejamentoSemanalMetasView({
                     <span
                       className={cn(
                         "text-xs font-semibold block truncate transition-all",
-                        tar.concluida ? "line-through text-neutral-500" : "text-white"
+                        tar.concluida ? "line-through text-neutral-500" : "text-white",
                       )}
                     >
                       {tar.titulo}
@@ -858,8 +891,8 @@ export function PlanejamentoSemanalMetasView({
                       tar.corPrazo === "hoje"
                         ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
                         : tar.corPrazo === "amanha"
-                        ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                        : "bg-neutral-800 text-neutral-300 border border-neutral-700"
+                          ? "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                          : "bg-neutral-800 text-neutral-300 border border-neutral-700",
                     )}
                   >
                     {tar.prazo}
@@ -918,13 +951,13 @@ export function PlanejamentoSemanalMetasView({
                         </div>
                         <span className="font-semibold text-white flex items-center gap-1 truncate max-w-[95px]">
                           <span>{ag.nome}</span>
-                          {ag.isCeo && <Crown className="size-3 text-amber-400 fill-amber-400 shrink-0" />}
+                          {ag.isCeo && (
+                            <Crown className="size-3 text-amber-400 fill-amber-400 shrink-0" />
+                          )}
                         </span>
                       </div>
                     </td>
-                    <td className="py-2.5 text-right font-bold text-white">
-                      {ag.leads}
-                    </td>
+                    <td className="py-2.5 text-right font-bold text-white">{ag.leads}</td>
                     <td className="py-2.5 text-right font-medium text-neutral-300">
                       {ag.reunioes}
                     </td>
@@ -943,7 +976,6 @@ export function PlanejamentoSemanalMetasView({
             </table>
           </div>
         </div>
-
       </section>
 
       {/* =========================================================================
@@ -953,10 +985,7 @@ export function PlanejamentoSemanalMetasView({
         aberto={modalAtividadeAberto}
         onFechar={() => setModalAtividadeAberto(false)}
         onSalvarAtividade={(nova) => {
-          setEventos((prev) => [
-            ...prev,
-            { ...nova, id: `ev-${Date.now()}` },
-          ]);
+          setEventos((prev) => [...prev, { ...nova, id: `ev-${Date.now()}` }]);
           exibirToast(`Atividade "${nova.titulo}" agendada com sucesso!`);
         }}
       />

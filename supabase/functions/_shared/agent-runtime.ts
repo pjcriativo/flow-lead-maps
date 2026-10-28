@@ -25,8 +25,11 @@ export const FERRAMENTAS_DO_PAPEL: Record<AgentPapel, readonly string[]> = {
     "consultar_pipeline",
     "consultar_oportunidades",
     "consultar_execucoes_equipe",
+    "consultar_memoria",
     "delegar_tarefa",
     "propor_estrutura_equipe",
+    "registrar_memoria",
+    "propor_operacao",
   ],
   gerente_comercial: [
     "consultar_resumo_comercial",
@@ -34,6 +37,7 @@ export const FERRAMENTAS_DO_PAPEL: Record<AgentPapel, readonly string[]> = {
     "consultar_oportunidades",
     "consultar_lead",
     "consultar_execucoes_equipe",
+    "consultar_memoria",
     "delegar_tarefa",
   ],
   prospeccao: ["consultar_resumo_comercial", "consultar_oportunidades"],
@@ -122,6 +126,8 @@ export type BlockReason =
   | "limite_de_passos"
   | "teto_dia"
   | "teto_mes"
+  | "teto_org_dia"
+  | "teto_org_mes"
   | "modelo_nao_precificado"
   | "parametros_invalidos";
 
@@ -229,8 +235,19 @@ export const MODEL_PRICES: Record<string, { in: number; out: number }> = {
 };
 export const DEFAULT_CEO_MODEL = "claude-haiku-4-5";
 
-export function costUsd(model: string, tokensIn: number, tokensOut: number): number | null {
-  const p = MODEL_PRICES[model];
+export type TabelaPrecos = Record<string, { in: number; out: number }>;
+
+/**
+ * `tabela` (Central de IA) tem precedência sobre MODEL_PRICES; modelo sem preço em nenhuma das duas
+ * continua RECUSADO. O preço dos modelos da OpenAI vem do Super Admin, nunca do código.
+ */
+export function costUsd(
+  model: string,
+  tokensIn: number,
+  tokensOut: number,
+  tabela?: TabelaPrecos,
+): number | null {
+  const p = tabela?.[model] ?? MODEL_PRICES[model];
   if (!p) return null;
   return (Math.max(0, tokensIn) * p.in + Math.max(0, tokensOut) * p.out) / 1_000_000;
 }
@@ -240,8 +257,24 @@ export function estimateMaxCallCostUsd(
   model: string,
   promptChars: number,
   maxTokensOut: number,
+  tabela?: TabelaPrecos,
 ): number | null {
-  return costUsd(model, Math.ceil(promptChars / 4), maxTokensOut);
+  return costUsd(model, Math.ceil(promptChars / 4), maxTokensOut, tabela);
+}
+
+/** Teto AGREGADO da organização (todos os agentes e operações), imposto no backend além do teto por agente. */
+export function orgBudgetDecision(input: {
+  gastoDiaUsd: number;
+  gastoMesUsd: number;
+  tetoDiaUsd: number;
+  tetoMesUsd: number;
+  proximaChamadaUsd: number;
+}): Decision {
+  if (input.gastoDiaUsd + input.proximaChamadaUsd > input.tetoDiaUsd)
+    return { ok: false, reason: "teto_org_dia" };
+  if (input.gastoMesUsd + input.proximaChamadaUsd > input.tetoMesUsd)
+    return { ok: false, reason: "teto_org_mes" };
+  return { ok: true };
 }
 
 export function budgetDecision(input: {

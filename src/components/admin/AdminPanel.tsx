@@ -31,6 +31,7 @@ import {
   ChevronRight,
   Lock,
   Tag,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -60,6 +61,8 @@ import { AdminConfiguracoes, AdminProfile } from "./AdminConfiguracoes";
 import { AdminNotificacoes } from "./AdminNotificacoes";
 import { AdminCms } from "./AdminCms";
 import { AdminPagamentos } from "./AdminPagamentos";
+import { AdminIaProvedores } from "./AdminIaProvedores";
+import { IA_CENTRAL_HABILITADA } from "@/services/ia-catalogo";
 import { AdminApiUsageDashboard } from "./AdminApiUsageDashboard";
 import { lerConfigPublica } from "@/services/config-publica";
 import { setFusoHorario } from "@/lib/format";
@@ -81,7 +84,8 @@ type TelaAdmin =
   | "configuracoes"
   | "notificacoes"
   | "cms"
-  | "pagamentos";
+  | "pagamentos"
+  | "ia-provedores";
 
 type ItemNav = {
   rotulo: string;
@@ -111,6 +115,16 @@ const NAV: ItemNav[] = [
     ],
   },
   { rotulo: "Consumo de APIs", Icon: BarChart3, tela: "api-usage" },
+  // Central de IA: só aparece com VITE_IA_CENTRAL=true (desligada por padrão até a migration 004 ser publicada).
+  ...(IA_CENTRAL_HABILITADA
+    ? [
+        {
+          rotulo: "Inteligência Artificial",
+          Icon: Sparkles,
+          filhos: [{ rotulo: "Provedores & Modelos", tela: "ia-provedores" as const }],
+        },
+      ]
+    : []),
   { rotulo: "Planos", Icon: Tag, tela: "plans" },
   { rotulo: "Pagamentos", Icon: Wallet, tela: "pagamentos" },
   { rotulo: "Relatórios", Icon: BarChart3, tela: "relatorios" },
@@ -598,6 +612,7 @@ export function AdminPanel({ email }: { email: string }) {
             {tela === "notificacoes" && <AdminNotificacoes />}
             {tela === "cms" && <AdminCms />}
             {tela === "pagamentos" && <AdminPagamentos />}
+            {tela === "ia-provedores" && IA_CENTRAL_HABILITADA && <AdminIaProvedores />}
           </main>
         </div>
       </div>

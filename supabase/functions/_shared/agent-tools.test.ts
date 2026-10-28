@@ -89,8 +89,8 @@ test("contagens que chegam como texto numérico (bigint do Postgres) são aceita
   assert.equal(r.disponivel && r.totalLeads, 10);
 });
 
-test("registro: 5 ferramentas de leitura e 2 de coordenação interna, nenhuma externa", () => {
-  assert.equal(TOOL_REGISTRY.length, 7);
+test("registro: 6 ferramentas de leitura e 4 de coordenação interna, nenhuma externa", () => {
+  assert.equal(TOOL_REGISTRY.length, 10);
   const risco = (r: string) =>
     TOOL_REGISTRY.filter((t) => t.risco === r)
       .map((t) => t.nome)
@@ -98,11 +98,17 @@ test("registro: 5 ferramentas de leitura e 2 de coordenação interna, nenhuma e
   assert.deepEqual(risco("read"), [
     "consultar_execucoes_equipe",
     "consultar_lead",
+    "consultar_memoria",
     "consultar_oportunidades",
     "consultar_pipeline",
     "consultar_resumo_comercial",
   ]);
-  assert.deepEqual(risco("write_internal"), ["delegar_tarefa", "propor_estrutura_equipe"]);
+  assert.deepEqual(risco("write_internal"), [
+    "delegar_tarefa",
+    "propor_estrutura_equipe",
+    "propor_operacao",
+    "registrar_memoria",
+  ]);
   assert.deepEqual(risco("external_send"), []);
   assert.deepEqual(risco("spend"), []);
 });

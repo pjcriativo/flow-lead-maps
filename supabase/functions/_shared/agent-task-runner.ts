@@ -9,6 +9,7 @@ import {
   classifyFailure,
   costUsd,
   estimateMaxCallCostUsd,
+  orgBudgetDecision,
   retryDecision,
   StepRecorder,
   stepLimitDecision,
@@ -17,6 +18,7 @@ import {
   type AgentPermission,
   type BlockReason,
   type StepRecord,
+  type TabelaPrecos,
   type ToolSpec,
 } from "./agent-runtime.ts";
 import { anthropicToolSchemas, ferramentasDoAgente } from "./agent-tools.ts";
@@ -48,6 +50,12 @@ export type RunnerDeps = {
     agentId: string,
   ): Promise<{ agent: AgentIdentity; catalog: ToolSpec[]; permissions: AgentPermission[] } | null>;
   consumo(agentId: string): Promise<{ usdDia: number; usdMes: number }>;
+  /** Gasto e teto AGREGADOS da organização. Ausente = só vale o teto por agente (comportamento anterior). */
+  consumoOrg?(
+    orgId: string,
+  ): Promise<{ usdDia: number; usdMes: number; tetoDia: number; tetoMes: number }>;
+  /** Preços da Central de IA (modelos fora de MODEL_PRICES). */
+  tabelaPrecos?: TabelaPrecos;
   iniciarRun(taskId: string, modelo: string): Promise<string>;
   registrarPasso(runId: string, step: StepRecord): Promise<void>;
   finalizarRun(
@@ -162,6 +170,7 @@ export async function executarTarefaAgente(
         modelo,
         JSON.stringify(mensagens).length + system.length,
         atual.agent.maxTokensSaida,
+        deps.tabelaPrecos,
       );
       if (estimativa === null) return await bloquear("modelo_nao_precificado", modelo);
       const consumo = await deps.consumo(atual.agent.id);
@@ -173,6 +182,17 @@ export async function executarTarefaAgente(
         proximaChamadaUsd: estimativa,
       });
       if (!orcamento.ok) return await bloquear(orcamento.reason);
+      if (deps.consumoOrg) {
+        const org = await deps.consumoOrg(tarefa.orgId);
+        const orcOrg = orgBudgetDecision({
+          gastoDiaUsd: org.usdDia,
+          gastoMesUsd: org.usdMes,
+          tetoDiaUsd: org.tetoDia,
+          tetoMesUsd: org.tetoMes,
+          proximaChamadaUsd: estimativa,
+        });
+        if (!orcOrg.ok) return await bloquear(orcOrg.reason);
+      }
 
       const ferramentas = ferramentasDoAgente(atual.agent, atual.catalog, atual.permissions);
       const inicio = deps.agora().getTime();
@@ -183,9 +203,11 @@ export async function executarTarefaAgente(
         maxTokensSaida: atual.agent.maxTokensSaida,
         tools: anthropicToolSchemas(ferramentas),
       });
-      const custo = costUsd(modelo, resp.tokensEntrada, resp.tokensSaida) ?? 0;
+      const modeloUsado = resp.modeloUsado ?? modelo;
+      const custo =
+        costUsd(modeloUsado, resp.tokensEntrada, resp.tokensSaida, deps.tabelaPrecos) ?? 0;
       custoTotal += custo;
-      await deps.registrarUsoIa({ userId: input.userId, modelo });
+      await deps.registrarUsoIa({ userId: input.userId, modelo: modeloUsado });
       await gravar(
         rec.next({
           tipo: "model",
@@ -233,7 +255,12 @@ export async function executarTarefaAgente(
         return { ok: true, taskId: tarefa.id, texto, custoUsd: custoTotal, passos: rec.count };
       }
 
-      mensagens.push({ role: "assistant", text: resp.texto, toolUses: resp.toolUses });
+      mensagens.push({
+        role: "assistant",
+        text: resp.texto,
+        toolUses: resp.toolUses,
+        raw: resp.raw,
+      });
       for (const u of resp.toolUses) usadas.add(u.name);
       const { resultados, delegacoesUsadas } = await processarUsosDeFerramenta({
         usos: resp.toolUses,

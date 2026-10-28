@@ -245,7 +245,15 @@ export type AdminAcao =
   | "apify_chave_status"
   | "apify_chave_ordem"
   | "apify_chave_testar"
-  | "apify_simular_esgotamento";
+  | "apify_simular_esgotamento"
+  | "ia_central_ler"
+  | "ia_openai_conectar"
+  | "ia_openai_testar"
+  | "ia_openai_revogar"
+  | "ia_provedor_ativar"
+  | "ia_modelo_salvar"
+  | "ia_config_salvar"
+  | "ia_orcamento_org_salvar";
 
 export async function adminAcao(
   acao: AdminAcao,

@@ -1,6 +1,7 @@
 // Lógica PURA da configuração do CEO de IA (Telas 02, 03 e 10). Sem I/O: o que vale é o backend
 // (migrations 202610270001/2); aqui só espelhamos os tetos para validar cedo e derivar os estados
 // que a interface mostra. Nenhum valor daqui concede permissão — o banco recusa o que excede.
+import { modelosExtras } from "./modelos-ia.ts";
 
 export const FERRAMENTA_RESUMO_COMERCIAL = "consultar_resumo_comercial";
 
@@ -27,6 +28,17 @@ export const MODELOS_CEO = [
   { id: "claude-opus-4-8", rotulo: "Claude Opus 4.8", usdEntrada: 5, usdSaida: 25, padrao: false },
 ] as const;
 export const MODELO_PADRAO_CEO = "claude-haiku-4-5";
+
+/** Base estática (Claude) + catálogo da Central de IA, quando carregado (ver modelos-ia.ts). */
+export function modelosConhecidos(): { id: string; usdEntrada: number; usdSaida: number }[] {
+  const base: { id: string; usdEntrada: number; usdSaida: number }[] = MODELOS_CEO.map((m) => ({
+    id: m.id,
+    usdEntrada: m.usdEntrada,
+    usdSaida: m.usdSaida,
+  }));
+  for (const m of modelosExtras()) if (!base.some((b) => b.id === m.id)) base.push(m);
+  return base;
+}
 
 /** Avatares profissionais que já existem no catálogo da Tela 02 (o banco só aceita esta origem). */
 export const AVATARES_CEO = [
@@ -77,7 +89,8 @@ export function validarConfigCeo(f: ConfigCeoForm): { ok: boolean; erros: ErrosC
   if (f.descricao.length > 500) erros.descricao = "A descrição aceita até 500 caracteres.";
   if (!(AVATARES_CEO as readonly string[]).includes(f.avatarUrl))
     erros.avatarUrl = "Escolha um avatar da lista.";
-  if (!MODELOS_CEO.some((m) => m.id === f.modelo)) erros.modelo = "Modelo indisponível no backend.";
+  if (!modelosConhecidos().some((m) => m.id === f.modelo))
+    erros.modelo = "Modelo indisponível no backend.";
   if (!Number.isFinite(f.tetoDiaUsd) || f.tetoDiaUsd <= 0 || f.tetoDiaUsd > TETOS_CEO.diaMaxUsd) {
     erros.tetoDiaUsd = `O limite diário vai de US$ 0,01 a US$ ${TETOS_CEO.diaMaxUsd}.`;
   }
@@ -94,7 +107,7 @@ export function validarConfigCeo(f: ConfigCeoForm): { ok: boolean; erros: ErrosC
 
 /** Custo típico de UMA pergunta (2 chamadas ao modelo, ~3 mil tokens de entrada e ~600 de saída). */
 export function estimarCustoPerguntaUsd(modeloId: string): number | null {
-  const m = MODELOS_CEO.find((x) => x.id === modeloId);
+  const m = modelosConhecidos().find((x) => x.id === modeloId);
   if (!m) return null;
   return (3000 * m.usdEntrada + 600 * m.usdSaida) / 1_000_000;
 }
@@ -221,7 +234,7 @@ export function derivarEstadoCeo(input: {
   if (!agente) return infoEstado("nao_configurado");
   if (agente.killSwitch) return infoEstado("bloqueado");
 
-  const modeloValido = MODELOS_CEO.some((m) => m.id === agente.modelo);
+  const modeloValido = modelosConhecidos().some((m) => m.id === agente.modelo);
   const limitesValidos =
     agente.tetoDiaUsd > 0 &&
     agente.tetoMesUsd > 0 &&

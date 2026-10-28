@@ -19,8 +19,12 @@ import {
 import {
   autorizarGestorDeAgentes,
   carregarAgenteComPermissoes,
-  chamarAnthropic,
+  carregarContextoIa,
+  criarChamadorModelo,
+  criarConsumoOrg,
+  criarRegistradorDeEventos,
   criarRpc,
+  ehMotivoDeTeto,
   type Rec,
 } from "../_shared/agent-edge-kit.ts";
 
@@ -53,8 +57,11 @@ Deno.serve(async (req) => {
   if (!auth.ok) return json({ error: auth.error }, auth.status);
   const userId = auth.userId;
 
-  const chave = await resolverChave(admin, "ANTHROPIC_API_KEY");
-  if (!chave) return json({ error: "Assistente indisponível." }, 503);
+  // Provedor/modelo vêm da Central de IA; sem ela publicada vale o comportamento anterior (Claude).
+  const ia = await carregarContextoIa(admin);
+  if (!ia.central && !(await resolverChave(admin, "ANTHROPIC_API_KEY"))) {
+    return json({ error: "Assistente indisponível." }, 503);
+  }
   const rpc = criarRpc(admin);
 
   // Tarefa específica (tem de ser da organização) ou as próximas da fila da organização.
@@ -79,6 +86,7 @@ Deno.serve(async (req) => {
   }
   if (ids.length === 0) return json({ ok: true, processadas: 0, resultados: [] });
 
+  const registrarEvento = criarRegistradorDeEventos(admin, { orgId });
   const deps: RunnerDeps = {
     reservar: async (taskId, workerId): Promise<TarefaReservada | null> => {
       const r = (await rpc("agent_reservar_tarefa", {
@@ -144,7 +152,9 @@ Deno.serve(async (req) => {
         },
         ctx.params,
       ),
-    chamarModelo: (r) => chamarAnthropic(chave, r),
+    chamarModelo: criarChamadorModelo(admin, ia, registrarEvento),
+    tabelaPrecos: ia.tabela,
+    consumoOrg: criarConsumoOrg(rpc),
     registrarUsoIa: async ({ userId: uid, modelo }) => {
       await admin.from("ia_uso").insert({ user_id: uid, funcao: "agent-worker", modelo });
     },
@@ -158,6 +168,15 @@ Deno.serve(async (req) => {
       userId,
       workerId: `agent-worker:${crypto.randomUUID()}`,
     });
+    if (!r.ok && ehMotivoDeTeto(r.reason)) {
+      await registrarEvento({
+        tipo: "limite_atingido",
+        provider: null,
+        modelo: "—",
+        status: r.reason,
+        detalhe: "Tarefa de agente bloqueada por teto de custo",
+      });
+    }
     resultados.push(
       r.ok
         ? { tarefa_id: r.taskId, ok: true, custo_usd: r.custoUsd, passos: r.passos }

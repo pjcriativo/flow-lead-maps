@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { derivarEstadoAgente, type Papel } from "@/lib/equipe-config";
 import type { CargaCeo } from "@/lib/ceo-config";
 import { ErroCeo } from "@/services/agente-ceo-admin";
+import { useCatalogoIa } from "./useCatalogoIa";
 import { carregarEquipe, type EquipeCarregada } from "@/services/agente-equipe-admin";
 import type { CeoReal } from "./useCeoReal";
 
@@ -59,12 +60,22 @@ export function useAgenteReal(papel: Papel | null): CeoReal {
           : 0,
       }
     : null;
+  const cat = useCatalogoIa(papel !== null);
+  const carregandoTotal = carregando || cat.carregando;
   const estado = useMemo(
-    () => derivarEstadoAgente({ carregando, erroServico: erro !== null, carga }),
+    () => derivarEstadoAgente({ carregando: carregandoTotal, erroServico: erro !== null, carga }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [carregando, erro, equipe, papel],
+    [carregandoTotal, erro, equipe, papel, cat.versao],
   );
-  return { estado, carga, orgId: equipe?.orgId ?? null, carregando, erro, recarregar };
+  return {
+    estado,
+    carga,
+    orgId: equipe?.orgId ?? null,
+    carregando: carregandoTotal,
+    erro,
+    recarregar,
+    catalogo: cat.catalogo,
+  };
 }
 
 function inicioDoDia(): number {

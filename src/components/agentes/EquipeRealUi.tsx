@@ -15,6 +15,7 @@ import {
   ROTULO_TIPO_TAREFA,
   TIPOS_DE_PLANEJAMENTO,
   ehPropostaDeEquipe,
+  ehPropostaDeOperacao,
   formatarDuracao,
   ordenarEquipe,
   papeisFaltantes,
@@ -33,6 +34,7 @@ import {
   processarFila,
   revogarFerramenta,
 } from "@/services/agente-equipe-admin";
+import { decidirPropostaOperacao } from "@/services/agente-operacoes";
 import { CeoEstadoPill } from "./CeoRealUi";
 import { estadoDoAgente, type EquipeReal } from "./useEquipeReal";
 import type { CeoReal } from "./useCeoReal";
@@ -523,7 +525,9 @@ export function AprovacoesRealPanel({ eq }: { eq: EquipeReal }) {
       () =>
         ehPropostaDeEquipe(a)
           ? decidirPropostaEquipe(a.id, aprovar)
-          : decidirAprovacao(a.id, aprovar),
+          : ehPropostaDeOperacao(a)
+            ? decidirPropostaOperacao(a.id, aprovar)
+            : decidirAprovacao(a.id, aprovar),
       aprovar ? "Aprovada." : "Rejeitada.",
     );
 

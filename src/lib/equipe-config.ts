@@ -41,8 +41,11 @@ export const META_PAPEL: Record<Papel, MetaPapel> = {
       "consultar_pipeline",
       "consultar_oportunidades",
       "consultar_execucoes_equipe",
+      "consultar_memoria",
       "delegar_tarefa",
       "propor_estrutura_equipe",
+      "registrar_memoria",
+      "propor_operacao",
     ],
     tipos: ["copiloto_conversa", "analise_comercial"],
     superior: null,
@@ -57,6 +60,7 @@ export const META_PAPEL: Record<Papel, MetaPapel> = {
       "consultar_oportunidades",
       "consultar_lead",
       "consultar_execucoes_equipe",
+      "consultar_memoria",
       "delegar_tarefa",
     ],
     tipos: ["analise_comercial", "priorizar_oportunidades", "supervisao_comercial"],
@@ -116,6 +120,9 @@ export const ROTULO_FERRAMENTA: Record<
   consultar_execucoes_equipe: { rotulo: "Execuções da equipe", risco: "leitura" },
   delegar_tarefa: { rotulo: "Delegar tarefa interna", risco: "coordenação interna" },
   propor_estrutura_equipe: { rotulo: "Propor estrutura da equipe", risco: "coordenação interna" },
+  consultar_memoria: { rotulo: "Memória da organização", risco: "leitura" },
+  registrar_memoria: { rotulo: "Registrar memória", risco: "coordenação interna" },
+  propor_operacao: { rotulo: "Propor operação comercial", risco: "coordenação interna" },
 };
 
 export const ROTULO_TIPO_TAREFA: Record<string, string> = {
@@ -263,7 +270,7 @@ export type AprovacaoLinha = {
   tipo: string;
   resumo: string;
   status: string;
-  payload: { equipe?: { papel: string }[] } | null;
+  payload: { equipe?: { papel: string }[]; operacao?: { nome?: string } } | null;
   criadoEm: string;
   decididoEm: string | null;
   motivo: string | null;
@@ -272,6 +279,15 @@ export type AprovacaoLinha = {
 /** Proposta de estrutura de equipe (a única aprovação que materializa agentes). */
 export function ehPropostaDeEquipe(a: Pick<AprovacaoLinha, "tipo" | "payload">): boolean {
   return a.tipo === "mudanca_configuracao" && Array.isArray(a.payload?.equipe);
+}
+
+/** Proposta de OPERAÇÃO comercial do CEO: aprovar cria a operação (nunca agentes nem permissões). */
+export function ehPropostaDeOperacao(a: Pick<AprovacaoLinha, "tipo" | "payload">): boolean {
+  return (
+    a.tipo === "mudanca_configuracao" &&
+    typeof a.payload?.operacao === "object" &&
+    a.payload?.operacao !== null
+  );
 }
 
 export const ROTULO_TIPO_APROVACAO: Record<string, string> = {

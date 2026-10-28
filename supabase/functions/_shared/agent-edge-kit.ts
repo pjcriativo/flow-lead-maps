@@ -2,13 +2,30 @@
 // agente, RPC do runtime e chamada ao provedor de IA. Sem regra de negócio: ela mora nos módulos puros.
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 import { acessoFerramentaLiberado } from "./acesso.ts";
+import { resolverChave } from "./chaves.ts";
 import {
   canManageAgents,
+  classifyFailure,
+  estimateMaxCallCostUsd,
   type AgentIdentity,
   type AgentPermission,
+  type TabelaPrecos,
   type ToolSpec,
 } from "./agent-runtime.ts";
 import { ModeloErro, type ChamadaModelo, type RespostaModelo } from "./agent-ceo-turn.ts";
+import { chamarOpenAI } from "./ai-openai.ts";
+import {
+  MSG_CONFIGURAR_PROVEDOR,
+  PROVEDORES,
+  decidirFallback,
+  decidirProvedor,
+  ehProvedor,
+  redigirSegredos,
+  tabelaDePrecos,
+  type ConfigIa,
+  type ModeloIa,
+  type ProviderId,
+} from "./ai-provider.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Rec = Record<string, any>;
@@ -176,5 +193,211 @@ export async function chamarAnthropic(chave: string, r: ChamadaModelo): Promise<
       .map((b) => ({ id: b.id, name: b.name, input: b.input })),
     tokensEntrada: data.usage?.input_tokens ?? 0,
     tokensSaida: data.usage?.output_tokens ?? 0,
+  };
+}
+
+// ───────────────────────────── Central de IA (provedores e modelos) ─────────────────────────────
+// Lê a configuração do Super Admin (ia_config/ia_provedores/ia_modelos) e escolhe o provedor do modelo
+// do agente. Sem a migration 202610280001 (tabelas ausentes) o comportamento é o ANTERIOR: Claude com a
+// chave ANTHROPIC_API_KEY. As chaves vêm do cofre (resolverChave) só dentro da chamada e nunca são logadas.
+const CHAVE_DO_PROVEDOR: Record<ProviderId, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+};
+
+export type ContextoIa = {
+  /** false = tabelas da Central ainda não existem (migration não aplicada) → modo legado Claude. */
+  central: boolean;
+  modelos: ModeloIa[];
+  cfg: ConfigIa;
+  provedoresAtivos: Set<ProviderId>;
+  tabela: TabelaPrecos;
+};
+
+const CFG_PADRAO: ConfigIa = {
+  provedorCeo: "anthropic",
+  modeloPadrao: null,
+  modeloCeo: null,
+  modelosPorPapel: {},
+  fallbackProvider: null,
+  fallbackModelo: null,
+};
+
+export async function carregarContextoIa(admin: SupabaseClient): Promise<ContextoIa> {
+  const [mod, prov, cfg] = await Promise.all([
+    admin
+      .from("ia_modelos")
+      .select("id, provider, rotulo, usd_in_mtok, usd_out_mtok, suporta_ferramentas, ativo"),
+    admin.from("ia_provedores").select("provider, ativo"),
+    admin.from("ia_config").select("*").eq("id", true).maybeSingle(),
+  ]);
+  if (mod.error || prov.error || cfg.error) {
+    return {
+      central: false,
+      modelos: [],
+      cfg: CFG_PADRAO,
+      provedoresAtivos: new Set<ProviderId>(["anthropic"]),
+      tabela: {},
+    };
+  }
+  const modelos: ModeloIa[] = (mod.data ?? [])
+    .filter((m: Rec) => ehProvedor(m.provider))
+    .map((m: Rec) => ({
+      id: m.id,
+      provider: m.provider,
+      rotulo: m.rotulo,
+      usdIn: m.usd_in_mtok === null ? null : Number(m.usd_in_mtok),
+      usdOut: m.usd_out_mtok === null ? null : Number(m.usd_out_mtok),
+      ativo: m.ativo === true,
+      suportaFerramentas: m.suporta_ferramentas !== false,
+    }));
+  const c: Rec = cfg.data ?? {};
+  return {
+    central: true,
+    modelos,
+    cfg: {
+      provedorCeo: ehProvedor(c.provedor_ceo) ? c.provedor_ceo : "anthropic",
+      modeloPadrao: c.modelo_padrao ?? null,
+      modeloCeo: c.modelo_ceo ?? null,
+      modelosPorPapel: (c.modelos_por_papel ?? {}) as Record<string, string>,
+      fallbackProvider: ehProvedor(c.fallback_provider) ? c.fallback_provider : null,
+      fallbackModelo: c.fallback_modelo ?? null,
+    },
+    provedoresAtivos: new Set<ProviderId>(
+      (prov.data ?? [])
+        .filter((p: Rec) => p.ativo === true && ehProvedor(p.provider))
+        .map((p: Rec) => p.provider),
+    ),
+    tabela: tabelaDePrecos(modelos),
+  };
+}
+
+export type RegistrarEvento = (e: {
+  tipo: "chamada_falhou" | "fallback_usado" | "limite_atingido";
+  provider: ProviderId | null;
+  modelo: string;
+  status: string;
+  detalhe: string;
+}) => Promise<void>;
+
+/** Grava o evento na Central (best-effort). O detalhe passa por redigirSegredos antes de sair daqui. */
+export function criarRegistradorDeEventos(
+  admin: SupabaseClient,
+  base: { orgId: string; agentId?: string },
+): RegistrarEvento {
+  return async (e) => {
+    try {
+      await admin.from("ia_eventos").insert({
+        tipo: e.tipo,
+        provider: e.provider,
+        modelo: e.modelo.slice(0, 80),
+        status: e.status.slice(0, 40),
+        detalhe: redigirSegredos(e.detalhe),
+        org_id: base.orgId,
+        agent_id: base.agentId ?? null,
+      });
+    } catch {
+      /* log é auxiliar: nunca derruba a execução */
+    }
+  };
+}
+
+/** Motivos de bloqueio que são TETO de custo (agente ou organização): viram alerta no log da Central. */
+export const MOTIVOS_DE_TETO = ["teto_dia", "teto_mes", "teto_org_dia", "teto_org_mes"] as const;
+export const ehMotivoDeTeto = (reason: string): boolean =>
+  (MOTIVOS_DE_TETO as readonly string[]).includes(reason);
+
+/**
+ * Chamador de modelo com roteamento por provedor. Regras: provedor ativo + chave no cofre + preço
+ * conhecido; fallback só se o Super Admin autorizou, a falha é transitória e o custo MÁXIMO do
+ * fallback não excede o do modelo principal (o orçamento já foi checado para o principal).
+ */
+export function criarChamadorModelo(
+  admin: SupabaseClient,
+  ia: ContextoIa,
+  registrar: RegistrarEvento,
+  fetcher?: typeof fetch,
+) {
+  const chaveDe = async (p: ProviderId) => resolverChave(admin, CHAVE_DO_PROVEDOR[p]);
+  const chamar = async (p: ProviderId, chave: string, r: ChamadaModelo): Promise<RespostaModelo> =>
+    p === "openai" ? chamarOpenAI(chave, r, { fetcher }) : chamarAnthropic(chave, r);
+
+  return async (r: ChamadaModelo): Promise<RespostaModelo> => {
+    const chaves = new Set<ProviderId>();
+    for (const p of PROVEDORES) if ((await chaveDe(p)) !== null) chaves.add(p);
+    const d = decidirProvedor({
+      modelo: r.modelo,
+      modelos: ia.modelos,
+      provedoresAtivos: ia.provedoresAtivos,
+      chavesConfiguradas: chaves,
+    });
+    if (!d.ok) {
+      throw new ModeloErro(`${MSG_CONFIGURAR_PROVEDOR} (${d.reason})`, 412);
+    }
+    const chave = (await chaveDe(d.provider))!;
+    try {
+      return { ...(await chamar(d.provider, chave, r)), modeloUsado: r.modelo };
+    } catch (e) {
+      if (!(e instanceof ModeloErro)) throw e;
+      const transitoria = classifyFailure({ status: e.status, aborted: e.aborted }) === "transient";
+      await registrar({
+        tipo: "chamada_falhou",
+        provider: d.provider,
+        modelo: r.modelo,
+        status: String(e.status ?? "rede"),
+        detalhe: e.message,
+      });
+      const fb = decidirFallback({
+        cfg: ia.cfg,
+        provedorAtual: d.provider,
+        modelos: ia.modelos,
+        provedoresAtivos: ia.provedoresAtivos,
+        chavesConfiguradas: chaves,
+        falhaTransitoria: transitoria,
+      });
+      if (!fb.usar) throw e;
+      const chars = JSON.stringify(r.mensagens).length + r.system.length;
+      const principal = estimateMaxCallCostUsd(r.modelo, chars, r.maxTokensSaida, ia.tabela);
+      const alternativo = estimateMaxCallCostUsd(fb.modelo, chars, r.maxTokensSaida, ia.tabela);
+      if (principal === null || alternativo === null || alternativo > principal) throw e;
+      const chaveFb = await chaveDe(fb.provider);
+      if (!chaveFb) throw e;
+      await registrar({
+        tipo: "fallback_usado",
+        provider: fb.provider,
+        modelo: fb.modelo,
+        status: "ok",
+        detalhe: `de ${d.provider}/${r.modelo}`,
+      });
+      return {
+        ...(await chamar(fb.provider, chaveFb, { ...r, modelo: fb.modelo })),
+        modeloUsado: fb.modelo,
+      };
+    }
+  };
+}
+
+/** Gasto/teto agregados da organização. Sem a migration 004 não há teto agregado (vale o teto por agente). */
+export function criarConsumoOrg(rpc: (nome: string, args: Rec) => Promise<unknown>) {
+  let indisponivel = false;
+  const semTeto = { usdDia: 0, usdMes: 0, tetoDia: Infinity, tetoMes: Infinity };
+  return async (orgId: string) => {
+    if (indisponivel) return semTeto;
+    try {
+      const r = (await rpc("agent_orcamento_org_estado", { p_org: orgId })) as Rec[];
+      const l = r?.[0] ?? {};
+      return {
+        usdDia: Number(l.usd_dia ?? 0),
+        usdMes: Number(l.usd_mes ?? 0),
+        tetoDia: Number(l.teto_dia ?? Infinity),
+        tetoMes: Number(l.teto_mes ?? Infinity),
+      };
+    } catch (e) {
+      if (/agent_orcamento_org_estado|PGRST202|does not exist/i.test(String(e))) {
+        indisponivel = true;
+        return semTeto;
+      }
+      throw e;
+    }
   };
 }

@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { derivarEstadoCeo, type CargaCeo, type EstadoCeo } from "@/lib/ceo-config";
 import { carregarCeo, ErroCeo } from "@/services/agente-ceo-admin";
+import type { CatalogoIa } from "@/services/ia-catalogo";
+import { useCatalogoIa } from "./useCatalogoIa";
 
 export type CeoReal = {
   estado: EstadoCeo;
@@ -11,6 +13,8 @@ export type CeoReal = {
   /** Mensagem do último erro de leitura (serviço fora do ar, sem permissão etc.). */
   erro: string | null;
   recarregar: () => Promise<void>;
+  /** Catálogo da Central de IA (provedores/modelos); "indisponível" quando a Central não está publicada. */
+  catalogo: CatalogoIa;
 };
 
 export function useCeoReal(habilitado = true): CeoReal {
@@ -18,6 +22,7 @@ export function useCeoReal(habilitado = true): CeoReal {
   const [carga, setCarga] = useState<CargaCeo | null>(null);
   const [orgId, setOrgId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const cat = useCatalogoIa(habilitado);
 
   const recarregar = useCallback(async () => {
     setCarregando(true);
@@ -43,9 +48,20 @@ export function useCeoReal(habilitado = true): CeoReal {
     if (habilitado) void recarregar();
   }, [habilitado, recarregar]);
 
+  const carregandoTotal = carregando || cat.carregando;
   const estado = useMemo(
-    () => derivarEstadoCeo({ carregando, erroServico: erro !== null, carga }),
-    [carregando, erro, carga],
+    () => derivarEstadoCeo({ carregando: carregandoTotal, erroServico: erro !== null, carga }),
+    // cat.versao: o catálogo muda quais modelos (ex.: OpenAI) a interface considera válidos
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [carregandoTotal, erro, carga, cat.versao],
   );
-  return { estado, carga, orgId, carregando, erro, recarregar };
+  return {
+    estado,
+    carga,
+    orgId,
+    carregando: carregandoTotal,
+    erro,
+    recarregar,
+    catalogo: cat.catalogo,
+  };
 }

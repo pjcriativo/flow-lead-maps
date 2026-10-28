@@ -172,7 +172,11 @@ test("Edge agent-ceo: JWT, papel de gestão, nenhuma tabela de negócio e nenhum
   const rpcs = [...exec.matchAll(/chamarRpc\("([a-z_]+)"/g)].map((m) => m[1]);
   assert.ok(rpcs.length >= 7);
   assert.ok(
-    rpcs.every((n) => /^agent_(tool_[a-z_]+|delegar_tarefa|propor_equipe)$/.test(n)),
+    rpcs.every((n) =>
+      /^agent_(tool_[a-z_]+|delegar_tarefa|propor_equipe|propor_operacao|registrar_memoria)$/.test(
+        n,
+      ),
+    ),
     rpcs.join(","),
   );
   assert.doesNotMatch(exec, /\.from\("|\.insert\(|\.update\(|fetch\(/);

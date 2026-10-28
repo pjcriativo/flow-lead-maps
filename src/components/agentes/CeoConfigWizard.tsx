@@ -18,6 +18,7 @@ import {
   type ConfigCeoForm,
   type ErrosConfigCeo,
 } from "@/lib/ceo-config";
+import { MSG_CONFIGURAR_PROVEDOR } from "@/lib/ia-config";
 import { definirEstadoCeo, ErroCeo, salvarConfigCeo } from "@/services/agente-ceo-admin";
 import { CeoEstadoPill } from "./CeoRealUi";
 import type { CeoReal } from "./useCeoReal";
@@ -74,7 +75,14 @@ export function CeoConfigWizard({ aberto, onFechar, ceo, onAbrirMontagemCompleta
             tetoMesUsd: agente.tetoMesUsd,
             ferramentas: ceo.carga?.ferramentasConcedidas ?? [],
           }
-        : CONFIG_CEO_PADRAO,
+        : {
+            ...CONFIG_CEO_PADRAO,
+            // Central de IA publicada: o modelo inicial é o escolhido pelo Super Admin para o CEO.
+            modelo:
+              ceo.catalogo.disponivel && ceo.catalogo.modeloCeo
+                ? ceo.catalogo.modeloCeo
+                : CONFIG_CEO_PADRAO.modelo,
+          },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto]);
@@ -88,7 +96,22 @@ export function CeoConfigWizard({ aberto, onFechar, ceo, onAbrirMontagemCompleta
     ),
   );
   const etapaValida = Object.keys(errosEtapa).length === 0;
-  const servicoOk = ceo.orgId !== null && ceo.estado.id !== "servico_indisponivel";
+  const catalogo = ceo.catalogo;
+  // Com a Central de IA publicada: só os modelos liberados pelo Super Admin (e conectados) aparecem.
+  const opcoesModelo: {
+    id: string;
+    rotulo: string;
+    usdEntrada: number;
+    usdSaida: number;
+    padrao: boolean;
+  }[] = catalogo.disponivel
+    ? catalogo.modelos.map((m) => ({ ...m, padrao: m.id === catalogo.modeloCeo }))
+    : MODELOS_CEO.map((m) => ({ ...m }));
+  // Provedor do CEO sem conexão válida (ou sem modelo liberado): não dá para ativar.
+  const bloqueadoPorProvedor =
+    catalogo.disponivel && (!catalogo.ceoPronto || opcoesModelo.length === 0);
+  const servicoOk =
+    ceo.orgId !== null && ceo.estado.id !== "servico_indisponivel" && !bloqueadoPorProvedor;
   const set = <K extends keyof ConfigCeoForm>(k: K, v: ConfigCeoForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
   const custo = estimarCustoPerguntaUsd(form.modelo);
@@ -254,8 +277,18 @@ export function CeoConfigWizard({ aberto, onFechar, ceo, onAbrirMontagemCompleta
               <div className="sm:col-span-2">
                 <p className="text-[11px] font-medium text-neutral-300">Provedor de IA</p>
                 <p className="mt-1 text-xs text-white">
-                  Anthropic (Claude) — único provedor configurado no backend
+                  {catalogo.disponivel
+                    ? `${catalogo.provedorCeo === "openai" ? "OpenAI" : "Anthropic (Claude)"} — definido pelo Super Admin`
+                    : "Anthropic (Claude) — único provedor configurado no backend"}
                 </p>
+                {bloqueadoPorProvedor && (
+                  <p
+                    role="alert"
+                    className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-200"
+                  >
+                    {MSG_CONFIGURAR_PROVEDOR}
+                  </p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 {campo(
@@ -266,7 +299,7 @@ export function CeoConfigWizard({ aberto, onFechar, ceo, onAbrirMontagemCompleta
                     value={form.modelo}
                     onChange={(e) => set("modelo", e.target.value)}
                   >
-                    {MODELOS_CEO.map((m) => (
+                    {opcoesModelo.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.rotulo}
                         {m.padrao ? " (padrão, mais econômico)" : ""} — US$ {m.usdEntrada}/
@@ -367,7 +400,7 @@ export function CeoConfigWizard({ aberto, onFechar, ceo, onAbrirMontagemCompleta
                   ["Organização", ceo.orgId ?? "indisponível"],
                   ["Identidade", `${form.nome} · ${form.cargo} · ${form.departamento}`],
                   ["Especialidade", form.especialidade],
-                  ["Modelo", MODELOS_CEO.find((m) => m.id === form.modelo)?.rotulo ?? form.modelo],
+                  ["Modelo", opcoesModelo.find((m) => m.id === form.modelo)?.rotulo ?? form.modelo],
                   [
                     "Ferramenta",
                     form.ferramentas.join(", ") || "Nenhuma (não será possível ativar)",

@@ -11,18 +11,24 @@ import {
   type ToolSpec,
 } from "./agent-runtime.ts";
 import {
+  TOOL_CONSULTAR_MEMORIA,
   TOOL_DELEGAR,
   TOOL_EXECUCOES,
   TOOL_LEAD,
   TOOL_OPORTUNIDADES,
   TOOL_PIPELINE,
   TOOL_PROPOR_EQUIPE,
+  TOOL_PROPOR_OPERACAO,
+  TOOL_REGISTRAR_MEMORIA,
   TOOL_REGISTRY,
   TOOL_RESUMO_COMERCIAL,
   limitarSaidaFerramenta,
   normalizarResumoComercial,
   PAPEIS_SUBORDINADOS,
 } from "./agent-tools.ts";
+
+import { montarDefOperacao } from "./agent-operacoes.ts";
+import { validarMemoriaDoAgente } from "./agent-memory.ts";
 
 /** Teto de delegações criadas por UMA execução: impede laço de tarefas. */
 export const MAX_DELEGACOES_POR_EXECUCAO = 5;
@@ -86,6 +92,8 @@ export async function executarFerramentaAgente(
       if (!instrucoes) throw new Error("instrucoes_vazias");
       const leadId = params.lead_id ? String(params.lead_id) : null;
       if (leadId && !UUID.test(leadId)) throw new Error("lead_id_invalido");
+      const operacaoId = params.operacao_id ? String(params.operacao_id) : null;
+      if (operacaoId && !UUID.test(operacaoId)) throw new Error("operacao_id_invalido");
       const chave = await sha256(
         [
           ctx.orgId,
@@ -94,10 +102,11 @@ export async function executarFerramentaAgente(
           params.tipo,
           instrucoes,
           leadId ?? "",
+          operacaoId ?? "",
           ctx.hoje,
         ].join("|"),
       );
-      const tarefa = (await ctx.chamarRpc("agent_delegar_tarefa", {
+      const argsDelegar = {
         p_org: ctx.orgId,
         p_de: ctx.agentId,
         p_para_papel: params.papel,
@@ -105,7 +114,12 @@ export async function executarFerramentaAgente(
         p_entrada: { instrucoes, ...(leadId ? { lead_id: leadId } : {}) },
         p_idempotency_key: chave,
         p_parent: ctx.taskId,
-      })) as { id?: string; status?: string } | null;
+      };
+      // Vinculada a uma operação: o banco exige operação ativa da organização e agente autorizado nela.
+      const tarefa = (await ctx.chamarRpc(
+        operacaoId ? "agent_delegar_tarefa_op" : "agent_delegar_tarefa",
+        operacaoId ? { ...argsDelegar, p_operacao: operacaoId } : argsDelegar,
+      )) as { id?: string; status?: string } | null;
       return {
         delegada: true,
         tarefa_id: tarefa?.id ?? null,
@@ -128,6 +142,51 @@ export async function executarFerramentaAgente(
         aprovacao_id: id,
         papeis: lista.papeis,
         observacao: "Aguardando aprovação de um administrador; nenhum agente foi criado.",
+      };
+    }
+    case TOOL_CONSULTAR_MEMORIA: {
+      const operacaoId = params.operacao_id ? String(params.operacao_id) : null;
+      if (operacaoId && !UUID.test(operacaoId)) throw new Error("operacao_id_invalido");
+      return ctx.chamarRpc("agent_tool_memoria", {
+        ...base,
+        p_categoria: params.categoria ? String(params.categoria) : null,
+        p_operacao: operacaoId,
+        p_limite: Math.trunc(Number(params.limite ?? 15)),
+      });
+    }
+    case TOOL_REGISTRAR_MEMORIA: {
+      const entrada = {
+        categoria: String(params.categoria ?? ""),
+        titulo: String(params.titulo ?? ""),
+        conteudo: String(params.conteudo ?? ""),
+      };
+      const v = validarMemoriaDoAgente(entrada);
+      if (!v.ok) throw new Error(v.motivo);
+      const operacaoId = params.operacao_id ? String(params.operacao_id) : null;
+      if (operacaoId && !UUID.test(operacaoId)) throw new Error("operacao_id_invalido");
+      return ctx.chamarRpc("agent_registrar_memoria", {
+        ...base,
+        p_categoria: entrada.categoria,
+        p_titulo: entrada.titulo.trim(),
+        p_conteudo: entrada.conteudo.trim(),
+        p_operacao: operacaoId,
+      });
+    }
+    case TOOL_PROPOR_OPERACAO: {
+      const m = montarDefOperacao(params);
+      if (!m.ok) throw new Error(`operacao_invalida:${m.erros.join(",")}`);
+      const id = await ctx.chamarRpc("agent_propor_operacao", {
+        p_org: ctx.orgId,
+        p_de: ctx.agentId,
+        p_def: m.def,
+      });
+      return {
+        proposta_criada: true,
+        aprovacao_id: id,
+        operacao: m.def.nome,
+        papeis: m.def.papeis,
+        observacao:
+          "Aguardando aprovação de um administrador; nenhuma operação, agente ou permissão foi criada.",
       };
     }
     default:

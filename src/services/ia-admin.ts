@@ -1,0 +1,99 @@
+// Serviço da Central de IA (Super Admin). Tudo passa pela Edge `admin-acoes`, que revalida o papel de
+// super admin no servidor. A chave da OpenAI só trafega NO ENVIO (POST autenticado) e nunca volta: a
+// leitura devolve apenas estado e a máscara. Nada aqui grava em localStorage ou loga a chave.
+import { adminAcao } from "@/services/admin";
+import type { ModeloLinha, ProvedorId, StatusConexao, VisaoOrg } from "@/lib/ia-config";
+
+export type ProvedorEstado = {
+  provider: ProvedorId;
+  ativo: boolean;
+  conexao_status: StatusConexao;
+  conexao_verificada_em: string | null;
+  conexao_detalhe: string | null;
+  chave: {
+    configurada: boolean;
+    origem: "cofre" | "ambiente" | null;
+    mascarada: string | null;
+    atualizada_em: string | null;
+  };
+};
+
+export type ConfigIa = {
+  provedor_ceo: ProvedorId;
+  modelo_padrao: string | null;
+  modelo_ceo: string | null;
+  modelos_por_papel: Record<string, string>;
+  fallback_provider: ProvedorId | null;
+  fallback_modelo: string | null;
+  teto_org_dia_usd: number;
+  teto_org_mes_usd: number;
+};
+
+export type EventoIa = {
+  id: number;
+  criado_em: string;
+  provider: string | null;
+  tipo: string;
+  modelo: string | null;
+  status: string | null;
+  detalhe: string | null;
+  org_id: string | null;
+};
+
+export type ConsumoModelo = {
+  modelo: string;
+  execucoes: number;
+  falhas: number;
+  tokens_in: number;
+  tokens_out: number;
+  custo_usd: number;
+};
+
+export type CentralIa =
+  | { disponivel: false; motivo: string }
+  | {
+      disponivel: true;
+      config: ConfigIa;
+      provedores: ProvedorEstado[];
+      modelos: ModeloLinha[];
+      modelos_permitidos: string[];
+      eventos: EventoIa[];
+      consumo: ConsumoModelo[];
+      visao_orgs: VisaoOrg[];
+    };
+
+export type ResultadoIa = { ok: boolean; reason?: string; detalhe?: string } & Record<
+  string,
+  unknown
+>;
+
+export async function lerCentralIa(): Promise<CentralIa> {
+  const r = await adminAcao("ia_central_ler");
+  if (!r.ok) throw new Error(r.detalhe || r.reason || "Falha ao ler a Central de IA.");
+  if (r.disponivel !== true)
+    return { disponivel: false, motivo: String(r.motivo ?? "indisponivel") };
+  return r as unknown as CentralIa;
+}
+
+/** A chave é enviada uma vez; o chamador deve limpar o campo logo depois. */
+export const conectarOpenAI = (chave: string): Promise<ResultadoIa> =>
+  adminAcao("ia_openai_conectar", { chave });
+export const testarOpenAI = (): Promise<ResultadoIa> => adminAcao("ia_openai_testar");
+export const revogarOpenAI = (): Promise<ResultadoIa> => adminAcao("ia_openai_revogar");
+export const ativarProvedor = (provider: ProvedorId, ativo: boolean): Promise<ResultadoIa> =>
+  adminAcao("ia_provedor_ativar", { provider, ativo });
+export const salvarModeloIa = (m: {
+  id: string;
+  ativo: boolean;
+  usd_in_mtok: number | null;
+  usd_out_mtok: number | null;
+  rotulo?: string;
+}): Promise<ResultadoIa> => adminAcao("ia_modelo_salvar", m);
+export const salvarConfigIa = (c: Partial<ConfigIa>): Promise<ResultadoIa> =>
+  adminAcao("ia_config_salvar", c as Record<string, unknown>);
+export const salvarOrcamentoOrg = (
+  orgId: string,
+  dia: number | null,
+  mes: number | null,
+): Promise<ResultadoIa> =>
+  adminAcao("ia_orcamento_org_salvar", { org_id: orgId, teto_dia_usd: dia, teto_mes_usd: mes });
