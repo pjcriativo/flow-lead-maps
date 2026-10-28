@@ -116,6 +116,121 @@ export type Database = {
           },
         ];
       };
+      agent_conversa_mensagens: {
+        Row: {
+          acoes: Json;
+          client_message_id: string | null;
+          conteudo: string;
+          conversa_id: string;
+          criado_em: string;
+          custo_usd: number;
+          ferramentas: string[];
+          id: string;
+          org_id: string;
+          papel: string;
+          task_id: string | null;
+        };
+        Insert: {
+          acoes?: Json;
+          client_message_id?: string | null;
+          conteudo: string;
+          conversa_id: string;
+          criado_em?: string;
+          custo_usd?: number;
+          ferramentas?: string[];
+          id?: string;
+          org_id: string;
+          papel: string;
+          task_id?: string | null;
+        };
+        Update: {
+          acoes?: Json;
+          client_message_id?: string | null;
+          conteudo?: string;
+          conversa_id?: string;
+          criado_em?: string;
+          custo_usd?: number;
+          ferramentas?: string[];
+          id?: string;
+          org_id?: string;
+          papel?: string;
+          task_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversa_mensagens_conversa_id_org_id_fkey";
+            columns: ["conversa_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_conversas";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_conversa_mensagens_task_id_org_id_fkey";
+            columns: ["task_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_tasks";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
+      agent_conversas: {
+        Row: {
+          agent_id: string;
+          atualizado_em: string;
+          criado_em: string;
+          estado: string;
+          id: string;
+          operacao_id: string | null;
+          org_id: string;
+          titulo: string;
+          user_id: string;
+        };
+        Insert: {
+          agent_id: string;
+          atualizado_em?: string;
+          criado_em?: string;
+          estado?: string;
+          id?: string;
+          operacao_id?: string | null;
+          org_id: string;
+          titulo?: string;
+          user_id: string;
+        };
+        Update: {
+          agent_id?: string;
+          atualizado_em?: string;
+          criado_em?: string;
+          estado?: string;
+          id?: string;
+          operacao_id?: string | null;
+          org_id?: string;
+          titulo?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversas_agent_id_org_id_fkey";
+            columns: ["agent_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_conversas_operacao_id_org_id_fkey";
+            columns: ["operacao_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_operacoes";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_conversas_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       agent_memoria: {
         Row: {
           agent_id: string | null;
@@ -8308,6 +8423,11 @@ export type Database = {
             Returns: Json;
           };
       agent_cancelar_tarefa: { Args: { p_task: string }; Returns: undefined };
+      agent_chat_redigir: { Args: { p_texto: string }; Returns: string };
+      agent_chat_usuario_ok: {
+        Args: { p_org: string; p_user: string };
+        Returns: boolean;
+      };
       agent_conceder_permissao: {
         Args: { p_agent: string; p_tool: string };
         Returns: undefined;
@@ -8380,6 +8500,52 @@ export type Database = {
           usd_dia: number;
           usd_mes: number;
         }[];
+      };
+      agent_conversa_abrir: {
+        Args: {
+          p_agent: string;
+          p_conversa?: string;
+          p_operacao?: string;
+          p_org: string;
+          p_user: string;
+        };
+        Returns: string;
+      };
+      agent_conversa_arquivar: {
+        Args: { p_conversa: string };
+        Returns: undefined;
+      };
+      agent_conversa_definir_operacao: {
+        Args: { p_conversa: string; p_operacao: string };
+        Returns: undefined;
+      };
+      agent_conversa_historico: {
+        Args: {
+          p_conversa: string;
+          p_limite?: number;
+          p_org: string;
+          p_user: string;
+        };
+        Returns: {
+          conteudo: string;
+          criado_em: string;
+          papel: string;
+        }[];
+      };
+      agent_conversa_registrar: {
+        Args: {
+          p_acoes: Json;
+          p_client_message_id: string;
+          p_conversa: string;
+          p_custo: number;
+          p_ferramentas: string[];
+          p_org: string;
+          p_pergunta: string;
+          p_resposta: string;
+          p_task: string;
+          p_user: string;
+        };
+        Returns: undefined;
       };
       agent_criar_ceo: {
         Args: { p_org: string };
@@ -8774,6 +8940,7 @@ export type Database = {
         };
         Returns: Json;
       };
+      agent_tool_operacoes: { Args: { p_agent: string }; Returns: Json };
       agent_tool_oportunidades: {
         Args: { p_agent: string; p_limite?: number };
         Returns: Json;
