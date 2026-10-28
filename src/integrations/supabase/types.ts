@@ -314,6 +314,7 @@ export type Database = {
           atualizado_em: string;
           concluido_em: string | null;
           criado_em: string;
+          delegado_por: string | null;
           entrada: Json;
           id: string;
           idempotency_key: string;
@@ -321,6 +322,7 @@ export type Database = {
           max_attempts: number;
           next_attempt_at: string;
           org_id: string;
+          parent_task_id: string | null;
           prioridade: number;
           resultado: Json | null;
           solicitado_por: string | null;
@@ -335,6 +337,7 @@ export type Database = {
           atualizado_em?: string;
           concluido_em?: string | null;
           criado_em?: string;
+          delegado_por?: string | null;
           entrada?: Json;
           id?: string;
           idempotency_key: string;
@@ -342,6 +345,7 @@ export type Database = {
           max_attempts?: number;
           next_attempt_at?: string;
           org_id: string;
+          parent_task_id?: string | null;
           prioridade?: number;
           resultado?: Json | null;
           solicitado_por?: string | null;
@@ -356,6 +360,7 @@ export type Database = {
           atualizado_em?: string;
           concluido_em?: string | null;
           criado_em?: string;
+          delegado_por?: string | null;
           entrada?: Json;
           id?: string;
           idempotency_key?: string;
@@ -363,6 +368,7 @@ export type Database = {
           max_attempts?: number;
           next_attempt_at?: string;
           org_id?: string;
+          parent_task_id?: string | null;
           prioridade?: number;
           resultado?: Json | null;
           solicitado_por?: string | null;
@@ -380,11 +386,25 @@ export type Database = {
             referencedColumns: ["id", "org_id"];
           },
           {
+            foreignKeyName: "agent_tasks_delegado_por_fkey";
+            columns: ["delegado_por", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
             foreignKeyName: "agent_tasks_org_id_fkey";
             columns: ["org_id"];
             isOneToOne: false;
             referencedRelation: "orgs";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_tasks_parent_fkey";
+            columns: ["parent_task_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_tasks";
+            referencedColumns: ["id", "org_id"];
           },
         ];
       };
@@ -432,6 +452,7 @@ export type Database = {
           nome: string;
           org_id: string;
           papel: string;
+          reports_to: string | null;
           slug: string;
           teto_usd_dia: number;
           teto_usd_mes: number;
@@ -455,6 +476,7 @@ export type Database = {
           nome: string;
           org_id: string;
           papel: string;
+          reports_to?: string | null;
           slug: string;
           teto_usd_dia?: number;
           teto_usd_mes?: number;
@@ -478,6 +500,7 @@ export type Database = {
           nome?: string;
           org_id?: string;
           papel?: string;
+          reports_to?: string | null;
           slug?: string;
           teto_usd_dia?: number;
           teto_usd_mes?: number;
@@ -489,6 +512,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "orgs";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agents_reports_to_fkey";
+            columns: ["reports_to", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
           },
         ];
       };
@@ -7938,6 +7968,7 @@ export type Database = {
           nome: string;
           org_id: string;
           papel: string;
+          reports_to: string | null;
           slug: string;
           teto_usd_dia: number;
           teto_usd_mes: number;
@@ -7984,6 +8015,7 @@ export type Database = {
           nome: string;
           org_id: string;
           papel: string;
+          reports_to: string | null;
           slug: string;
           teto_usd_dia: number;
           teto_usd_mes: number;
@@ -7995,10 +8027,19 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      agent_criar_equipe: {
+        Args: { p_def: Json; p_org: string };
+        Returns: number;
+      };
       agent_decidir_aprovacao: {
         Args: { p_approval: string; p_aprovar: boolean; p_motivo?: string };
         Returns: undefined;
       };
+      agent_decidir_proposta_equipe: {
+        Args: { p_approval: string; p_aprovar: boolean; p_motivo?: string };
+        Returns: number;
+      };
+      agent_defaults_do_papel: { Args: { p_papel: string }; Returns: Json };
       agent_definir_estado: {
         Args: { p_agent: string; p_estado: string };
         Returns: undefined;
@@ -8011,6 +8052,50 @@ export type Database = {
           p_teto_dia: number;
           p_teto_mes: number;
         };
+        Returns: undefined;
+      };
+      agent_delegar_tarefa: {
+        Args: {
+          p_de: string;
+          p_entrada: Json;
+          p_idempotency_key: string;
+          p_org: string;
+          p_para_papel: string;
+          p_parent?: string;
+          p_tipo: string;
+        };
+        Returns: {
+          agent_id: string;
+          attempt_count: number;
+          atualizado_em: string;
+          concluido_em: string | null;
+          criado_em: string;
+          delegado_por: string | null;
+          entrada: Json;
+          id: string;
+          idempotency_key: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          next_attempt_at: string;
+          org_id: string;
+          parent_task_id: string | null;
+          prioridade: number;
+          resultado: Json | null;
+          solicitado_por: string | null;
+          status: string;
+          tipo: string;
+          ultimo_erro: string | null;
+          worker_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "agent_tasks";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      agent_desabilitar_delegacao: {
+        Args: { p_agent: string };
         Returns: undefined;
       };
       agent_enfileirar_tarefa: {
@@ -8028,6 +8113,7 @@ export type Database = {
           atualizado_em: string;
           concluido_em: string | null;
           criado_em: string;
+          delegado_por: string | null;
           entrada: Json;
           id: string;
           idempotency_key: string;
@@ -8035,6 +8121,7 @@ export type Database = {
           max_attempts: number;
           next_attempt_at: string;
           org_id: string;
+          parent_task_id: string | null;
           prioridade: number;
           resultado: Json | null;
           solicitado_por: string | null;
@@ -8051,8 +8138,16 @@ export type Database = {
         };
       };
       agent_exigir_humano: { Args: { p_org: string }; Returns: string };
+      agent_ferramentas_do_papel: {
+        Args: { p_papel: string };
+        Returns: string[];
+      };
       agent_finalizar_run: {
         Args: { p_erro?: string; p_run: string; p_status: string };
+        Returns: undefined;
+      };
+      agent_habilitar_delegacao: {
+        Args: { p_agent: string };
         Returns: undefined;
       };
       agent_iniciar_run: {
@@ -8063,7 +8158,48 @@ export type Database = {
         Args: { p_ligado: boolean; p_org: string };
         Returns: number;
       };
+      agent_materializar_equipe: {
+        Args: { p_def: Json; p_org: string; p_user: string };
+        Returns: number;
+      };
+      agent_modelos_permitidos: { Args: never; Returns: string[] };
       agent_pode_gerir: { Args: { p_org: string }; Returns: boolean };
+      agent_propor_equipe: {
+        Args: { p_de: string; p_def: Json; p_org: string };
+        Returns: string;
+      };
+      agent_proximas_tarefas: {
+        Args: { p_limite?: number; p_org: string };
+        Returns: {
+          agent_id: string;
+          attempt_count: number;
+          atualizado_em: string;
+          concluido_em: string | null;
+          criado_em: string;
+          delegado_por: string | null;
+          entrada: Json;
+          id: string;
+          idempotency_key: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          next_attempt_at: string;
+          org_id: string;
+          parent_task_id: string | null;
+          prioridade: number;
+          resultado: Json | null;
+          solicitado_por: string | null;
+          status: string;
+          tipo: string;
+          ultimo_erro: string | null;
+          worker_id: string | null;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "agent_tasks";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
       agent_registrar_passo: {
         Args: {
           p_custo: number;
@@ -8088,6 +8224,7 @@ export type Database = {
           atualizado_em: string;
           concluido_em: string | null;
           criado_em: string;
+          delegado_por: string | null;
           entrada: Json;
           id: string;
           idempotency_key: string;
@@ -8095,6 +8232,7 @@ export type Database = {
           max_attempts: number;
           next_attempt_at: string;
           org_id: string;
+          parent_task_id: string | null;
           prioridade: number;
           resultado: Json | null;
           solicitado_por: string | null;
@@ -8124,6 +8262,26 @@ export type Database = {
           p_task: string;
           p_tipo: string;
         };
+        Returns: string;
+      };
+      agent_tipos_do_papel: { Args: { p_papel: string }; Returns: string[] };
+      agent_tool_execucoes_equipe: { Args: { p_agent: string }; Returns: Json };
+      agent_tool_lead: {
+        Args: { p_agent: string; p_lead: string };
+        Returns: Json;
+      };
+      agent_tool_oportunidades: {
+        Args: { p_agent: string; p_limite?: number };
+        Returns: Json;
+      };
+      agent_tool_pipeline: { Args: { p_agent: string }; Returns: Json };
+      agent_tool_resumo_comercial: { Args: { p_agent: string }; Returns: Json };
+      agent_validar_def_equipe: {
+        Args: { p_def: Json; p_org: string };
+        Returns: undefined;
+      };
+      agent_validar_uso: {
+        Args: { p_agent: string; p_tool: string };
         Returns: string;
       };
       canonical_lead_niche_key: { Args: { p_value: string }; Returns: string };

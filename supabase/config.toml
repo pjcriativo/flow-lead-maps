@@ -39,12 +39,12 @@ verify_jwt = true
 
 [functions.agent-ceo]
 # Copiloto do CEO de IA (Prompt 28). Manual, somente leitura. JWT obrigatório; a Edge valida org e papel.
-# Publicada em 2026-10-27 (v1). O CEO só responde com agente ativo e VITE_CEO_IA_REAL ligada.
+# Publicada (v2 em 2026-10-27: ferramentas de equipe). O CEO só responde com agente ativo e VITE_CEO_IA_REAL ligada.
 verify_jwt = true
 
 [functions.agent-worker]
 # Executa tarefas delegadas da equipe comercial (Prompt 37). Manual, sem cron. JWT obrigatório; valida org e papel.
-# NÃO publicada: deploy depende de autorização do dono.
+# Publicada em 2026-10-27 (v1). Sem cron: só roda quando um administrador dispara o processamento.
 verify_jwt = true
 
 [functions.sdr-sugerir]
