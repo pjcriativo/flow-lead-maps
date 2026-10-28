@@ -116,6 +116,228 @@ export type Database = {
           },
         ];
       };
+      agent_memoria: {
+        Row: {
+          agent_id: string | null;
+          ativo: boolean;
+          categoria: string;
+          conteudo: string;
+          criado_em: string;
+          criado_por: string | null;
+          fonte_ref: string | null;
+          hash: string;
+          id: string;
+          operacao_id: string | null;
+          org_id: string;
+          origem: string;
+          titulo: string;
+        };
+        Insert: {
+          agent_id?: string | null;
+          ativo?: boolean;
+          categoria: string;
+          conteudo: string;
+          criado_em?: string;
+          criado_por?: string | null;
+          fonte_ref?: string | null;
+          hash: string;
+          id?: string;
+          operacao_id?: string | null;
+          org_id: string;
+          origem: string;
+          titulo: string;
+        };
+        Update: {
+          agent_id?: string | null;
+          ativo?: boolean;
+          categoria?: string;
+          conteudo?: string;
+          criado_em?: string;
+          criado_por?: string | null;
+          fonte_ref?: string | null;
+          hash?: string;
+          id?: string;
+          operacao_id?: string | null;
+          org_id?: string;
+          origem?: string;
+          titulo?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_memoria_agent_id_org_id_fkey";
+            columns: ["agent_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_memoria_operacao_fkey";
+            columns: ["operacao_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_operacoes";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_memoria_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_operacao_agentes: {
+        Row: {
+          agent_id: string;
+          autorizado_em: string;
+          autorizado_por: string;
+          operacao_id: string;
+          org_id: string;
+        };
+        Insert: {
+          agent_id: string;
+          autorizado_em?: string;
+          autorizado_por: string;
+          operacao_id: string;
+          org_id: string;
+        };
+        Update: {
+          agent_id?: string;
+          autorizado_em?: string;
+          autorizado_por?: string;
+          operacao_id?: string;
+          org_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_operacao_agentes_agent_id_org_id_fkey";
+            columns: ["agent_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_operacao_agentes_operacao_id_org_id_fkey";
+            columns: ["operacao_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_operacoes";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
+      agent_operacoes: {
+        Row: {
+          aprovacao_id: string | null;
+          aprovado_por: string | null;
+          atualizado_em: string;
+          criado_em: string;
+          estrategia: Json;
+          id: string;
+          metas: Json;
+          nicho: string;
+          nome: string;
+          orcamento_usd_mes: number;
+          org_id: string;
+          papeis: string[];
+          papeis_pendentes: string[];
+          produto: string;
+          proposta_por: string | null;
+          publico_alvo: string;
+          regiao: string;
+          status: string;
+          subnicho: string | null;
+        };
+        Insert: {
+          aprovacao_id?: string | null;
+          aprovado_por?: string | null;
+          atualizado_em?: string;
+          criado_em?: string;
+          estrategia?: Json;
+          id?: string;
+          metas?: Json;
+          nicho: string;
+          nome: string;
+          orcamento_usd_mes?: number;
+          org_id: string;
+          papeis?: string[];
+          papeis_pendentes?: string[];
+          produto: string;
+          proposta_por?: string | null;
+          publico_alvo: string;
+          regiao: string;
+          status?: string;
+          subnicho?: string | null;
+        };
+        Update: {
+          aprovacao_id?: string | null;
+          aprovado_por?: string | null;
+          atualizado_em?: string;
+          criado_em?: string;
+          estrategia?: Json;
+          id?: string;
+          metas?: Json;
+          nicho?: string;
+          nome?: string;
+          orcamento_usd_mes?: number;
+          org_id?: string;
+          papeis?: string[];
+          papeis_pendentes?: string[];
+          produto?: string;
+          proposta_por?: string | null;
+          publico_alvo?: string;
+          regiao?: string;
+          status?: string;
+          subnicho?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_operacoes_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: false;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_operacoes_proposta_por_org_id_fkey";
+            columns: ["proposta_por", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+        ];
+      };
+      agent_orcamento_org: {
+        Row: {
+          atualizado_em: string;
+          atualizado_por: string | null;
+          org_id: string;
+          teto_dia_usd: number;
+          teto_mes_usd: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          org_id: string;
+          teto_dia_usd: number;
+          teto_mes_usd: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          org_id?: string;
+          teto_dia_usd?: number;
+          teto_mes_usd?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_orcamento_org_org_id_fkey";
+            columns: ["org_id"];
+            isOneToOne: true;
+            referencedRelation: "orgs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       agent_permissions: {
         Row: {
           agent_id: string;
@@ -321,6 +543,7 @@ export type Database = {
           lease_expires_at: string | null;
           max_attempts: number;
           next_attempt_at: string;
+          operacao_id: string | null;
           org_id: string;
           parent_task_id: string | null;
           prioridade: number;
@@ -344,6 +567,7 @@ export type Database = {
           lease_expires_at?: string | null;
           max_attempts?: number;
           next_attempt_at?: string;
+          operacao_id?: string | null;
           org_id: string;
           parent_task_id?: string | null;
           prioridade?: number;
@@ -367,6 +591,7 @@ export type Database = {
           lease_expires_at?: string | null;
           max_attempts?: number;
           next_attempt_at?: string;
+          operacao_id?: string | null;
           org_id?: string;
           parent_task_id?: string | null;
           prioridade?: number;
@@ -390,6 +615,13 @@ export type Database = {
             columns: ["delegado_por", "org_id"];
             isOneToOne: false;
             referencedRelation: "agents";
+            referencedColumns: ["id", "org_id"];
+          },
+          {
+            foreignKeyName: "agent_tasks_operacao_fkey";
+            columns: ["operacao_id", "org_id"];
+            isOneToOne: false;
+            referencedRelation: "agent_operacoes";
             referencedColumns: ["id", "org_id"];
           },
           {
@@ -1709,6 +1941,161 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      ia_config: {
+        Row: {
+          atualizado_em: string;
+          atualizado_por: string | null;
+          fallback_modelo: string | null;
+          fallback_provider: string | null;
+          id: boolean;
+          modelo_ceo: string | null;
+          modelo_padrao: string | null;
+          modelos_por_papel: Json;
+          provedor_ceo: string;
+          teto_org_dia_usd: number;
+          teto_org_mes_usd: number;
+        };
+        Insert: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          fallback_modelo?: string | null;
+          fallback_provider?: string | null;
+          id?: boolean;
+          modelo_ceo?: string | null;
+          modelo_padrao?: string | null;
+          modelos_por_papel?: Json;
+          provedor_ceo?: string;
+          teto_org_dia_usd?: number;
+          teto_org_mes_usd?: number;
+        };
+        Update: {
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          fallback_modelo?: string | null;
+          fallback_provider?: string | null;
+          id?: boolean;
+          modelo_ceo?: string | null;
+          modelo_padrao?: string | null;
+          modelos_por_papel?: Json;
+          provedor_ceo?: string;
+          teto_org_dia_usd?: number;
+          teto_org_mes_usd?: number;
+        };
+        Relationships: [];
+      };
+      ia_eventos: {
+        Row: {
+          agent_id: string | null;
+          criado_em: string;
+          detalhe: string | null;
+          id: number;
+          modelo: string | null;
+          org_id: string | null;
+          provider: string | null;
+          status: string | null;
+          tipo: string;
+          user_id: string | null;
+        };
+        Insert: {
+          agent_id?: string | null;
+          criado_em?: string;
+          detalhe?: string | null;
+          id?: never;
+          modelo?: string | null;
+          org_id?: string | null;
+          provider?: string | null;
+          status?: string | null;
+          tipo: string;
+          user_id?: string | null;
+        };
+        Update: {
+          agent_id?: string | null;
+          criado_em?: string;
+          detalhe?: string | null;
+          id?: never;
+          modelo?: string | null;
+          org_id?: string | null;
+          provider?: string | null;
+          status?: string | null;
+          tipo?: string;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
+      ia_modelos: {
+        Row: {
+          ativo: boolean;
+          atualizado_em: string;
+          id: string;
+          provider: string;
+          rotulo: string | null;
+          suporta_ferramentas: boolean;
+          usd_in_mtok: number | null;
+          usd_out_mtok: number | null;
+          validado_em: string | null;
+        };
+        Insert: {
+          ativo?: boolean;
+          atualizado_em?: string;
+          id: string;
+          provider: string;
+          rotulo?: string | null;
+          suporta_ferramentas?: boolean;
+          usd_in_mtok?: number | null;
+          usd_out_mtok?: number | null;
+          validado_em?: string | null;
+        };
+        Update: {
+          ativo?: boolean;
+          atualizado_em?: string;
+          id?: string;
+          provider?: string;
+          rotulo?: string | null;
+          suporta_ferramentas?: boolean;
+          usd_in_mtok?: number | null;
+          usd_out_mtok?: number | null;
+          validado_em?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ia_modelos_provider_fkey";
+            columns: ["provider"];
+            isOneToOne: false;
+            referencedRelation: "ia_provedores";
+            referencedColumns: ["provider"];
+          },
+        ];
+      };
+      ia_provedores: {
+        Row: {
+          ativo: boolean;
+          atualizado_em: string;
+          atualizado_por: string | null;
+          conexao_detalhe: string | null;
+          conexao_status: string;
+          conexao_verificada_em: string | null;
+          provider: string;
+        };
+        Insert: {
+          ativo?: boolean;
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          conexao_detalhe?: string | null;
+          conexao_status?: string;
+          conexao_verificada_em?: string | null;
+          provider: string;
+        };
+        Update: {
+          ativo?: boolean;
+          atualizado_em?: string;
+          atualizado_por?: string | null;
+          conexao_detalhe?: string | null;
+          conexao_status?: string;
+          conexao_verificada_em?: string | null;
+          provider?: string;
+        };
+        Relationships: [];
       };
       ia_uso: {
         Row: {
@@ -8039,6 +8426,10 @@ export type Database = {
         Args: { p_approval: string; p_aprovar: boolean; p_motivo?: string };
         Returns: number;
       };
+      agent_decidir_proposta_operacao: {
+        Args: { p_approval: string; p_aprovar: boolean; p_motivo?: string };
+        Returns: string;
+      };
       agent_defaults_do_papel: { Args: { p_papel: string }; Returns: Json };
       agent_definir_estado: {
         Args: { p_agent: string; p_estado: string };
@@ -8077,6 +8468,49 @@ export type Database = {
           lease_expires_at: string | null;
           max_attempts: number;
           next_attempt_at: string;
+          operacao_id: string | null;
+          org_id: string;
+          parent_task_id: string | null;
+          prioridade: number;
+          resultado: Json | null;
+          solicitado_por: string | null;
+          status: string;
+          tipo: string;
+          ultimo_erro: string | null;
+          worker_id: string | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "agent_tasks";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      agent_delegar_tarefa_op: {
+        Args: {
+          p_de: string;
+          p_entrada: Json;
+          p_idempotency_key: string;
+          p_operacao: string;
+          p_org: string;
+          p_para_papel: string;
+          p_parent: string;
+          p_tipo: string;
+        };
+        Returns: {
+          agent_id: string;
+          attempt_count: number;
+          atualizado_em: string;
+          concluido_em: string | null;
+          criado_em: string;
+          delegado_por: string | null;
+          entrada: Json;
+          id: string;
+          idempotency_key: string;
+          lease_expires_at: string | null;
+          max_attempts: number;
+          next_attempt_at: string;
+          operacao_id: string | null;
           org_id: string;
           parent_task_id: string | null;
           prioridade: number;
@@ -8120,6 +8554,7 @@ export type Database = {
           lease_expires_at: string | null;
           max_attempts: number;
           next_attempt_at: string;
+          operacao_id: string | null;
           org_id: string;
           parent_task_id: string | null;
           prioridade: number;
@@ -8162,9 +8597,57 @@ export type Database = {
         Args: { p_def: Json; p_org: string; p_user: string };
         Returns: number;
       };
+      agent_membro_gestor: { Args: { p_org: string }; Returns: boolean };
+      agent_memoria_arquivar: { Args: { p_id: string }; Returns: undefined };
+      agent_memoria_inserir: {
+        Args: {
+          p_agent: string;
+          p_categoria: string;
+          p_conteudo: string;
+          p_operacao: string;
+          p_org: string;
+          p_origem: string;
+          p_titulo: string;
+          p_user: string;
+        };
+        Returns: Json;
+      };
+      agent_memoria_registrar_humano: {
+        Args: {
+          p_categoria: string;
+          p_conteudo: string;
+          p_operacao?: string;
+          p_org: string;
+          p_titulo: string;
+        };
+        Returns: Json;
+      };
+      agent_memoria_texto_ok: { Args: { p_texto: string }; Returns: boolean };
       agent_modelos_permitidos: { Args: never; Returns: string[] };
+      agent_operacao_autorizar_agente: {
+        Args: { p_agent: string; p_autorizar?: boolean; p_op: string };
+        Returns: undefined;
+      };
+      agent_operacao_definir_estado: {
+        Args: { p_estado: string; p_op: string };
+        Returns: undefined;
+      };
+      agent_operacoes_desempenho: { Args: { p_org: string }; Returns: Json };
+      agent_orcamento_org_estado: {
+        Args: { p_org: string };
+        Returns: {
+          teto_dia: number;
+          teto_mes: number;
+          usd_dia: number;
+          usd_mes: number;
+        }[];
+      };
       agent_pode_gerir: { Args: { p_org: string }; Returns: boolean };
       agent_propor_equipe: {
+        Args: { p_de: string; p_def: Json; p_org: string };
+        Returns: string;
+      };
+      agent_propor_operacao: {
         Args: { p_de: string; p_def: Json; p_org: string };
         Returns: string;
       };
@@ -8183,6 +8666,7 @@ export type Database = {
           lease_expires_at: string | null;
           max_attempts: number;
           next_attempt_at: string;
+          operacao_id: string | null;
           org_id: string;
           parent_task_id: string | null;
           prioridade: number;
@@ -8199,6 +8683,16 @@ export type Database = {
           isOneToOne: false;
           isSetofReturn: true;
         };
+      };
+      agent_registrar_memoria: {
+        Args: {
+          p_agent: string;
+          p_categoria: string;
+          p_conteudo: string;
+          p_operacao?: string;
+          p_titulo: string;
+        };
+        Returns: Json;
       };
       agent_registrar_passo: {
         Args: {
@@ -8231,6 +8725,7 @@ export type Database = {
           lease_expires_at: string | null;
           max_attempts: number;
           next_attempt_at: string;
+          operacao_id: string | null;
           org_id: string;
           parent_task_id: string | null;
           prioridade: number;
@@ -8270,6 +8765,15 @@ export type Database = {
         Args: { p_agent: string; p_lead: string };
         Returns: Json;
       };
+      agent_tool_memoria: {
+        Args: {
+          p_agent: string;
+          p_categoria?: string;
+          p_limite?: number;
+          p_operacao?: string;
+        };
+        Returns: Json;
+      };
       agent_tool_oportunidades: {
         Args: { p_agent: string; p_limite?: number };
         Returns: Json;
@@ -8280,6 +8784,7 @@ export type Database = {
         Args: { p_def: Json; p_org: string };
         Returns: undefined;
       };
+      agent_validar_def_operacao: { Args: { p_def: Json }; Returns: undefined };
       agent_validar_uso: {
         Args: { p_agent: string; p_tool: string };
         Returns: string;
@@ -8488,6 +8993,10 @@ export type Database = {
         Returns: Json;
       };
       html_email_seguro: { Args: { p_html: string }; Returns: boolean };
+      ia_consumo_resumo: { Args: { p_dias?: number }; Returns: Json };
+      ia_modelo_do_papel: { Args: { p_papel: string }; Returns: string };
+      ia_modelos_disponiveis: { Args: never; Returns: Json };
+      ia_visao_orgs: { Args: never; Returns: Json };
       instagram_dashboard_advanced_v1: {
         Args: { p_days?: number };
         Returns: Json;
