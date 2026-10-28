@@ -249,6 +249,7 @@ export type AdminAcao =
   | "ia_central_ler"
   | "ia_openai_conectar"
   | "ia_openai_testar"
+  | "ia_catalogo_sincronizar"
   | "ia_openai_revogar"
   | "ia_provedor_ativar"
   | "ia_modelo_salvar"

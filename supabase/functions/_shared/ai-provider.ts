@@ -15,6 +15,10 @@ export type ModeloIa = {
   usdOut: number | null;
   ativo: boolean;
   suportaFerramentas: boolean;
+  /** Categoria de uso: modelos de imagem/áudio/etc. nunca entram na lista do chat. Ausente = linha antiga (true). */
+  chatCeo?: boolean | null;
+  /** "indisponivel" = a API deixou de listar o modelo. Ausente = linha antiga. */
+  disponibilidade?: string | null;
 };
 
 export type ConfigIa = {
@@ -172,6 +176,7 @@ export function decidirFallback(input: {
 export const MSG_CONFIGURAR_PROVEDOR =
   "Configure um provedor de IA no Super Admin para ativar o CEO.";
 
+// (modeloOpenAICompativel acima também barra imagem/áudio/realtime/embeddings da lista de conversa)
 /** Mesma regra de agent_modelos_permitidos (SQL): Claude padrão (salvo desativado) ∪ ativos+precificados de provedor ativo. */
 export const MODELOS_CLAUDE_PADRAO = [
   "claude-haiku-4-5",
@@ -190,8 +195,12 @@ export function modelosPermitidos(
     if (!modelos.some((m) => m.id === id && !m.ativo)) ids.add(id);
   }
   for (const m of modelos) {
-    if (m.ativo && provedoresAtivos.has(m.provider) && m.usdIn !== null && m.usdOut !== null)
-      ids.add(m.id);
+    if (!m.ativo || !provedoresAtivos.has(m.provider) || m.usdIn === null || m.usdOut === null)
+      continue;
+    // imagem/áudio/embeddings habilitados na Central não são modelos de conversa do runtime
+    if (m.chatCeo === false || m.disponibilidade === "indisponivel") continue;
+    if (m.provider === "openai" && !modeloOpenAICompativel(m.id)) continue;
+    ids.add(m.id);
   }
   return [...ids].sort();
 }

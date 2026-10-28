@@ -10,6 +10,8 @@ export type ProvedorEstado = {
   conexao_status: StatusConexao;
   conexao_verificada_em: string | null;
   conexao_detalhe: string | null;
+  catalogo_sincronizado_em?: string | null;
+  catalogo_total?: number | null;
   chave: {
     configurada: boolean;
     origem: "cofre" | "ambiente" | null;
@@ -23,6 +25,8 @@ export type ConfigIa = {
   modelo_padrao: string | null;
   modelo_ceo: string | null;
   modelos_por_papel: Record<string, string>;
+  /** economico, analise_complexa, visao, imagem, transcricao, voz — ausente até a migration do catálogo. */
+  modelos_por_capacidade?: Record<string, string>;
   fallback_provider: ProvedorId | null;
   fallback_modelo: string | null;
   teto_org_dia_usd: number;
@@ -56,6 +60,8 @@ export type CentralIa =
       config: ConfigIa;
       provedores: ProvedorEstado[];
       modelos: ModeloLinha[];
+      /** false até a migration do catálogo: a classificação mostrada é inferida no navegador. */
+      catalogo_migrado?: boolean;
       modelos_permitidos: string[];
       eventos: EventoIa[];
       consumo: ConsumoModelo[];
@@ -82,12 +88,23 @@ export const testarOpenAI = (): Promise<ResultadoIa> => adminAcao("ia_openai_tes
 export const revogarOpenAI = (): Promise<ResultadoIa> => adminAcao("ia_openai_revogar");
 export const ativarProvedor = (provider: ProvedorId, ativo: boolean): Promise<ResultadoIa> =>
   adminAcao("ia_provedor_ativar", { provider, ativo });
+/** Atualiza o catálogo a partir de GET /v1/models (gratuito). Preços e ativações não são tocados. */
+export const sincronizarCatalogoOpenAI = (): Promise<ResultadoIa> =>
+  adminAcao("ia_catalogo_sincronizar");
 export const salvarModeloIa = (m: {
   id: string;
   ativo: boolean;
   usd_in_mtok: number | null;
   usd_out_mtok: number | null;
   rotulo?: string;
+  /** exigido pelo servidor para ALTERAR um preço já cadastrado */
+  confirmar_preco?: boolean;
+  categorias?: string[];
+  contexto_tokens?: number | null;
+  saida_max_tokens?: number | null;
+  suporta_estruturadas?: boolean | null;
+  precos_extra?: { item: string; unidade: string; usd: number; modo: string }[];
+  preco_fonte?: string | null;
 }): Promise<ResultadoIa> => adminAcao("ia_modelo_salvar", m);
 export const salvarConfigIa = (c: Partial<ConfigIa>): Promise<ResultadoIa> =>
   adminAcao("ia_config_salvar", c as Record<string, unknown>);

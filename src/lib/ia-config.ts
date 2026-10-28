@@ -58,6 +58,23 @@ const MOTIVOS: Record<string, string> = {
   fallback_modelo_invalido: "Escolha um modelo permitido do provedor de fallback.",
   tetos_invalidos: "Tetos inválidos: o diário não pode passar do mensal.",
   migration_pendente: "A Central de IA ainda não foi publicada no banco.",
+  migration_catalogo_pendente:
+    "O catálogo completo ainda não foi publicado no banco (migration pendente de autorização). Nada foi alterado.",
+  acao_desconhecida:
+    "O servidor ainda não tem esta função publicada (Edge pendente de autorização). Nada foi alterado.",
+  lista_de_modelos_vazia:
+    "A OpenAI respondeu sem nenhum modelo: a chave/projeto pode não ter permissão de modelos. O catálogo foi preservado.",
+  confirmacao_preco_necessaria: "Este modelo já tem preço: confirme a alteração para sobrescrever.",
+  modelo_indisponivel: "A OpenAI não lista mais este modelo para esta chave.",
+  modelo_incompativel_com_capacidade: "Este modelo não pertence à categoria desta capacidade.",
+  capacidade_invalida: "Capacidade desconhecida.",
+  categorias_invalidas: "Escolha ao menos uma categoria válida.",
+  limite_invalido: "Contexto/saída devem ser inteiros positivos.",
+  preco_item_invalido: "Item de preço inválido.",
+  preco_unidade_invalida: "Unidade de cobrança inválida.",
+  preco_modo_invalido: "Modalidade de processamento inválida.",
+  preco_duplicado: "Há dois preços iguais (item, unidade e modalidade).",
+  precos_extra_invalido: "Lista de preços adicionais inválida.",
 };
 export const traduzirMotivoIa = (reason: string | undefined): string =>
   (reason && MOTIVOS[reason]) || "Operação não concluída.";

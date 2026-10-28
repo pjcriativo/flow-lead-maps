@@ -155,35 +155,86 @@ export async function chamarOpenAI(
   return lerRespostaResponses(data);
 }
 
-/** Lista os modelos que a CHAVE enxerga (chamada gratuita). Usada para validar a conexão e a allowlist. */
+const motivoHttp = (status: number): string =>
+  status === 401
+    ? "chave_invalida_ou_revogada"
+    : status === 403
+      ? "chave_sem_permissao"
+      : status === 429
+        ? "limite_do_provedor"
+        : "erro_do_provedor";
+
+export type ModeloListado = { id: string; criadoEm: number | null; dono: string | null };
+const MAX_PAGINAS_MODELOS = 20;
+
+/** Lista os modelos que a CHAVE enxerga (chamada gratuita). Usada para validar a conexão e a allowlist.
+ *  Segue a paginação quando a API a anunciar (`has_more` + `after`); hoje ela devolve tudo de uma vez. */
 export async function listarModelosOpenAI(
   chave: string,
   opts: { fetcher?: typeof fetch } = {},
-): Promise<{ ok: true; ids: string[] } | { ok: false; status: number | null; motivo: string }> {
+): Promise<
+  | { ok: true; ids: string[]; modelos: ModeloListado[]; paginas: number }
+  | { ok: false; status: number | null; motivo: string }
+> {
   const fetcher = opts.fetcher ?? fetch;
-  let res: Response;
+  const modelos: ModeloListado[] = [];
+  const vistos = new Set<string>();
+  let depois: string | null = null;
+  let paginas = 0;
+  while (paginas < MAX_PAGINAS_MODELOS) {
+    const url: string = `${OPENAI_BASE}/models${depois ? `?after=${encodeURIComponent(depois)}` : ""}`;
+    let res: Response;
+    try {
+      res = await fetcher(url, {
+        headers: { Authorization: `Bearer ${chave}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      return { ok: false, status: null, motivo: "sem_resposta_do_provedor" };
+    }
+    const data: Rec = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, status: res.status, motivo: motivoHttp(res.status) };
+    paginas += 1;
+    const pagina: Rec[] = Array.isArray(data?.data) ? data.data : [];
+    let novos = 0;
+    for (const m of pagina) {
+      if (typeof m?.id !== "string" || vistos.has(m.id)) continue;
+      vistos.add(m.id);
+      novos += 1;
+      modelos.push({
+        id: m.id,
+        criadoEm: typeof m.created === "number" ? m.created : null,
+        dono: typeof m.owned_by === "string" ? m.owned_by.slice(0, 80) : null,
+      });
+    }
+    const ultimo = pagina.length ? pagina[pagina.length - 1]?.id : null;
+    // só continua se a API disse que há mais E a página trouxe algo novo (evita laço infinito)
+    if (data?.has_more === true && typeof ultimo === "string" && novos > 0) depois = ultimo;
+    else break;
+  }
+  return { ok: true, ids: modelos.map((m) => m.id), modelos, paginas };
+}
+
+/** O projeto/chave pode usar ESTE modelo? `GET /models/{id}` — gratuito, não gera inferência.
+ *  Distingue autenticação válida (a lista funcionou) de permissão efetiva sobre o modelo. */
+export async function verificarAcessoModeloOpenAI(
+  chave: string,
+  modelo: string,
+  opts: { fetcher?: typeof fetch } = {},
+): Promise<{ ok: true } | { ok: false; status: number | null; motivo: string }> {
+  const fetcher = opts.fetcher ?? fetch;
   try {
-    res = await fetcher(`${OPENAI_BASE}/models`, {
+    const res = await fetcher(`${OPENAI_BASE}/models/${encodeURIComponent(modelo)}`, {
       headers: { Authorization: `Bearer ${chave}` },
       signal: AbortSignal.timeout(15_000),
     });
+    if (res.ok) return { ok: true };
+    return {
+      ok: false,
+      status: res.status,
+      motivo: res.status === 404 ? "modelo_inacessivel_ao_projeto" : motivoHttp(res.status),
+    };
   } catch {
     return { ok: false, status: null, motivo: "sem_resposta_do_provedor" };
   }
-  const data: Rec = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const motivo =
-      res.status === 401
-        ? "chave_invalida_ou_revogada"
-        : res.status === 403
-          ? "chave_sem_permissao"
-          : res.status === 429
-            ? "limite_do_provedor"
-            : "erro_do_provedor";
-    return { ok: false, status: res.status, motivo };
-  }
-  const ids = (Array.isArray(data?.data) ? data.data : [])
-    .map((m: Rec) => m?.id)
-    .filter((id: unknown): id is string => typeof id === "string");
-  return { ok: true, ids };
 }

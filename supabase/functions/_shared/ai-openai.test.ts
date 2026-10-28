@@ -233,6 +233,11 @@ test("listagem de modelos: ids da API; erros traduzidos sem expor a chave", asyn
   assert.deepEqual(await listarModelosOpenAI(CHAVE, { fetcher: ok }), {
     ok: true,
     ids: ["gpt-x", "text-embedding-z"],
+    modelos: [
+      { id: "gpt-x", criadoEm: null, dono: null },
+      { id: "text-embedding-z", criadoEm: null, dono: null },
+    ],
+    paginas: 1,
   });
   const f = (status: number) =>
     (async () => resp({ error: { message: CHAVE } }, status)) as unknown as typeof fetch;

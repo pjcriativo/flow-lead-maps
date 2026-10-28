@@ -107,3 +107,28 @@ equipe/tarefas/aprovações pelo chat, depende de autorização específica:
 
 Isolamento: a conversa é do usuário dono (RLS `user_id = auth.uid()`), dentro da organização; outro admin
 da mesma organização e o super admin da plataforma não leem. Segredos colados são redigidos antes de gravar.
+
+## Central OpenAI — catálogo dinâmico (Prompt 47)
+
+A tela Provedores & Modelos deixou de ter lista fixa: o catálogo vem de `GET /v1/models` (gratuito), com
+busca, filtros por categoria/status, paginação, detalhes e histórico. Preço agora é **US$ por 1M de tokens**
+(antes a tela mostrava por 1K) e qualquer alteração de preço já cadastrado exige confirmação.
+
+**Código no `main`, retrocompatível com o banco/Edge atuais**: sem a migration a tela mostra os modelos já
+gravados com a classificação inferida no navegador e avisa; "Atualizar modelos" responde com motivo claro
+(`migration_catalogo_pendente` / `acao_desconhecida`) e não altera nada.
+
+Para ativar (cada passo exige autorização específica do dono):
+
+1. Backup + migration `202610290001_ia_catalogo_openai.sql` (aditiva e idempotente; provada em pglite, 12
+   verificações). Ela também faz `agent_modelos_permitidos()` excluir modelos de imagem/áudio/indisponíveis.
+2. Republicar a Edge `admin-acoes` (ação `ia_catalogo_sincronizar`, preços adicionais, capacidades, teste de
+   acesso ao modelo do CEO via `GET /models/{id}`).
+3. Regenerar tipos (`src/integrations/supabase/types.ts`).
+4. Na tela: **Atualizar modelos** → o Super Admin precifica e habilita (nada nasce habilitado nem com preço).
+
+Garantias: a sincronização nunca altera preço, habilitação, rótulo nem classificação manual; modelos que a
+API deixa de listar viram `indisponivel` (não são apagados); lista vazia com 200 não marca o catálogo como
+indisponível. Metadados que a API não fornece (contexto, preço, homologação) ficam vazios até o Super Admin
+informar; "homologado" só existe após teste funcional real (nenhum foi feito: exige inferência paga).
+Reversão: a migration é aditiva (colunas novas com default); basta não usar a ação nova.

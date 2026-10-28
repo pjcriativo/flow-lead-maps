@@ -25,7 +25,18 @@ import { collectUniqueOffsetPages } from "../_shared/offset-pagination.ts";
 import { validarEmailAutentico } from "../_shared/email-validation.ts";
 import { getMetaOAuthPrerequisiteStatus } from "../_shared/meta-oauth-config.ts";
 import { PAPEIS_AGENTE } from "../_shared/agent-runtime.ts";
-import { listarModelosOpenAI } from "../_shared/ai-openai.ts";
+import { listarModelosOpenAI, verificarAcessoModeloOpenAI } from "../_shared/ai-openai.ts";
+import {
+  classificarModelo,
+  ehCapacidade,
+  ehCategoria,
+  modeloServeCapacidade,
+  planejarSincronizacao,
+  precoSuficienteParaAtivar,
+  validarPrecosExtras,
+  type Categoria,
+  type PrecoExtra,
+} from "../_shared/ia-catalogo.ts";
 import {
   classificarModelosOpenAI,
   ehProvedor,
@@ -2121,6 +2132,9 @@ Deno.serve(
             usdOut: m.usd_out_mtok === null ? null : Number(m.usd_out_mtok),
             ativo: m.ativo === true,
             suportaFerramentas: m.suporta_ferramentas !== false,
+            // colunas da migration 202610290001: ausentes até ela ser aplicada (linha antiga = modelo de chat)
+            chatCeo: m.chat_ceo === undefined ? null : m.chat_ceo !== false,
+            disponibilidade: (m.disponibilidade as string | undefined) ?? null,
           }));
           const ativos = new Set<ProviderId>(
             (prov.data ?? [])
@@ -2185,6 +2199,8 @@ Deno.serve(
               chave: p.provider === "openai" ? kO : kA,
             })),
             modelos: c.mod,
+            // false até a migration do catálogo ser aplicada: a tela deriva o que falta e avisa
+            catalogo_migrado: c.mod.length > 0 && "disponibilidade" in c.mod[0],
             modelos_permitidos: modelosPermitidos(c.modelos, c.ativos),
             eventos: eventos.data ?? [],
             consumo: consumo.error ? [] : (consumo.data ?? []),
@@ -2291,22 +2307,156 @@ Deno.serve(
               { onConflict: "id", ignoreDuplicates: true },
             );
           }
+          // Autenticação válida (a lista respondeu) ≠ permissão efetiva sobre o modelo do CEO.
+          // GET /models/{id} é gratuito: não gera inferência.
+          const cfgAtual = (await carregar()).cfg;
+          const modeloCeo =
+            cfgAtual?.provedor_ceo === "openai" ? (cfgAtual.modelo_ceo as string | null) : null;
+          let modeloCeoAcessivel: boolean | null = null;
+          if (modeloCeo) {
+            const acesso = await verificarAcessoModeloOpenAI(chave, modeloCeo);
+            modeloCeoAcessivel = acesso.ok;
+          }
+          const detalhe =
+            `${lista.ids.length} modelos listados, ${compativeis.length} compatíveis com o chat` +
+            (modeloCeoAcessivel === null
+              ? ""
+              : `; CEO ${modeloCeo}: ${modeloCeoAcessivel ? "acessível" : "SEM acesso neste projeto"}`);
           await admin
             .from("ia_provedores")
             .update({
               conexao_status: "ok",
               conexao_verificada_em: agora,
-              conexao_detalhe: `${compativeis.length} modelos compatíveis`,
+              conexao_detalhe: detalhe,
               atualizado_em: agora,
             })
             .eq("provider", "openai");
-          await evento(
-            "conexao_testada",
-            "openai",
-            "ok",
-            `${compativeis.length} modelos compatíveis`,
+          await evento("conexao_testada", "openai", "ok", detalhe);
+          return json({
+            ok: true,
+            autenticacao: "valida",
+            total_modelos: lista.ids.length,
+            modelos_compativeis: compativeis.length,
+            modelo_ceo: modeloCeo,
+            modelo_ceo_acessivel: modeloCeoAcessivel,
+          });
+        }
+
+        // Sincroniza o catálogo COMPLETO da API (GET /v1/models, gratuito) sem tocar em preço, ativação,
+        // rótulo nem classificação manual. Modelos que somem viram "indisponivel" (nunca são apagados).
+        if (acao === "ia_catalogo_sincronizar") {
+          const chave = await resolverChave(admin, "OPENAI_API_KEY");
+          if (!chave) return json({ ok: false, reason: "chave_nao_configurada" });
+          const c = await carregar();
+          if (c.erro)
+            return json({
+              ok: false,
+              reason: faltaMigration(c.erro) ? "migration_pendente" : "erro_consulta",
+            });
+          if (!c.mod.length || !("disponibilidade" in c.mod[0]))
+            return json({ ok: false, reason: "migration_catalogo_pendente" });
+          const lista = await listarModelosOpenAI(chave);
+          const agora = new Date().toISOString();
+          if (!lista.ok) {
+            await evento("modelos_sincronizados", "openai", "falha", lista.motivo);
+            return json({ ok: false, reason: lista.motivo });
+          }
+          // lista vazia com 200 = chave sem escopo de modelos: NÃO marcar o catálogo inteiro como indisponível
+          if (lista.modelos.length === 0) {
+            await evento("modelos_sincronizados", "openai", "falha", "lista vazia");
+            return json({ ok: false, reason: "lista_de_modelos_vazia" });
+          }
+          const emUso = new Set<string>(
+            [
+              c.cfg?.modelo_ceo,
+              c.cfg?.modelo_padrao,
+              c.cfg?.fallback_modelo,
+              ...Object.values((c.cfg?.modelos_por_papel ?? {}) as Record<string, string>),
+              ...Object.values((c.cfg?.modelos_por_capacidade ?? {}) as Record<string, string>),
+            ].filter((x): x is string => typeof x === "string"),
           );
-          return json({ ok: true, modelos_compativeis: compativeis.length });
+          const plano = planejarSincronizacao({
+            existentes: c.mod
+              .filter((m) => m.provider === "openai")
+              .map((m) => ({
+                id: String(m.id),
+                disponibilidade: m.disponibilidade as string | null,
+                classificacao_origem: m.classificacao_origem as string | null,
+              })),
+            api: lista.modelos.map((m) => ({ id: m.id, criadoEm: m.criadoEm, dono: m.dono })),
+            agora,
+            emUso,
+          });
+          for (let i = 0; i < plano.novos.length; i += 100) {
+            const { error } = await admin
+              .from("ia_modelos")
+              .insert(plano.novos.slice(i, i + 100).map((n) => ({ ...n, validado_em: agora })));
+            if (error) {
+              await evento("modelos_sincronizados", "openai", "falha", error.message);
+              return json({
+                ok: false,
+                reason: "erro_salvar",
+                detalhe: redigirSegredos(error.message),
+              });
+            }
+          }
+          for (let i = 0; i < plano.atualizar.length; i += 10) {
+            const lote = await Promise.all(
+              plano.atualizar
+                .slice(i, i + 10)
+                .map((u) => admin.from("ia_modelos").update(u.patch).eq("id", u.id)),
+            );
+            const falha = lote.find((r) => r.error)?.error;
+            if (falha) {
+              await evento("modelos_sincronizados", "openai", "falha", falha.message);
+              return json({
+                ok: false,
+                reason: "erro_salvar",
+                detalhe: redigirSegredos(falha.message),
+              });
+            }
+          }
+          if (plano.indisponiveis.length) {
+            await admin
+              .from("ia_modelos")
+              .update({ disponibilidade: "indisponivel", atualizado_em: agora })
+              .in("id", plano.indisponiveis)
+              .eq("provider", "openai");
+          }
+          const total = lista.modelos.length;
+          await admin
+            .from("ia_provedores")
+            .update({
+              conexao_status: "ok",
+              conexao_verificada_em: agora,
+              conexao_detalhe: `${total} modelos na API`,
+              catalogo_sincronizado_em: agora,
+              catalogo_total: total,
+              atualizado_por: userData.user.id,
+              atualizado_em: agora,
+            })
+            .eq("provider", "openai");
+          const resumo =
+            `${total} na API; ${plano.novos.length} novos; ${plano.indisponiveis.length} indisponíveis; ` +
+            `${plano.reaparecidos.length} reapareceram`;
+          await evento("modelos_sincronizados", "openai", "ok", resumo);
+          const porCategoria: Record<string, number> = {};
+          for (const m of (await carregar()).mod) {
+            if (m.provider !== "openai" || m.disponibilidade !== "disponivel") continue;
+            for (const cat of (m.categorias as string[] | null) ?? [])
+              porCategoria[cat] = (porCategoria[cat] ?? 0) + 1;
+          }
+          return json({
+            ok: true,
+            total_api: total,
+            paginas: lista.paginas,
+            sincronizado_em: agora,
+            novos: plano.novos.map((n) => n.id),
+            indisponiveis: plano.indisponiveis,
+            reaparecidos: plano.reaparecidos,
+            indisponiveis_em_uso: plano.indisponiveisEmUso,
+            por_categoria: porCategoria,
+          });
         }
 
         if (acao === "ia_openai_revogar") {
@@ -2373,8 +2523,18 @@ Deno.serve(
           if (c.erro) return json({ ok: false, reason: "migration_pendente" });
           const m = c.modelos.find((x) => x.id === id);
           if (!m) return json({ ok: false, reason: "modelo_desconhecido" });
-          if (m.provider === "openai" && !modeloOpenAICompativel(id))
-            return json({ ok: false, reason: "modelo_incompativel" });
+          const linha = (c.mod.find((x) => x.id === id) ?? {}) as Rec;
+          const migrado = "disponibilidade" in linha;
+          const CAMPOS_CATALOGO = [
+            "categorias",
+            "contexto_tokens",
+            "saida_max_tokens",
+            "suporta_estruturadas",
+            "precos_extra",
+            "preco_fonte",
+          ];
+          if (!migrado && CAMPOS_CATALOGO.some((k) => k in b))
+            return json({ ok: false, reason: "migration_catalogo_pendente" });
           const preco = (v: unknown) =>
             v === null || v === "" || v === undefined ? null : Number(v);
           const pin = preco(b.usd_in_mtok);
@@ -2383,9 +2543,71 @@ Deno.serve(
             if (p !== null && (!Number.isFinite(p) || p < 0 || p > 1000))
               return json({ ok: false, reason: "preco_invalido" });
           }
+          const inteiro = (v: unknown): number | null | "invalido" => {
+            if (v === null || v === "" || v === undefined) return null;
+            const n = Number(v);
+            return Number.isInteger(n) && n >= 1 && n <= 100_000_000 ? n : "invalido";
+          };
+          const contexto = "contexto_tokens" in b ? inteiro(b.contexto_tokens) : undefined;
+          const saidaMax = "saida_max_tokens" in b ? inteiro(b.saida_max_tokens) : undefined;
+          if (contexto === "invalido" || saidaMax === "invalido")
+            return json({ ok: false, reason: "limite_invalido" });
+          const extrasBrutos = "precos_extra" in b ? b.precos_extra : linha.precos_extra;
+          const extras = validarPrecosExtras(extrasBrutos);
+          if (!extras.ok) return json({ ok: false, reason: extras.erro });
+          let categorias: Categoria[] | undefined;
+          if ("categorias" in b) {
+            const bruto = Array.isArray(b.categorias) ? b.categorias : null;
+            if (!bruto || !bruto.length || !bruto.every(ehCategoria))
+              return json({ ok: false, reason: "categorias_invalidas" });
+            categorias = [...new Set(bruto as Categoria[])];
+          }
+          const categoriasFinais: string[] =
+            categorias ??
+            (linha.categorias as string[] | undefined) ??
+            classificarModelo(id).categorias;
+          const chatCeo =
+            m.provider !== "openai" ||
+            (modeloOpenAICompativel(id) &&
+              (categoriasFinais.includes("texto") || categoriasFinais.includes("raciocinio")));
+          // preço válido já cadastrado só muda com confirmação explícita do Super Admin
+          const antesIn =
+            linha.usd_in_mtok === null || linha.usd_in_mtok === undefined
+              ? null
+              : Number(linha.usd_in_mtok);
+          const antesOut =
+            linha.usd_out_mtok === null || linha.usd_out_mtok === undefined
+              ? null
+              : Number(linha.usd_out_mtok);
+          // jsonb não preserva a ordem das chaves: compara numa forma canônica
+          const canon = (l: readonly PrecoExtra[]) =>
+            JSON.stringify(
+              l
+                .map((p) => [p.item, p.unidade, p.modo, p.usd] as const)
+                .sort((x, y) => (String(x) < String(y) ? -1 : 1)),
+            );
+          const antesExtras = validarPrecosExtras(linha.precos_extra);
+          const extrasAntes = canon(antesExtras.ok ? antesExtras.precos : []);
+          const mudouPreco =
+            antesIn !== pin ||
+            antesOut !== pout ||
+            ("precos_extra" in b && canon(extras.precos) !== extrasAntes);
+          const haPrecoAntes = antesIn !== null || antesOut !== null || extrasAntes !== "[]";
+          if (mudouPreco && haPrecoAntes && b.confirmar_preco !== true)
+            return json({ ok: false, reason: "confirmacao_preco_necessaria" });
           const ativo = b.ativo === true;
-          if (ativo && (pin === null || pout === null))
+          if (
+            ativo &&
+            !precoSuficienteParaAtivar({
+              chatCeo,
+              usd_in_mtok: pin,
+              usd_out_mtok: pout,
+              precosExtra: extras.precos,
+            })
+          )
             return json({ ok: false, reason: "preco_obrigatorio_para_ativar" });
+          if (ativo && linha.disponibilidade === "indisponivel")
+            return json({ ok: false, reason: "modelo_indisponivel" });
           if (!ativo) {
             const emUso =
               c.cfg &&
@@ -2394,6 +2616,7 @@ Deno.serve(
                 c.cfg.modelo_padrao,
                 c.cfg.fallback_modelo,
                 ...Object.values((c.cfg.modelos_por_papel ?? {}) as Record<string, string>),
+                ...Object.values((c.cfg.modelos_por_capacidade ?? {}) as Record<string, string>),
               ].includes(id);
             if (emUso) return json({ ok: false, reason: "modelo_em_uso_na_configuracao" });
           }
@@ -2401,6 +2624,7 @@ Deno.serve(
             typeof b.rotulo === "string" && b.rotulo.trim()
               ? b.rotulo.trim().slice(0, 80)
               : (m.rotulo ?? id);
+          const agora = new Date().toISOString();
           const { error } = await admin
             .from("ia_modelos")
             .update({
@@ -2408,7 +2632,34 @@ Deno.serve(
               usd_out_mtok: pout,
               ativo,
               rotulo,
-              atualizado_em: new Date().toISOString(),
+              atualizado_em: agora,
+              ...(migrado
+                ? {
+                    precos_extra: extras.precos,
+                    ...(mudouPreco ? { preco_origem: "manual", preco_atualizado_em: agora } : {}),
+                    ...("preco_fonte" in b
+                      ? {
+                          preco_fonte:
+                            typeof b.preco_fonte === "string" && b.preco_fonte.trim()
+                              ? b.preco_fonte.trim().slice(0, 200)
+                              : null,
+                        }
+                      : {}),
+                    ...(contexto !== undefined ? { contexto_tokens: contexto } : {}),
+                    ...(saidaMax !== undefined ? { saida_max_tokens: saidaMax } : {}),
+                    ...("suporta_estruturadas" in b
+                      ? {
+                          suporta_estruturadas:
+                            typeof b.suporta_estruturadas === "boolean"
+                              ? b.suporta_estruturadas
+                              : null,
+                        }
+                      : {}),
+                    ...(categorias
+                      ? { categorias, classificacao_origem: "manual", chat_ceo: chatCeo }
+                      : {}),
+                  }
+                : {}),
             })
             .eq("id", id);
           if (error)
@@ -2464,6 +2715,45 @@ Deno.serve(
             if (m && !permitidos.has(m))
               return json({ ok: false, reason: "modelo_nao_permitido", detalhe: m });
           }
+          // capacidades independentes (economico, analise_complexa, visao, imagem, transcricao, voz):
+          // só gravam o que o Super Admin escolheu; nada é trocado automaticamente
+          const migradoCfg = Boolean(c.cfg && "modelos_por_capacidade" in c.cfg);
+          if ("modelos_por_capacidade" in b && !migradoCfg)
+            return json({ ok: false, reason: "migration_catalogo_pendente" });
+          const porCapBruto =
+            ("modelos_por_capacidade" in b
+              ? b.modelos_por_capacidade
+              : c.cfg?.modelos_por_capacidade) ?? {};
+          if (!porCapBruto || typeof porCapBruto !== "object" || Array.isArray(porCapBruto))
+            return json({ ok: false, reason: "modelos_por_capacidade_invalido" });
+          const porCapacidade: Record<string, string> = {};
+          for (const [cap, modelo] of Object.entries(porCapBruto as Rec)) {
+            if (!ehCapacidade(cap)) return json({ ok: false, reason: "capacidade_invalida" });
+            if (modelo === null || modelo === "") continue;
+            const mo = c.modelos.find((x) => x.id === modelo);
+            const raw = (c.mod.find((x) => x.id === modelo) ?? {}) as Rec;
+            if (typeof modelo !== "string" || !mo || !mo.ativo || !c.ativos.has(mo.provider))
+              return json({ ok: false, reason: "modelo_nao_permitido", detalhe: cap });
+            if (mo.disponibilidade === "indisponivel")
+              return json({ ok: false, reason: "modelo_indisponivel", detalhe: cap });
+            const categoriasModelo =
+              (raw.categorias as string[] | undefined) ?? classificarModelo(modelo).categorias;
+            if (
+              !modeloServeCapacidade(cap, {
+                categorias: categoriasModelo,
+                chatCeo: mo.chatCeo,
+                ativo: mo.ativo,
+              })
+            )
+              return json({
+                ok: false,
+                reason: "modelo_incompativel_com_capacidade",
+                detalhe: cap,
+              });
+            if (["economico", "analise_complexa", "visao"].includes(cap) && !permitidos.has(modelo))
+              return json({ ok: false, reason: "modelo_nao_permitido", detalhe: cap });
+            porCapacidade[cap] = modelo;
+          }
           if (provedorCeo === "openai") {
             const mo = c.modelos.find((x) => x.id === modeloCeo);
             if (!modeloCeo || mo?.provider !== "openai")
@@ -2505,6 +2795,7 @@ Deno.serve(
               modelo_ceo: modeloCeo,
               modelo_padrao: modeloPadrao,
               modelos_por_papel: porPapel,
+              ...(migradoCfg ? { modelos_por_capacidade: porCapacidade } : {}),
               fallback_provider: fallbackProvider,
               fallback_modelo: fallbackProvider ? fallbackModelo : null,
               teto_org_dia_usd: tetoDia,
