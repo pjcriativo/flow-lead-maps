@@ -39,6 +39,7 @@ import {
   Wrench,
   X,
   Zap,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -60,9 +61,15 @@ import { useEquipeReal } from "./useEquipeReal";
 interface EquipeAgentesViewProps {
   onVoltarPainel?: () => void;
   onVerPerfil?: (agenteId: string) => void;
+  /** Abre o chat real com o CEO (Tela 10). */
+  onConversarCeo?: () => void;
 }
 
-export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentesViewProps) {
+export function EquipeAgentesView({
+  onVoltarPainel,
+  onVerPerfil,
+  onConversarCeo,
+}: EquipeAgentesViewProps) {
   const [abaAtiva, setAbaAtiva] = useState<"agentes" | "departamentos" | "enxames" | "biblioteca">(
     "agentes",
   );
@@ -178,6 +185,17 @@ export function EquipeAgentesView({ onVoltarPainel, onVerPerfil }: EquipeAgentes
               <Plus className="size-4 text-neutral-400" />
               <span>Novo Agente</span>
             </button>
+
+            {onConversarCeo && (
+              <button
+                type="button"
+                onClick={onConversarCeo}
+                className="flex h-10 items-center gap-2 rounded-xl bg-[#f95d14] px-5 text-xs font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:bg-[#ff6c26]"
+              >
+                <MessageSquare className="size-4" />
+                <span>Conversar com CEO</span>
+              </button>
+            )}
 
             <button
               type="button"

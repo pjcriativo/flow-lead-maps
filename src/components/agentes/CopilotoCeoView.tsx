@@ -6,6 +6,7 @@ import { CEO_IA_REAL_HABILITADO, perguntarAoCeo } from "@/services/agente-ceo";
 import { copilotoRealPronto } from "@/lib/ceo-config";
 import { CeoCopilotoBanner, CeoEstadoPill } from "./CeoRealUi";
 import { useCeoReal } from "./useCeoReal";
+import { CeoChatReal } from "./CeoChatReal";
 import {
   Activity,
   AlertCircle,
@@ -256,6 +257,19 @@ export function CopilotoCeoView({
     c.titulo.toLowerCase().includes(termoBuscaConversa.toLowerCase()) ||
     c.subtitulo.toLowerCase().includes(termoBuscaConversa.toLowerCase()),
   );
+
+  // Copiloto REAL ligado: a tela é o chat com o CEO (sem os cards demonstrativos, que não vêm do backend).
+  if (CEO_IA_REAL_HABILITADO) {
+    return (
+      <CeoChatReal
+        ceo={ceoReal}
+        onVoltar={onVoltar}
+        onNavegarPerfil={onNavegarPerfil}
+        onNavegarEquipe={onNavegarEquipe}
+        onNavegarAprovacoes={onNavegarAprovacoes}
+      />
+    );
+  }
 
   return (
     <div className="space-y-5 p-4 lg:p-7 max-w-[1600px] mx-auto text-neutral-100 animate-in fade-in duration-300">

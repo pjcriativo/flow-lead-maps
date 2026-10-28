@@ -89,3 +89,21 @@ repete **uma vez** sem o campo (o pedido foi rejeitado antes de gerar tokens: se
 Atenção ao ligar: em modelos de raciocínio, `max_output_tokens` inclui os tokens de raciocínio; o limite
 atual do agente (800) pode gerar resposta `incomplete` (erro permanente 422, sem custo oculto além do
 consumido). Se ocorrer no smoke autorizado, subir `max_tokens_saida` do CEO pela UI de limites.
+
+## Chat do CEO (Prompt 42)
+
+Tela 10 vira o chat real com o CEO quando `VITE_CEO_IA_REAL=true` (já ligada): conversa ampla, atalhos
+iniciais reais, seletor de operação, cartão "Plano de Operação Comercial" (aprovar usa as RPCs humanas),
+copiar, tentar de novo (idempotente) e histórico. Botões "Conversar com CEO" nas Telas 01, 02 e 03.
+
+Sem backend novo o chat funciona (Edge atual): histórico só na sessão. Para persistir e consultar
+equipe/tarefas/aprovações pelo chat, depende de autorização específica:
+
+1. Backup + migration `202610280002_ceo_chat_conversas.sql` (provada em pglite: 123 verificações 001–005).
+2. Republicar `agent-ceo` (histórico por conversa, contexto da operação, ações no retorno).
+3. Regenerar tipos; `VITE_CEO_CHAT=true` e redeploy.
+4. Quem já habilitou a delegação do CEO precisa **reabilitar** (a 005 acrescenta `consultar_operacoes` à lista
+   concedida por humano); nada é concedido automaticamente.
+
+Isolamento: a conversa é do usuário dono (RLS `user_id = auth.uid()`), dentro da organização; outro admin
+da mesma organização e o super admin da plataforma não leem. Segredos colados são redigidos antes de gravar.

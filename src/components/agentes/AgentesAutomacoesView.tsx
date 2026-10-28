@@ -147,10 +147,12 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
           <EquipeAgentesView
             onVoltarPainel={() => mudarTela("visao_geral")}
             onVerPerfil={(id) => mudarTela("perfil", id)}
+            onConversarCeo={() => mudarTela("copiloto", "ceo")}
           />
         ) : telaAtiva === "perfil" ? (
           <PerfilAgenteView
             agenteId={agentePerfilId}
+            onConversarCeo={() => mudarTela("copiloto", "ceo")}
             onVoltar={() => mudarTela("equipe")}
             onNavegarEquipe={() => mudarTela("equipe")}
             onNavegarTreinamento={() => mudarTela("treinamento", agentePerfilId)}
@@ -435,7 +437,7 @@ export function AgentesAutomacoesView({ onRevisar }: { onRevisar?: () => void })
                 </button>
                 <button
                   type="button"
-                  onClick={() => mudarTela("perfil", "ceo")}
+                  onClick={() => mudarTela("copiloto", "ceo")}
                   className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#f95d14] px-3 text-xs font-semibold text-white shadow-md shadow-orange-500/20 transition-all hover:bg-[#ff6c26]"
                 >
                   <MessageSquare className="size-3.5" />

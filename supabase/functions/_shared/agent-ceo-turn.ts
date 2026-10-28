@@ -127,6 +127,8 @@ export type TurnoCeoInput = {
   mensagem: string;
   historico?: { role: string; content: string }[];
   workerId: string;
+  /** Texto acrescentado ao prompt do sistema (ex.: operação em foco). Gerado pelo servidor, nunca pelo cliente. */
+  contextoExtra?: string;
 };
 
 export type TurnoCeoResultado =
@@ -235,6 +237,7 @@ export async function executarTurnoCeo(
   if (!reservada) return falha("em_andamento");
 
   const modelo = carga.agent.modelo;
+  const system = CEO_SYSTEM_PROMPT + (input.contextoExtra ? `\n\n${input.contextoExtra}` : "");
   const runId = await deps.iniciarRun(reservada.id, modelo);
   const rec = new StepRecorder();
   const gravar = async (step: StepRecord) => deps.registrarPasso(runId, step);
@@ -290,7 +293,7 @@ export async function executarTurnoCeo(
 
       const estimativa = estimateMaxCallCostUsd(
         modelo,
-        JSON.stringify(mensagens).length + CEO_SYSTEM_PROMPT.length,
+        JSON.stringify(mensagens).length + system.length,
         atual.agent.maxTokensSaida,
         deps.tabelaPrecos,
       );
@@ -320,7 +323,7 @@ export async function executarTurnoCeo(
       const inicio = deps.agora().getTime();
       const resp = await deps.chamarModelo({
         modelo,
-        system: CEO_SYSTEM_PROMPT,
+        system,
         mensagens,
         maxTokensSaida: atual.agent.maxTokensSaida,
         tools: anthropicToolSchemas(

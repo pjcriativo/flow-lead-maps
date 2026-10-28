@@ -18,14 +18,15 @@ import { TOOL_REGISTRY, TIPOS_DELEGAVEIS, PAPEIS_SUBORDINADOS } from "./agent-to
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 const sql003 = read("../../migrations/202610270003_agent_team.sql");
 const sql004 = read("../../migrations/202610280001_ia_provedores_memoria_operacoes.sql");
-const sql = sql003 + "\n" + sql004;
+const sql005 = read("../../migrations/202610280002_ceo_chat_conversas.sql");
+const sql = sql003 + "\n" + sql004 + "\n" + sql005;
 const base = read("../../migrations/202610270001_agent_foundation.sql");
 
 const arrayDe = (texto: string): string[] => [...texto.matchAll(/'([^']+)'/g)].map((m) => m[1]);
 // A definição EFETIVA é a última aplicada: a 004 (mais nova) sobrescreve a 003 quando redefine a função.
 const funcao = (nome: string) => {
   const re = new RegExp(`create or replace function public\\.${nome}\\([\\s\\S]*?\\n\\$\\$;`);
-  return sql004.match(re)?.[0] ?? sql003.match(re)?.[0] ?? "";
+  return sql005.match(re)?.[0] ?? sql004.match(re)?.[0] ?? sql003.match(re)?.[0] ?? "";
 };
 
 test("papéis: o CHECK do banco é exatamente a lista do TypeScript", () => {

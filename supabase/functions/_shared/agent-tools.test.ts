@@ -89,8 +89,8 @@ test("contagens que chegam como texto numérico (bigint do Postgres) são aceita
   assert.equal(r.disponivel && r.totalLeads, 10);
 });
 
-test("registro: 6 ferramentas de leitura e 4 de coordenação interna, nenhuma externa", () => {
-  assert.equal(TOOL_REGISTRY.length, 10);
+test("registro: 7 ferramentas de leitura e 4 de coordenação interna, nenhuma externa", () => {
+  assert.equal(TOOL_REGISTRY.length, 11);
   const risco = (r: string) =>
     TOOL_REGISTRY.filter((t) => t.risco === r)
       .map((t) => t.nome)
@@ -99,6 +99,7 @@ test("registro: 6 ferramentas de leitura e 4 de coordenação interna, nenhuma e
     "consultar_execucoes_equipe",
     "consultar_lead",
     "consultar_memoria",
+    "consultar_operacoes",
     "consultar_oportunidades",
     "consultar_pipeline",
     "consultar_resumo_comercial",

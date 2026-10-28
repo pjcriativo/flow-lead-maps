@@ -23,7 +23,12 @@ import {
   ehMotivoDeTeto,
   type Rec,
 } from "../_shared/agent-edge-kit.ts";
-import { MSG_CONFIGURAR_PROVEDOR } from "../_shared/ai-provider.ts";
+import { MSG_CONFIGURAR_PROVEDOR, redigirSegredos } from "../_shared/ai-provider.ts";
+import {
+  montarContextoOperacao,
+  resumirAcaoDaFerramenta,
+  type AcaoChat,
+} from "../_shared/ceo-chat.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
@@ -65,6 +70,67 @@ Deno.serve(async (req) => {
     maxAttempts: t.max_attempts,
     resultado: t.resultado ?? null,
   });
+
+  // ── conversa persistente (opcional): só quando a migration do chat existe; senão segue sem histórico ──
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const quer = body.persistir === true;
+  const conversaPedida =
+    typeof body.conversa_id === "string" && UUID.test(body.conversa_id) ? body.conversa_id : null;
+  const operacaoPedida =
+    typeof body.operacao_id === "string" && UUID.test(body.operacao_id) ? body.operacao_id : null;
+  let conversaId: string | null = null;
+  let persistencia = false;
+  let historicoDb: { role: string; content: string }[] | null = null;
+  if (quer) {
+    const ceoCarga = await carregarAgenteComPermissoes(admin, { orgId, slug: "ceo" });
+    if (ceoCarga) {
+      try {
+        conversaId = (await rpc("agent_conversa_abrir", {
+          p_org: orgId,
+          p_user: userId,
+          p_agent: ceoCarga.agent.id,
+          p_conversa: conversaPedida,
+          p_operacao: operacaoPedida,
+        })) as string;
+        persistencia = true;
+        const h = (await rpc("agent_conversa_historico", {
+          p_org: orgId,
+          p_user: userId,
+          p_conversa: conversaId,
+          p_limite: 12,
+        })) as { papel: string; conteudo: string }[];
+        historicoDb = (h ?? []).map((m) => ({ role: m.papel, content: m.conteudo }));
+      } catch (e) {
+        const msg = String(e instanceof Error ? e.message : e);
+        // migration do chat ainda não aplicada: segue sem persistência (comportamento anterior)
+        if (!/agent_conversa_abrir|agent_conversa_historico|PGRST202|does not exist/i.test(msg)) {
+          const permissao = /sem_permissao|conversa_inexistente|agente_fora|operacao_fora/.test(
+            msg,
+          );
+          return json(
+            { ok: false, reason: permissao ? "conversa_invalida" : "erro_conversa" },
+            permissao ? 403 : 500,
+          );
+        }
+      }
+    }
+  }
+  // operação em foco: texto montado NO SERVIDOR a partir de dados da própria organização
+  let contextoExtra = "";
+  const operacaoFoco = operacaoPedida;
+  if (operacaoFoco) {
+    const { data: op } = await admin
+      .from("agent_operacoes")
+      .select(
+        "id, nome, nicho, subnicho, produto, publico_alvo, regiao, status, orcamento_usd_mes, papeis, papeis_pendentes",
+      )
+      .eq("id", operacaoFoco)
+      .eq("org_id", orgId)
+      .maybeSingle();
+    if (op) contextoExtra = montarContextoOperacao(op as Rec);
+  }
+  const ferramentasUsadas = new Set<string>();
+  const acoes: AcaoChat[] = [];
 
   const registrarEvento = criarRegistradorDeEventos(admin, { orgId });
   const deps: CeoDeps = {
@@ -122,8 +188,9 @@ Deno.serve(async (req) => {
       });
     },
     // Único caminho de dados do modelo: RPC fixa por ferramenta, org derivada do agente no banco.
-    executarFerramenta: (nome, ctx) =>
-      executarFerramentaAgente(
+    executarFerramenta: async (nome, ctx) => {
+      ferramentasUsadas.add(nome);
+      const saida = await executarFerramentaAgente(
         nome,
         {
           orgId: ctx.orgId,
@@ -133,7 +200,11 @@ Deno.serve(async (req) => {
           chamarRpc: rpc,
         },
         ctx.params,
-      ),
+      );
+      const acao = resumirAcaoDaFerramenta(nome, saida);
+      if (acao) acoes.push(acao);
+      return saida;
+    },
     chamarModelo: criarChamadorModelo(admin, ia, registrarEvento),
     tabelaPrecos: ia.tabela,
     consumoOrg: criarConsumoOrg(rpc),
@@ -148,8 +219,9 @@ Deno.serve(async (req) => {
     userId,
     clientMessageId: typeof body.client_message_id === "string" ? body.client_message_id : "",
     mensagem: typeof body.mensagem === "string" ? body.mensagem : "",
-    historico: Array.isArray(body.historico) ? body.historico : [],
+    historico: historicoDb ?? (Array.isArray(body.historico) ? body.historico : []),
     workerId: `agent-ceo:${crypto.randomUUID()}`,
+    contextoExtra: contextoExtra || undefined,
   });
   if (!resultado.ok) {
     if (ehMotivoDeTeto(resultado.reason)) {
@@ -171,11 +243,41 @@ Deno.serve(async (req) => {
       resultado.httpStatus,
     );
   }
+  let persistido = false;
+  if (persistencia && conversaId) {
+    try {
+      await rpc("agent_conversa_registrar", {
+        p_org: orgId,
+        p_user: userId,
+        p_conversa: conversaId,
+        p_client_message_id:
+          typeof body.client_message_id === "string" ? body.client_message_id : null,
+        p_pergunta: typeof body.mensagem === "string" ? body.mensagem : "",
+        p_resposta: resultado.resposta,
+        p_ferramentas: [...ferramentasUsadas],
+        p_acoes: acoes,
+        p_task: resultado.taskId,
+        p_custo: resultado.custoUsd,
+      });
+      persistido = true;
+    } catch (e) {
+      // a resposta já foi gerada e cobrada: não a perdemos; o cliente é avisado de que não foi salva
+      console.error(
+        "agent_conversa_registrar:",
+        redigirSegredos(e instanceof Error ? e.message : e),
+      );
+    }
+  }
   return json({
     ok: true,
     resposta: resultado.resposta,
     reutilizado: resultado.reutilizado,
     custo_usd: resultado.custoUsd,
     passos: resultado.passos,
+    task_id: resultado.taskId,
+    conversa_id: persistencia ? conversaId : null,
+    persistido,
+    ferramentas: [...ferramentasUsadas],
+    acoes,
   });
 });

@@ -59,6 +59,8 @@ import { LimitesRestricoesModal } from "./LimitesRestricoesModal";
 
 interface PerfilAgenteViewProps {
   agenteId?: string;
+  /** Abre o chat real com o CEO (Tela 10). */
+  onConversarCeo?: () => void;
   onVoltar?: () => void;
   onNavegarEquipe?: () => void;
   onNavegarTreinamento?: () => void;
@@ -73,6 +75,7 @@ const PANEL_CLASS =
 
 export function PerfilAgenteView({
   agenteId = "ceo",
+  onConversarCeo,
   onVoltar,
   onNavegarEquipe,
   onNavegarTreinamento,
@@ -186,6 +189,17 @@ export function PerfilAgenteView({
                 <Check className="size-3.5" />
                 <span>Alterações salvas localmente</span>
               </span>
+            )}
+
+            {onConversarCeo && (
+              <button
+                type="button"
+                onClick={onConversarCeo}
+                className="flex h-10 items-center gap-2 rounded-xl bg-[#f95d14] px-5 text-xs font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:bg-[#ff6c26]"
+              >
+                <MessageSquare className="size-4" />
+                <span>Conversar com CEO</span>
+              </button>
             )}
 
             <button

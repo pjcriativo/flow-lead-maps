@@ -15,6 +15,7 @@ import {
   TOOL_DELEGAR,
   TOOL_EXECUCOES,
   TOOL_LEAD,
+  TOOL_OPERACOES,
   TOOL_OPORTUNIDADES,
   TOOL_PIPELINE,
   TOOL_PROPOR_EQUIPE,
@@ -87,6 +88,8 @@ export async function executarFerramentaAgente(
     }
     case TOOL_EXECUCOES:
       return ctx.chamarRpc("agent_tool_execucoes_equipe", base);
+    case TOOL_OPERACOES:
+      return ctx.chamarRpc("agent_tool_operacoes", base);
     case TOOL_DELEGAR: {
       const instrucoes = String(params.instrucoes ?? "").trim();
       if (!instrucoes) throw new Error("instrucoes_vazias");
@@ -185,6 +188,7 @@ export async function executarFerramentaAgente(
         aprovacao_id: id,
         operacao: m.def.nome,
         papeis: m.def.papeis,
+        plano: m.def,
         observacao:
           "Aguardando aprovação de um administrador; nenhuma operação, agente ou permissão foi criada.",
       };
