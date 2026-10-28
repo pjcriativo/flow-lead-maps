@@ -472,3 +472,24 @@ test("Tela: sem lista fixa de modelos nem preço por 1K; botão chama a sincroni
   assert.match(tela, /Preço não configurado/);
   assert.match(tela, /Última sincronização/);
 });
+
+test("Tela: fluxo chave → verificar → modelo → CEO não fica preso e não esconde a origem da chave", () => {
+  assert.match(tela, /Salvar e verificar/);
+  assert.match(
+    tela,
+    /Chave do ambiente do servidor/,
+    "chave de ambiente não é exibida como se fosse do cofre",
+  );
+  assert.equal(
+    tela.includes("••••••••••••••••••••••••••••••••••••••••"),
+    false,
+    "sem máscara falsa",
+  );
+  assert.match(
+    tela,
+    /migration_catalogo_pendente[\s\S]{0,200}testarOpenAI/,
+    "sem a migration cai no catálogo atual",
+  );
+  assert.match(tela, /garantirProvedorAtivo/, "habilitar modelo ativa o provedor");
+  assert.match(tela, /Nenhum modelo elegível ainda/, "seletor vazio explica o próximo passo");
+});

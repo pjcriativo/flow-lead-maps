@@ -451,7 +451,9 @@ export function AdminIaProvedores() {
           `Chave válida (${r.total_modelos} modelos listados), mas o projeto NÃO tem acesso ao modelo do CEO (${r.modelo_ceo}).`,
         );
       } else {
-        toast.success(`Autenticação válida: ${r.total_modelos} modelos listados pela OpenAI.`);
+        toast.success(
+          `Conexão confirmada: ${r.total_modelos} modelos listados pela OpenAI. Agora habilite e precifique o modelo desejado na tabela.`,
+        );
       }
       await carregar();
     } catch (e) {
@@ -466,6 +468,22 @@ export function AdminIaProvedores() {
     setOcupado("sincronizar");
     try {
       const r = await sincronizarCatalogoOpenAI();
+      if (
+        !r.ok &&
+        (r.reason === "migration_catalogo_pendente" || r.reason === "acao_desconhecida")
+      ) {
+        // schema/Edge antigos: sincroniza o que já é suportado (modelos de chat) em vez de travar o fluxo
+        const antigo = await testarOpenAI();
+        if (!antigo.ok) {
+          toast.error(traduzirMotivoIa(antigo.reason));
+          return;
+        }
+        toast.success(
+          `Modelos de texto atualizados (${antigo.modelos_compativeis ?? 0} compatíveis com o CEO). O catálogo completo (imagem, áudio, etc.) depende da migration pendente.`,
+        );
+        await carregar();
+        return;
+      }
       if (!r.ok) {
         toast.error(traduzirMotivoIa(r.reason));
         return;
@@ -577,6 +595,17 @@ export function AdminIaProvedores() {
     setConfirmandoPreco(false);
   };
 
+  // Habilitar um modelo exige o provedor ativo; sem isto o usuário ficaria preso entre provedor e modelo
+  const garantirProvedorAtivo = async (): Promise<boolean> => {
+    if (openaiEstado?.ativo) return true;
+    const r = await ativarProvedor("openai", true);
+    if (!r.ok) {
+      toast.error(traduzirMotivoIa(r.reason));
+      return false;
+    }
+    return true;
+  };
+
   // Habilitar/desabilitar direto na tabela (sem alterar preços)
   const handleToggleModelo = async (modelo: LinhaCatalogo) => {
     const novoStatus = !modelo.ativo;
@@ -585,6 +614,7 @@ export function AdminIaProvedores() {
       handleAbrirEditarModelo(modelo);
       return;
     }
+    if (novoStatus && !(await garantirProvedorAtivo())) return;
     await executar(
       `modelo-${modelo.id}`,
       () =>
@@ -636,6 +666,7 @@ export function AdminIaProvedores() {
       setConfirmandoPreco(true);
       return;
     }
+    if (editAtivo && !(await garantirProvedorAtivo())) return;
     const r = await executar(
       "salvar-modelo-modal",
       () =>
@@ -693,6 +724,10 @@ export function AdminIaProvedores() {
 
   const conexaoStatus = openaiEstado?.conexao_status ?? "nao_configurado";
   const conexaoInfo = ROTULO_CONEXAO[conexaoStatus];
+  const mensagemConexao =
+    openaiEstado?.chave.origem === "ambiente"
+      ? "Há uma chave no ambiente do servidor, ainda não verificada. Clique em “Salvar e verificar” (com o campo vazio usa essa chave; colando outra, ela vai para o cofre)."
+      : "Cole a chave e clique em “Salvar e verificar”.";
 
   return (
     <div className="space-y-6 text-slate-100 pb-12">
@@ -953,10 +988,11 @@ export function AdminIaProvedores() {
                     value={chave}
                     onChange={(e) => setChave(e.target.value)}
                     placeholder={
-                      openaiEstado?.chave.configurada
-                        ? (openaiEstado.chave.mascarada ??
-                          "••••••••••••••••••••••••••••••••••••••••")
-                        : "sk-proj-..."
+                      openaiEstado?.chave.origem === "cofre"
+                        ? (openaiEstado.chave.mascarada ?? "Chave salva no cofre")
+                        : openaiEstado?.chave.origem === "ambiente"
+                          ? "Chave do ambiente do servidor (não exibida)"
+                          : "sk-proj-..."
                     }
                     className="h-10 w-full rounded-lg border border-[#252936] bg-[#0E1015] px-3 pr-10 font-mono text-xs text-white placeholder:text-slate-500 focus:border-[#F97316] focus:outline-none focus:ring-1 focus:ring-[#F97316]"
                   />
@@ -991,7 +1027,7 @@ export function AdminIaProvedores() {
                   <div>
                     <p className="text-xs font-bold text-white">{conexaoInfo.rotulo}</p>
                     <p className="text-[11px] text-slate-400">
-                      {openaiEstado?.conexao_detalhe ?? "Cole a chave e verifique a conexão."}
+                      {openaiEstado?.conexao_detalhe ?? mensagemConexao}
                       {openaiEstado?.conexao_verificada_em
                         ? ` · ${new Date(openaiEstado.conexao_verificada_em).toLocaleString("pt-BR")}`
                         : ""}
@@ -1008,7 +1044,7 @@ export function AdminIaProvedores() {
                   {ocupado === "conectar" || ocupado === "testar" ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    "Verificar conexão"
+                    "Salvar e verificar"
                   )}
                 </button>
               </div>
@@ -1094,8 +1130,9 @@ export function AdminIaProvedores() {
                     onTrocar={(v) => void handleTrocarModelo("modelo_ceo", v)}
                   />
                   <p className="text-[10px] text-slate-500">
-                    Só modelos de texto com ferramentas, habilitados e com preço. Não é trocado
-                    automaticamente.
+                    {opcoesCeo.length === 0
+                      ? "Nenhum modelo elegível ainda: na tabela abaixo, informe o preço e habilite um modelo de texto."
+                      : "Só modelos de texto com ferramentas, habilitados e com preço. Não é trocado automaticamente."}
                   </p>
                 </div>
               </div>
