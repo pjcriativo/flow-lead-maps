@@ -2,8 +2,9 @@
 // ainda não publicada no banco, nada muda: vale a lista estática de Claude. Nenhum segredo trafega aqui.
 import { rpc } from "@/services/agente-ceo-admin";
 import { definirModelosExtras, type ModeloCatalogo } from "@/lib/modelos-ia";
-
-export const IA_CENTRAL_HABILITADA = import.meta.env.VITE_IA_CENTRAL === "true";
+// Central de IA habilitada: ativada por padrão no Super Admin (VITE_IA_CENTRAL === "true" ou não false).
+export const IA_CENTRAL_HABILITADA =
+  import.meta.env.VITE_IA_CENTRAL === "true" || import.meta.env.VITE_IA_CENTRAL !== "false";
 
 export type CatalogoIa = {
   /** false = Central não publicada / flag desligada → usar a lista estática. */

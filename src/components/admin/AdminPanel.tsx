@@ -667,13 +667,32 @@ export function AdminPanel({ email }: { email: string }) {
   const usuarios = painel?.usuarios ?? [];
   const snapshot = painel?.snapshot ?? null;
 
+  const handleNavegar = (novaTela: TelaAdmin) => {
+    setTela(novaTela);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tela", novaTela);
+      window.history.pushState({}, "", url.toString());
+    }
+  };
+
+  useEffect(() => {
+    const onPop = () => {
+      const p = new URLSearchParams(window.location.search).get("tela");
+      if (p) setTela(p as TelaAdmin);
+      else setTela("dashboard");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   if (tela !== "dashboard") {
     return (
-      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-        <Sidebar tela={tela} onNavegar={setTela} />
-        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-          <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
-          <main className="w-full flex-1 overflow-y-auto space-y-5 p-6">
+      <div className="flex h-screen w-full overflow-hidden bg-[#0B0C0E] text-slate-100">
+        <Sidebar tela={tela} onNavegar={handleNavegar} />
+        <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#0B0C0E]">
+          <Topbar email={email} perfil={perfilTopo} onNavegar={handleNavegar} />
+          <main className="w-full flex-1 overflow-y-auto space-y-5 p-6 bg-[#0B0C0E]">
             {erro && (
               <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                 Falha ao carregar: {erro}
@@ -792,9 +811,9 @@ export function AdminPanel({ email }: { email: string }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-      <Sidebar tela={tela} onNavegar={setTela} />
+      <Sidebar tela={tela} onNavegar={handleNavegar} />
       <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-        <Topbar email={email} perfil={perfilTopo} onNavegar={setTela} />
+        <Topbar email={email} perfil={perfilTopo} onNavegar={handleNavegar} />
         <main className="w-full flex-1 overflow-y-auto space-y-5 p-6">
           <div className="rounded-xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold">
@@ -809,13 +828,13 @@ export function AdminPanel({ email }: { email: string }) {
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               {/* ação REAL: leva à tela de usuários da plataforma */}
               <button
-                onClick={() => setTela("all-users")}
+                onClick={() => handleNavegar("all-users")}
                 className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/15"
               >
                 <Users className="h-3.5 w-3.5" /> Gerenciar usuários
               </button>
               <button
-                onClick={() => setTela("tickets")}
+                onClick={() => handleNavegar("tickets")}
                 className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-gold/10 px-3 py-1.5 text-xs font-semibold text-gold hover:bg-gold/15"
               >
                 <LifeBuoy className="h-3.5 w-3.5" /> Tickets
