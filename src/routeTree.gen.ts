@@ -13,6 +13,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as RefundRouteImport } from './routes/refund'
+import { Route as ProspeccaoRouteImport } from './routes/prospeccao'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ManutencaoRouteImport } from './routes/manutencao'
@@ -44,6 +45,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const RefundRoute = RefundRouteImport.update({
   id: '/refund',
   path: '/refund',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProspeccaoRoute = ProspeccaoRouteImport.update({
+  id: '/prospeccao',
+  path: '/prospeccao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/prospeccao': typeof ProspeccaoRoute
   '/refund': typeof RefundRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/prospeccao': typeof ProspeccaoRoute
   '/refund': typeof RefundRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
+  '/prospeccao': typeof ProspeccaoRoute
   '/refund': typeof RefundRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/manutencao'
     | '/pricing'
     | '/privacy'
+    | '/prospeccao'
     | '/refund'
     | '/reset-password'
     | '/sitemap.xml'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/manutencao'
     | '/pricing'
     | '/privacy'
+    | '/prospeccao'
     | '/refund'
     | '/reset-password'
     | '/sitemap.xml'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/manutencao'
     | '/pricing'
     | '/privacy'
+    | '/prospeccao'
     | '/refund'
     | '/reset-password'
     | '/sitemap.xml'
@@ -224,6 +236,7 @@ export interface RootRouteChildren {
   ManutencaoRoute: typeof ManutencaoRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
+  ProspeccaoRoute: typeof ProspeccaoRoute
   RefundRoute: typeof RefundRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       path: '/refund'
       fullPath: '/refund'
       preLoaderRoute: typeof RefundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prospeccao': {
+      id: '/prospeccao'
+      path: '/prospeccao'
+      fullPath: '/prospeccao'
+      preLoaderRoute: typeof ProspeccaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -371,6 +391,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManutencaoRoute: ManutencaoRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
+  ProspeccaoRoute: ProspeccaoRoute,
   RefundRoute: RefundRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import {
   GoogleMapsIcon,
   InstagramIcon,
@@ -15,7 +16,7 @@ export function RecursosSection() {
       title: "Google Maps",
       desc: "Encontre empresas e oportunidades por localização.",
       icon: GoogleMapsIcon,
-      targetHref: "#ecossistema",
+      targetHref: "/prospeccao",
       category: "Prospecção Multicanal",
     },
     {
@@ -23,7 +24,7 @@ export function RecursosSection() {
       title: "Instagram",
       desc: "Descubra perfis e analise oportunidades comerciais.",
       icon: InstagramIcon,
-      targetHref: "#ecossistema",
+      targetHref: "/prospeccao",
       category: "Prospecção Multicanal",
     },
     {
@@ -31,7 +32,7 @@ export function RecursosSection() {
       title: "LinkedIn",
       desc: "Explore oportunidades B2B e organize sua prospecção.",
       icon: LinkedInIcon,
-      targetHref: "#ecossistema",
+      targetHref: "/prospeccao",
       category: "Prospecção Multicanal",
     },
     {
@@ -39,7 +40,7 @@ export function RecursosSection() {
       title: "WhatsApp",
       desc: "Centralize conversas e processos de atendimento.",
       icon: WhatsAppIcon,
-      targetHref: "#ecossistema",
+      targetHref: "/prospeccao",
       category: "CRM & Vendas",
     },
     {
@@ -47,7 +48,7 @@ export function RecursosSection() {
       title: "Agentes de IA",
       desc: "Planeje operações e coordene tarefas com inteligência artificial.",
       icon: BotAiIcon,
-      targetHref: "#ecossistema",
+      targetHref: "/prospeccao",
       category: "CEO & Agentes",
     },
     {
@@ -55,7 +56,7 @@ export function RecursosSection() {
       title: "Propostas e Contratos",
       desc: "Organize documentos e acompanhe negociações.",
       icon: PropostasContratosIcon,
-      targetHref: "#ecossistema",
+      targetHref: "/pricing",
       category: "CRM & Vendas",
     },
   ];
@@ -81,9 +82,10 @@ export function RecursosSection() {
       {/* Grid de 6 Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {recursos.map((item) => (
-          <a
+          <Link
             key={item.id}
-            href={item.targetHref}
+            to={item.targetHref}
+            preload="render"
             className="group relative flex items-center justify-between rounded-2xl border border-white/[0.08] bg-[#090e17]/90 p-5 backdrop-blur-sm transition-all duration-300 hover:border-[#ff6200]/50 hover:bg-[#0d1421] hover:shadow-[0_0_25px_rgba(255,98,0,0.18)] hover:-translate-y-0.5"
           >
             <div className="flex items-center gap-4 min-w-0 pr-3">
@@ -109,7 +111,7 @@ export function RecursosSection() {
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-slate-400 group-hover:bg-[#ff6200] group-hover:text-white transition-all">
               <ChevronRight className="h-4 w-4" />
             </div>
-          </a>
+          </Link>
         ))}
       </div>
     </section>

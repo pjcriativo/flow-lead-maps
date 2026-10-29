@@ -183,3 +183,61 @@ export function YouTubeIcon({ className = "w-5 h-5", ...props }: IconProps) {
   );
 }
 
+export function TikTokIcon({ className = "w-6 h-6", ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={className} {...props}>
+      <rect width="48" height="48" rx="12" fill="#000000" />
+      <g filter="url(#tiktok-glow)">
+        <path
+          d="M33 17.5c-2.3 0-4.2-1.2-5.3-3v14.2c0 5.4-4.4 9.8-9.8 9.8s-9.8-4.4-9.8-9.8 4.4-9.8 9.8-9.8c.6 0 1.2.1 1.8.2v4.3c-.6-.2-1.2-.3-1.8-.3-3 0-5.5 2.5-5.5 5.5s2.5 5.5 5.5 5.5 5.5-2.5 5.5-5.5V9h4.3c.4 3 2.8 5.4 5.8 5.7v2.8z"
+          fill="#00F2FE"
+          opacity="0.9"
+          transform="translate(-1, -1)"
+        />
+        <path
+          d="M33 17.5c-2.3 0-4.2-1.2-5.3-3v14.2c0 5.4-4.4 9.8-9.8 9.8s-9.8-4.4-9.8-9.8 4.4-9.8 9.8-9.8c.6 0 1.2.1 1.8.2v4.3c-.6-.2-1.2-.3-1.8-.3-3 0-5.5 2.5-5.5 5.5s2.5 5.5 5.5 5.5 5.5-2.5 5.5-5.5V9h4.3c.4 3 2.8 5.4 5.8 5.7v2.8z"
+          fill="#FE2C55"
+          opacity="0.9"
+          transform="translate(1, 1)"
+        />
+        <path
+          d="M33 17.5c-2.3 0-4.2-1.2-5.3-3v14.2c0 5.4-4.4 9.8-9.8 9.8s-9.8-4.4-9.8-9.8 4.4-9.8 9.8-9.8c.6 0 1.2.1 1.8.2v4.3c-.6-.2-1.2-.3-1.8-.3-3 0-5.5 2.5-5.5 5.5s2.5 5.5 5.5 5.5 5.5-2.5 5.5-5.5V9h4.3c.4 3 2.8 5.4 5.8 5.7v2.8z"
+          fill="#FFFFFF"
+        />
+      </g>
+    </svg>
+  );
+}
+
+export function BusinessB2BIcon({ className = "w-6 h-6", ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 48 48" fill="none" className={className} {...props}>
+      <defs>
+        <linearGradient id="b2b-grad" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#2563eb" />
+          <stop offset="100%" stopColor="#1d4ed8" />
+        </linearGradient>
+      </defs>
+      <rect width="48" height="48" rx="12" fill="url(#b2b-grad)" />
+      {/* High-rise Building 1 */}
+      <rect x="12" y="14" width="13" height="24" rx="2" fill="#FFFFFF" />
+      <rect x="15" y="18" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+      <rect x="19.5" y="18" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+      <rect x="15" y="23" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+      <rect x="19.5" y="23" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+      <rect x="15" y="28" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+      <rect x="19.5" y="28" width="2.5" height="2.5" rx="0.5" fill="#2563eb" />
+      <rect x="17" y="33" width="3" height="5" fill="#2563eb" />
+
+      {/* Building 2 */}
+      <rect x="25" y="20" width="11" height="18" rx="2" fill="#93c5fd" />
+      <rect x="27.5" y="23" width="2" height="2" rx="0.5" fill="#1e3a8a" />
+      <rect x="31.5" y="23" width="2" height="2" rx="0.5" fill="#1e3a8a" />
+      <rect x="27.5" y="27" width="2" height="2" rx="0.5" fill="#1e3a8a" />
+      <rect x="31.5" y="27" width="2" height="2" rx="0.5" fill="#1e3a8a" />
+      <rect x="27.5" y="31" width="2" height="2" rx="0.5" fill="#1e3a8a" />
+      <rect x="31.5" y="31" width="2" height="2" rx="0.5" fill="#1e3a8a" />
+    </svg>
+  );
+}
+

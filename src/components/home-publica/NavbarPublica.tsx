@@ -34,16 +34,16 @@ export function NavbarPublica() {
 
         {/* NAVEGAÇÃO CENTRAL (DESKTOP) */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-          <a href="#recursos" className="hover:text-white transition-colors">
+          <a href="/#recursos" className="hover:text-white transition-colors">
             Recursos
           </a>
-          <a href="#ecossistema" className="hover:text-white transition-colors">
+          <Link to="/prospeccao" className="hover:text-white transition-colors">
             Soluções
-          </a>
-          <a href="#planos" className="hover:text-white transition-colors">
+          </Link>
+          <Link to="/pricing" className="hover:text-white transition-colors">
             Planos
-          </a>
-          <a href="#demo" className="hover:text-white transition-colors">
+          </Link>
+          <a href="/#demo" className="hover:text-white transition-colors">
             Conteúdo
           </a>
           <a href="#suporte" className="hover:text-white transition-colors">
@@ -95,28 +95,28 @@ export function NavbarPublica() {
         <div className="md:hidden border-b border-white/10 bg-[#070c14] px-4 pt-3 pb-6 space-y-3 animate-in slide-in-from-top-4 duration-200">
           <div className="flex flex-col space-y-2 text-sm font-medium text-slate-300">
             <a
-              href="#recursos"
+              href="/#recursos"
               onClick={() => setMobileMenuOpen(false)}
               className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
             >
               Recursos
             </a>
-            <a
-              href="#ecossistema"
+            <Link
+              to="/prospeccao"
               onClick={() => setMobileMenuOpen(false)}
               className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
             >
               Soluções
-            </a>
-            <a
-              href="#planos"
+            </Link>
+            <Link
+              to="/pricing"
               onClick={() => setMobileMenuOpen(false)}
               className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
             >
               Planos
-            </a>
+            </Link>
             <a
-              href="#demo"
+              href="/#demo"
               onClick={() => setMobileMenuOpen(false)}
               className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
             >
