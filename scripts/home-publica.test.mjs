@@ -89,3 +89,4 @@ test("Home Pública — Validação Estrutural e Fidelidade ao Layout Aprovado",
     assert.match(footerContent, /LinkedIn/i);
   });
 });
+
