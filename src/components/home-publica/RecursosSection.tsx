@@ -40,7 +40,7 @@ export function RecursosSection() {
       title: "WhatsApp",
       desc: "Centralize conversas e processos de atendimento.",
       icon: WhatsAppIcon,
-      targetHref: "/prospeccao",
+      targetHref: "/crm",
       category: "CRM & Vendas",
     },
     {
@@ -56,7 +56,7 @@ export function RecursosSection() {
       title: "Propostas e Contratos",
       desc: "Organize documentos e acompanhe negociações.",
       icon: PropostasContratosIcon,
-      targetHref: "/pricing",
+      targetHref: "/crm",
       category: "CRM & Vendas",
     },
   ];

@@ -18,6 +18,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ManutencaoRouteImport } from './routes/manutencao'
 import { Route as EntrarRouteImport } from './routes/entrar'
+import { Route as CrmRouteImport } from './routes/crm'
 import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AguardandoAprovacaoRouteImport } from './routes/aguardando-aprovacao'
@@ -72,6 +73,11 @@ const EntrarRoute = EntrarRouteImport.update({
   path: '/entrar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CrmRoute = CrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CadastroRoute = CadastroRouteImport.update({
   id: '/cadastro',
   path: '/cadastro',
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/aguardando-aprovacao': typeof AguardandoAprovacaoRoute
   '/auth': typeof AuthRoute
   '/cadastro': typeof CadastroRoute
+  '/crm': typeof CrmRoute
   '/entrar': typeof EntrarRoute
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/aguardando-aprovacao': typeof AguardandoAprovacaoRoute
   '/auth': typeof AuthRoute
   '/cadastro': typeof CadastroRoute
+  '/crm': typeof CrmRoute
   '/entrar': typeof EntrarRoute
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
@@ -155,6 +163,7 @@ export interface FileRoutesById {
   '/aguardando-aprovacao': typeof AguardandoAprovacaoRoute
   '/auth': typeof AuthRoute
   '/cadastro': typeof CadastroRoute
+  '/crm': typeof CrmRoute
   '/entrar': typeof EntrarRoute
   '/manutencao': typeof ManutencaoRoute
   '/pricing': typeof PricingRoute
@@ -175,6 +184,7 @@ export interface FileRouteTypes {
     | '/aguardando-aprovacao'
     | '/auth'
     | '/cadastro'
+    | '/crm'
     | '/entrar'
     | '/manutencao'
     | '/pricing'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/aguardando-aprovacao'
     | '/auth'
     | '/cadastro'
+    | '/crm'
     | '/entrar'
     | '/manutencao'
     | '/pricing'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/aguardando-aprovacao'
     | '/auth'
     | '/cadastro'
+    | '/crm'
     | '/entrar'
     | '/manutencao'
     | '/pricing'
@@ -232,6 +244,7 @@ export interface RootRouteChildren {
   AguardandoAprovacaoRoute: typeof AguardandoAprovacaoRoute
   AuthRoute: typeof AuthRoute
   CadastroRoute: typeof CadastroRoute
+  CrmRoute: typeof CrmRoute
   EntrarRoute: typeof EntrarRoute
   ManutencaoRoute: typeof ManutencaoRoute
   PricingRoute: typeof PricingRoute
@@ -307,6 +320,13 @@ declare module '@tanstack/react-router' {
       path: '/entrar'
       fullPath: '/entrar'
       preLoaderRoute: typeof EntrarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/crm': {
+      id: '/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof CrmRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cadastro': {
@@ -387,6 +407,7 @@ const rootRouteChildren: RootRouteChildren = {
   AguardandoAprovacaoRoute: AguardandoAprovacaoRoute,
   AuthRoute: AuthRoute,
   CadastroRoute: CadastroRoute,
+  CrmRoute: CrmRoute,
   EntrarRoute: EntrarRoute,
   ManutencaoRoute: ManutencaoRoute,
   PricingRoute: PricingRoute,

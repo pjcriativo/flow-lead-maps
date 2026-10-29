@@ -30,18 +30,20 @@ export function CtaProspeccaoSection() {
             >
               Ver planos <ArrowRight className="h-5 w-5" />
             </Link>
-            <a
-              href="#canais"
+            <Link
+              to="/crm"
+              preload="render"
               className="inline-flex h-13 w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-6 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:border-[#ff6200]/40"
             >
               <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white">
                 <Play className="h-2.5 w-2.5 fill-white text-white translate-x-0.5" />
               </div>
               Conhecer o CRM
-            </a>
+            </Link>
           </div>
         </div>
       </div>
     </section>
   );
 }
+

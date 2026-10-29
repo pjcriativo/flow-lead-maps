@@ -90,3 +90,4 @@ test("Página 02 — Prospecção Multicanal: Validação Estrutural e Fidelidad
     assert.match(ctaContent, /to="\/pricing"/);
   });
 });
+
