@@ -29,6 +29,9 @@ export function FooterPublico() {
             <Link to="/crm" className="hover:text-white transition-colors">
               CRM & Vendas
             </Link>
+            <Link to="/agentes" className="hover:text-white transition-colors">
+              Agentes de IA
+            </Link>
             <a href="/#recursos" className="hover:text-white transition-colors">
               Recursos
             </a>

@@ -33,12 +33,15 @@ export function NavbarPublica() {
         </Link>
 
         {/* NAVEGAÇÃO CENTRAL (DESKTOP) */}
-        <nav className="hidden md:flex items-center gap-7 lg:gap-8 text-sm font-medium text-slate-300">
+        <nav className="hidden md:flex items-center gap-6 lg:gap-7 text-sm font-medium text-slate-300">
           <Link to="/prospeccao" className="hover:text-white transition-colors">
             Prospecção
           </Link>
           <Link to="/crm" className="hover:text-white transition-colors">
             CRM & Vendas
+          </Link>
+          <Link to="/agentes" className="hover:text-white transition-colors">
+            Agentes de IA
           </Link>
           <a href="/#recursos" className="hover:text-white transition-colors">
             Recursos
@@ -110,6 +113,13 @@ export function NavbarPublica() {
               className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
             >
               CRM & Vendas
+            </Link>
+            <Link
+              to="/agentes"
+              onClick={() => setMobileMenuOpen(false)}
+              className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
+            >
+              CEO & Agentes de IA
             </Link>
             <a
               href="/#recursos"

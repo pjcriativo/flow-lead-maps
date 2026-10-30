@@ -48,7 +48,7 @@ export function RecursosSection() {
       title: "Agentes de IA",
       desc: "Planeje operações e coordene tarefas com inteligência artificial.",
       icon: BotAiIcon,
-      targetHref: "/prospeccao",
+      targetHref: "/agentes",
       category: "CEO & Agentes",
     },
     {
