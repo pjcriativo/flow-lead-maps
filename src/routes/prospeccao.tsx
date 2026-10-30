@@ -3,70 +3,74 @@ import { NavbarPublica } from "@/components/home-publica/NavbarPublica";
 import { FooterPublico } from "@/components/home-publica/FooterPublico";
 import { HeroProspeccao } from "@/components/prospeccao-publica/HeroProspeccao";
 import { PrincipaisCanaisSection } from "@/components/prospeccao-publica/PrincipaisCanaisSection";
-import { CanaisComplementaresSection } from "@/components/prospeccao-publica/CanaisComplementaresSection";
+import { FiltrosInteligentesSection } from "@/components/prospeccao-publica/FiltrosInteligentesSection";
 import { ComoFuncionaSection } from "@/components/prospeccao-publica/ComoFuncionaSection";
-import { InteligenciaComercialSection } from "@/components/prospeccao-publica/InteligenciaComercialSection";
+import { ResultadosReaisSection } from "@/components/prospeccao-publica/ResultadosReaisSection";
 import { CtaProspeccaoSection } from "@/components/prospeccao-publica/CtaProspeccaoSection";
 
 export const Route = createFileRoute("/prospeccao")({
   head: () => ({
     meta: [
       {
-        title: "Prospecção Multicanal — Flow Business",
+        title: "Prospecção Multicanal — Encontre Clientes em Todos os Canais com IA | Flow Business",
       },
       {
         name: "description",
         content:
-          "Encontre seus próximos clientes nos canais certos. Descubra empresas, identifique oportunidades e organize sua prospecção no Google Maps, Instagram, LinkedIn e mais.",
+          "Encontre clientes em todos os canais com inteligência artificial. Prospecção automatizada no Instagram, LinkedIn, YouTube, TikTok e Google Maps integrada ao seu CRM.",
       },
       {
-        property: "og:title",
-        content: "Prospecção Multicanal — Flow Business",
+        name: "keywords",
+        content:
+          "prospecção multicanal, leads instagram, leads linkedin, leads google maps, prospecção b2b, flow business",
       },
+      { property: "og:title", content: "Prospecção Multicanal | Flow Business" },
       {
         property: "og:description",
         content:
-          "Encontre seus próximos clientes nos canais certos. Descubra empresas, identifique oportunidades e organize sua prospecção em um único lugar.",
+          "Use inteligência artificial para encontrar, qualificar e organizar leads no Instagram, LinkedIn, YouTube, TikTok e Google Maps.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://flowleads.com.br/prospeccao" },
+      { property: "og:url", content: "https://business.flowgenius.com.br/prospeccao" },
       { property: "og:image", content: "https://flowleads.com.br/og-image-flow-business.png" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "canonical", href: "https://flowleads.com.br/prospeccao" }],
+    links: [
+      { rel: "canonical", href: "https://business.flowgenius.com.br/prospeccao" },
+    ],
   }),
-  component: ProspeccaoPage,
+  component: ProspeccaoPublicaPage,
 });
 
-function ProspeccaoPage() {
+function ProspeccaoPublicaPage() {
   return (
-    <div className="min-h-screen bg-[#05080e] text-slate-100 selection:bg-[#ff6200]/30 selection:text-white font-sans overflow-x-hidden antialiased">
-      {/* Cabeçalho Sticky Institucional */}
+    <div className="min-h-screen bg-[#05080e] text-slate-100 flex flex-col font-sans selection:bg-[#ff6200] selection:text-white">
+      {/* CABEÇALHO GLOBAL */}
       <NavbarPublica />
 
-      <main>
-        {/* 1. Hero da Prospecção Multicanal */}
+      {/* CONTEÚDO DA PÁGINA DE PROSPECÇÃO MULTICANAL */}
+      <main className="flex-1">
+        {/* 1. Hero com Mockup da Interface e Cards de Canais */}
         <HeroProspeccao />
 
-        {/* 2. Principais Canais (Google Maps, Instagram, LinkedIn) */}
+        {/* 2. Seção "Canais de prospecção" (5 Cards Completos) */}
         <PrincipaisCanaisSection />
 
-        {/* 3. Canais Complementares (Business B2B, YouTube, TikTok) */}
-        <CanaisComplementaresSection />
+        {/* 3. Seção "Filtros inteligentes" (Bullets + Formulário + Cards de Leads) */}
+        <FiltrosInteligentesSection />
 
-        {/* 4. Como Funciona (Da busca ao cliente, em 3 passos) */}
+        {/* 4. Seção "Como funciona" (4 Etapas Sequenciais) */}
         <ComoFuncionaSection />
 
-        {/* 5. Inteligência Comercial (Fluxo em 5 Etapas) */}
-        <InteligenciaComercialSection />
+        {/* 5. Seção "Resultados reais" (3 Cards de Métricas e Gráficos) */}
+        <ResultadosReaisSection />
 
-        {/* 6. CTA Final (Seu próximo cliente pode estar a uma busca de distância) */}
+        {/* 6. Bloco de CTA Final */}
         <CtaProspeccaoSection />
       </main>
 
-      {/* Rodapé Institucional */}
+      {/* RODAPÉ GLOBAL */}
       <FooterPublico />
     </div>
   );
 }
-

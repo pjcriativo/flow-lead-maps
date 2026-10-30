@@ -2,92 +2,95 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-test("Página 02 — Prospecção Multicanal: Validação Estrutural e Fidelidade Visual", async (t) => {
+test("Página 02 — Prospecção Multicanal: Validação Fiel ao Layout Aprovado", async (t) => {
   const pageContent = readFileSync("src/routes/prospeccao.tsx", "utf8");
   const heroContent = readFileSync("src/components/prospeccao-publica/HeroProspeccao.tsx", "utf8");
-  const principaisContent = readFileSync("src/components/prospeccao-publica/PrincipaisCanaisSection.tsx", "utf8");
-  const compContent = readFileSync("src/components/prospeccao-publica/CanaisComplementaresSection.tsx", "utf8");
+  const canaisContent = readFileSync("src/components/prospeccao-publica/PrincipaisCanaisSection.tsx", "utf8");
+  const filtrosContent = readFileSync("src/components/prospeccao-publica/FiltrosInteligentesSection.tsx", "utf8");
   const comoContent = readFileSync("src/components/prospeccao-publica/ComoFuncionaSection.tsx", "utf8");
-  const intelContent = readFileSync("src/components/prospeccao-publica/InteligenciaComercialSection.tsx", "utf8");
+  const resContent = readFileSync("src/components/prospeccao-publica/ResultadosReaisSection.tsx", "utf8");
   const ctaContent = readFileSync("src/components/prospeccao-publica/CtaProspeccaoSection.tsx", "utf8");
 
   await t.test("1. SEO: Um único H1 e metadados Open Graph para /prospeccao", () => {
     const h1Matches = heroContent.match(/<h1[^>]*>/g);
     assert.equal(h1Matches?.length, 1, "Deve existir exatamente um H1 no Hero");
-    assert.match(heroContent, /Encontre seus/);
-    assert.match(heroContent, /próximos clientes/);
-    assert.match(heroContent, /nos canais certos\./);
+    assert.match(heroContent, /Encontre clientes/);
+    assert.match(heroContent, /em todos os canais/);
+    assert.match(heroContent, /com IA\./);
     assert.match(pageContent, /canonical.*\/prospeccao/);
     assert.match(pageContent, /og:title/);
   });
 
-  await t.test("2. Hero: Presença de botões, 3 badges e painéis de Google Maps, Instagram e LinkedIn", () => {
+  await t.test("2. Hero: Mockup da interface, leads e 5 cards inferiores de canais", () => {
     assert.match(heroContent, /PROSPECÇÃO MULTICANAL/);
-    assert.match(heroContent, /Ver planos/);
-    assert.match(heroContent, /Conhecer os recursos/);
-    assert.match(heroContent, /Mais oportunidades/);
-    assert.match(heroContent, /Dados qualificados/);
-    assert.match(heroContent, /Integração com CRM/);
-    assert.match(heroContent, /Clínicas odontológicas em São Paulo - SP/);
-    assert.match(heroContent, /Oral Prime/);
-    assert.match(heroContent, /Instagram/);
-    assert.match(heroContent, /LinkedIn/);
+    assert.match(heroContent, /Buscar leads, nicho, localização\.\.\./);
+    assert.match(heroContent, /Clínica Vida/);
+    assert.match(heroContent, /Studio Fitness/);
+    assert.match(heroContent, /Casa & Decor/);
+    assert.match(heroContent, /Sabor da Mesa/);
+    assert.match(heroContent, /Auto Center/);
+    assert.match(heroContent, /1\.248 leads/);
+    assert.match(heroContent, /932 leads/);
+    assert.match(heroContent, /576 leads/);
+    assert.match(heroContent, /418 leads/);
+    assert.match(heroContent, /2\.143 leads/);
   });
 
-  await t.test("3. Principais Canais: Google Maps, Instagram e LinkedIn com 5 itens de checklist cada", () => {
-    assert.match(principaisContent, /Google Maps/);
-    assert.match(principaisContent, /Busca por segmento/);
-    assert.match(principaisContent, /Localização/);
-    assert.match(principaisContent, /Dados empresariais/);
-    assert.match(principaisContent, /Filtros avançados/);
-    assert.match(principaisContent, /Organização em listas/);
-
-    assert.match(principaisContent, /Instagram/);
-    assert.match(principaisContent, /Pesquisa de perfis/);
-    assert.match(principaisContent, /Filtros de segmentação/);
-    assert.match(principaisContent, /Análise de perfis/);
-    assert.match(principaisContent, /Inteligência competitiva/);
-    assert.match(principaisContent, /Organização no CRM/);
-
-    assert.match(principaisContent, /LinkedIn/);
-    assert.match(principaisContent, /Empresas e profissionais/);
-    assert.match(principaisContent, /Segmentação comercial/);
-    assert.match(principaisContent, /Organização de oportunidades/);
-    assert.match(principaisContent, /Integração com CRM/);
-    assert.match(principaisContent, /Planejamento de prospecção/);
+  await t.test("3. Canais de Prospecção: 5 cards completos (Instagram, LinkedIn, YouTube, TikTok, Google Maps)", () => {
+    assert.match(canaisContent, /Prospecção em/);
+    assert.match(canaisContent, /múltiplos canais\./);
+    assert.match(canaisContent, /Instagram/);
+    assert.match(canaisContent, /LinkedIn/);
+    assert.match(canaisContent, /YouTube/);
+    assert.match(canaisContent, /TikTok/);
+    assert.match(canaisContent, /Google Maps/);
   });
 
-  await t.test("4. Canais Complementares: Business B2B, YouTube e TikTok", () => {
-    assert.match(compContent, /Business B2B/);
-    assert.match(compContent, /Empresas e dados corporativos\./);
-    assert.match(compContent, /YouTube/);
-    assert.match(compContent, /Canais e criadores do seu nicho\./);
-    assert.match(compContent, /TikTok/);
-    assert.match(compContent, /Perfis e tendências do seu mercado\./);
+  await t.test("4. Filtros Inteligentes: 6 bullets + painel de busca + cards de leads", () => {
+    assert.match(filtrosContent, /Resultados mais/);
+    assert.match(filtrosContent, /rápidos e precisos\./);
+    assert.match(filtrosContent, /Nicho e palavras-chave/);
+    assert.match(filtrosContent, /Tipo de conta/);
+    assert.match(filtrosContent, /Localização/);
+    assert.match(filtrosContent, /E-mail e WhatsApp/);
+    assert.match(filtrosContent, /Seguidores e engajamento/);
+    assert.match(filtrosContent, /Conta comercial/);
+    assert.match(filtrosContent, /Buscar leads/);
+    assert.match(filtrosContent, /Limpar filtros/);
   });
 
-  await t.test("5. Como Funciona: 3 passos sequenciais", () => {
-    assert.match(comoContent, /Da busca ao cliente, em/);
-    assert.match(comoContent, /3 passos\./);
-    assert.match(comoContent, /Escolha seu público/);
-    assert.match(comoContent, /Descubra oportunidades/);
-    assert.match(comoContent, /Organize suas vendas/);
+  await t.test("5. Como Funciona: 4 etapas sequenciais", () => {
+    assert.match(comoContent, /Da busca ao cliente,/);
+    assert.match(comoContent, /em 4 etapas\./);
+    assert.match(comoContent, /01/);
+    assert.match(comoContent, /Buscar/);
+    assert.match(comoContent, /02/);
+    assert.match(comoContent, /Qualificar/);
+    assert.match(comoContent, /03/);
+    assert.match(comoContent, /Adicionar ao CRM/);
+    assert.match(comoContent, /04/);
+    assert.match(comoContent, /Converter/);
   });
 
-  await t.test("6. Inteligência Comercial: Apresentação da arquitetura em 5 etapas", () => {
-    assert.match(intelContent, /Da prospecção à estratégia comercial\./);
-    assert.match(intelContent, /Canais de Prospecção/);
-    assert.match(intelContent, /Leads Qualificados/);
-    assert.match(intelContent, /CRM Organização/);
-    assert.match(intelContent, /CEO Mestre/);
-    assert.match(intelContent, /Equipe Comercial/);
+  await t.test("6. Resultados Reais: 3 cards com valores numéricos e mini gráficos", () => {
+    assert.match(resContent, /Mais oportunidades\./);
+    assert.match(resContent, /Mais clientes\./);
+    assert.match(resContent, /Leads encontrados/);
+    assert.match(resContent, /2\.847/);
+    assert.match(resContent, /Taxa de qualificação/);
+    assert.match(resContent, /28%/);
+    assert.match(resContent, /Leads no CRM/);
+    assert.match(resContent, /463/);
   });
 
-  await t.test("7. CTA Final: Headline e botões para rotas válidas", () => {
-    assert.match(ctaContent, /Seu próximo cliente pode estar a uma busca de distância\./);
+  await t.test("7. CTA Final: Headline aprovada e botões funcionais", () => {
+    assert.match(ctaContent, /PRONTO PARA ENCONTRAR MAIS CLIENTES\?/);
+    assert.match(ctaContent, /Comece sua/);
+    assert.match(ctaContent, /prospecção agora\./);
     assert.match(ctaContent, /Ver planos/);
-    assert.match(ctaContent, /Conhecer o CRM/);
+    assert.match(ctaContent, /Falar com especialista/);
     assert.match(ctaContent, /to="\/pricing"/);
+    // Sem teste grátis
+    assert.doesNotMatch(pageContent, /teste grátis/i);
   });
 });
-

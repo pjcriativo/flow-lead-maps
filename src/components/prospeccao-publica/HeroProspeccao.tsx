@@ -1,312 +1,305 @@
 import { Link } from "@tanstack/react-router";
+import { ArrowRight, Play, Search, Plus, ChevronDown, MapPin } from "lucide-react";
 import {
-  ArrowRight,
-  Play,
-  Sparkles,
-  Target,
-  Layers,
-  MapPin,
-  Search,
-  Bell,
-  Plus,
-  Building2,
-  Users,
-  Compass,
-  CheckCircle2,
-} from "lucide-react";
-import {
-  FlowLogoMark,
-  GoogleMapsIcon,
   InstagramIcon,
   LinkedInIcon,
-} from "../home-publica/HomeIcons";
+  YouTubeIcon,
+  TikTokIcon,
+  GoogleMapsIcon,
+} from "@/components/home-publica/HomeIcons";
 
 export function HeroProspeccao() {
-  return (
-    <section className="relative pt-12 pb-20 sm:pt-16 sm:pb-28 overflow-hidden">
-      {/* 1. Aura Luminosa Laranja e Feixes de Laser */}
-      <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 -z-10 h-[700px] w-full max-w-7xl">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,98,0,0.25)_0%,_rgba(255,80,0,0.08)_40%,_transparent_70%)] blur-2xl" />
-        {/* Feixes curvos de laser laranja */}
-        <svg
-          viewBox="0 0 1200 600"
-          className="absolute inset-0 h-full w-full opacity-60"
-          fill="none"
-        >
-          <path
-            d="M600 50C750 60 950 140 1150 450"
-            stroke="url(#prosp-laser-1)"
-            strokeWidth="3"
-            strokeLinecap="round"
-          />
-          <path
-            d="M500 80C700 95 900 200 1100 520"
-            stroke="url(#prosp-laser-2)"
-            strokeWidth="1.8"
-            strokeOpacity="0.7"
-          />
-          <defs>
-            <linearGradient id="prosp-laser-1" x1="600" y1="50" x2="1150" y2="450" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#FF4500" stopOpacity="0" />
-              <stop offset="30%" stopColor="#FF6200" stopOpacity="0.9" />
-              <stop offset="70%" stopColor="#FFA040" stopOpacity="1" />
-              <stop offset="100%" stopColor="#FF4500" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="prosp-laser-2" x1="500" y1="80" x2="1100" y2="520" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#FF6200" stopOpacity="0" />
-              <stop offset="50%" stopColor="#FF7A00" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#FF6200" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>
+  const perfisDemonstracao = [
+    {
+      nome: "Clínica Vida",
+      user: "@clinicavida",
+      seguidores: "28.4K",
+      local: "São Paulo - SP",
+      avatarBg: "bg-gradient-to-tr from-pink-500 to-amber-500",
+      avatarLetra: "C",
+    },
+    {
+      nome: "Studio Fitness",
+      user: "@studiofitness",
+      seguidores: "15.2K",
+      local: "Curitiba - PR",
+      avatarBg: "bg-gradient-to-tr from-blue-500 to-cyan-500",
+      avatarLetra: "S",
+    },
+    {
+      nome: "Casa & Decor",
+      user: "@casaedecor",
+      seguidores: "42.7K",
+      local: "Rio de Janeiro - RJ",
+      avatarBg: "bg-gradient-to-tr from-purple-500 to-pink-500",
+      avatarLetra: "C",
+    },
+    {
+      nome: "Sabor da Mesa",
+      user: "@sabordamesa",
+      seguidores: "37.1K",
+      local: "Belo Horizonte - MG",
+      avatarBg: "bg-gradient-to-tr from-amber-500 to-orange-500",
+      avatarLetra: "S",
+    },
+    {
+      nome: "Auto Center",
+      user: "@autocenter",
+      seguidores: "19.6K",
+      local: "Porto Alegre - RS",
+      avatarBg: "bg-gradient-to-tr from-emerald-500 to-teal-500",
+      avatarLetra: "A",
+    },
+  ];
 
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          {/* COLUNA ESQUERDA: Textos, Chamada e Badges */}
-          <div className="lg:col-span-5 text-left">
-            {/* Eyebrow */}
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#ff6200]/30 bg-[#ff6200]/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.25em] text-[#ff7a00] shadow-[0_0_15px_rgba(255,98,0,0.15)]">
+  const canaisInferiores = [
+    {
+      id: "instagram",
+      nome: "Instagram",
+      leads: "1.248 leads",
+      icone: InstagramIcon,
+      borda: "border-pink-500/30",
+      glow: "hover:border-pink-500/60 hover:shadow-[0_0_15px_rgba(236,72,153,0.25)]",
+    },
+    {
+      id: "linkedin",
+      nome: "LinkedIn",
+      leads: "932 leads",
+      icone: LinkedInIcon,
+      borda: "border-blue-500/30",
+      glow: "hover:border-blue-500/60 hover:shadow-[0_0_15px_rgba(59,130,246,0.25)]",
+    },
+    {
+      id: "youtube",
+      nome: "YouTube",
+      leads: "576 leads",
+      icone: YouTubeIcon,
+      borda: "border-red-500/30",
+      glow: "hover:border-red-500/60 hover:shadow-[0_0_15px_rgba(239,68,68,0.25)]",
+    },
+    {
+      id: "tiktok",
+      nome: "TikTok",
+      leads: "418 leads",
+      icone: TikTokIcon,
+      borda: "border-cyan-500/30",
+      glow: "hover:border-cyan-500/60 hover:shadow-[0_0_15px_rgba(6,182,212,0.25)]",
+    },
+    {
+      id: "google-maps",
+      nome: "Google Maps",
+      leads: "2.143 leads",
+      icone: GoogleMapsIcon,
+      borda: "border-emerald-500/30",
+      glow: "hover:border-emerald-500/60 hover:shadow-[0_0_15px_rgba(16,185,129,0.25)]",
+    },
+  ];
+
+  return (
+    <section className="relative overflow-hidden pt-6 pb-16 sm:pt-10 sm:pb-24 border-b border-white/[0.06]">
+      {/* Luz e Glow de Fundo */}
+      <div
+        className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-[500px] w-full max-w-7xl opacity-40 blur-[120px]"
+        style={{
+          background: "radial-gradient(ellipse at top, #ff6200 0%, #ff3b00 25%, transparent 70%)",
+        }}
+      />
+
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+          {/* COLUNA ESQUERDA: Textos & Botões */}
+          <div className="lg:col-span-5 flex flex-col items-start text-left">
+            {/* Badge de Categoria */}
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#ff6200]/30 bg-[#ff6200]/10 px-3.5 py-1 text-xs font-bold tracking-wider text-[#ff7a00] uppercase mb-6 shadow-[0_0_15px_rgba(255,98,0,0.15)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#ff6200] animate-pulse" />
               PROSPECÇÃO MULTICANAL
             </div>
 
-            {/* H1 Principal */}
-            <h1 className="text-3xl sm:text-5xl md:text-[52px] font-extrabold tracking-tight text-white leading-[1.12]">
-              Encontre seus <br />
-              próximos clientes <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff851b] via-[#ff6200] to-[#ff4136]">
-                nos canais certos.
+            {/* Headline Principal com H1 Único */}
+            <h1 className="font-sans text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem] font-black tracking-tight text-white leading-[1.12]">
+              Encontre clientes <br />
+              em todos os canais <br />
+              <span className="text-[#ff6200] drop-shadow-[0_0_25px_rgba(255,98,0,0.4)]">
+                com IA.
               </span>
             </h1>
 
             {/* Subtítulo */}
-            <p className="mt-6 text-base sm:text-lg text-slate-300 leading-relaxed font-normal">
-              Descubra empresas, identifique oportunidades e organize sua prospecção em um único lugar.
+            <p className="mt-5 max-w-lg text-sm sm:text-base text-slate-300 font-normal leading-relaxed">
+              Use inteligência artificial para encontrar, qualificar e organizar leads no Instagram,
+              LinkedIn, YouTube, TikTok e Google Maps.
             </p>
 
             {/* Botões de Ação */}
-            <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
                 to="/pricing"
                 preload="render"
-                className="inline-flex h-13 items-center justify-center gap-2 rounded-xl bg-[#ff6200] px-7 text-base font-bold text-white shadow-[0_0_25px_rgba(255,98,0,0.4)] transition-all hover:bg-[#e05600] hover:shadow-[0_0_35px_rgba(255,98,0,0.6)] hover:scale-105 active:scale-95"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#ff6200] px-6 py-3.5 text-sm sm:text-base font-bold text-white shadow-[0_0_25px_rgba(255,98,0,0.45)] hover:bg-[#e05600] hover:shadow-[0_0_35px_rgba(255,98,0,0.6)] transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 Ver planos <ArrowRight className="h-4 w-4" />
               </Link>
+
               <a
                 href="#canais"
-                className="inline-flex h-13 items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/[0.04] px-6 text-base font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/10 hover:border-[#ff6200]/40"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] backdrop-blur-sm px-6 py-3.5 text-sm sm:text-base font-semibold text-slate-200 hover:bg-white/[0.08] hover:text-white hover:border-white/25 transition-all"
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white">
-                  <Play className="h-3 w-3 fill-white text-white translate-x-0.5" />
-                </div>
-                Conhecer os recursos
+                <Play className="h-4 w-4 text-[#ff6200] fill-[#ff6200]/20" /> Ver demonstração
               </a>
-            </div>
-
-            {/* Três Indicadores / Badges Inferiores */}
-            <div className="mt-10 flex flex-wrap items-center gap-5 pt-6 border-t border-white/[0.08] text-xs font-medium text-slate-300">
-              <div className="flex items-center gap-2">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#ff6200]/20 text-[#ff6200]">
-                  <Sparkles className="h-3 w-3" />
-                </div>
-                <span>Mais oportunidades</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#ff6200]/20 text-[#ff6200]">
-                  <Target className="h-3 w-3" />
-                </div>
-                <span>Dados qualificados</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#ff6200]/20 text-[#ff6200]">
-                  <Layers className="h-3 w-3" />
-                </div>
-                <span>Integração com CRM</span>
-              </div>
             </div>
           </div>
 
-          {/* COLUNA DIREITA: Composição Visual dos Painéis de Prospecção */}
+          {/* COLUNA DIREITA: Mockup da Interface Completa */}
           <div className="lg:col-span-7 relative">
-            {/* PAINEL PRINCIPAL: Google Maps no Dashboard Flow Business */}
-            <div className="relative z-10 rounded-2xl md:rounded-3xl border-2 border-[#ff6200]/60 bg-[#070b11] shadow-[0_0_50px_rgba(255,98,0,0.28)] overflow-hidden">
-              {/* Header da Interface */}
-              <div className="flex items-center justify-between border-b border-white/[0.08] bg-[#0a0f18] px-4 py-2.5 text-xs">
-                <div className="flex items-center gap-2.5">
-                  <FlowLogoMark className="h-5 w-5" />
-                  <span className="font-bold text-white text-xs tracking-tight">Flow Business</span>
-                </div>
-                <div className="flex items-center gap-2 rounded-lg bg-white/[0.06] border border-white/10 px-3 py-1 text-slate-400 text-[11px] w-48 sm:w-64">
-                  <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <span className="truncate">Buscar empresas, pessoas, nichos...</span>
-                </div>
+            {/* Glow Laranja sob a interface */}
+            <div
+              className="absolute -inset-2 rounded-3xl opacity-50 blur-2xl pointer-events-none"
+              style={{
+                background: "radial-gradient(circle at center, rgba(255,98,0,0.3) 0%, transparent 70%)",
+              }}
+            />
+
+            {/* Painel Principal do Dashboard Multicanal */}
+            <div className="relative rounded-2xl border border-[#ff6200]/40 bg-[#070c14]/95 shadow-[0_0_35px_rgba(255,98,0,0.2)] overflow-hidden">
+              {/* Barra Superior / Header do Mockup */}
+              <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3 bg-[#0a101d]">
                 <div className="flex items-center gap-2">
-                  <Bell className="h-3.5 w-3.5 text-slate-400" />
-                  <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-[#ff6200] to-[#ffa040] flex items-center justify-center text-[10px] font-bold text-white">
-                    FB
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#ff6200] text-[11px] font-black text-white">
+                    F
                   </div>
+                  <span className="font-sans text-xs font-bold text-white tracking-tight">
+                    Flow Business
+                  </span>
+                </div>
+
+                {/* Input de Busca */}
+                <div className="relative flex-1 max-w-xs mx-4">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    readOnly
+                    value="Buscar leads, nicho, localização..."
+                    className="w-full rounded-lg bg-black/40 border border-white/10 pl-8 pr-3 py-1 text-[11px] text-slate-300 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-emerald-400" />
+                  <span className="text-[10px] text-slate-400">Online</span>
                 </div>
               </div>
 
-              {/* Corpo da Interface */}
-              <div className="flex h-[340px] sm:h-[380px]">
-                {/* Mini Sidebar */}
-                <div className="hidden sm:flex flex-col w-36 shrink-0 border-r border-white/[0.08] bg-[#060a12] p-2.5 text-[11px] space-y-1">
-                  <div className="flex items-center gap-2 rounded-lg bg-[#ff6200]/15 border border-[#ff6200]/30 px-2 py-1.5 text-white font-semibold">
-                    <Compass className="h-3.5 w-3.5 text-[#ff6200]" />
+              {/* Corpo do Painel: Menu Lateral + Lista de Leads */}
+              <div className="grid grid-cols-12 divide-x divide-white/[0.06]">
+                {/* Menu Lateral de Canais */}
+                <div className="col-span-3 p-3 bg-[#05080e]/90 space-y-1.5 hidden sm:block">
+                  <div className="flex items-center gap-2 rounded-lg bg-[#ff6200]/15 border border-[#ff6200]/30 px-2.5 py-1.5 text-[11px] font-bold text-[#ff7a00]">
+                    <Search className="h-3.5 w-3.5 text-[#ff6200]" />
                     <span>Prospecção</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-slate-400 hover:text-white">
-                    <GoogleMapsIcon className="h-3.5 w-3.5" />
-                    <span>Google Maps</span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-slate-400 hover:text-white">
-                    <InstagramIcon className="h-3.5 w-3.5" />
+
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-[10px] text-slate-300 hover:text-white">
+                    <InstagramIcon className="h-3 w-3 text-pink-400" />
                     <span>Instagram</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-slate-400 hover:text-white">
-                    <LinkedInIcon className="h-3.5 w-3.5" />
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-[10px] text-slate-400 hover:text-white">
+                    <LinkedInIcon className="h-3 w-3 text-blue-400" />
                     <span>LinkedIn</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-slate-400 hover:text-white">
-                    <Building2 className="h-3.5 w-3.5 text-blue-400" />
-                    <span>Business B2B</span>
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-[10px] text-slate-400 hover:text-white">
+                    <YouTubeIcon className="h-3 w-3 text-red-400" />
+                    <span>YouTube</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-slate-400 hover:text-white">
-                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Leads</span>
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-[10px] text-slate-400 hover:text-white">
+                    <TikTokIcon className="h-3 w-3 text-cyan-400" />
+                    <span>TikTok</span>
                   </div>
-                  <div className="flex items-center gap-2 rounded-lg px-2 py-1 text-slate-400 hover:text-white">
-                    <Layers className="h-3.5 w-3.5 text-slate-400" />
-                    <span>Listas</span>
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-[10px] text-slate-400 hover:text-white">
+                    <GoogleMapsIcon className="h-3 w-3 text-emerald-400" />
+                    <span>Google Maps</span>
                   </div>
                 </div>
 
-                {/* Mapa Central + Lista Lateral de Resultados */}
-                <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
-                  {/* Mapa Satélite com Pins */}
-                  <div className="relative flex-1 bg-[#090e17] overflow-hidden p-3 flex flex-col justify-between">
-                    <div className="flex items-center gap-2 rounded-lg bg-[#070b12]/90 border border-white/10 px-2.5 py-1 text-[11px] text-white w-fit shadow-md">
-                      <GoogleMapsIcon className="h-4 w-4" />
-                      <div>
-                        <span className="font-bold">Google Maps</span>
-                        <p className="text-[9px] text-slate-400">Empresas por localização</p>
-                      </div>
+                {/* Área Principal: Lista de Perfis / Leads */}
+                <div className="col-span-12 sm:col-span-9 p-4 bg-[#070c14]">
+                  {/* Topo da lista */}
+                  <div className="flex items-center justify-between pb-3 border-b border-white/[0.06] mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white">Instagram</span>
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-slate-300">
+                        1.248 leads
+                      </span>
                     </div>
 
-                    {/* Fundo do Mapa com Grid & Pins Luminosos */}
-                    <div className="relative my-auto h-40 sm:h-48 w-full rounded-xl bg-slate-950 border border-white/5 overflow-hidden">
-                      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1.5px,transparent_1.5px)] [background-size:16px_16px] opacity-80" />
-                      {/* Badge Central do Nicho */}
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/85 border border-[#ff6200]/60 px-3 py-1 text-[10px] font-bold text-white shadow-[0_0_15px_rgba(255,98,0,0.4)] whitespace-nowrap">
-                        Clínicas odontológicas em São Paulo - SP
-                      </div>
-                      {/* Pins */}
-                      <div className="absolute top-6 left-10 h-3.5 w-3.5 rounded-full bg-[#ff6200] ring-4 ring-[#ff6200]/30 shadow-[0_0_12px_#ff6200]" />
-                      <div className="absolute bottom-6 left-16 h-3.5 w-3.5 rounded-full bg-[#ff6200] ring-4 ring-[#ff6200]/30 shadow-[0_0_12px_#ff6200]" />
-                      <div className="absolute top-8 right-12 h-3.5 w-3.5 rounded-full bg-[#ff6200] ring-4 ring-[#ff6200]/30 shadow-[0_0_12px_#ff6200]" />
-                      <div className="absolute bottom-8 right-16 h-3.5 w-3.5 rounded-full bg-[#ff6200] ring-4 ring-[#ff6200]/30 shadow-[0_0_12px_#ff6200]" />
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 border border-white/10 rounded-md px-2 py-0.5 bg-black/40">
+                      <span>Últimos 30 dias</span>
+                      <ChevronDown className="h-3 w-3 text-slate-400" />
                     </div>
                   </div>
 
-                  {/* Lista de Resultados na Direita */}
-                  <div className="w-full sm:w-56 border-t sm:border-t-0 sm:border-l border-white/[0.08] bg-[#070c14] p-2.5 flex flex-col justify-between text-[11px]">
-                    <div className="space-y-1.5 overflow-hidden">
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-                        <div className="min-w-0 pr-1">
-                          <p className="font-bold text-white truncate">Oral Prime</p>
-                          <p className="text-[9px] text-slate-400 truncate">Clínica Odontológica · SP</p>
+                  {/* Lista de Leads Encontrados */}
+                  <div className="space-y-2">
+                    {perfisDemonstracao.map((lead, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/5 hover:border-[#ff6200]/30 transition-colors"
+                      >
+                        {/* Perfil */}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div
+                            className={`h-7 w-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0 ${lead.avatarBg}`}
+                          >
+                            {lead.avatarLetra}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{lead.nome}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{lead.user}</p>
+                          </div>
                         </div>
-                        <button className="h-5 w-5 rounded bg-[#ff6200]/20 text-[#ff6200] flex items-center justify-center shrink-0">
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
 
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-                        <div className="min-w-0 pr-1">
-                          <p className="font-bold text-white truncate">Sorriso & Vida</p>
-                          <p className="text-[9px] text-slate-400 truncate">Clínica Odontológica · SP</p>
+                        {/* Métricas */}
+                        <div className="hidden md:block text-center">
+                          <p className="text-xs font-bold text-white">{lead.seguidores}</p>
+                          <p className="text-[9px] text-slate-400">seguidores</p>
                         </div>
-                        <button className="h-5 w-5 rounded bg-[#ff6200]/20 text-[#ff6200] flex items-center justify-center shrink-0">
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
 
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-                        <div className="min-w-0 pr-1">
-                          <p className="font-bold text-white truncate">OdontoMais</p>
-                          <p className="text-[9px] text-slate-400 truncate">Clínica Odontológica · SP</p>
+                        {/* Localização */}
+                        <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-300">
+                          <MapPin className="h-3 w-3 text-[#ff6200]" />
+                          <span className="truncate max-w-[100px]">{lead.local}</span>
                         </div>
-                        <button className="h-5 w-5 rounded bg-[#ff6200]/20 text-[#ff6200] flex items-center justify-center shrink-0">
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
 
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-                        <div className="min-w-0 pr-1">
-                          <p className="font-bold text-white truncate">Clínica Boa Saúde</p>
-                          <p className="text-[9px] text-slate-400 truncate">Clínica Odontológica · SP</p>
-                        </div>
-                        <button className="h-5 w-5 rounded bg-[#ff6200]/20 text-[#ff6200] flex items-center justify-center shrink-0">
+                        {/* Botão Adicionar */}
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 rounded-md bg-[#ff6200]/20 hover:bg-[#ff6200] text-[#ff7a00] hover:text-white px-2 py-1 text-[10px] font-bold border border-[#ff6200]/40 transition-colors shrink-0"
+                        >
                           <Plus className="h-3 w-3" />
+                          <span>Adicionar</span>
                         </button>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* CARD FLUTUANTE 1: INSTAGRAM (Sobreposto em Primeiro Plano na Esquerda) */}
-            <div className="hidden sm:block absolute -bottom-8 -left-6 z-20 w-64 rounded-2xl border border-white/15 bg-[#090e18]/95 p-3.5 shadow-2xl backdrop-blur-md">
-              <div className="flex items-center gap-2 mb-2.5">
-                <InstagramIcon className="h-5 w-5" />
-                <div>
-                  <p className="text-xs font-bold text-white">Instagram</p>
-                  <p className="text-[9px] text-slate-400">Perfis e oportunidades</p>
-                </div>
-              </div>
-              {/* Grid de 3 Fotos / Perfis */}
-              <div className="grid grid-cols-3 gap-1.5">
-                <div className="h-14 rounded-lg bg-slate-800 border border-white/10 overflow-hidden relative group">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                  <span className="absolute bottom-1 left-1 text-[8px] font-medium text-white truncate">Clínica</span>
-                </div>
-                <div className="h-14 rounded-lg bg-slate-800 border border-white/10 overflow-hidden relative group">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                  <span className="absolute bottom-1 left-1 text-[8px] font-medium text-white truncate">Consultório</span>
-                </div>
-                <div className="h-14 rounded-lg bg-slate-800 border border-white/10 overflow-hidden relative group">
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                  <span className="absolute bottom-1 left-1 text-[8px] font-medium text-white truncate">Dra. Paula</span>
-                </div>
-              </div>
-            </div>
-
-            {/* CARD FLUTUANTE 2: LINKEDIN (Sobreposto em Primeiro Plano na Direita) */}
-            <div className="hidden sm:block absolute -bottom-10 -right-4 z-20 w-64 rounded-2xl border border-white/15 bg-[#090e18]/95 p-3.5 shadow-2xl backdrop-blur-md">
-              <div className="flex items-center gap-2 mb-2.5">
-                <LinkedInIcon className="h-5 w-5" />
-                <div>
-                  <p className="text-xs font-bold text-white">LinkedIn</p>
-                  <p className="text-[9px] text-slate-400">Empresas e profissionais</p>
-                </div>
-              </div>
-              {/* Lista B2B */}
-              <div className="space-y-1.5 text-[10px]">
-                <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/5 border border-white/5">
-                  <span className="text-white font-medium truncate">OdontoCare Group</span>
-                  <span className="text-[9px] text-[#ff6200] font-mono">+ Lead</span>
-                </div>
-                <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/5 border border-white/5">
-                  <span className="text-white font-medium truncate">Orthos Pro Soluções</span>
-                  <span className="text-[9px] text-[#ff6200] font-mono">+ Lead</span>
-                </div>
-                <div className="flex items-center justify-between p-1.5 rounded-lg bg-white/5 border border-white/5">
-                  <span className="text-white font-medium truncate">Sorriso Digital B2B</span>
-                  <span className="text-[9px] text-[#ff6200] font-mono">+ Lead</span>
-                </div>
+              {/* 5 Cards Inferiores de Canais */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-3 bg-[#0a101d] border-t border-white/[0.08]">
+                {canaisInferiores.map((canal) => {
+                  const Icone = canal.icone;
+                  return (
+                    <div
+                      key={canal.id}
+                      className={`flex flex-col items-center p-2 rounded-xl bg-black/40 border ${canal.borda} ${canal.glow} transition-all text-center`}
+                    >
+                      <Icone className="h-5 w-5 mb-1" />
+                      <span className="text-[11px] font-bold text-white leading-tight">
+                        {canal.nome}
+                      </span>
+                      <span className="text-[9px] text-slate-400 mt-0.5">{canal.leads}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -315,4 +308,3 @@ export function HeroProspeccao() {
     </section>
   );
 }
-

@@ -1,184 +1,128 @@
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowRight } from "lucide-react";
 import {
-  GoogleMapsIcon,
   InstagramIcon,
   LinkedInIcon,
-} from "../home-publica/HomeIcons";
+  YouTubeIcon,
+  TikTokIcon,
+  GoogleMapsIcon,
+} from "@/components/home-publica/HomeIcons";
 
 export function PrincipaisCanaisSection() {
   const canais = [
     {
-      id: "maps",
-      nome: "Google Maps",
-      sub: "Encontre empresas por nicho e localização.",
-      icon: GoogleMapsIcon,
-      // Mini Mockup de Mapa
-      renderMockup: () => (
-        <div className="relative h-32 w-full rounded-xl bg-slate-950 border border-white/5 overflow-hidden my-4">
-          <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:12px_12px] opacity-70" />
-          {/* Pins Laranja Conectados */}
-          <div className="absolute top-6 left-8 h-3 w-3 rounded-full bg-[#ff6200] shadow-[0_0_8px_#ff6200]" />
-          <div className="absolute top-14 left-24 h-3 w-3 rounded-full bg-[#ff6200] shadow-[0_0_8px_#ff6200]" />
-          <div className="absolute top-8 right-16 h-3.5 w-3.5 rounded-full bg-[#ff6200] ring-2 ring-white/50 shadow-[0_0_12px_#ff6200]" />
-          <div className="absolute bottom-6 right-24 h-3 w-3 rounded-full bg-[#ff6200] shadow-[0_0_8px_#ff6200]" />
-          {/* Linhas de conexão sutis */}
-          <svg className="absolute inset-0 h-full w-full pointer-events-none" fill="none">
-            <line x1="38" y1="30" x2="102" y2="62" stroke="#ff6200" strokeWidth="1" strokeOpacity="0.4" strokeDasharray="3 3" />
-            <line x1="102" y1="62" x2="200" y2="38" stroke="#ff6200" strokeWidth="1" strokeOpacity="0.4" strokeDasharray="3 3" />
-          </svg>
-        </div>
-      ),
-      itens: [
-        "Busca por segmento",
-        "Localização",
-        "Dados empresariais",
-        "Filtros avançados",
-        "Organização em listas",
-      ],
-    },
-    {
       id: "instagram",
       nome: "Instagram",
-      sub: "Descubra perfis e oportunidades comerciais.",
-      icon: InstagramIcon,
-      // Mini Mockup de Instagram
-      renderMockup: () => (
-        <div className="grid grid-cols-3 gap-2 my-4">
-          <div className="h-32 rounded-xl bg-[#0e1624] border border-white/10 p-2 flex flex-col justify-between">
-            <div className="h-14 w-full rounded-lg bg-gradient-to-tr from-purple-900/40 to-pink-900/40 border border-white/5" />
-            <div className="space-y-1">
-              <div className="h-1.5 w-12 bg-white/30 rounded" />
-              <div className="h-1 w-8 bg-white/20 rounded" />
-            </div>
-          </div>
-          <div className="h-32 rounded-xl bg-[#0e1624] border border-white/10 p-2 flex flex-col justify-between">
-            <div className="h-14 w-full rounded-lg bg-gradient-to-tr from-pink-900/40 to-orange-900/40 border border-white/5" />
-            <div className="space-y-1">
-              <div className="h-1.5 w-12 bg-white/30 rounded" />
-              <div className="h-1 w-8 bg-white/20 rounded" />
-            </div>
-          </div>
-          <div className="h-32 rounded-xl bg-[#0e1624] border border-white/10 p-2 flex flex-col justify-between">
-            <div className="h-14 w-full rounded-lg bg-gradient-to-tr from-purple-900/40 to-blue-900/40 border border-white/5" />
-            <div className="space-y-1">
-              <div className="h-1.5 w-12 bg-white/30 rounded" />
-              <div className="h-1 w-8 bg-white/20 rounded" />
-            </div>
-          </div>
-        </div>
-      ),
-      itens: [
-        "Pesquisa de perfis",
-        "Filtros de segmentação",
-        "Análise de perfis",
-        "Inteligência competitiva",
-        "Organização no CRM",
-      ],
+      descricao: "Encontre perfis, filtre por nicho e seguidores e gere leads qualificados.",
+      icone: InstagramIcon,
+      borda: "border-pink-500/30 hover:border-pink-500/70",
+      glow: "hover:shadow-[0_0_25px_rgba(236,72,153,0.25)]",
     },
     {
       id: "linkedin",
       nome: "LinkedIn",
-      sub: "Explore oportunidades no mercado B2B.",
-      icon: LinkedInIcon,
-      // Mini Mockup de LinkedIn
-      renderMockup: () => (
-        <div className="my-4 h-32 rounded-xl bg-[#090e18] border border-white/10 p-2.5 flex flex-col justify-between">
-          <div className="flex items-center gap-2 pb-1.5 border-b border-white/5">
-            <div className="h-5 w-5 rounded bg-[#0A66C2] flex items-center justify-center text-[10px] font-bold text-white">in</div>
-            <div className="h-2 w-24 bg-white/20 rounded" />
-          </div>
-          <div className="space-y-1.5">
-            <div className="p-1.5 rounded bg-white/5 flex items-center justify-between text-[10px]">
-              <div className="h-1.5 w-20 bg-white/40 rounded" />
-              <div className="h-1.5 w-8 bg-[#ff6200]/50 rounded" />
-            </div>
-            <div className="p-1.5 rounded bg-white/5 flex items-center justify-between text-[10px]">
-              <div className="h-1.5 w-24 bg-white/40 rounded" />
-              <div className="h-1.5 w-8 bg-[#ff6200]/50 rounded" />
-            </div>
-          </div>
-        </div>
-      ),
-      itens: [
-        "Empresas e profissionais",
-        "Segmentação comercial",
-        "Organização de oportunidades",
-        "Integração com CRM",
-        "Planejamento de prospecção",
-      ],
+      descricao: "Encontre empresas e tomadores de decisão com dados completos.",
+      icone: LinkedInIcon,
+      borda: "border-blue-500/30 hover:border-blue-500/70",
+      glow: "hover:shadow-[0_0_25px_rgba(59,130,246,0.25)]",
+    },
+    {
+      id: "youtube",
+      nome: "YouTube",
+      descricao: "Descubra canais, criadores e negócios do seu nicho.",
+      icone: YouTubeIcon,
+      borda: "border-red-500/30 hover:border-red-500/70",
+      glow: "hover:shadow-[0_0_25px_rgba(239,68,68,0.25)]",
+    },
+    {
+      id: "tiktok",
+      nome: "TikTok",
+      descricao: "Encontre perfis em alta e novos jogadores do seu mercado.",
+      icone: TikTokIcon,
+      borda: "border-cyan-500/30 hover:border-cyan-500/70",
+      glow: "hover:shadow-[0_0_25px_rgba(6,182,212,0.25)]",
+    },
+    {
+      id: "google-maps",
+      nome: "Google Maps",
+      descricao: "Encontre empresas locais com telefone, endereço e site.",
+      icone: GoogleMapsIcon,
+      borda: "border-emerald-500/30 hover:border-emerald-500/70",
+      glow: "hover:shadow-[0_0_25px_rgba(16,185,129,0.25)]",
     },
   ];
 
   return (
-    <section id="canais" className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 py-20">
-      {/* Header da Seção */}
-      <div className="text-center max-w-3xl mx-auto mb-16">
-        <span className="inline-block text-xs font-bold uppercase tracking-[0.25em] text-[#ff6200] mb-3">
-          PRINCIPAIS CANAIS
-        </span>
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
-          Prospecção poderosa em{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff7a00] to-[#ff4500]">
-            múltiplos canais.
-          </span>
-        </h2>
-        <p className="mt-4 text-base sm:text-lg text-slate-300">
-          Encontre empresas, perfis e oportunidades em diferentes plataformas, com filtros inteligentes e dados organizados.
-        </p>
-      </div>
+    <section id="canais" className="relative py-16 sm:py-24 border-b border-white/[0.06] bg-[#03060a]">
+      {/* Luz Difusa Laranja */}
+      <div
+        className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-full max-w-6xl opacity-20 blur-[130px]"
+        style={{
+          background: "radial-gradient(circle, #ff6200 0%, transparent 65%)",
+        }}
+      />
 
-      {/* Grade dos 3 Cards Principais */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-        {canais.map((c) => (
-          <div
-            key={c.id}
-            className="group relative flex flex-col justify-between rounded-3xl border border-white/[0.08] bg-[#090e17]/90 p-6 sm:p-7 backdrop-blur-md transition-all duration-300 hover:border-[#ff6200]/50 hover:bg-[#0c1320] hover:shadow-[0_0_30px_rgba(255,98,0,0.18)]"
-          >
-            <div>
-              {/* Topo: Ícone + Título e Subtítulo */}
-              <div className="flex items-center gap-3.5 mb-2">
-                <div className="h-12 w-12 shrink-0 rounded-2xl overflow-hidden shadow-md group-hover:scale-105 transition-transform">
-                  <c.icon className="h-full w-full" />
-                </div>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 relative z-10">
+        {/* CABEÇALHO DA SEÇÃO */}
+        <div className="flex flex-col items-start text-left max-w-2xl mb-12 sm:mb-16">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#ff6200]/30 bg-[#ff6200]/10 px-3.5 py-1 text-xs font-bold tracking-wider text-[#ff7a00] uppercase mb-4 shadow-[0_0_12px_rgba(255,98,0,0.15)]">
+            CANAIS DE PROSPECÇÃO
+          </div>
+
+          <h2 className="font-sans text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white">
+            Prospecção em{" "}
+            <span className="text-[#ff6200] drop-shadow-[0_0_20px_rgba(255,98,0,0.35)]">
+              múltiplos canais.
+            </span>
+          </h2>
+
+          <p className="mt-3 text-sm sm:text-base text-slate-300">
+            Encontre, filtre e qualifique leads com dados reais em todas as principais plataformas.
+          </p>
+        </div>
+
+        {/* GRADE DE 5 CARDS DE CANAIS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          {canais.map((canal) => {
+            const Icone = canal.icone;
+            return (
+              <div
+                key={canal.id}
+                className={`group relative rounded-2xl border ${canal.borda} bg-[#070c14]/90 backdrop-blur-md p-5 transition-all duration-300 ${canal.glow} hover:-translate-y-1 flex flex-col justify-between`}
+              >
                 <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight group-hover:text-[#ff7a00] transition-colors">
-                    {c.nome}
+                  {/* Ícone Grande do Canal */}
+                  <div className="h-12 w-12 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                    <Icone className="h-7 w-7" />
+                  </div>
+
+                  {/* Nome do Canal */}
+                  <h3 className="text-base font-bold text-white mb-2 group-hover:text-[#ff7a00] transition-colors">
+                    {canal.nome}
                   </h3>
-                  <p className="text-xs text-slate-400 leading-snug">{c.sub}</p>
+
+                  {/* Descrição Curta */}
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {canal.descricao}
+                  </p>
+                </div>
+
+                {/* Seta no Canto Inferior */}
+                <div className="mt-6 pt-3 border-t border-white/[0.06] flex justify-end">
+                  <Link
+                    to="/pricing"
+                    preload="render"
+                    aria-label={`Ver planos e detalhes para ${canal.nome}`}
+                    className="h-7 w-7 rounded-full bg-white/[0.05] border border-white/10 group-hover:bg-[#ff6200] group-hover:border-[#ff6200] flex items-center justify-center text-slate-300 group-hover:text-white transition-all shadow-sm"
+                  >
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
                 </div>
               </div>
-
-              {/* Mockup Ilustrativo */}
-              {c.renderMockup()}
-
-              {/* Lista de Recursos (Checklist Laranja) */}
-              <ul className="space-y-3 my-6 text-xs sm:text-sm text-slate-300">
-                {c.itens.map((item, idx) => (
-                  <li key={idx} className="flex items-center gap-2.5">
-                    <CheckCircle2 className="h-4 w-4 text-[#ff6200] shrink-0" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Rodapé do Card com Botão de Ação Circular */}
-            <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400 group-hover:text-white transition-colors">
-                Explorar canal
-              </span>
-              <a
-                href="/pricing"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.05] border border-white/10 text-white group-hover:bg-[#ff6200] group-hover:border-[#ff6200] group-hover:shadow-[0_0_15px_rgba(255,98,0,0.5)] transition-all"
-                aria-label={`Explorar recursos do ${c.nome}`}
-              >
-                <ArrowRight className="h-4 w-4" />
-              </a>
-            </div>
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
     </section>
   );
 }
-
