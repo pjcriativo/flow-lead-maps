@@ -203,3 +203,4 @@ function AgenteCard({ agente }: { agente: AgenteItem }) {
     </div>
   );
 }
+

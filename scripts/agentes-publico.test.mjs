@@ -90,3 +90,4 @@ test("Página 04 — CEO Mestre & Agentes de IA: Validação Estrutural e Fideli
     assert.match(footerContent, /to="\/agentes"/, "Footer deve ter link para /agentes");
   });
 });
+
