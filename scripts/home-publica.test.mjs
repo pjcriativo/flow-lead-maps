@@ -24,11 +24,14 @@ test("Home Pública — Validação Estrutural e Fidelidade ao Layout Aprovado",
   await t.test("2. Cabeçalho: Links reais, Logo e botões Entrar e Ver planos", () => {
     assert.match(navbarContent, /Flow Business/);
     assert.match(navbarContent, /Recursos/);
-    assert.match(navbarContent, /Soluções/);
+    assert.match(navbarContent, /CRM & Vendas/);
+    assert.match(navbarContent, /Prospecção/);
     assert.match(navbarContent, /Planos/);
     assert.match(navbarContent, /Entrar/);
     assert.match(navbarContent, /to="\/auth"/);
     assert.match(navbarContent, /to="\/pricing"/);
+    assert.match(navbarContent, /to="\/crm"/);
+    assert.match(navbarContent, /to="\/prospeccao"/);
   });
 
   await t.test("3. Hero Visual & Player de Vídeo: Métricas reais do dashboard e play interativo", () => {

@@ -92,5 +92,16 @@ test("Página 03 — CRM & Vendas: Validação Estrutural e Fidelidade Visual", 
     // Sem teste grátis na página
     assert.doesNotMatch(pageContent, /teste grátis/i);
   });
+
+  await t.test("8. Navegação e Menus: Link para CRM e Prospecção presentes na Navbar e Footer", () => {
+    const navbarContent = readFileSync("src/components/home-publica/NavbarPublica.tsx", "utf8");
+    const footerContent = readFileSync("src/components/home-publica/FooterPublico.tsx", "utf8");
+
+    assert.match(navbarContent, /to="\/crm"/, "Navbar deve ter link para /crm");
+    assert.match(navbarContent, /to="\/prospeccao"/, "Navbar deve ter link para /prospeccao");
+    assert.match(footerContent, /to="\/crm"/, "Footer deve ter link para /crm");
+    assert.match(footerContent, /to="\/prospeccao"/, "Footer deve ter link para /prospeccao");
+  });
 });
+
 

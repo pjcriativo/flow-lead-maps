@@ -23,17 +23,20 @@ export function FooterPublico() {
 
           {/* Links Centrais */}
           <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs sm:text-sm font-medium text-slate-300">
-            <a href="#recursos" className="hover:text-white transition-colors">
+            <Link to="/prospeccao" className="hover:text-white transition-colors">
+              Prospecção
+            </Link>
+            <Link to="/crm" className="hover:text-white transition-colors">
+              CRM & Vendas
+            </Link>
+            <a href="/#recursos" className="hover:text-white transition-colors">
               Recursos
-            </a>
-            <a href="#ecossistema" className="hover:text-white transition-colors">
-              Soluções
             </a>
             <Link to="/pricing" className="hover:text-white transition-colors">
               Planos
             </Link>
-            <a href="#demo" className="hover:text-white transition-colors">
-              Conteúdo
+            <a href="/#demo" className="hover:text-white transition-colors">
+              Demonstração
             </a>
             <a href="mailto:contato@flowleads.com.br" className="hover:text-white transition-colors">
               Suporte

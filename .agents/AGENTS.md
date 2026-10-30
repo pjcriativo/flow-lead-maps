@@ -38,4 +38,9 @@
 - **Sempre que concluir um conjunto de alterações**, além do `git push`, execute obrigatoriamente `npm run deploy` (`vite build && npx vercel deploy --prebuilt --prod --yes --scope pjcriativos-projects`).
 - **Motivo**: O projeto utiliza `@tanstack/react-start` com Nitro gerando Build Output API (`.vercel/output`). O deploy via CLI prebuilt garante que a produção (`https://business.flowgenius.com.br`) atualize imediatamente em tempo real a cada alteração.
 
+## 7. Navegação e Menus do Site Comercial Público
+
+- **Sempre que criar ou atualizar uma nova página comercial pública**, atualize OBRIGATORIAMENTE o menu de navegação (`NavbarPublica.tsx`) e rodapé (`FooterPublico.tsx`) para incluir o link direto para a rota (ex: `/prospeccao`, `/crm`, etc.).
+- Qualquer nova tela pública criada nos prompts subsequentes deve ter seu link explicitamente inserido na barra de navegação (desktop e mobile drawer), garantindo que os visitantes possam transitar livremente por todas as páginas públicas do ecossistema Flow Business.
+
 

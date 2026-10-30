@@ -33,18 +33,21 @@ export function NavbarPublica() {
         </Link>
 
         {/* NAVEGAÇÃO CENTRAL (DESKTOP) */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
+        <nav className="hidden md:flex items-center gap-7 lg:gap-8 text-sm font-medium text-slate-300">
+          <Link to="/prospeccao" className="hover:text-white transition-colors">
+            Prospecção
+          </Link>
+          <Link to="/crm" className="hover:text-white transition-colors">
+            CRM & Vendas
+          </Link>
           <a href="/#recursos" className="hover:text-white transition-colors">
             Recursos
           </a>
-          <Link to="/prospeccao" className="hover:text-white transition-colors">
-            Soluções
-          </Link>
           <Link to="/pricing" className="hover:text-white transition-colors">
             Planos
           </Link>
           <a href="/#demo" className="hover:text-white transition-colors">
-            Conteúdo
+            Demonstração
           </a>
           <a href="#suporte" className="hover:text-white transition-colors">
             Suporte
@@ -94,6 +97,20 @@ export function NavbarPublica() {
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-white/10 bg-[#070c14] px-4 pt-3 pb-6 space-y-3 animate-in slide-in-from-top-4 duration-200">
           <div className="flex flex-col space-y-2 text-sm font-medium text-slate-300">
+            <Link
+              to="/prospeccao"
+              onClick={() => setMobileMenuOpen(false)}
+              className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
+            >
+              Prospecção Multicanal
+            </Link>
+            <Link
+              to="/crm"
+              onClick={() => setMobileMenuOpen(false)}
+              className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
+            >
+              CRM & Vendas
+            </Link>
             <a
               href="/#recursos"
               onClick={() => setMobileMenuOpen(false)}
@@ -101,13 +118,6 @@ export function NavbarPublica() {
             >
               Recursos
             </a>
-            <Link
-              to="/prospeccao"
-              onClick={() => setMobileMenuOpen(false)}
-              className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
-            >
-              Soluções
-            </Link>
             <Link
               to="/pricing"
               onClick={() => setMobileMenuOpen(false)}
@@ -120,7 +130,7 @@ export function NavbarPublica() {
               onClick={() => setMobileMenuOpen(false)}
               className="py-2 px-3 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
             >
-              Conteúdo & Vídeo
+              Demonstração & Vídeo
             </a>
             <a
               href="#suporte"
