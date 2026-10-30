@@ -93,3 +93,4 @@ test("Página 03 — CRM & Vendas: Validação Estrutural e Fidelidade Visual", 
     assert.doesNotMatch(pageContent, /teste grátis/i);
   });
 });
+
